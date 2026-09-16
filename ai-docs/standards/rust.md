@@ -13,7 +13,7 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 ## 项目规则
 
 - 采用 edition 2024；任务 001 固定经过验证的 stable 版本，记录 `rust-version` 策略。升级编译器与依赖分别评估，不能以浮动 stable 代替验证记录。
-- crate 名使用 `chronos-` 前缀，模块/函数 `snake_case`、类型 `PascalCase`。默认使用 rustfmt；Clippy 规则由基础设施任务固定，不能盲目对第三方启用本项目 lint。
+- crate 名使用 `panta-` 前缀，模块/函数 `snake_case`、类型 `PascalCase`。默认使用 rustfmt；Clippy 规则由基础设施任务固定，不能盲目对第三方启用本项目 lint。
 - 领域库用结构化 `Result`，在应用边界补充上下文；不在正常输入、文件读写和协议处理路径使用 `unwrap`/`expect` 代替错误处理。
 - ID 使用 newtype；持久化 DTO 和内存领域对象分离。文件路径采用 `Path`/`PathBuf`，不假定操作系统路径一定能无损转成 UTF-8 字符串。
 - `unsafe` 集中在边界模块，每处注明安全前提、所有者和线程条件。不得为了通过类型检查无依据实现 `Send`/`Sync`。

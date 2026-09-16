@@ -1,4 +1,4 @@
-# chronos
+# panta
 
 规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
 
