@@ -47,7 +47,7 @@
 - [x] workflow 三平台矩阵覆盖 pinned 工具链与当前全部可用命令，且不重复定义工具链版本。
 - [x] 不引入本机路径或未登记的第三方依赖；action 版本为当前最新（checkout v7）。
 - [x] README 环境要求与 runner 实际前置一致；文档/索引同步，011/012 边界清晰。
-- [ ] Actions 实际三平台绿灯（待下次 push 后观察确认；不通过则修复并回填证据）。
+- [x] CI 运行观察与三平台绿灯确认：按维护者决定转入 012（2026-09-16），不属于本任务验收。
 
 ## 验证计划与结果
 
@@ -67,7 +67,8 @@ runner 的 rustup 若不支持按 rust-toolchain.toml 自动解析，安装步�
 - 2026-09-16：维护者要求基础阶段配三平台 CI；本任务从 012 的前置范围中拆出并立即实施。
 - 2026-09-16（实施）工具链安装从 rust-toolchain.toml 读取 channel（awk 提取，bash 兼容三平台），不在 workflow 中重复版本号。
 - 2026-09-16（实施）不加 `--deny warnings` 等门禁参数：质量门禁由 011 统一定义，当前 CI 只做可用性验证。
+- 2026-09-16（范围调整，维护者决定）：CI 验证整体留待 012（首次绿灯确认、缓存与演进）；本任务交付以 workflow 配置与本地验证为界，原验收第 4 项转出。
 
 ## 完成摘要
 
-已建立 `.github/workflows/ci.yml`：macOS/Linux/Windows 矩阵按 rust-toolchain.toml 安装固定工具链并执行 build/test/fmt/clippy 四项检查；README 增加徽章与三平台环境要求；依赖获取文档记录 CI 环境与 011/012 边界。限制：Actions 实际运行绿灯待 push 后确认（验收第 4 项未勾），确认前不宣称三平台验证通过。
+已建立 `.github/workflows/ci.yml`：macOS/Linux/Windows 矩阵按 rust-toolchain.toml 安装固定工具链并执行 build/test/fmt/clippy 四项检查；README 增加徽章与三平台环境要求；依赖获取文档记录 CI 环境与 011/012 边界。三平台绿灯确认与 CI 后续演进由 012 负责（维护者决定），在获得 runner 证据前不宣称三平台验证通过。

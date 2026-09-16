@@ -1,0 +1,4 @@
+{
+    // 共享推荐设置：仅使用 ${workspaceFolder} 相对引用，不含个人绝对路径。
+    "cmake.sourceDirectory": "${workspaceFolder}/native"
+}

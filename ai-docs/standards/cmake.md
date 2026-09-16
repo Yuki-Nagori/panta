@@ -17,9 +17,9 @@ CMake 用 targets 和 usage requirements 表达构建关系，`PRIVATE`、`PUBLI
 - 依赖优先使用已发现的 imported targets；若上游包没有合适导出，在本地 adapter 内封装，不让平台库名散布在多个业务 CMake 文件。
 - 明确列出源码、QML 和资源。生成代码使用带输入依赖与产物声明的构建规则，避免只在 configure 时执行且遗漏增量追踪。
 - 共享 presets 不包含个人路径；本机前缀通过 user presets 或文档化参数传入。Cargo 调度与直接诊断构建使用同一套有效配置，避免两套默认值漂移。
-- `cmake_minimum_required` 依据实际用到的 API 和验证结果确定。不要因为查到最新文档就直接要求最新 CMake。
+- `cmake_minimum_required` 依据实际用到的 API 和验证结果确定。不要因为查到最新文档就直接要求最新 CMake。当前 native 树为 3.22（任务 003：presets schema 3 所需）。
 - install 规则定义运行产物和布局；测试通过 CTest 注册。native 层不得无条件调用发起构建的同一个 Cargo target。
 
 ## 验证
 
-检查从干净目录 configure/build/install、构建配置切换和找不到依赖时的诊断；查看 usage requirements 是否将 adapter 的私有库泄露到领域 core。具体 preset 名在任务 003 确定后再提供可复制命令。
+检查从干净目录 configure/build/install、构建配置切换和找不到依赖时的诊断；查看 usage requirements 是否将 adapter 的私有库泄露到领域 core。共享 presets 为 `debug` 与 `release`（单配置 Ninja，任务 003），在 `native/` 下可复制命令：`cmake --preset debug` → `cmake --build --preset debug` → `ctest --preset debug` → `cmake --install build/debug`；`cmake --install` 不支持 preset，显式给构建目录。

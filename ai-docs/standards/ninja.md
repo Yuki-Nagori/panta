@@ -11,6 +11,7 @@ Ninja 侧重快速执行由更高层工具生成的构建图，图中区分输�
 ## 项目规则
 
 - 由 CMake 生成 Ninja 文件，不手工维护或提交 `build.ninja`。修改构建行为回到 CMake 或 Cargo 调度层。
+- 采用普通（单配置）Ninja：配置由 preset 的 `CMAKE_BUILD_TYPE` 固定，Debug/Release 以独立构建目录隔离（任务 003 决策）；launcher 定位与增量路径因此无需 `$<CONFIG>` 展开。
 - 优先通过 `cmake --build` 调用，Ninja 命令仅用于诊断。使用普通 Ninja 还是 Multi-Config 必须在任务 003 明确，配置目录和 launcher 定位方式随之固定。
 - 总并行度由编排层协调，避免 Cargo 与嵌套 Ninja 各自占满 CPU/内存。为大型链接或代码生成限流时记录证据和配置来源。
 - 生成文件必须声明完整依赖，删除单个产物后应可重建。不得用“每次先 clean”掩盖缺失依赖。

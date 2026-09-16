@@ -11,7 +11,7 @@ Core Guidelines 强调资源管理、类型安全、接口与并发，建议以 
 ## 项目规则
 
 - 每个自有 target 显式声明 C++20 要求并关闭编译器扩展；不引入 C++23 专属设施作为默认依赖，例如不能直接假定 `std::expected` 可用。
-- 文件使用 `snake_case.hpp/.cpp`，类型使用 `PascalCase`，普通函数/变量使用 `snake_case`；Qt 属性、槽和信号遵循 Qt 的 `camelCase`，适配器边界允许原生 API 命名。格式最终由任务 003 提交的配置统一。
+- 文件使用 `snake_case.hpp/.cpp`，类型使用 `PascalCase`，普通函数/变量使用 `snake_case`；Qt 属性、槽和信号遵循 Qt 的 `camelCase`，适配器边界允许原生 API 命名。C++ 格式由根 [.clang-format](../../.clang-format) 统一（任务 003），检查命令 `clang-format --dry-run -Werror <文件>`。
 - 优先值语义和 RAII；唯一所有权用 `std::unique_ptr`，仅在确有共享生命周期时使用 `std::shared_ptr`。Qt parent、OCCT handle 和 VTK 引用计数按各自规则管理，不再叠加独立释放者。
 - `std::span`、引用和裸指针作为借用时明确有效期，不能跨后台任务保存短命栈数据。公开 ID 使用独立类型，避免把网格索引、几何 ID 和任务 ID 混用。
 - 公共头文件只包含必要依赖；几何/网格核心头不暴露 Qt、VTK、OCCT 实现对象。禁止头文件级 `using namespace` 和依赖隐式 include 顺序。

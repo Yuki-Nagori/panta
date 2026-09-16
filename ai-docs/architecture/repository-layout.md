@@ -4,7 +4,7 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置、`ai-docs/`，以及任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
+当前存在根目录文档、许可证、忽略配置、`ai-docs/`、任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`），以及任务 003 落地的 native 构建骨架（`native/` 顶层 CMakeLists、presets 与 `foundation` target）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
 
 ```text
 panta/
@@ -25,7 +25,10 @@ panta/
 │   ├── solver-client/         # 规划：外部求解器客户端
 │   └── storage/               # 规划：持久化与数据资产索引
 ├── native/
-│   ├── CMakeLists.txt
+│   ├── CMakeLists.txt         # native 顶层构建（任务 003 已落地）
+│   ├── CMakePresets.json      # 单配置 Ninja presets：debug / release（003 已落地）
+│   ├── cmake/                 # 安装包配置模板（003 已落地）
+│   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
 │   ├── app/                   # Qt 桌面入口
 │   ├── bridge/                # QObject ViewModel、viewport 桥接
 │   ├── geometry/{core,occt}/

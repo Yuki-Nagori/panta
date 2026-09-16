@@ -27,7 +27,9 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 | `cargo fmt --all -- --check` | 格式检查 |
 | `cargo run` | 输出"桌面尚未接入"诊断，以退出码 69 结束；不会启动 GUI |
 
-作为完整桌面入口（自动调度 CMake、Qt/VTK/OCCT/Netgen 并启动程序）的 `cargo build`/`cargo run`/`cargo test` 仍是目标体验：[构建说明](ai-docs/architecture/build-and-development.md) 列出落地条件，由任务 003/004/005 实施。
+作为完整桌面入口（自动调度 CMake、Qt/VTK/OCCT/Netgen 并启动程序）的 `cargo build`/`cargo run`/`cargo test` 仍是目标体验：[构建说明](ai-docs/architecture/build-and-development.md) 列出落地条件，由任务 004/005 实施。
+
+native 构建骨架（任务 003）已可用：在 `native/` 下执行 `cmake --preset debug`、`cmake --build --preset debug`、`ctest --preset debug`、`cmake --install build/debug`；release 同理，仅用于诊断，尚未接入任何第三方依赖。
 
 ## 开始工作
 

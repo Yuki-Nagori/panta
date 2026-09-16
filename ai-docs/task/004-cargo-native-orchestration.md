@@ -1,8 +1,8 @@
 # 004 — Cargo 调度 CMake 与运行入口
 
-- 状态：planned
+- 状态：ready
 - 阶段：M0
-- 依赖：[001](001-cargo-config.md)、[003](003-cmake-native-skeleton.md)
+- 依赖：[001](001-cargo-config.md)、[003](003-cmake-native-skeleton.md)（均已完成：workspace 与 native CMake 骨架就绪）
 - 优先级：P0
 - 负责人：待分配
 - 创建 / 更新：2026-09-16 / 2026-09-16

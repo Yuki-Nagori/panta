@@ -6,7 +6,9 @@
 
 Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、唯一成员 `crates/launcher` 与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行；`cargo run` 只输出"桌面尚未接入"诊断并以退出码 69 结束，不会启动 GUI。
 
-仍不能构建或启动桌面应用：仓库尚无 `build.rs`、`native/CMakeLists.txt` 或 CI，原生调度由任务 003/004 接入。下面是构建契约与实施要求，不是已验证的安装教程。
+native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 最小 target 与 CTest 测试、单配置 Ninja presets（`debug`/`release`）。在 `native/` 下可用命令：`cmake --preset debug`、`cmake --build --preset debug`、`ctest --preset debug`、`cmake --install build/debug`；安装树可被 `find_package(panta-native)` 消费。此时尚未接入 Qt/VTK/OCCT/Netgen，也不经 Cargo 调度（004）。
+
+仍不能构建或启动桌面应用：仓库尚无 `build.rs`、Qt 入口或 CI 中的 native 构建，托管引导由任务 004 接入。下面是构建契约与实施要求，不是已验证的安装教程。
 
 ## 构建职责
 
