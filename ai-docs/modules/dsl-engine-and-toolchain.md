@@ -16,16 +16,17 @@
 
 ## `.pa` 到 TS/QM 的构建流
 
-`.pa` 是开发者直接编写的 UTF-8 文本字典/变量/主题源文件。首期语法使用无引号、行式声明；首个 `=` 左侧是字段或 key，右侧直到行尾是值：
+`.pa` 是开发者直接编写的 UTF-8 文本字典/变量/主题源文件。首期语法采用 YAML 风格的冒号和两格缩进，但不实现通用 YAML；字典值不加引号，变量/Theme 的类型表达式保留 `=`：
 
 ```text
-version 1
-kind language
-locale zh-CN
-fallback en
+version: 1
+kind: language
+locale: zh-CN
+fallback: en
 
-message app.advance_revision = 推进修订
-message app.revision_count = 修订计数：%1
+messages:
+  app.advance_revision: 推进修订
+  app.revision_count: 修订计数：%1
 ```
 
 构建流程为：读取 `.pa` → pest 解析与领域校验 → Artifact 聚合器按 `kind` 生成语言/Theme/变量快照 → 对语言快照由 quick-xml 写出构建树临时 `panta_zh_CN.ts` → 调用锁定的 Qt Linguist 预编译 `lrelease` → 生成并嵌入 QM。QM 是唯一的运行期翻译输入；应用启动和语言切换不解析 `.pa` 或 XML。`panta-dslc` 不自行下载、编译或寻找系统 Qt，`lrelease` 路径由 CMake 供给并记录版本。

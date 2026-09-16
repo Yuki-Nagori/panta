@@ -1,6 +1,6 @@
 # 034 — Rust Panta Artifact 解析与 TS/QM 编译入口
 
-- 状态：ready
+- 状态：in-progress
 - 阶段：应用平台扩展
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P1
@@ -9,13 +9,14 @@
 
 ## 目标与背景
 
-为变量 DSL、主题和国际化建立一个共享的 Rust `.pa` Artifact 解析/聚合内核及单文件 CLI。`.pa` 是人直接编写的简洁文本；国际化由 CLI 输出构建树临时 TS，CMake 使用锁定的 QtTools 预编译 `lrelease` 生成 QM。当前仅完成编排，尚未实现。
+为变量 DSL、主题和国际化建立一个共享的 Rust `.pa` Artifact 解析/聚合内核及单文件 CLI。`.pa` 是人直接编写的简洁文本；国际化由 CLI 输出构建树临时 TS，CMake 使用锁定的 QtTools 预编译 `lrelease` 生成 QM。当前已开始实现解析内核与 TS 生成入口。
 
 ## 必读
 
 - [模块设计](../modules/dsl-engine-and-toolchain.md)
 - [变量 DSL](../modules/variable-dsl.md)
 - [国际化](../modules/internationalization.md)
+- [`.pa` 规则](../standards/pa.md)
 - [Rust 规范](../standards/rust.md)
 - [CMake 规范](../standards/cmake.md)
 - [验证与评审](../standards/validation-and-review.md)
@@ -27,13 +28,13 @@
 
 ## 前置条件与待决策
 
-Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kind 头部、行式无引号语法、转义规则和 TS 支持的 Qt TS 版本。首选 pest；若基准证明配置文件解析无法满足性能目标，才评估 nom。`quick-xml`、`serde` 和其他 crate 的版本、许可证与 MSRV 必须进入 Cargo.lock 并按依赖规范审核。
+Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kind 头部、YAML 风格缩进、无引号标量、转义规则和 TS 支持的 Qt TS 版本。首选 pest；若基准证明配置文件解析无法满足性能目标，才评估 nom。`quick-xml`、`serde` 和其他 crate 的版本、许可证与 MSRV 必须进入 Cargo.lock 并按依赖规范审核。
 
 ## 实施步骤
 
 1. 建立 `panta-dsl-core` library、公共 AST/诊断 DTO、pest grammar 和限制常量，覆盖变量/主题/language 的 kind 分派。
 2. 实现 Artifact 聚合和 quick-xml TS 生成/校验；输出规范化临时 TS，不修改 `.pa` 源文件。
-3. 实现 `panta-dslc` CLI（validate、emit-ts、format 等最小子命令）及 Cargo/CMake 调用入口，记录 QtTools 预编译 `lrelease` 路径。
+3. 实现 `panta-dslc` CLI（validate、emit-ts 等最小子命令）及 Cargo/CMake 调用入口，记录 QtTools 预编译 `lrelease` 路径；格式化由 035 接入。
 4. 添加语法往返、失败、上限、任意 cwd 和稳定输出测试，完成 022/025/030 的消费契约。
 
 ## 预计改动
@@ -59,7 +60,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-09-16 | 完成 Rust parser/CLI 架构与 `.pa` 简洁语法设计 | 明确 pest、quick-xml、serde、TS/QM 和 CMake 边界 | 仅文档完成，代码与构建验证未执行 |
+| 2026-09-16 | 完成 Rust parser/CLI 架构与 `.pa` 简洁语法设计 | 明确 pest、quick-xml、serde、TS/QM 和 CMake 边界 | 设计已提交；实现与构建验证进行中 |
 
 ## 风险与回退
 
@@ -69,6 +70,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 - 2026-09-16：创建任务；确认这是应用平台的配置/资源引擎工作，Rust library + 单文件 CLI 是唯一解析实现。
 - 2026-09-16：首选 pest；quick-xml 将语言 Artifact 生成 Qt TS XML，serde 负责 DTO，QM 保持 Qt 运行期格式；`.pa` 源码不暴露 XML。
+- 2026-09-16：开始实现 `panta-dsl-core` 与 `panta-dslc`，首期采用 YAML 风格缩进和无引号标量；变量/Theme 的类型表达式保留 `=`。
 
 ## 完成摘要
 

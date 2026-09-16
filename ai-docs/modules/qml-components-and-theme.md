@@ -43,12 +43,14 @@ UI 尺寸统一采用 Qt Quick 逻辑像素语义，不自行乘设备像素比�
 示意主题文本（`.pa` 文法沿用 025；键映射尚未实现）：
 
 ```text
-version 1
-kind theme
-let spacing_small: real = 8
-let control_height: real = 32
-let font_body: real = 14
-let color_background: string = "#1e1f22"
+version: 1
+kind: theme
+
+values:
+  spacing_small: real = 8
+  control_height: real = 32
+  font_body: real = 14
+  color_background: string = #1e1f22
 ```
 
 映射示意：spacing_small → Theme.spacingSmall，control_height → Theme.controlHeight。键名映射由单一 schema 明确定义，不按字符串猜测属性。颜色首期用 string 加主题专用校验，不要求 025 引入 color 类型；数值在 DSL 层仍无量纲，主题 schema 将特定键解释为逻辑像素，与 CAE 物理单位无关。

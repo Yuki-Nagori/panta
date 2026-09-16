@@ -22,6 +22,7 @@
 | C++20 | [C++](cpp.md) | native 核心与适配器 |
 | C++ 测试 | [GTest](gtest.md) | native 单元与行为测试 |
 | Rust 2024 | [Rust](rust.md) | 应用平台 |
+| Panta `.pa` DSL | [`.pa` 规则](pa.md) | DSL 源文件、格式化与校验 |
 | Cargo | [Cargo](cargo.md) | workspace 与调度 |
 | CMake | [CMake](cmake.md) | native 构建图 |
 | Ninja | [Ninja](ninja.md) | 构建执行 |

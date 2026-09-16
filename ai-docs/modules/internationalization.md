@@ -22,16 +22,17 @@ QML 使用稳定 message key 的 `qsTrId()`，C++ 展示文本使用 `qtTrId()`�
 
 ## `.pa` 字典语法约定
 
-`.pa`（Panta Artifact）是 UTF-8 文本，不是 XML 容器；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。每个 locale 一个文件，英文文件是完整基线，其他文件只覆盖相同 key。语法以行式声明为主，值从首个 `=` 到行尾，不需要引号：
+`.pa`（Panta Artifact）是 UTF-8 文本，不是 XML 容器；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。每个 locale 一个文件，英文文件是完整基线，其他文件只覆盖相同 key。语法采用 YAML 风格的区块和冒号，不需要引号：
 
 ```text
-version 1
-kind language
-locale zh-CN
-fallback en
+version: 1
+kind: language
+locale: zh-CN
+fallback: en
 
-message app.advance_revision = 推进修订
-message app.revision_count = 修订计数：%1
+messages:
+  app.advance_revision: 推进修订
+  app.revision_count: 修订计数：%1
 ```
 
 英文基线使用相同 key 和 English 文本。编译器以 key 生成 TS 的 message id，并用稳定的 `Panta` context 和英文 source 填充 Qt 节点，因此 QML/C++ 不需要把 XML 结构暴露给开发者。message key 只允许 ASCII 小写、数字、点和下划线；翻译值为 UTF-8 字符串，行尾空白会被规范化，需要保留前后空格时使用反斜杠转义。`%1`、`%n` 等占位符必须与基线集合一致。缺失 key 按 fallback 链回退，重复 key、未知 key、占位符不一致、非法 locale 或损坏文件拒绝整个字典。

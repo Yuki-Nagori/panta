@@ -6,31 +6,34 @@
 
 DSL 用于可审阅地声明软件内的变量、参数及逻辑资源引用。先做声明式文本与受限表达式，不引入通用脚本执行；运行时消费校验后的变量快照，路径解析调用 023 的服务。它不替代 QML、不直接调用 OCCT/Netgen/VTK，也不改变外部求解器协议。
 
-Panta DSL 的源码统一使用 `.pa` 后缀（Panta Artifact）；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。`.pa` 面向人读写，Artifact 引擎按 `kind` 聚合为字典、Theme 或变量快照。国际化 `.pa` 由 Rust 编译器转换为构建树中的临时 TS XML，再交给 QtTools 生成 QM，源码目录不需要出现 `.ts`。以下为待实现的变量域语法示意，完整关键字和 API 仍由 025 冻结：
+Panta DSL 的源码统一使用 `.pa` 后缀（Panta Artifact）；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。`.pa` 面向人读写，Artifact 引擎按 `kind` 聚合为字典、Theme 或变量快照。国际化 `.pa` 由 Rust 编译器转换为构建树中的临时 TS XML，再交给 QtTools 生成 QM，源码目录不需要出现 `.ts`。语法借鉴 YAML 的层级和冒号，但不承诺通用 YAML 兼容；以下为待实现的变量域语法示意，完整关键字和 API 仍由 025 冻结：
 
 ```text
-version 1
-kind variables
-let divisions: int = 24
-let scale: real = 0.5
-let visible: bool = true
-let label: string = Inlet
-let mesh: resource = project:/assets/mesh.vtu
-let half: real = divisions * scale
+version: 1
+kind: variables
+
+values:
+  divisions: int = 24
+  scale: real = 0.5
+  visible: bool = true
+  label: string = Inlet
+  mesh: resource = project:/assets/mesh.vtu
+  half: real = divisions * scale
 ```
 
 国际化字典复用同一文件头和诊断格式，使用简洁的 message 声明；TS XML 仅是编译中间文件：
 
 ```text
-version 1
-kind language
-locale en
-fallback en
+version: 1
+kind: language
+locale: en
+fallback: en
 
-message app.advance_revision = Advance revision
+messages:
+  app.advance_revision: Advance revision
 ```
 
-语言字典放在 `resources/i18n/<locale>.pa`，主题和变量也使用 `.pa` 文本；域由 `kind` 明确区分。声明使用首个 `=` 分隔，值默认取到行尾，不写引号；注释使用 `//`，反斜杠用于转义 `=`、换行和行尾空白。`.pa` 必须是 UTF-8，不能执行脚本、import、网络或 shell。语言域的 key、fallback、占位符和缺项规则见[国际化模块](internationalization.md)。
+语言字典放在 `resources/i18n/<locale>.pa`，主题和变量也使用 `.pa` 文本；域由 `kind` 明确区分。顶层和区块字段使用 `key: value`，值默认取到行尾，不写引号；变量/Theme 的表达式使用 `type = expression`。注释使用 `//`，反斜杠用于转义 `:`、`=`、换行和行尾空白。`.pa` 必须是 UTF-8，不能执行脚本、import、网络或 shell。语言域的 key、fallback、占位符和缺项规则见[国际化模块](internationalization.md)。
 
 V1 包含 bool、int、有限 real、string、resource；类型显式声明，int 算术检查溢出，int 到 real 的提升规则固定并测试。字符串定义 UTF-8 与转义规则；关键字、标识与小数点均不随 UI 语言变化。标识符初期限定 ASCII，用户可读标签允许 Unicode。表达式仅允许引用、括号及类型允许的算术，不提供 eval、循环、函数定义、import、网络或 shell。
 
