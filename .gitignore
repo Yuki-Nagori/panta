@@ -1,56 +1,59 @@
-# C++ objects and libs
-*.slo
-*.lo
-*.o
-*.a
-*.la
-*.lai
-*.so
-*.so.*
-*.dll
-*.dylib
+# Cargo workspace outputs; keep Cargo.lock and .cargo/config.toml tracked.
+/target/
 
-# Qt-es
-object_script.*.Release
-object_script.*.Debug
-*_plugin_import.cpp
-/.qmake.cache
-/.qmake.stash
-*.pro.user
-*.pro.user.*
-*.qbs.user
-*.qbs.user.*
-*.moc
-moc_*.cpp
-moc_*.h
-qrc_*.cpp
-ui_*.h
-*.qmlc
-*.jsc
-Makefile*
-*build-*
-build/
-*.qm
-*.prl
-*.qmlls.ini
-
-# Qt unit tests
-target_wrapper.*
-
-# QtCreator
-*.autosave
-
-# QtCreator Qml
-*.qmlproject.user
-*.qmlproject.user.*
-
-# QtCreator CMake
-CMakeLists.txt.user*
-
-# QtCreator 4.8< compilation database
+# Native/Python build and package outputs (out-of-source builds only).
+/build/
+/out/
+/dist/
+/native/build/
+/native/out/
+/python/build/
+/python/dist/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
 compile_commands.json
+.ninja_deps
+.ninja_log
 
-# QtCreator local machine specific files for imported projects
-*creator.user*
+# Qt Creator per-user state; QML/resources and generated-code inputs stay tracked.
+CMakeLists.txt.user
+CMakeLists.txt.user.*
 
-*_qmlcache.qrc
+# Python environments, bytecode, package metadata and tool caches.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local runtime data and verification outputs; fixtures belong outside these dirs.
+/.local/
+/artifacts/
+/coverage/
+
+# Machine-local environment overrides; keep documented examples.
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Editor/system caches; shared .vscode settings are intentionally not excluded.
+.cache/
+.clangd/
+.idea/
+.vs/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
