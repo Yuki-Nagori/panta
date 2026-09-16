@@ -1,33 +1,48 @@
 document = { SOI ~ line* ~ EOI }
 
-line = { blank | comment | version | kind | catalog | fallback | translation | directive | section | entry | message }
+line = { blank | comment_line | version | kind | catalog | language | sourcelanguage | context | section | message | src | oldsrc | translation | status | comment_field | extra_field | numerus | entry }
 blank = { hws* ~ newline }
-comment = { hws* ~ "//" ~ (!newline ~ ANY)* ~ newline? }
+comment_line = { hws* ~ "//" ~ (!newline ~ ANY)* ~ newline? }
 
 version = { hws* ~ "version" ~ hws* ~ ":" ~ hws* ~ integer ~ hws* ~ newline? }
 kind = { hws* ~ "kind" ~ hws* ~ ":" ~ hws* ~ kind_name ~ hws* ~ newline? }
 catalog = { hws* ~ "catalog" ~ hws* ~ ":" ~ hws* ~ catalog_name ~ hws* ~ newline? }
-fallback = { hws* ~ "fallback" ~ hws* ~ ":" ~ hws* ~ locale_name ~ hws* ~ newline? }
-message = { hws* ~ !("msgid" ~ hws+) ~ source_key ~ hws* ~ ":" ~ hws* ~ newline }
-translation = { indent ~ "translation" ~ hws+ ~ locale_name ~ hws* ~ ":" ~ hws* ~ scalar ~ hws* ~ newline? }
-directive = { unfinished | source_note | translation_note }
-unfinished = { indent ~ "@unfinished" ~ hws+ ~ locale_name ~ hws* ~ newline? }
-source_note = { indent ~ "@source-note" ~ hws* ~ ":" ~ hws* ~ scalar ~ hws* ~ newline? }
-translation_note = { indent ~ "@translation-note" ~ hws+ ~ locale_name ~ hws* ~ ":" ~ hws* ~ scalar ~ hws* ~ newline? }
+language = { hws* ~ "language" ~ hws* ~ ":" ~ hws* ~ locale_name ~ hws* ~ newline? }
+sourcelanguage = { hws* ~ "sourcelanguage" ~ hws* ~ ":" ~ hws* ~ locale_name ~ hws* ~ newline? }
+context = { hws* ~ "[" ~ context_name ~ "]" ~ hws* ~ newline }
 section = { hws* ~ section_name ~ hws* ~ ":" ~ hws* ~ newline? }
+
+message = { hws* ~ message_key ~ hws* ~ ":" ~ hws* ~ newline }
+src = { indent ~ "src" ~ hws* ~ ":" ~ hws* ~ value ~ hws* ~ newline? }
+oldsrc = { indent ~ "oldsrc" ~ hws* ~ ":" ~ hws* ~ value ~ hws* ~ newline? }
+translation = { indent ~ "tr" ~ hws* ~ ":" ~ hws* ~ translation_value ~ hws* ~ newline? }
+status = { indent ~ "st" ~ hws* ~ ":" ~ hws* ~ status_name ~ hws* ~ newline? }
+comment_field = { indent ~ "comment" ~ hws* ~ ":" ~ hws* ~ value ~ hws* ~ newline? }
+extra_field = { indent ~ "extra" ~ hws* ~ ":" ~ hws* ~ value ~ hws* ~ newline? }
+numerus = { indent ~ "numerus" ~ hws* ~ ":" ~ hws* ~ boolean ~ hws* ~ newline? }
 entry = { indent ~ key ~ hws* ~ ":" ~ hws* ~ entry_value ~ hws* ~ newline? }
+
+translation_value = { array | value }
+array = { "[" ~ hws* ~ quoted ~ (hws* ~ "," ~ hws* ~ quoted)* ~ hws* ~ "]" }
 entry_value = _{ typed_value | scalar }
 typed_value = { type_name ~ hws+ ~ "=" ~ hws* ~ scalar }
+value = { quoted | scalar }
+quoted = { "\"" ~ ("\\\"" | "\\\\" | (!"\"" ~ !newline ~ ANY))* ~ "\"" }
 
 integer = @{ ASCII_DIGIT+ }
+boolean = @{ "true" | "false" }
 kind_name = @{ "language" | "theme" | "variables" }
 section_name = @{ "values" }
+status_name = @{ "finished" | "unfinished" | "vanished" }
 type_name = @{ "bool" | "int" | "real" | "string" | "resource" }
 locale_name = @{ (ASCII_ALPHANUMERIC | "-" | "_")+ }
-source_key = @{ ("\\:" | "\\\\" | (!":" ~ !newline ~ ANY))+ }
-key = @{ identifier ~ ("." ~ identifier)* }
-identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "-")* }
 catalog_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "-")* }
+context_name = @{ (!"]" ~ !newline ~ ANY)+ }
+message_key = { quoted_key | bare_key }
+quoted_key = { quoted }
+bare_key = @{ identifier ~ ("." ~ identifier)* }
+key = @{ identifier ~ ("." ~ identifier)* }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 scalar = @{ (!newline ~ ANY)* }
 
 indent = _{ "  " }

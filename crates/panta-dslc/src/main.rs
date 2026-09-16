@@ -37,7 +37,11 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
             if document.kind != Kind::Language {
                 return Err("emit-ts requires kind: language".to_owned());
             }
-            let locale = arguments.get(3).map(String::as_str).unwrap_or("en");
+            let locale = arguments
+                .get(3)
+                .map(String::as_str)
+                .or(document.language.as_deref())
+                .unwrap_or("en");
             let ts = emit_ts(&document, locale).map_err(|error| error.to_string())?;
             write_atomically(output, ts.as_bytes())
         }

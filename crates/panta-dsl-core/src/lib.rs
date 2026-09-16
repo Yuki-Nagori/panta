@@ -1,6 +1,6 @@
 //! Shared parser and artifact aggregation for the human-readable `.pa` DSL.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 
 use pest::Parser as PestParser;
@@ -21,6 +21,14 @@ pub enum Kind {
     Language,
     Theme,
     Variables,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    Finished,
+    Unfinished,
+    Vanished,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,12 +61,21 @@ pub struct Variable {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Translation {
+    pub forms: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
+    pub context: String,
+    pub id: String,
     pub source: String,
-    pub translations: BTreeMap<String, String>,
-    pub source_note: Option<String>,
-    pub translation_notes: BTreeMap<String, String>,
-    pub unfinished: BTreeSet<String>,
+    pub old_source: Option<String>,
+    pub translations: BTreeMap<String, Translation>,
+    pub status: Option<Status>,
+    pub comment: Option<String>,
+    pub extra: Option<String>,
+    pub numerus: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,7 +83,8 @@ pub struct Document {
     pub version: u32,
     pub kind: Kind,
     pub catalog: Option<String>,
-    pub fallback: Option<String>,
+    pub language: Option<String>,
+    pub source_language: String,
     pub messages: BTreeMap<String, Message>,
     pub values: Vec<Variable>,
 }
@@ -147,13 +165,17 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
         version: 0,
         kind: Kind::Variables,
         catalog: None,
-        fallback: None,
+        language: None,
+        source_language: "en".to_owned(),
         messages: BTreeMap::new(),
         values: Vec::new(),
     };
     let mut seen_version = false;
     let mut seen_kind = false;
+    let mut seen_language = false;
+    let mut seen_source_language = false;
     let mut section: Option<String> = None;
+    let mut current_context = "Panta".to_owned();
     let mut current_message: Option<(String, Message)> = None;
     let mut declaration_count = 0usize;
     let mut diagnostics = Vec::new();
@@ -164,7 +186,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
         };
         let body_offset = body.as_span().start();
         match body.as_rule() {
-            Rule::blank | Rule::comment => {}
+            Rule::blank | Rule::comment_line => {}
             Rule::version => {
                 if seen_version {
                     push_diagnostic(
@@ -176,10 +198,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                 } else {
                     seen_version = true;
-                    result.version = body
-                        .into_inner()
-                        .find(|pair| pair.as_rule() == Rule::integer)
-                        .and_then(|pair| pair.as_str().parse::<u32>().ok())
+                    result.version = find_text(body, Rule::integer)
+                        .and_then(|value| value.parse::<u32>().ok())
                         .unwrap_or_default();
                 }
             }
@@ -194,11 +214,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                 } else {
                     seen_kind = true;
-                    if let Some(pair) = body
-                        .into_inner()
-                        .find(|pair| pair.as_rule() == Rule::kind_name)
-                    {
-                        result.kind = match pair.as_str() {
+                    if let Some(kind) = find_text(body, Rule::kind_name) {
+                        result.kind = match kind.as_str() {
                             "language" => Kind::Language,
                             "theme" => Kind::Theme,
                             "variables" => Kind::Variables,
@@ -207,175 +224,212 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     }
                 }
             }
-            Rule::catalog => {
-                set_header(
-                    &mut result.catalog,
-                    body,
-                    "catalog",
-                    source,
-                    &mut diagnostics,
-                    Rule::catalog_name,
-                );
-            }
-            Rule::fallback => {
-                set_header(
-                    &mut result.fallback,
-                    body,
-                    "fallback",
-                    source,
-                    &mut diagnostics,
-                    Rule::locale_name,
-                );
-                if let Some(fallback) = result.fallback.as_mut() {
-                    *fallback = normalize_locale(fallback);
-                }
-            }
-            Rule::message => {
-                flush_message(&mut current_message, &mut result);
-                let key = body
-                    .into_inner()
-                    .find(|pair| pair.as_rule() == Rule::source_key)
-                    .map(|pair| decode_scalar(pair.as_str(), source, &mut diagnostics))
-                    .unwrap_or_default();
-                if key.is_empty() {
+            Rule::catalog => set_header(
+                &mut result.catalog,
+                body,
+                "catalog",
+                source,
+                &mut diagnostics,
+                Rule::catalog_name,
+            ),
+            Rule::language => {
+                if seen_language {
                     push_diagnostic(
                         &mut diagnostics,
-                        "pa.empty_source",
-                        "language entry requires a source text",
+                        "pa.duplicate_header",
+                        "language is repeated",
+                        body_offset,
+                        source,
+                    );
+                } else {
+                    seen_language = true;
+                    result.language =
+                        find_text(body, Rule::locale_name).map(|value| normalize_locale(&value));
+                }
+            }
+            Rule::sourcelanguage => {
+                if seen_source_language {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.duplicate_header",
+                        "sourcelanguage is repeated",
+                        body_offset,
+                        source,
+                    );
+                } else {
+                    seen_source_language = true;
+                    result.source_language = find_text(body, Rule::locale_name)
+                        .map(|value| normalize_locale(&value))
+                        .unwrap_or_else(|| "en".to_owned());
+                }
+            }
+            Rule::context => {
+                flush_message(&mut current_message, &mut result, &mut diagnostics, source);
+                current_context = find_text(body, Rule::context_name)
+                    .map(|value| value.trim().to_owned())
+                    .unwrap_or_else(|| "Panta".to_owned());
+                section = None;
+            }
+            Rule::section => {
+                section = find_text(body, Rule::section_name);
+            }
+            Rule::message => {
+                flush_message(&mut current_message, &mut result, &mut diagnostics, source);
+                let id = find_message_key(body, source, &mut diagnostics).unwrap_or_default();
+                if id.is_empty() {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.empty_id",
+                        "language entry requires an id",
                         body_offset,
                         source,
                     );
                     continue;
                 }
-                if result.messages.contains_key(&key) {
+                current_message = Some((
+                    message_key(&current_context, &id),
+                    Message {
+                        context: current_context.clone(),
+                        id,
+                        source: String::new(),
+                        old_source: None,
+                        translations: BTreeMap::new(),
+                        status: None,
+                        comment: None,
+                        extra: None,
+                        numerus: false,
+                    },
+                ));
+            }
+            Rule::src => {
+                if let Some((_, message)) = current_message.as_mut() {
+                    let value = field_value(body, source, &mut diagnostics);
+                    if message.source.is_empty() {
+                        message.source = value;
+                    } else {
+                        duplicate_field(&mut diagnostics, "src", body_offset, source);
+                    }
+                } else {
                     push_diagnostic(
                         &mut diagnostics,
-                        "pa.duplicate_source",
-                        format!("source '{key}' is repeated"),
+                        "pa.field_without_message",
+                        "src must follow a message id",
                         body_offset,
                         source,
                     );
-                    current_message = None;
+                }
+            }
+            Rule::oldsrc => {
+                if let Some((_, message)) = current_message.as_mut() {
+                    let value = field_value(body, source, &mut diagnostics);
+                    if message.old_source.is_none() {
+                        message.old_source = Some(value);
+                    } else {
+                        duplicate_field(&mut diagnostics, "oldsrc", body_offset, source);
+                    }
                 } else {
-                    current_message = Some((
-                        key.clone(),
-                        Message {
-                            source: key,
-                            translations: BTreeMap::new(),
-                            source_note: None,
-                            translation_notes: BTreeMap::new(),
-                            unfinished: BTreeSet::new(),
-                        },
-                    ));
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.field_without_message",
+                        "oldsrc must follow a message id",
+                        body_offset,
+                        source,
+                    );
                 }
             }
             Rule::translation => {
-                let Some((key, message)) = current_message.as_mut() else {
+                if let Some((_, message)) = current_message.as_mut() {
+                    let forms = translation_value(body, source, &mut diagnostics);
+                    let locale = result
+                        .language
+                        .clone()
+                        .unwrap_or_else(|| result.source_language.clone());
+                    if message
+                        .translations
+                        .insert(locale, Translation { forms })
+                        .is_some()
+                    {
+                        duplicate_field(&mut diagnostics, "tr", body_offset, source);
+                    }
+                } else {
                     push_diagnostic(
                         &mut diagnostics,
-                        "pa.translation_without_source",
-                        "translation must follow a source entry",
-                        body_offset,
-                        source,
-                    );
-                    continue;
-                };
-                let mut parts = body.into_inner();
-                let Some(locale) = parts
-                    .find(|pair| pair.as_rule() == Rule::locale_name)
-                    .map(|pair| normalize_locale(pair.as_str()))
-                else {
-                    continue;
-                };
-                let value = parts
-                    .find(|pair| pair.as_rule() == Rule::scalar)
-                    .map(|pair| decode_scalar(pair.as_str(), source, &mut diagnostics))
-                    .unwrap_or_default();
-                if message.translations.insert(locale.clone(), value).is_some() {
-                    push_diagnostic(
-                        &mut diagnostics,
-                        "pa.duplicate_translation",
-                        format!("translation locale '{locale}' for '{key}' is repeated"),
+                        "pa.field_without_message",
+                        "tr must follow a message id",
                         body_offset,
                         source,
                     );
                 }
             }
-            Rule::directive => {
-                let Some((key, message)) = current_message.as_mut() else {
-                    push_diagnostic(
-                        &mut diagnostics,
-                        "pa.directive_without_source",
-                        "directive must follow a source entry",
-                        body_offset,
-                        source,
-                    );
-                    continue;
-                };
-                let Some(directive) = body.into_inner().next() else {
-                    continue;
-                };
-                match directive.as_rule() {
-                    Rule::unfinished => {
-                        if let Some(locale) = directive
-                            .into_inner()
-                            .find(|pair| pair.as_rule() == Rule::locale_name)
-                        {
-                            message.unfinished.insert(normalize_locale(locale.as_str()));
-                        }
+            Rule::status => {
+                if let Some((_, message)) = current_message.as_mut() {
+                    if message.status.is_some() {
+                        duplicate_field(&mut diagnostics, "st", body_offset, source);
                     }
-                    Rule::source_note => {
-                        if message.source_note.is_some() {
-                            push_diagnostic(
-                                &mut diagnostics,
-                                "pa.duplicate_source_note",
-                                format!("source note for '{key}' is repeated"),
-                                directive.as_span().start(),
-                                source,
-                            );
-                        } else {
-                            message.source_note = directive
-                                .into_inner()
-                                .find(|pair| pair.as_rule() == Rule::scalar)
-                                .map(|pair| decode_scalar(pair.as_str(), source, &mut diagnostics));
-                        }
-                    }
-                    Rule::translation_note => {
-                        let mut parts = directive.into_inner();
-                        let Some(locale) = parts
-                            .find(|pair| pair.as_rule() == Rule::locale_name)
-                            .map(|pair| normalize_locale(pair.as_str()))
-                        else {
-                            continue;
+                    if let Some(value) = find_text(body, Rule::status_name) {
+                        message.status = match value.as_str() {
+                            "finished" => Some(Status::Finished),
+                            "unfinished" => Some(Status::Unfinished),
+                            "vanished" => Some(Status::Vanished),
+                            _ => None,
                         };
-                        let note = parts
-                            .find(|pair| pair.as_rule() == Rule::scalar)
-                            .map(|pair| decode_scalar(pair.as_str(), source, &mut diagnostics))
-                            .unwrap_or_default();
-                        if message
-                            .translation_notes
-                            .insert(locale.clone(), note)
-                            .is_some()
-                        {
-                            push_diagnostic(
-                                &mut diagnostics,
-                                "pa.duplicate_translation_note",
-                                format!(
-                                    "translation note locale '{locale}' for '{key}' is repeated"
-                                ),
-                                body_offset,
-                                source,
-                            );
-                        }
                     }
-                    _ => {}
+                } else {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.field_without_message",
+                        "st must follow a message id",
+                        body_offset,
+                        source,
+                    );
                 }
             }
-            Rule::section => {
-                section = body
-                    .into_inner()
-                    .find(|pair| pair.as_rule() == Rule::section_name)
-                    .map(|pair| pair.as_str().to_owned());
+            Rule::comment_field => {
+                if let Some((_, message)) = current_message.as_mut() {
+                    if message.comment.is_some() {
+                        duplicate_field(&mut diagnostics, "comment", body_offset, source);
+                    }
+                    message.comment = Some(field_value(body, source, &mut diagnostics));
+                } else {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.field_without_message",
+                        "comment must follow a message id",
+                        body_offset,
+                        source,
+                    );
+                }
+            }
+            Rule::extra_field => {
+                if let Some((_, message)) = current_message.as_mut() {
+                    if message.extra.is_some() {
+                        duplicate_field(&mut diagnostics, "extra", body_offset, source);
+                    }
+                    message.extra = Some(field_value(body, source, &mut diagnostics));
+                } else {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.field_without_message",
+                        "extra must follow a message id",
+                        body_offset,
+                        source,
+                    );
+                }
+            }
+            Rule::numerus => {
+                if let Some((_, message)) = current_message.as_mut() {
+                    if let Some(value) = find_text(body, Rule::boolean) {
+                        message.numerus = value == "true";
+                    }
+                } else {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.field_without_message",
+                        "numerus must follow a message id",
+                        body_offset,
+                        source,
+                    );
+                }
             }
             Rule::entry => {
                 declaration_count += 1;
@@ -406,6 +460,16 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                     continue;
                 }
+                if key.contains('_') {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.invalid_key",
+                        format!("value key '{key}' must use kebab-case"),
+                        body_offset,
+                        source,
+                    );
+                    continue;
+                }
                 let (value_type, expression) = typed_entry(value_pair, source, &mut diagnostics);
                 if result.values.iter().any(|item| item.name == key) {
                     push_diagnostic(
@@ -426,7 +490,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             _ => {}
         }
     }
-    flush_message(&mut current_message, &mut result);
+    flush_message(&mut current_message, &mut result, &mut diagnostics, source);
 
     if !seen_version {
         push_diagnostic(
@@ -454,22 +518,33 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             source,
         );
     }
+    if let Some(language) = result.language.as_deref()
+        && !valid_locale(language)
+    {
+        push_diagnostic(
+            &mut diagnostics,
+            "pa.invalid_locale",
+            format!("invalid language locale '{language}'"),
+            0,
+            source,
+        );
+    }
+    if !valid_locale(&result.source_language) {
+        push_diagnostic(
+            &mut diagnostics,
+            "pa.invalid_locale",
+            format!("invalid source locale '{}'", result.source_language),
+            0,
+            source,
+        );
+    }
     match result.kind {
         Kind::Language => {
-            if result.catalog.is_none() {
+            if result.language.is_none() {
                 push_diagnostic(
                     &mut diagnostics,
-                    "pa.missing_catalog",
-                    "language requires catalog",
-                    0,
-                    source,
-                );
-            }
-            if !result.values.is_empty() {
-                push_diagnostic(
-                    &mut diagnostics,
-                    "pa.unexpected_values",
-                    "values are only valid for theme or variables",
+                    "pa.missing_language",
+                    "language requires a target locale",
                     0,
                     source,
                 );
@@ -483,14 +558,23 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     source,
                 );
             }
+            if !result.values.is_empty() {
+                push_diagnostic(
+                    &mut diagnostics,
+                    "pa.unexpected_values",
+                    "values are only valid for theme or variables",
+                    0,
+                    source,
+                );
+            }
         }
         Kind::Theme | Kind::Variables => {
-            if result.catalog.is_some() || result.fallback.is_some() || !result.messages.is_empty()
+            if result.catalog.is_some() || result.language.is_some() || !result.messages.is_empty()
             {
                 push_diagnostic(
                     &mut diagnostics,
                     "pa.unexpected_language_field",
-                    "catalog, fallback and messages are only valid for language",
+                    "language fields are only valid for language",
                     0,
                     source,
                 );
@@ -506,6 +590,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             }
         }
     }
+    validate_messages(&result, source, &mut diagnostics);
     if diagnostics.is_empty() {
         Ok(result)
     } else {
@@ -523,11 +608,7 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
         ));
     }
     let locale = normalize_locale(locale);
-    if locale.is_empty()
-        || !locale.chars().all(|character| {
-            character.is_ascii_alphanumeric() || character == '-' || character == '_'
-        })
-    {
+    if !valid_locale(&locale) {
         return Err(Diagnostics::one(
             "pa.ts_locale",
             "invalid output locale",
@@ -535,26 +616,29 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
             "",
         ));
     }
-
     let mut diagnostics = Vec::new();
-    for (key, message) in &document.messages {
+    for message in document.messages.values() {
         if let Some(translation) = message.translations.get(&locale)
-            && !message.unfinished.contains(&locale)
-            && placeholders(&message.source) != placeholders(translation)
+            && message.status != Some(Status::Unfinished)
+            && message.status != Some(Status::Vanished)
         {
-            diagnostics.push(Diagnostic {
-                code: "pa.placeholder_mismatch".to_owned(),
-                message: format!("message '{key}' has different placeholders"),
-                offset: 0,
-                line: 1,
-                column: 1,
-            });
+            for form in &translation.forms {
+                if placeholders(&message.source) != placeholders(form) {
+                    diagnostics.push(Diagnostic {
+                        code: "pa.placeholder_mismatch".to_owned(),
+                        message: format!("message '{}' has different placeholders", message.id),
+                        offset: 0,
+                        line: 1,
+                        column: 1,
+                    });
+                    break;
+                }
+            }
         }
     }
     if !diagnostics.is_empty() {
         return Err(Diagnostics { diagnostics });
     }
-
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
     writer
         .write_event(Event::Decl(BytesDecl::new(
@@ -566,50 +650,29 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
     let mut ts = BytesStart::new("TS");
     ts.push_attribute(("version", "2.1"));
     ts.push_attribute(("language", locale.replace('-', "_").as_str()));
-    ts.push_attribute(("sourcelanguage", "en"));
+    ts.push_attribute(("sourcelanguage", document.source_language.as_str()));
     writer
         .write_event(Event::Start(ts))
         .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-    writer
-        .write_event(Event::Start(BytesStart::new("context")))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-    write_text_element(&mut writer, "name", "Panta")?;
-    for (key, message) in &document.messages {
-        let translation = message.translations.get(&locale).unwrap_or(&message.source);
-        let mut message_node = BytesStart::new("message");
-        message_node.push_attribute(("id", key.as_str()));
-        if message.source.contains("%n") {
-            message_node.push_attribute(("numerus", "yes"));
+    let mut contexts: BTreeMap<&str, Vec<&Message>> = BTreeMap::new();
+    for message in document.messages.values() {
+        contexts
+            .entry(message.context.as_str())
+            .or_default()
+            .push(message);
+    }
+    for (context, messages) in contexts {
+        writer
+            .write_event(Event::Start(BytesStart::new("context")))
+            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        write_text_element(&mut writer, "name", context)?;
+        for message in messages {
+            emit_message(&mut writer, message, &locale)?;
         }
         writer
-            .write_event(Event::Start(message_node))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-        if let Some(note) = &message.source_note {
-            write_text_element(&mut writer, "extracomment", note)?;
-        }
-        write_text_element(&mut writer, "source", &message.source)?;
-        let unfinished =
-            !message.translations.contains_key(&locale) || message.unfinished.contains(&locale);
-        let mut translation_node = BytesStart::new("translation");
-        if unfinished {
-            translation_node.push_attribute(("type", "unfinished"));
-        }
-        writer
-            .write_event(Event::Start(translation_node))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-        writer
-            .write_event(Event::Text(BytesText::new(translation)))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-        writer
-            .write_event(Event::End(BytesEnd::new("translation")))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-        writer
-            .write_event(Event::End(BytesEnd::new("message")))
+            .write_event(Event::End(BytesEnd::new("context")))
             .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
     }
-    writer
-        .write_event(Event::End(BytesEnd::new("context")))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
     writer
         .write_event(Event::End(BytesEnd::new("TS")))
         .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
@@ -617,43 +680,83 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
         .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))
 }
 
+fn emit_message(
+    writer: &mut Writer<Vec<u8>>,
+    message: &Message,
+    locale: &str,
+) -> Result<(), Diagnostics> {
+    let mut node = BytesStart::new("message");
+    node.push_attribute(("id", message.id.as_str()));
+    if message.numerus {
+        node.push_attribute(("numerus", "yes"));
+    }
+    writer
+        .write_event(Event::Start(node))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    if let Some(comment) = &message.comment {
+        write_text_element(writer, "comment", comment)?;
+    }
+    if let Some(extra) = &message.extra {
+        write_text_element(writer, "extracomment", extra)?;
+    }
+    if let Some(old_source) = &message.old_source {
+        write_text_element(writer, "oldsource", old_source)?;
+    }
+    write_text_element(writer, "source", &message.source)?;
+    let translation = message.translations.get(locale);
+    let mut translation_node = BytesStart::new("translation");
+    if message.status == Some(Status::Vanished) {
+        translation_node.push_attribute(("type", "vanished"));
+    } else if message.status == Some(Status::Unfinished) || translation.is_none() {
+        translation_node.push_attribute(("type", "unfinished"));
+    }
+    writer
+        .write_event(Event::Start(translation_node))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    let forms = translation
+        .map(|value| value.forms.as_slice())
+        .unwrap_or(&[]);
+    if message.numerus {
+        for form in forms.iter().take(2) {
+            write_text_element(writer, "numerusform", form)?;
+        }
+        if forms.is_empty() {
+            write_text_element(writer, "numerusform", &message.source)?;
+        }
+    } else {
+        writer
+            .write_event(Event::Text(BytesText::new(
+                forms.first().unwrap_or(&message.source),
+            )))
+            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    }
+    writer
+        .write_event(Event::End(BytesEnd::new("translation")))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    writer
+        .write_event(Event::End(BytesEnd::new("message")))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    Ok(())
+}
+
 /// Returns the first source match at the start of `input`, preferring the longest source.
-/// Exact source lookup is the normal QML/C++ path; this helper is for text adapters.
 pub fn source_prefix<'a>(document: &'a Document, input: &str) -> Option<(&'a str, &'a Message)> {
     document
         .messages
-        .iter()
-        .filter(|(_, message)| input.starts_with(&message.source))
-        .max_by_key(|(_, message)| message.source.chars().count())
-        .map(|(key, message)| (key.as_str(), message))
+        .values()
+        .filter(|message| input.starts_with(&message.source))
+        .max_by_key(|message| message.source.chars().count())
+        .map(|message| (message.id.as_str(), message))
 }
 
-fn normalize_locale(locale: &str) -> String {
-    if locale.eq_ignore_ascii_case("cn")
-        || locale.eq_ignore_ascii_case("zh-cn")
-        || locale.eq_ignore_ascii_case("zh_cn")
-    {
-        "zh-CN".to_owned()
-    } else {
-        locale.to_owned()
-    }
-}
-
-fn write_text_element(
-    writer: &mut Writer<Vec<u8>>,
-    name: &str,
-    value: &str,
-) -> Result<(), Diagnostics> {
-    writer
-        .write_event(Event::Start(BytesStart::new(name)))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-    writer
-        .write_event(Event::Text(BytesText::new(value)))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-    writer
-        .write_event(Event::End(BytesEnd::new(name)))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-    Ok(())
+fn duplicate_field(diagnostics: &mut Vec<Diagnostic>, field: &str, offset: usize, source: &str) {
+    push_diagnostic(
+        diagnostics,
+        "pa.duplicate_field",
+        format!("{field} is repeated"),
+        offset,
+        source,
+    );
 }
 
 fn set_header(
@@ -674,17 +777,124 @@ fn set_header(
         );
         return;
     }
-    *target = body
-        .into_inner()
-        .find(|pair| pair.as_rule() == value_rule)
-        .map(|pair| pair.as_str().to_owned());
+    *target = find_text(body, value_rule);
 }
 
-fn flush_message(current: &mut Option<(String, Message)>, result: &mut Document) {
+fn flush_message(
+    current: &mut Option<(String, Message)>,
+    result: &mut Document,
+    diagnostics: &mut Vec<Diagnostic>,
+    source: &str,
+) {
     let Some((key, message)) = current.take() else {
         return;
     };
-    result.messages.insert(key, message);
+    if message.source.is_empty() {
+        push_diagnostic(
+            diagnostics,
+            "pa.missing_src",
+            format!("message '{}' requires src", message.id),
+            0,
+            source,
+        );
+    }
+    if result.messages.insert(key, message).is_some() {
+        push_diagnostic(
+            diagnostics,
+            "pa.duplicate_message",
+            "context and id are repeated",
+            0,
+            source,
+        );
+    }
+}
+
+fn find_text(body: Pair<'_, Rule>, rule: Rule) -> Option<String> {
+    if body.as_rule() == rule {
+        return Some(body.as_str().to_owned());
+    }
+    body.into_inner().find_map(|pair| find_text(pair, rule))
+}
+
+fn find_message_key(
+    body: Pair<'_, Rule>,
+    source: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<String> {
+    let key = find_text(body.clone(), Rule::bare_key)
+        .or_else(|| find_text(body, Rule::quoted).map(|value| value.trim_matches('"').to_owned()));
+    key.map(|value| decode_scalar(&value, source, diagnostics))
+}
+
+fn field_value(body: Pair<'_, Rule>, source: &str, diagnostics: &mut Vec<Diagnostic>) -> String {
+    find_text(body.clone(), Rule::quoted)
+        .map(|value| decode_scalar(value.trim_matches('"'), source, diagnostics))
+        .or_else(|| {
+            find_text(body, Rule::scalar).map(|value| decode_scalar(&value, source, diagnostics))
+        })
+        .unwrap_or_default()
+}
+
+fn translation_value(
+    body: Pair<'_, Rule>,
+    source: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<String> {
+    if let Some(array) = find_pair(body.clone(), Rule::array) {
+        return array
+            .into_inner()
+            .filter(|pair| pair.as_rule() == Rule::quoted)
+            .map(|pair| decode_scalar(pair.as_str().trim_matches('"'), source, diagnostics))
+            .collect();
+    }
+    vec![field_value(body, source, diagnostics)]
+}
+
+fn find_pair(body: Pair<'_, Rule>, rule: Rule) -> Option<Pair<'_, Rule>> {
+    if body.as_rule() == rule {
+        Some(body)
+    } else {
+        body.into_inner().find_map(|pair| find_pair(pair, rule))
+    }
+}
+
+fn message_key(context: &str, id: &str) -> String {
+    format!("{context}\u{1f}{id}")
+}
+
+fn normalize_locale(locale: &str) -> String {
+    if locale.eq_ignore_ascii_case("cn")
+        || locale.eq_ignore_ascii_case("zh-cn")
+        || locale.eq_ignore_ascii_case("zh_cn")
+    {
+        "zh-CN".to_owned()
+    } else {
+        locale.to_owned()
+    }
+}
+
+fn valid_locale(locale: &str) -> bool {
+    let mut chars = locale.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() {
+        return false;
+    }
+    let mut previous_separator = false;
+    for character in chars {
+        if character.is_ascii_alphanumeric() {
+            previous_separator = false;
+        } else if character == '-' || character == '_' {
+            if previous_separator {
+                return false;
+            }
+            previous_separator = true;
+        } else {
+            return false;
+        }
+    }
+    !previous_separator
 }
 
 fn typed_entry(
@@ -692,9 +902,7 @@ fn typed_entry(
     source: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> (Option<ValueType>, String) {
-    let typed = if value_pair.as_rule() == Rule::typed_value {
-        value_pair
-    } else {
+    if value_pair.as_rule() != Rule::typed_value {
         push_diagnostic(
             diagnostics,
             "pa.value_type",
@@ -703,16 +911,62 @@ fn typed_entry(
             source,
         );
         return (None, String::new());
-    };
-    let mut parts = typed.into_inner();
-    let value_type = parts
-        .find(|pair| pair.as_rule() == Rule::type_name)
-        .and_then(|pair| ValueType::parse(pair.as_str()));
-    let expression = parts
-        .find(|pair| pair.as_rule() == Rule::scalar)
-        .map(|pair| decode_scalar(pair.as_str(), source, diagnostics))
+    }
+    let value_type =
+        find_text(value_pair.clone(), Rule::type_name).and_then(|value| ValueType::parse(&value));
+    let expression = find_text(value_pair, Rule::scalar)
+        .map(|value| decode_scalar(&value, source, diagnostics))
         .unwrap_or_default();
     (value_type, expression)
+}
+
+fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Diagnostic>) {
+    let mut source_lengths: BTreeMap<(String, usize), String> = BTreeMap::new();
+    for message in document.messages.values() {
+        let length_key = (message.context.clone(), message.source.chars().count());
+        if let Some(previous_id) = source_lengths.insert(length_key, message.id.clone())
+            && previous_id != message.id
+        {
+            push_diagnostic(
+                diagnostics,
+                "pa.source_length_conflict",
+                format!(
+                    "context '{}' contains messages '{}' and '{}' with the same source length",
+                    message.context, previous_id, message.id
+                ),
+                0,
+                source,
+            );
+        }
+        if message.numerus
+            && message
+                .translations
+                .values()
+                .any(|translation| translation.forms.is_empty())
+        {
+            push_diagnostic(
+                diagnostics,
+                "pa.empty_plural",
+                format!("message '{}' has no plural forms", message.id),
+                0,
+                source,
+            );
+        }
+        if !message.numerus
+            && message
+                .translations
+                .values()
+                .any(|translation| translation.forms.len() > 1)
+        {
+            push_diagnostic(
+                diagnostics,
+                "pa.unexpected_plural",
+                format!("message '{}' is not numerus", message.id),
+                0,
+                source,
+            );
+        }
+    }
 }
 
 fn decode_scalar(raw: &str, source: &str, diagnostics: &mut Vec<Diagnostic>) -> String {
@@ -783,6 +1037,23 @@ fn placeholders(value: &str) -> Vec<String> {
     result
 }
 
+fn write_text_element(
+    writer: &mut Writer<Vec<u8>>,
+    name: &str,
+    value: &str,
+) -> Result<(), Diagnostics> {
+    writer
+        .write_event(Event::Start(BytesStart::new(name)))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    writer
+        .write_event(Event::Text(BytesText::new(value)))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    writer
+        .write_event(Event::End(BytesEnd::new(name)))
+        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    Ok(())
+}
+
 fn pest_diagnostic(error: PestError<Rule>, source: &str) -> Diagnostics {
     let offset = match error.location {
         InputLocation::Pos(position) => position,
@@ -790,7 +1061,6 @@ fn pest_diagnostic(error: PestError<Rule>, source: &str) -> Diagnostics {
     };
     Diagnostics::one("pa.syntax", error.to_string(), offset, source)
 }
-
 fn push_diagnostic(
     diagnostics: &mut Vec<Diagnostic>,
     code: &str,
@@ -807,7 +1077,6 @@ fn push_diagnostic(
         column,
     });
 }
-
 fn source_position(source: &str, offset: usize) -> (usize, usize) {
     let clamped = offset.min(source.len());
     let before = &source[..clamped];
@@ -825,93 +1094,80 @@ mod tests {
 
     use super::*;
 
-    const CATALOG: &str = "version: 1\nkind: language\ncatalog: panta-ui\nfallback: en\n\nok:\n  translation cn: 好的\n\nok ok:\n  translation cn: 好好的\n";
+    const CATALOG: &str = "version: 1\nkind: language\nlanguage: zh_CN\nsourcelanguage: en\n\n[FileMenu]\nopen:\n  src: Open\n  tr: 打开\n\nok:\n  src: ok\n  tr: 好的\n\nok-pair:\n  src: ok ok\n  tr: 好好的\n";
 
     #[test]
-    fn parses_global_catalog_without_quotes() {
+    fn parses_ts_shaped_catalog() {
         let document = parse(CATALOG).expect("valid catalog");
-        assert_eq!(document.kind, Kind::Language);
-        assert_eq!(document.catalog.as_deref(), Some("panta-ui"));
-        assert_eq!(document.messages["ok"].source, "ok");
-        assert_eq!(document.messages["ok"].translations["zh-CN"], "好的");
-    }
-
-    #[test]
-    fn parses_source_text_with_escaped_colon_and_cn_alias() {
-        let document = parse(
-            "version: 1\nkind: language\ncatalog: panta-ui\n\nRevision\\: %1:\n  translation cn: 修订 %1\n",
-        )
-        .expect("source text should parse");
+        assert_eq!(document.language.as_deref(), Some("zh-CN"));
+        assert_eq!(document.messages.len(), 3);
         assert_eq!(
-            document.messages["Revision: %1"].translations["zh-CN"],
-            "修订 %1"
+            document.messages[&message_key("FileMenu", "open")].source,
+            "Open"
         );
     }
 
     #[test]
-    fn parses_typed_values_and_escapes() {
-        let source = "version: 1\nkind: variables\n\nvalues:\n  label: string = Inlet\\: A\n  count: int = 24\n";
-        let document = parse(source).expect("valid document");
-        assert_eq!(document.values.len(), 2);
-        assert_eq!(document.values[0].expression, "Inlet: A");
-        assert_eq!(document.values[1].value_type, ValueType::Int);
+    fn parses_status_plural_and_comments() {
+        let document = parse("version: 1\nkind: language\nlanguage: cn\n\n[FileMenu]\nfiles-selected:\n  src: \"%n file(s) selected\"\n  numerus: true\n  tr: [\"已选择 %n 个文件\"]\n  comment: 菜单项\n  extra: 翻译提示\n  st: unfinished\n").expect("valid plural");
+        let message = &document.messages[&message_key("FileMenu", "files-selected")];
+        assert!(message.numerus);
+        assert_eq!(message.translations["zh-CN"].forms.len(), 1);
+        assert_eq!(message.status, Some(Status::Unfinished));
     }
 
     #[test]
-    fn enforces_kebab_case_for_business_keys() {
-        let error = parse("version: 1\nkind: variables\n\nvalues:\n  spacing_small: real = 8\n")
-            .expect_err("underscore is not a business key");
-        assert_eq!(error.diagnostics[0].code, "pa.syntax");
+    fn parses_variables_and_rejects_underscored_key() {
+        let document = parse("version: 1\nkind: variables\n\nvalues:\n  spacing-small: real = 8\n")
+            .expect("valid variables");
+        assert_eq!(document.values[0].name, "spacing-small");
+        assert!(
+            parse("version: 1\nkind: variables\n\nvalues:\n  spacing_small: real = 8\n").is_err()
+        );
     }
 
     #[test]
-    fn language_rejects_variable_values() {
-        let error = parse(
-            "version: 1\nkind: language\ncatalog: panta-ui\n\nvalues:\n  spacing: real = 8\n",
-        )
-        .expect_err("language cannot contain values");
+    fn rejects_duplicate_context_id_and_missing_source() {
+        let error = parse("version: 1\nkind: language\nlanguage: cn\n\n[FileMenu]\nopen:\n  src: Open\nopen:\n  src: Open again\n").expect_err("duplicate id");
         assert!(
             error
                 .diagnostics
                 .iter()
-                .any(|item| item.code == "pa.unexpected_values")
+                .any(|item| item.code == "pa.duplicate_message")
         );
     }
 
     #[test]
-    fn rejects_duplicate_source_and_unknown_version() {
-        let error = parse(
-            "version: 2\nkind: language\ncatalog: panta\nok:\n  translation cn: 好的\nok:\n  translation cn: 好好\n",
-        )
-        .expect_err("invalid document");
-        assert!(
-            error
-                .diagnostics
-                .iter()
-                .any(|item| item.code == "pa.duplicate_source")
-        );
-        assert!(
-            error
-                .diagnostics
-                .iter()
-                .any(|item| item.code == "pa.unsupported_version")
-        );
-    }
-
-    #[test]
-    fn emits_qt_ts_per_locale() {
+    fn longest_source_and_ts_output_work() {
         let document = parse(CATALOG).expect("catalog");
+        assert_eq!(
+            source_prefix(&document, "ok ok!").map(|(id, _)| id),
+            Some("ok-pair")
+        );
         let ts = emit_ts(&document, "cn").expect("TS");
-        assert!(ts.contains("id=\"ok ok\""));
-        assert!(ts.contains("好的"));
         assert!(ts.contains("language=\"zh_CN\""));
-        assert!(ts.contains("<source>ok</source>"));
+        assert!(ts.contains("<name>FileMenu</name>"));
+        assert!(ts.contains("<source>ok ok</source>"));
+        assert!(!ts.contains("<numerusform>好的</numerusform>"));
     }
 
     #[test]
-    fn source_prefix_prefers_longer_match() {
-        let document = parse(CATALOG).expect("catalog");
-        let (key, _) = source_prefix(&document, "ok ok!").expect("match");
-        assert_eq!(key, "ok ok");
+    fn rejects_source_length_conflicts_and_invalid_locale() {
+        let error = parse(
+            "version: 1\nkind: language\nlanguage: en--US\n\n[Menu]\na:\n  src: One\n  tr: Uno\nb:\n  src: Two\n  tr: Dos\n",
+        )
+        .expect_err("invalid locale and equal source lengths");
+        assert!(
+            error
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.invalid_locale")
+        );
+        assert!(
+            error
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.source_length_conflict")
+        );
     }
 }
