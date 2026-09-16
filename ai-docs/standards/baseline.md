@@ -8,6 +8,7 @@
 |---|---|---|---|
 | 主验证平台 | macOS 26.3.1 / arm64，Apple clang 17.0.0（CLT）+ macOS 26.2 SDK + libc++ | CI 矩阵在 macOS/Linux/Windows 验证 Rust 层（018）；native 层跨平台矩阵随构建任务扩展 | 002 / 018 |
 | C++ | 自有代码 C++20 | 部署目标版本、编译器选项矩阵 | 002 / 003 |
+| C++ 测试 | GoogleTest v1.18.0（FetchContent，仅 `BUILD_TESTING`；规则见 [gtest](gtest.md)） | 聚合入口与门禁 | 019 / 011 |
 | Rust | stable，edition 2024 | 版本与 MSRV 已固定（stable 1.98.1；`rust-version` 下限 1.88） | 001 |
 | Cargo | 主开发入口 | launcher 骨架已落地（001）；native 调度待 004 | 001 / 004 |
 | CMake + Ninja | CMake 4.4.3 + Ninja 1.13.2（Cargo 引导供给，均为上游最新） | 引导实装与首次 configure | 002 / 003 |

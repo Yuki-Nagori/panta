@@ -1,4 +1,9 @@
 {
     // 共享推荐设置：仅使用 ${workspaceFolder} 相对引用，不含个人绝对路径。
-    "cmake.sourceDirectory": "${workspaceFolder}/native"
+    "cmake.sourceDirectory": "${workspaceFolder}/native",
+    // configure 后把编译数据库复制到固定相对位置，供 IntelliSense 消费，
+    // 避免 gtest 等第三方宏在编辑器中出现"非 bool"等误报（gtest.md）。
+    "cmake.copyCompileCommands": "${workspaceFolder}/native/compile_commands.json",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/native/compile_commands.json",
+    "C_Cpp.default.cppStandard": "c++20"
 }

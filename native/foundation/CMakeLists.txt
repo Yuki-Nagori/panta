@@ -33,21 +33,28 @@ target_compile_definitions(panta_foundation PRIVATE
   PANTA_NATIVE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
-add_executable(panta_foundation_version_test tests/version_test.cpp)
-target_compile_features(panta_foundation_version_test PRIVATE cxx_std_20)
-set_target_properties(panta_foundation_version_test PROPERTIES CXX_EXTENSIONS OFF)
-target_compile_options(panta_foundation_version_test PRIVATE
-  $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
-  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
-)
-target_link_libraries(panta_foundation_version_test PRIVATE panta::foundation)
-target_compile_definitions(panta_foundation_version_test PRIVATE
-  PANTA_TEST_EXPECT_MAJOR=${PROJECT_VERSION_MAJOR}
-  PANTA_TEST_EXPECT_MINOR=${PROJECT_VERSION_MINOR}
-  PANTA_TEST_EXPECT_PATCH=${PROJECT_VERSION_PATCH}
-)
-
-add_test(NAME panta.foundation.version COMMAND panta_foundation_version_test)
+# 测试注册由 gtest_discover_tests 承担：每个用例成为独立 CTest 项（gtest.md）。
+# include(GoogleTest) 模块随 CMake 提供；链接 gtest_main 复用其 main()。
+if(BUILD_TESTING)
+  include(GoogleTest)
+  add_executable(panta_foundation_version_test tests/version_test.cpp)
+  target_compile_features(panta_foundation_version_test PRIVATE cxx_std_20)
+  set_target_properties(panta_foundation_version_test PROPERTIES CXX_EXTENSIONS OFF)
+  target_compile_options(panta_foundation_version_test PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
+  )
+  target_link_libraries(panta_foundation_version_test PRIVATE
+    panta::foundation
+    GTest::gtest_main
+  )
+  target_compile_definitions(panta_foundation_version_test PRIVATE
+    PANTA_TEST_EXPECT_MAJOR=${PROJECT_VERSION_MAJOR}
+    PANTA_TEST_EXPECT_MINOR=${PROJECT_VERSION_MINOR}
+    PANTA_TEST_EXPECT_PATCH=${PROJECT_VERSION_PATCH}
+  )
+  gtest_discover_tests(panta_foundation_version_test)
+endif()
 
 install(TARGETS panta_foundation EXPORT pantaNativeTargets
   ARCHIVE DESTINATION lib

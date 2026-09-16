@@ -32,6 +32,7 @@
 | VTK | 9.7.0（commit `23f0a095621e`，当前最新稳定 tag） | `github.com/Kitware/VTK` tag `v9.7.0`（官方镜像；上游 `gitlab.kitware.com/vtk/vtk`） | tag commit SHA | 源码构建 | testing OFF；启用 Qt 组（GUISupportQtQuick）；其余 007 定；`cmake_minimum_required 3.12...3.21` | `find_package(VTK)` 模块化 targets | BSD-3（源码树 Copyright.txt） | 007 |
 | OCCT | 8.0.1（tag `V8.0.1`，commit `b8f597c67781`，2026-07-30，当前最新 release） | `github.com/Open-Cascade-SAS/OCCT` tag `V8.0.1` | tag commit SHA | 源码构建 | 渲染/DRAW/Tcl-TK 相关关闭、模块裁剪由 009 定；`cmake_minimum_required 3.10` | `find_package(OpenCASCADE)` | LGPL-2.1 + OCCT 例外（源码树 LICENSE.txt） | 009 |
 | Netgen | v6.2.2604（commit `3ee489c7d58f`，当前最新 release） | `github.com/NGSolve/netgen` tag `v6.2.2604` | tag commit SHA | 源码构建 | `USE_OCC=ON`、GUI/Python 关闭等由 010 定；该 tag 默认 `USE_OCC=ON`，经 `find_package(OpenCASCADE)`；`cmake_minimum_required 3.16` | 待 010 核实 | LGPL-2.1（仓库 LICENSE） | 010 |
+| GoogleTest（仅测试） | v1.18.0（commit `063de7e9578f82b369302001269680b4b1553359`，当前最新 release） | `github.com/google/googletest` tag `v1.18.0` | tag commit SHA（即 FetchContent `GIT_TAG`） | CMake FetchContent：仅 `BUILD_TESTING=ON` 拉取，`EXCLUDE_FROM_ALL`、`INSTALL_GTEST=OFF` | `gtest_force_shared_crt=ON`；`BUILD_GMOCK=OFF`（需要时按 task 打开） | `GTest::gtest` / `GTest::gtest_main` | BSD-3（源码树 LICENSE） | 019 |
 
 "关键候选选项"是起点而非决定；实施任务按验证结果调整并回写本表。
 
