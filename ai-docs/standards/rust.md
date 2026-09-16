@@ -1,6 +1,6 @@
 # Rust 编码与工具链
 
-查阅日期：2026-09-16。状态：项目规范草案，尚未完成工具链集成验证。
+查阅日期：2026-09-16。状态：任务 001 已落地 workspace 骨架并固定工具链；FFI、native 依赖接入仍未验证。
 
 适用于 `crates/`、launcher 和 Rust 构建辅助代码。stable 表示工具链渠道；可复现构建仍需固定实际版本。
 
@@ -12,7 +12,7 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 
 ## 项目规则
 
-- 采用 edition 2024；任务 001 固定经过验证的 stable 版本，记录 `rust-version` 策略。升级编译器与依赖分别评估，不能以浮动 stable 代替验证记录。
+- 采用 edition 2024；工具链由 `rust-toolchain.toml` 固定在 stable 1.98.1（任务 001，2026-09-16 验证）。workspace `rust-version = "1.88"` 是承诺下限，跟随首选 CXX release（当时 1.0.202）的 MSRV，而非 edition 的最低要求 1.85；依赖或 CXX 要求更高时上调并记录原因。升级编译器与依赖分别评估，不能以浮动 stable 代替验证记录。
 - crate 名使用 `panta-` 前缀，模块/函数 `snake_case`、类型 `PascalCase`。默认使用 rustfmt；Clippy 规则由基础设施任务固定，不能盲目对第三方启用本项目 lint。
 - 领域库用结构化 `Result`，在应用边界补充上下文；不在正常输入、文件读写和协议处理路径使用 `unwrap`/`expect` 代替错误处理。
 - ID 使用 newtype；持久化 DTO 和内存领域对象分离。文件路径采用 `Path`/`PathBuf`，不假定操作系统路径一定能无损转成 UTF-8 字符串。
@@ -22,4 +22,4 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 
 ## 验证
 
-落地后使用 `cargo fmt --all -- --check` 和对实际 targets 的 Clippy 检查；领域测试覆盖输入修订、取消、错误转换。涉及 FFI 时同时运行 native 侧测试。当前没有 Cargo 工程，上述命令尚不可运行。
+骨架上 `cargo fmt --all -- --check` 与 `cargo clippy --locked --all-targets` 已在任务 001 验证通过；领域测试覆盖输入修订、取消、错误转换，随首个业务 crate 建立。涉及 FFI 时同时运行 native 侧测试。

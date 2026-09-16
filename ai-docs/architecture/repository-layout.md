@@ -4,7 +4,7 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置和 `ai-docs/`。下图中应用源码与构建部分为规划，不应据此创建无用途的占位模块。
+当前存在根目录文档、许可证、忽略配置、`ai-docs/`，以及任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
 
 ```text
 panta/
@@ -15,14 +15,15 @@ panta/
 │   ├── standards/             # 技术规范及官方依据
 │   ├── task-index.md          # 任务队列与状态
 │   └── task/                 # 模板与 NNN-name.md
-├── Cargo.toml / Cargo.lock    # 规划：Rust workspace 与依赖锁
+├── Cargo.toml / Cargo.lock    # Rust workspace 与依赖锁（任务 001 已落地）
+├── rust-toolchain.toml        # 固定 stable 工具链（任务 001 已落地）
 ├── crates/
-│   ├── launcher/              # 统一运行入口（规划，任务 001 确定）
-│   ├── core/                  # 通用 ID、错误和应用契约
-│   ├── project/               # 工程模型与命令
-│   ├── workflow/              # 任务、作业和流程编排
-│   ├── solver-client/         # 外部求解器客户端
-│   └── storage/               # 持久化与数据资产索引
+│   ├── launcher/              # 统一运行入口（任务 001 骨架：仅未接入诊断）
+│   ├── core/                  # 规划：通用 ID、错误和应用契约
+│   ├── project/               # 规划：工程模型与命令
+│   ├── workflow/              # 规划：任务、作业和流程编排
+│   ├── solver-client/         # 规划：外部求解器客户端
+│   └── storage/               # 规划：持久化与数据资产索引
 ├── native/
 │   ├── CMakeLists.txt
 │   ├── app/                   # Qt 桌面入口
@@ -54,4 +55,4 @@ C++ 各模块的 `core` 定义自有类型与行为，`occt`、`netgen`、`vtk` 
 
 按职责放置文件，避免按语言把所有业务堆进一个桥接层。模块内部测试可贴近实现；跨模块端到端验证放在 `tests/`。测试资产应小且能合法分发，大型 CAD/结果数据通过受控的外部资产机制管理。
 
-工程名、Rust package 名、Python package 名及最终桌面可执行文件名需在搭建脚手架时统一；不直接沿用附件中的 `moldcae-desktop` 等示意名称。
+工程名与 Rust package 名已统一：工程为 `panta`，Rust package 用 `panta-` 前缀，当前 launcher 的 bin 名为 `panta-launcher`（任务 001）。Python package 名与最终桌面可执行文件名在相应脚手架任务（014 / 005）搭建时确定；不直接沿用附件中的 `moldcae-desktop` 等示意名称。

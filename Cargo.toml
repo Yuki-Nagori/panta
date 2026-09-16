@@ -1,0 +1,26 @@
+[workspace]
+resolver = "3"
+members = ["crates/launcher"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# 承诺支持的最低工具链：跟随首选 CXX release（1.0.202）的 MSRV；
+# 日常验证使用 rust-toolchain.toml 固定的 stable 1.98.1。
+# resolver 3 的 MSRV 感知依赖解析以该值为准，依赖要求更高时上调并记录原因。
+rust-version = "1.88"
+license = "Apache-2.0"
+repository = "https://github.com/Yuki-Nagori/panta"
+
+[workspace.dependencies]
+# 公共依赖集中声明处；成员以 `依赖.workspace = true` 继承。当前骨架无外部依赖。
+
+[workspace.lints.rust]
+# FFI 边界模块（任务 006）引入 unsafe 时在此放开并注明安全前提。
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# 与 rust.md 的错误处理约定对应；完整 Clippy 策略由任务 011 固定。
+unwrap_used = "warn"
+expect_used = "warn"

@@ -1,0 +1,8 @@
+# 固定项目工具链，由 rustup 解析；工具链缺失时先执行：
+#   rustup toolchain install 1.98.1
+# 选型依据：edition 2024 只要求 1.85，首选 CXX 1.0.202 的 MSRV 为 1.88，
+# 实际锁定的 stable 1.98.1 同时满足两者（任务 001）。
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

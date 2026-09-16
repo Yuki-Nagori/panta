@@ -1,6 +1,6 @@
 # Cargo workspace 与原生调度
 
-查阅日期：2026-09-16。状态：项目规范草案，尚未完成工具链集成验证。
+查阅日期：2026-09-16。状态：workspace 骨架已按本规范落地并验证（任务 001）；native 调度、build script 约定由任务 004 实施后再验证。
 
 适用于 workspace、依赖锁、build scripts 和统一命令入口。Rust 语言规范另见 [Rust](rust.md)。
 
@@ -12,7 +12,7 @@ build script 产物应放在 `OUT_DIR`；重建追踪通过 `rerun-if-changed` �
 
 ## 项目规则
 
-- 任务 001 采用 edition 2024 和显式 `resolver = "3"`，集中管理成员与公共依赖。选择唯一默认 launcher，确保后续根目录 `cargo run` 没有 target 歧义。
+- workspace 采用 edition 2024 与显式 `resolver = "3"`，成员与公共依赖集中在根 `Cargo.toml`（任务 001 已落地）。默认 launcher 唯一：`crates/launcher`（bin `panta-launcher`），根目录 `cargo run` 无 target 歧义。
 - 应用仓库提交 `Cargo.lock`；CI 使用锁定依赖。不能提交仅含不存在目录的 workspace members，也不要为了结构整齐创建没有用途的 crate。
 - Cargo 是用户入口，CMake 拥有 native 构建图。任务 004 决定 `build.rs`、`cmake` crate 或辅助调度代码的具体组合，并画出无环依赖关系。
 - 使用 build script 时只向 `OUT_DIR` 写生成产物；native 源文件、QML、资源与影响配置的环境变量均进入重建追踪。不要把构建日志误输出为 Cargo 指令。

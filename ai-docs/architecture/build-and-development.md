@@ -4,7 +4,9 @@
 
 ## 当前可用范围
 
-目前可以阅读和维护文档，不能编译或启动桌面应用。仓库尚无 `Cargo.toml`、`build.rs`、`native/CMakeLists.txt` 或 CI。下面是构建契约与实施要求，不是已验证的安装教程。
+Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、唯一成员 `crates/launcher` 与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行；`cargo run` 只输出"桌面尚未接入"诊断并以退出码 69 结束，不会启动 GUI。
+
+仍不能构建或启动桌面应用：仓库尚无 `build.rs`、`native/CMakeLists.txt` 或 CI，原生调度由任务 003/004 接入。下面是构建契约与实施要求，不是已验证的安装教程。
 
 ## 构建职责
 

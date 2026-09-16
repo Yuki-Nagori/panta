@@ -7,8 +7,8 @@
 | 项目 | 项目选择 | 尚需确定/验证 | 责任任务 |
 |---|---|---|---|
 | C++ | 自有代码 C++20 | 编译器、标准库、ABI | 002 / 003 |
-| Rust | stable，edition 2024 | 固定版本、MSRV、组件 | 001 |
-| Cargo | 主开发入口 | launcher 与 native 调度 | 001 / 004 |
+| Rust | stable，edition 2024 | 版本与 MSRV 已由 001 固定（stable 1.98.1；`rust-version` 下限 1.88）；跨平台覆盖待验证 | 001 / 002 |
+| Cargo | 主开发入口 | launcher 骨架已落地（001）；native 调度待 004 | 001 / 004 |
 | CMake + Ninja | native 构建 | 精确版本、preset schema、配置模式 | 002 / 003 |
 | Qt | Qt 6 Quick / QML | 次版本、模块、部署与图形后端 | 002 / 005 |
 | VTK | V1 渲染后端 | release、Qt Quick 支持、ABI | 002 / 007 |
