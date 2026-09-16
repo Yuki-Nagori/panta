@@ -5,7 +5,7 @@
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-17
 
 ## 目标与背景
 
@@ -28,7 +28,7 @@
 
 ## 前置条件与待决策
 
-Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kind 头部、YAML 风格缩进、无引号标量、转义规则和 TS 支持的 Qt TS 版本。首选 pest；若基准证明配置文件解析无法满足性能目标，才评估 nom。`quick-xml`、`serde` 和其他 crate 的版本、许可证与 MSRV 必须进入 Cargo.lock 并按依赖规范审核。
+Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/sourcelanguage 头部、`[Context]` 区块、短 ID、`src/tr` 字段、状态/复数元数据、YAML 风格缩进、无引号标量、转义规则和 TS 支持的 Qt TS 版本。首选 pest；若基准证明配置文件解析无法满足性能目标，才评估 nom。`quick-xml`、`serde` 和其他 crate 的版本、许可证与 MSRV 必须进入 Cargo.lock 并按依赖规范审核。
 
 ## 实施步骤
 
@@ -39,7 +39,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 ## 预计改动
 
-新增 `crates/panta-dsl-core/`、`crates/panta-dslc/` 及 fixtures；更新 workspace `Cargo.toml`/`Cargo.lock`、CMake 构建入口和 `resources/i18n/<locale>.pa` 示例字典。具体模块/API 以实现时实际归属为准，不把生成的 TS/QM 或构建树放入仓库。
+新增 `crates/panta-dsl-core/`、`crates/panta-dslc/` 及 fixtures；更新 workspace `Cargo.toml`/`Cargo.lock`、CMake 构建入口和 `resources/i18n/panta-*.pa` 示例字典。具体模块/API 以实现时实际归属为准，不把生成的 TS/QM 或构建树放入仓库。
 
 ## 清理与兼容例外
 
@@ -47,7 +47,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 ## 验收标准
 
-- [ ] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 source、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。
+- [ ] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 context/ID、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。
 - [ ] pest grammar 提供准确 source span；kind variables/theme/language 分派明确，未知域与重复字段返回稳定诊断。
 - [ ] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/source、自动生成的内部 id、占位符和 locale 基线不丢失。
 - [ ] CLI 为单文件可执行物，任意 cwd 可运行且不访问网络/系统 Qt；输出临时 TS 后由锁定的预编译 `lrelease` 生成 QM。
@@ -61,7 +61,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-16 | 完成 Rust parser/CLI 架构与 `.pa` 简洁语法设计 | 明确 pest、quick-xml、serde、TS/QM 和 CMake 边界 | 设计已提交；实现与构建验证进行中 |
-| 2026-09-17 | `cargo test --locked`；`cargo fmt --all -- --check`；`cargo clippy -p panta-dsl-core -p panta-dslc --all-targets --all-features -- -D warnings` | parser/TS 生成、kebab-case 约束、最长 source 规则和 CLI crate 通过 | 8 个核心测试、2 个 fixture 集成测试、launcher 4 个测试通过；fmt 与两个 DSL crate 的 clippy 通过。workspace clippy 仍会触发 launcher 的 Qt 预编译下载，当前网络无法解析 Qt 镜像，记录为环境阻塞 |
+| 2026-09-17 | `cargo fmt --all`；`cargo test -p panta-dsl-core`；`cargo run -p panta-dslc -- check/emit-ts ...` | parser/TS 生成、kebab-case 约束、最长 source 规则和 CLI crate 通过 | 5 个核心单元测试、2 个 fixture 集成测试通过；CLI 成功校验 fixture 并生成 `zh_CN` TS。workspace 级 launcher/Qt 验证仍待预编译 Qt 供给可用后执行 |
 
 ## 风险与回退
 
@@ -71,7 +71,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 - 2026-09-16：创建任务；确认这是应用平台的配置/资源引擎工作，Rust library + 单文件 CLI 是唯一解析实现。
 - 2026-09-16：首选 pest；quick-xml 将语言 Artifact 生成 Qt TS XML，serde 负责 DTO，QM 保持 Qt 运行期格式；`.pa` 源码不暴露 XML。
-- 2026-09-17：语言 `.pa` 改为直接以 English source 文案作为条目键，不维护 `app.ok` 之类人工 msgid；locale 允许 `cn` 简写，编译器归一化为 `zh-CN`。
+- 2026-09-17：根据 TS 兼容示例，语言 `.pa` 改为 `[Context]` + 短 ID + `src/tr` 元数据结构；支持 `st`、`oldsrc`、`comment`、`extra`、`numerus` 和 plural forms，`cn` 简写归一化为 `zh-CN`。
 - 2026-09-17：开始实现 `panta-dsl-core` 与 `panta-dslc`，首期采用 YAML 风格缩进和无引号标量；变量/Theme 的类型表达式保留 `=`。
 
 ## 完成摘要

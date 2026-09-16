@@ -21,18 +21,21 @@ values:
   half: real = divisions * scale
 ```
 
-国际化字典复用同一文件头和诊断格式，使用全局 catalog 的 English source 条目；TS XML 仅是编译中间文件：
+国际化字典复用同一文件头和诊断格式，使用 `[Context]`、短 ID、`src/tr` 条目；TS XML 仅是编译中间文件：
 
 ```text
 version: 1
 kind: language
-catalog: panta-ui
+language: zh_CN
+sourcelanguage: en
 
-Advance revision:
-  translation cn: 推进修订
+[FileMenu]
+open:
+  src: Open
+  tr: 打开
 ```
 
-语言字典统一放在 `resources/i18n/panta-ui.pa`，构建器再按 locale 生成 TS/QM；主题和变量也使用 `.pa` 文本，域由 `kind` 明确区分。顶层和区块字段使用 `key: value`，值默认取到行尾，不写引号；变量/Theme 的表达式使用 `type = expression`。变量和 Theme 的业务 key 采用 kebab-case，locale 可用标准短横线或下划线形式，语言字典还允许 `cn` 简写 `zh-CN`。注释使用 `//`，反斜杠用于转义 `:`、`=`、换行和行尾空白。`.pa` 必须是 UTF-8，不能执行脚本、import、网络或 shell。语言域的 source、fallback、占位符和缺项规则见[国际化模块](internationalization.md)。
+语言字典按目标语言放在 `resources/i18n/panta-en.pa`、`panta-cn.pa` 等文件中，每个文件只包含一个 locale；构建器聚合这些文件后分别生成 TS/QM。主题和变量也使用 `.pa` 文本，域由 `kind` 明确区分。顶层和区块字段使用 `key: value`，值默认取到行尾，不写引号；变量/Theme 的表达式使用 `type = expression`。变量和 Theme 的业务 key 采用 kebab-case，locale 可用标准短横线或下划线形式，语言字典还允许 `cn` 简写 `zh-CN`。注释使用 `//`，反斜杠用于转义 `:`、`=`、换行和行尾空白。`.pa` 必须是 UTF-8，不能执行脚本、import、网络或 shell。语言域的 source、fallback、占位符和缺项规则见[国际化模块](internationalization.md)。
 
 V1 包含 bool、int、有限 real、string、resource；类型显式声明，int 算术检查溢出，int 到 real 的提升规则固定并测试。字符串定义 UTF-8 与转义规则；关键字、标识与小数点均不随 UI 语言变化。标识符初期限定 ASCII，用户可读标签允许 Unicode。表达式仅允许引用、括号及类型允许的算术，不提供 eval、循环、函数定义、import、网络或 shell。
 
