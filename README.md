@@ -5,7 +5,7 @@
 
 规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
 
-**当前状态：Rust workspace 骨架可构建、可测试；桌面程序与 native 构建尚未实现。**
+**当前状态：Rust workspace、Cargo 调度 native 构建与 Qt Quick/C++ ViewModel 桌面骨架已落地；完整 CAE 业务尚未实现。**
 
 ## 环境要求
 
@@ -36,7 +36,9 @@ native 直接诊断构建（不经 Cargo）仍可用：在 `native/` 下执行 `
 
 1. 从 [任务索引](ai-docs/task-index.md) 选择任务；新增工作先复制 [任务模板](ai-docs/task/_template.md)。
 2. 阅读任务引用的 [架构说明](ai-docs/architecture/README.md) 与 [技术规范](ai-docs/standards/README.md)。
-3. 按任务实施、验证并更新状态。001、002 已完成，CI（018）已建立；下一项为 [003 CMake/Ninja 原生构建骨架](ai-docs/task/003-cmake-native-skeleton.md)。
+3. 按任务实施、验证并更新状态。具体依赖与可开始任务以[任务索引](ai-docs/task-index.md)为准。
+
+国际化、跨平台路径与运行时、变量 DSL、C++/QML 模块和热重载的规划见[重要模块说明](ai-docs/modules/README.md)。
 
 完整路由见 [AGENTS.md](AGENTS.md)。
 

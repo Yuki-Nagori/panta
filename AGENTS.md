@@ -5,6 +5,7 @@
 | 工作内容 | 入口 |
 |---|---|
 | 开始任务、查依赖与状态 | [任务索引](ai-docs/task-index.md) / [任务模板](ai-docs/task/_template.md) |
+| 查 i18n、路径/运行时、DSL、模块与重载设计 | [重要模块说明](ai-docs/modules/README.md) |
 | 查模块职责、数据流与里程碑 | [架构总览及主题导航](ai-docs/architecture/README.md) |
 | 查版本基线、编码及依赖规则 | [技术规范索引](ai-docs/standards/README.md) |
 | 查外部物理引擎边界 | [[External / 非本仓库] MoldSolver](ai-docs/architecture/external-moldsolver.md) |

@@ -7,6 +7,7 @@
 ```text
 ai-docs/
 ├── architecture/                 # README.md 为总览与主题导航
+├── modules/                      # 重要模块设计与任务导航
 ├── standards/                    # 技术规范与官方依据
 ├── task-index.md                 # 全部任务索引
 └── task/
@@ -57,10 +58,25 @@ ai-docs/
 | 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | planned |
 | 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | planned |
 | 013 | [桌面安装布局与部署冒烟](task/013-desktop-deployment-smoke.md) | 交付基础 | 011 | planned |
-| 014 | [后续 Python 工具环境](task/014-python-tooling-foundation.md) | 后续可选 | 001 | deferred |
+| 014 | [后续 Python 工具环境](task/014-python-tooling-foundation.md) | MVP 后续能力 | 001 | deferred |
 | 018 | [三平台 CI 基础](task/018-cross-platform-ci.md) | 验证基础 | 001, 002 | done |
 | 019 | [GTest 测试配置与规则](task/019-gtest-native-testing.md) | 验证基础 | 003 | done |
 | 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | planned |
+
+## 应用平台扩展队列
+
+设计入口：[重要模块说明](modules/README.md)。下列任务均未实施。
+
+| 编号 | 任务 | 阶段 | 依赖 | 状态 |
+|---|---|---|---|---|
+| 022 | [UI 英文源文案与语言字典](task/022-ui-internationalization.md) | 应用平台扩展 | 005 | ready |
+| 023 | [跨平台路径与资源引用服务](task/023-cross-platform-paths.md) | 应用平台扩展 | 005, 006 | planned |
+| 024 | [工程运行时上下文与变量快照](task/024-runtime-context.md) | 应用平台扩展 | 008, 023 | planned |
+| 025 | [变量 DSL 解析、求值与存储](task/025-variable-dsl.md) | 应用平台扩展 | 024 | planned |
+| 026 | [C++ 静态库边界与 QML 自动注册](task/026-static-qml-modules.md) | 应用平台扩展 | 005 | ready |
+| 027 | [开发模式 QML 重载与状态恢复](task/027-qml-state-reload.md) | 应用平台扩展 | 007, 024, 026 | planned |
+| 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | ready |
+| 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
 
 ## 仓库与文档维护
 
@@ -69,6 +85,8 @@ ai-docs/
 | 015 | [文档入口与一致性整理](task/015-documentation-structure.md) | 文档维护 | — | done |
 | 016 | [忽略规则与通用开发规范](task/016-repository-conventions.md) | 仓库维护 | — | done |
 | 017 | [代码生命周期与 commit 一致性规范](task/017-code-lifecycle-and-commits.md) | 仓库维护 | — | done |
+| 021 | [重要模块说明与后续任务规划](task/021-important-module-planning.md) | 文档维护 | — | done |
+| 028 | [QML 原子组件与主题 DSL 规划](task/028-qml-theme-planning.md) | 文档维护 | — | done |
 
 ## 执行顺序与交付边界
 
@@ -76,6 +94,10 @@ ai-docs/
 
 平台分支：004 → 006；005 + 006 → 008 → 009 → 010，先建立 FFI、任务生命周期，再验证 OCCT 和 Netgen。两个分支都准备好后，007 + 008 + 010 → 011 → 012 / 013，统一测试、CI 和部署检查。这里是依赖图，编号相邻不意味着必须等待不相关任务；是否并行执行由实际工作安排决定。
 
-014 默认 deferred，只有开始 Python 工具工作时才推进，不阻塞桌面基础链。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
+主题分支：005 → 029；025 + 029 → 030。先迁移组件及尺寸参数，再接主题 DSL；主题切换不依赖工程打开或引擎重载。
+
+新增分支：005 → 022 / 026；005 + 006 → 023；008 + 023 → 024 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。
+
+014 默认 deferred，当前 MVP 不接入 Python；只有开始第一个真实 Python 工具工作时才推进，不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 
 后续新任务使用当前最大编号加一，不复用已有编号。001–005 已完成；主线下一项建议执行 [007 VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md)（006 可并行）。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

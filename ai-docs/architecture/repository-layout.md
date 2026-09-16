@@ -12,6 +12,7 @@ panta/
 ├── README.md                  # 使用入口与当前状态
 ├── ai-docs/
 │   ├── architecture/          # README.md 总览与分主题架构
+│   ├── modules/               # 重要模块设计；实施进展见 task
 │   ├── standards/             # 技术规范及官方依据
 │   ├── task-index.md          # 任务队列与状态
 │   └── task/                 # 模板与 NNN-name.md

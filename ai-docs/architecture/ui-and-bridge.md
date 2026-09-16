@@ -2,6 +2,10 @@
 
 [架构总览](README.md)
 
+UI 源文案统一英文，翻译由语言字典提供，具体规划见[国际化](../modules/internationalization.md)。C++ 静态库、QML 自动注册和开发模式状态重载见[模块与热重载](../modules/qml-modules-and-reload.md)，尚未实施。
+
+组件按原子控件、组合组件、业务面板和页面拼装；尺寸输入统一绑定 Theme，后续由独立应用主题 DSL 提供值。详细职责与数据流见[组件库与主题 DSL](../modules/qml-components-and-theme.md)。
+
 ## 界面构成
 
 目标桌面界面包含顶部菜单/工具栏、左侧工程树、中央 3D 视口、右侧属性编辑器、底部任务状态与 Console。工程树按 Geometry、Mesh、Studies、Results 组织；树选择、视口选择与属性面板应使用统一实体 ID 同步。
