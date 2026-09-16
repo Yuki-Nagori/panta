@@ -9,7 +9,7 @@
 
 ## 目标与背景
 
-基于当前界面建立原子/组合组件，以明确输入属性和输出信号拼装面板；所有可配置视觉尺寸统一收敛到现存 Theme.qml。 当前仅规划，未实施。
+基于当前界面建立原子/组合组件，以明确输入属性和输出信号拼装面板；所有可配置视觉尺寸统一收敛到现存 Theme.qml。当前已开始实施原子组件与尺寸参数化。
 
 ## 必读
 
@@ -38,7 +38,8 @@
 - 已在 `qml/Components/Atoms/` 落地 `ThemedLabel`、`ThemedButton` 和 `PanelSurface` 三个无业务依赖的原子组件。
 - `App.qml` 与 `PlaceholderPanel.qml` 已改为通过原子组件拼装；窗口最小尺寸、控件高度、面板圆角等视觉 token 集中到 `Themes/Theme.qml`。
 - `ThemedButton` 保留 Qt Quick Controls 的键盘、焦点和禁用行为，组件通过 `contentPadding`、`controlHeight` 等属性接受覆盖。
-- 尚未完成真实窗口的长文本、中英文、缩放和不同 DPI 验证，也未建立专门的 QML 行为测试；因此任务仍为 `in-progress`。
+- QML 模块文件系统输出已按 `Panta/Shell` URI 归位，并增加 `ThemeComponentTest` 验证默认 token 和显式尺寸覆盖。
+- 尚未完成真实窗口的长文本、中英文、缩放和不同 DPI 验证，以及 Theme 运行期变更通知验证；因此任务仍为 `in-progress`。
 
 ## 清理与兼容例外
 
@@ -62,7 +63,7 @@
 | 2026-09-16 | `cmake --preset debug` → `cmake --build build/debug` | 预编译 Qt 已缓存后配置与构建成功；生成三个原子组件并完成 QML cache 编译 |
 | 2026-09-16 | `cmake --build build/debug --target all_qmllint` | 命令成功；仅有既存 `Panta.Bridge` 手动注册类型不可见警告，无新增组件错误 |
 | 2026-09-16 | Qt 6.11.2 `qmlformat` 输出与 `qml/` 文件逐个 diff | 新增及迁移的 QML 文件格式一致 |
-| 2026-09-16 | `ctest --test-dir build/debug --output-on-failure` | 5/5 native tests 通过 |
+| 2026-09-16 | `ctest --test-dir build/debug --output-on-failure` | 6/6 native tests 通过，含 `Qml.ThemeComponentParameters` |
 | 2026-09-16 | `cargo build --locked`、`cargo test --locked` | Rust 构建成功；4/4 launcher tests 通过 |
 | 2026-09-16 | `native/build/debug/app/panta-native --version`、未知参数冒烟 | 版本输出正确；未知参数以 64 退出并给出用法诊断 |
 | 2026-09-16 | `QT_QPA_PLATFORM=offscreen` 启动 2 秒后终止 | 事件循环保持运行且无 QML 加载错误输出；因无头进程不会自行退出，按测试时限终止 |
@@ -74,6 +75,7 @@
 ## 决策与工作记录
 
 - 2026-09-16：依据用户原子组件与 DSL 主题需求，由 028 编排。
+- 2026-09-16：组件测试以 C++ QtTest 加载模块内 QML 资源，避免 qmltestrunner 未链接 `panta_shell` 时无法解析模块资源；测试纳入 CTest。
 
 ## 完成摘要
 
