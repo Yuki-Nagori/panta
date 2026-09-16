@@ -14,6 +14,10 @@ QtObject {
     readonly property int spacingSmall: 8
     readonly property int spacingMedium: 16
     readonly property int spacingLarge: 24
+    readonly property int radiusSmall: 8
+    readonly property int controlHeight: 36
+    readonly property int windowMinimumWidth: 640
+    readonly property int windowMinimumHeight: 480
 
     readonly property int fontTitle: 20
     readonly property int fontBody: 14

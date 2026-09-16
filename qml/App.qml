@@ -7,8 +7,8 @@ import Panta.Bridge
 ApplicationWindow {
     id: root
 
-    minimumWidth: 640
-    minimumHeight: 480
+    minimumWidth: Theme.windowMinimumWidth
+    minimumHeight: Theme.windowMinimumHeight
     visible: true
     title: qsTr("panta")
     color: Theme.colorBackground
@@ -22,22 +22,21 @@ ApplicationWindow {
         anchors.margins: Theme.spacingLarge
         spacing: Theme.spacingMedium
 
-        Label {
+        ThemedLabel {
             Layout.fillWidth: true
             text: viewModel.caption.length > 0 ? viewModel.caption : qsTr("panta — 桌面骨架（任务 005）")
-            font.pixelSize: Theme.fontTitle
-            color: Theme.colorText
+            textSize: Theme.fontTitle
         }
 
-        Button {
+        ThemedButton {
             text: qsTr("推进修订")
             onClicked: viewModel.tick()
         }
 
-        Label {
+        ThemedLabel {
             // 重复写入同一 caption 时不产生新通知（ShellViewModel 去重，测试覆盖）。
             text: qsTr("修订计数：") + viewModel.count
-            color: Theme.colorTextMuted
+            textColor: Theme.colorTextMuted
         }
 
         // 未来面板占位：工程树/视口/属性区由后续任务替换（架构：ui-and-bridge）。
@@ -47,11 +46,11 @@ ApplicationWindow {
         }
 
         // 错误展示入口：ViewModel 的用户可读摘要（详细诊断走日志，qt.md）。
-        Label {
+        ThemedLabel {
             Layout.fillWidth: true
             visible: viewModel.error.length > 0
             text: viewModel.error
-            color: Theme.colorError
+            textColor: Theme.colorError
             wrapMode: Text.Wrap
         }
     }

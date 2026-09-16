@@ -12,6 +12,9 @@ qt_add_qml_module(panta_shell
   QML_FILES
     App.qml
     Themes/Theme.qml
+    Components/Atoms/ThemedLabel.qml
+    Components/Atoms/ThemedButton.qml
+    Components/Atoms/PanelSurface.qml
     Panels/PlaceholderPanel.qml
 )
 
