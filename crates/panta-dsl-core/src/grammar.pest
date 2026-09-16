@@ -1,0 +1,35 @@
+document = { SOI ~ line* ~ EOI }
+
+line = { blank | comment | version | kind | catalog | fallback | translation | directive | section | entry | message }
+blank = { hws* ~ newline }
+comment = { hws* ~ "//" ~ (!newline ~ ANY)* ~ newline? }
+
+version = { hws* ~ "version" ~ hws* ~ ":" ~ hws* ~ integer ~ hws* ~ newline? }
+kind = { hws* ~ "kind" ~ hws* ~ ":" ~ hws* ~ kind_name ~ hws* ~ newline? }
+catalog = { hws* ~ "catalog" ~ hws* ~ ":" ~ hws* ~ catalog_name ~ hws* ~ newline? }
+fallback = { hws* ~ "fallback" ~ hws* ~ ":" ~ hws* ~ locale_name ~ hws* ~ newline? }
+message = { hws* ~ !("msgid" ~ hws+) ~ source_key ~ hws* ~ ":" ~ hws* ~ newline }
+translation = { indent ~ "translation" ~ hws+ ~ locale_name ~ hws* ~ ":" ~ hws* ~ scalar ~ hws* ~ newline? }
+directive = { unfinished | source_note | translation_note }
+unfinished = { indent ~ "@unfinished" ~ hws+ ~ locale_name ~ hws* ~ newline? }
+source_note = { indent ~ "@source-note" ~ hws* ~ ":" ~ hws* ~ scalar ~ hws* ~ newline? }
+translation_note = { indent ~ "@translation-note" ~ hws+ ~ locale_name ~ hws* ~ ":" ~ hws* ~ scalar ~ hws* ~ newline? }
+section = { hws* ~ section_name ~ hws* ~ ":" ~ hws* ~ newline? }
+entry = { indent ~ key ~ hws* ~ ":" ~ hws* ~ entry_value ~ hws* ~ newline? }
+entry_value = _{ typed_value | scalar }
+typed_value = { type_name ~ hws+ ~ "=" ~ hws* ~ scalar }
+
+integer = @{ ASCII_DIGIT+ }
+kind_name = @{ "language" | "theme" | "variables" }
+section_name = @{ "values" }
+type_name = @{ "bool" | "int" | "real" | "string" | "resource" }
+locale_name = @{ (ASCII_ALPHANUMERIC | "-" | "_")+ }
+source_key = @{ ("\\:" | "\\\\" | (!":" ~ !newline ~ ANY))+ }
+key = @{ identifier ~ ("." ~ identifier)* }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "-")* }
+catalog_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "-")* }
+scalar = @{ (!newline ~ ANY)* }
+
+indent = _{ "  " }
+hws = _{ " " | "\t" }
+newline = _{ "\r\n" | "\n" }

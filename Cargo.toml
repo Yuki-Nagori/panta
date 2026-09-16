@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/launcher"]
+members = ["crates/launcher", "crates/panta-dsl-core", "crates/panta-dslc"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,7 +13,10 @@ license = "Apache-2.0"
 repository = "https://github.com/Yuki-Nagori/panta"
 
 [workspace.dependencies]
-# 公共依赖集中声明处；成员以 `依赖.workspace = true` 继承。当前骨架无外部依赖。
+pest = "2.8"
+pest_derive = "2.8"
+quick-xml = { version = "0.38", features = ["serialize"] }
+serde = { version = "1.0", features = ["derive"] }
 
 [workspace.lints.rust]
 # FFI 边界模块（任务 006）引入 unsafe 时在此放开并注明安全前提。
