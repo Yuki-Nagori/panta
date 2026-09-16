@@ -18,25 +18,31 @@ QML 使用稳定 message key 的 `qsTrId()`，C++ 展示文本使用 `qtTrId()`�
 
 ## 构建与边界
 
-规划在 `resources/i18n/` 保存 `en.pa`、`zh-CN.pa` 等纯文本字典。Rust 编译器使用 025 的共享 lexer/parser 校验后，在构建树写出临时 `panta_en.ts`、`panta_zh_CN.ts`，调用锁定的 Qt Linguist 预编译 `lrelease` 生成 QM，再嵌入只读资源；临时 TS 和 QM 不作为源码提交。构建入口由 CMake 管理，Cargo 继续负责统一调度；QtTools 缺失时按预编译依赖规范补供给，不源码构建 Qt。
+规划在 `resources/i18n/panta-ui.pa` 保存全局字典。Rust 编译器使用 034 的共享 parser 校验后，按 locale 在构建树写出临时 `panta_en.ts`、`panta_zh_CN.ts`，调用锁定的 Qt Linguist 预编译 `lrelease` 生成对应 QM，再嵌入只读资源；临时 TS 和 QM 不作为源码提交。构建入口由 CMake 管理，Cargo 继续负责统一调度；QtTools 缺失时按预编译依赖规范补供给，不源码构建 Qt。
 
 ## `.pa` 字典语法约定
 
-`.pa`（Panta Artifact）是 UTF-8 文本，不是 XML 容器；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。每个 locale 一个文件，英文文件是完整基线，其他文件只覆盖相同 key。语法采用 YAML 风格的区块和冒号，不需要引号：
+`.pa`（Panta Artifact）是 UTF-8 文本，不是 XML 容器；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。语言域使用一个全局 catalog，不拆成每 locale 一个源文件。语法采用 YAML 风格的区块和冒号，不需要引号：
 
 ```text
 version: 1
 kind: language
-locale: zh-CN
-fallback: en
+catalog: panta-ui
 
-messages:
-  app.advance_revision: 推进修订
-  app.revision_count: 修订计数：%1
+msgid app.advance-revision:
+  source: Advance revision
+  translation zh-CN: 推进修订
+  translation ja: Advance revision
+
+  @source-note: Imperative action label
+  @translation-note zh-CN: Keep the imperative tone
+  @unfinished ja
 ```
 
-英文基线使用相同 key 和 English 文本。编译器以 key 生成 TS 的 message id，并用稳定的 `Panta` context 和英文 source 填充 Qt 节点，因此 QML/C++ 不需要把 XML 结构暴露给开发者。message key 只允许 ASCII 小写、数字、点和下划线；翻译值为 UTF-8 字符串，行尾空白会被规范化，需要保留前后空格时使用反斜杠转义。`%1`、`%n` 等占位符必须与基线集合一致。缺失 key 按 fallback 链回退，重复 key、未知 key、占位符不一致、非法 locale 或损坏文件拒绝整个字典。
+编译器以 `msgid` 生成 TS 的 message id，以 source 填充英文节点，再按 locale 选择 translation；QML/C++ 通过 `qsTrId()`/`qtTrId()` 查找，不需要把 XML 结构暴露给开发者。`msgid` 的每个点分段都使用 ASCII kebab-case（短横线 `-`），禁止下划线；locale 仍允许标准的 `zh-CN`/`en_US`。source/translation 为 UTF-8 行尾标量，行尾空白会被规范化，需要保留前后空格时使用反斜杠转义。`%1`、`%n` 等占位符必须在 source 与每个已完成 translation 间一致。缺失或 `@unfinished` 的译文由 QM 回退 source，重复 msgid、重复 locale、占位符不一致、非法 locale 或损坏文件拒绝整个字典。
 
 `.pa` 也用于主题和变量，由 `kind theme`、`kind variables` 区分域；所有域共用 025 的 lexer、parser、版本和诊断格式。国际化域由 Rust 生成 TS XML 以使用 Qt 的成熟工具和 QM 查找，不把 XML 解析放入运行时。
+
+同一 context 的 source-text 兼容查找采用最长匹配：`ok ok` 先于 `ok`，同长度候选直接报错；正常 QML/C++ 路径始终用 `msgid` 精确查找，避免在任意用户文本中替换短词。
 
 022 验证界面、占位参数、缺项回退、加载失败和语言偏好；完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。

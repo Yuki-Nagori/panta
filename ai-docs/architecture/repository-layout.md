@@ -4,7 +4,7 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置、`ai-docs/`、任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`）、任务 003/004 落地的 native 构建骨架，以及任务 005 落地的 Qt 桌面骨架（`native/app`+`native/bridge`、根 `qml/` 模块与 Qt 供给脚本）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
+当前存在根目录文档、许可证、忽略配置、`ai-docs/`、任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`），以及任务 034 正在实施的 `.pa` DSL parser/CLI（`crates/panta-dsl-core`、`crates/panta-dslc`）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt 桌面骨架（`native/app`+`native/bridge`、根 `qml/` 模块与 Qt 供给脚本）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
 
 ```text
 panta/
@@ -20,6 +20,8 @@ panta/
 ├── rust-toolchain.toml        # 固定 stable 工具链（任务 001 已落地）
 ├── crates/
 │   ├── launcher/              # 统一运行入口（任务 001 骨架：仅未接入诊断）
+│   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034 实施中）
+│   ├── panta-dslc/             # 单文件 .pa 校验/TS 输出 CLI（034 实施中）
 │   ├── core/                  # 规划：通用 ID、错误和应用契约
 │   ├── project/               # 规划：工程模型与命令
 │   ├── workflow/              # 规划：任务、作业和流程编排
@@ -43,7 +45,7 @@ panta/
 │   └── Themes/                # Theme 单例（005 已落地）
 ├── python/                    # 后续 Python API，包名待定
 ├── schemas/                   # 本地工程 schema、外部契约版本引用
-├── resources/                 # 图标、主题、样例等资源
+├── resources/                 # 图标、.pa 源文件与样例；TS/QM 只进构建树
 └── tests/                     # 跨模块场景与回归数据
 ```
 
@@ -54,6 +56,8 @@ panta/
 C++ 各模块的 `core` 定义自有类型与行为，`occt`、`netgen`、`vtk` 目录实现适配。ViewModel 不应承担几何修复、网格算法或文件格式解析。QML 组件处理布局、状态展示和交互绑定。
 
 `schemas/` 若包含共享协议，应明确其上游来源、版本及生成方式，不能与候选外部协议仓库分别维护两个权威版本。跨语言 FFI 优先验证 CXX，实际 crate、生成工具及目录由任务 006 确定，不预设它们已经存在。QML 模块可在 qml/ 下设置自己的 CMakeLists.txt，由 native 顶层纳入构建。
+
+`.pa` 源文件由 `panta-dsl-core` 统一解析，按 `kind` 聚合成 language、theme 或 variables Artifact；`panta-dslc` 只负责命令编排。国际化构建树中的临时 TS 由 quick-xml 生成、QM 由预编译 QtTools 生成，源码目录不保存这两类产物。格式化/校验规则和 fixtures 归 035，不能在各业务目录复制 parser。
 
 ## 新增文件原则
 

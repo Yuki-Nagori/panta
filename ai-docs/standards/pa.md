@@ -9,22 +9,27 @@
 - `.pa` 统一使用 UTF-8、LF 换行和两格缩进；禁止 Tab。文件末尾保留一个换行，格式化输出稳定且可复现。
 - 语法借鉴 YAML 的层级和 `key: value` 可读性，但不是通用 YAML。不得出现 `---`/`...` 多文档、anchor、alias、tag、flow collection、隐式类型推断或任意 YAML 扩展。
 - 值默认是不带引号的行尾标量。首个结构分隔符只解释当前声明的 `:`；值中的 `:`、`#` 和 URL 保持字面意义。注释使用 `//`，不使用 `#`。
-- 关键字、kind、locale、message key、变量名和 Theme key 使用 ASCII；用户可见文本保持 Unicode。文法关键字永远不随 UI 语言切换。
+- 关键字、kind、locale、message key、变量名和 Theme key 使用 ASCII；业务标识统一采用 kebab-case（短横线 `-`），禁止用下划线拼接，例如 `app.advance-revision`、`spacing-small`。locale 仍按标准允许 `zh-CN` 或 `en_US`。用户可见文本保持 Unicode；文法关键字永远不随 UI 语言切换。
+- 语言 catalog 中 `msgid` 是一等元素，source 与 translation 必须成对记录；同一 source 可因语境拥有不同 msgid，但同一查找上下文不得产生相同长度冲突。
 - 解析、格式化和校验共享 034 的 Rust AST；不能用正则或第二套 YAML parser 在任务模块里旁路处理。
 
 ## 推荐形状
 
-语言字典：
+语言字典是全局 catalog：一个文件保存所有 `msgid`、英文 source 和多个 locale 的 translation。构建器再按 locale 生成独立 TS/QM：
 
 ```text
 version: 1
 kind: language
-locale: zh-CN
-fallback: en
+catalog: panta-ui
 
-messages:
-  app.advance_revision: 推进修订
-  app.revision_count: 修订计数：%1
+msgid app.advance-revision:
+  source: Advance revision
+  translation zh-CN: 推进修订
+  translation ja: Advance revision
+
+  @source-note: Imperative action label
+  @translation-note zh-CN: Keep the imperative tone
+  @unfinished ja
 ```
 
 变量域：
@@ -46,11 +51,13 @@ version: 1
 kind: theme
 
 values:
-  spacing_small: real = 8
-  control_height: real = 32
+  spacing-small: real = 8
+  control-height: real = 32
 ```
 
-语言的 message 值从冒号后的第一个空格开始到行尾；变量/Theme 的 `type = expression` 是受限表达式，不把 `=` 后的数字或资源路径当成 YAML 的隐式 bool/number。多行文本、复杂集合、函数和脚本不在 V1；换行和保留行尾空白使用反斜杠转义。
+`msgid`、`source` 和 `translation <locale>` 是语言域的一等语法元素；每个 `msgid` 必须恰好有一个 source，每个 locale 最多一个 translation。`@unfinished <locale>` 标记未完成翻译，`@source-note` 和 `@translation-note <locale>` 分别记录源文本与译文注释。变量/Theme 的 `type = expression` 是受限表达式，不把 `=` 后的数字或资源路径当成 YAML 的隐式 bool/number。多行文本、复杂集合、函数和脚本不在 V1；换行和保留行尾空白使用反斜杠转义。
+
+Qt 运行时按 `msgid` 精确查 QM，不做隐式全局字符串替换。需要兼容 source-text 查找时，在同一 context 中采用最长 source 优先：`ok ok` 覆盖 `ok`，同长度候选必须报错；单词边界和是否允许子串匹配由调用方明确选择，不能由 formatter 猜测。
 
 ## 规范化与校验
 
@@ -58,7 +65,7 @@ values:
 
 格式化只改变空白、缩进和可安全排序的映射键，不改变值、表达式、声明顺序或注释语义。写回使用临时文件、fsync/替换和失败保留策略；不能把格式化失败当成校验通过。formatter 不补引号、不把 Unicode 转义成 `\\u`、不重排变量声明来改变诊断顺序。
 
-035 评估直接使用 `yaml-format`/同类工具与 Rust AST formatter：只有能证明不引入 YAML 隐式语义、保留无引号值、注释和自有类型表达式时才可复用；否则实现小型确定性 formatter。无论选型如何，`pa check` 是唯一权威校验入口。
+035 评估直接使用 `yaml-format`/同类工具与 Rust AST formatter：只有能证明不引入 YAML 隐式语义、保留无引号值、`msgid` 块、指令和注释时才可复用；否则实现小型确定性 formatter。无论选型如何，`pa check` 是唯一权威校验入口。
 
 ## 安全与演进
 

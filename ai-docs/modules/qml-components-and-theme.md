@@ -47,13 +47,13 @@ version: 1
 kind: theme
 
 values:
-  spacing_small: real = 8
-  control_height: real = 32
-  font_body: real = 14
-  color_background: string = #1e1f22
+  spacing-small: real = 8
+  control-height: real = 32
+  font-body: real = 14
+  color-background: string = #1e1f22
 ```
 
-映射示意：spacing_small → Theme.spacingSmall，control_height → Theme.controlHeight。键名映射由单一 schema 明确定义，不按字符串猜测属性。颜色首期用 string 加主题专用校验，不要求 025 引入 color 类型；数值在 DSL 层仍无量纲，主题 schema 将特定键解释为逻辑像素，与 CAE 物理单位无关。
+映射示意：`spacing-small` → `Theme.spacingSmall`，`control-height` → `Theme.controlHeight`。键名映射由单一 schema 明确定义，不按字符串猜测属性。颜色首期用 string 加主题专用校验，不要求 025 引入 color 类型；数值在 DSL 层仍无量纲，主题 schema 将特定键解释为逻辑像素，与 CAE 物理单位无关。业务 key 统一使用短横线，生成到 C++/QML 属性时才按 schema 映射为 camelCase。
 
 应用主题作用域独立于工程变量，复用解析器和不可变快照机制，但不要求打开工程，不随工程关闭销毁，切换也不把工程标记为 dirty。主题覆盖缺省键继承内置默认值；未知键、错误类型、非法颜色、非有限或越界尺寸拒绝整个覆盖。内置默认主题本身必须键齐全且通过构建/测试校验。
 

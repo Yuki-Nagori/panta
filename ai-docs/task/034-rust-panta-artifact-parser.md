@@ -61,6 +61,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-16 | 完成 Rust parser/CLI 架构与 `.pa` 简洁语法设计 | 明确 pest、quick-xml、serde、TS/QM 和 CMake 边界 | 设计已提交；实现与构建验证进行中 |
+| 2026-09-16 | `cargo test --locked`；`cargo fmt --all -- --check`；`cargo clippy -p panta-dsl-core -p panta-dslc --all-targets --all-features -- -D warnings` | parser/TS 生成、kebab-case 约束、最长 source 规则和 CLI crate 通过 | 7 个核心测试、launcher 4 个测试通过；fmt 与两个 DSL crate 的 clippy 通过。workspace clippy 仍会触发 launcher 的 Qt 预编译下载，当前网络无法解析 Qt 镜像，记录为环境阻塞 |
 
 ## 风险与回退
 
