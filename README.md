@@ -1,6 +1,7 @@
 # panta
 
-[![CI](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml/badge.svg)](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml)
+[![CI](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
 
