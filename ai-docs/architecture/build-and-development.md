@@ -8,11 +8,13 @@ Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.to
 
 native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 库、`native/app` 可执行骨架与 CTest 测试；单配置 Ninja presets（`debug`/`release`），安装树可被 `find_package(panta-native)` 消费。
 
-Cargo 调度已接通（任务 004）：`crates/launcher/build.rs` 以与 presets 一致的有效配置构建 native 树（构建树在 `target/` 内 OUT_DIR 下），`cargo run` 启动 `panta-native` 并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。此时尚未接入 Qt/VTK/OCCT/Netgen，CMake/Ninja 二进制仍要求本机可用（自动供给见任务 020），native 骨架不等于桌面。
+Cargo 调度已接通（任务 004）：`crates/launcher/build.rs` 以与 presets 一致的有效配置构建 native 树（构建树在 `target/` 内 OUT_DIR 下），`cargo run` 启动 native 产物并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。
 
-构建图与扩展点：Cargo → launcher 的 build.rs → CMake/Ninja → native targets，单向无环；CMake 侧不回调 Cargo。重建追踪显式列举 native 源/配置目录，`qml/`、`resources/` 落地时（任务 005）追加；Rust 库供 C++ 消费的接入点在 CMake 侧，由任务 006 确定。
+Qt Quick 主窗口已可用（任务 005）：`native/app` 为 Qt 入口，`native/bridge` 提供 ViewModel（GTest 信号测试），`qml/`（URI `Panta.Shell`，NO_PLUGIN 资源模块）承载界面；Qt 6.11.2 预编译包由 `native/cmake/qt-provision.cmake` 按三平台固定清单下载到构建树。QML/资源目录已纳入 build.rs 重建追踪（改 QML 即重跑 qmlcachegen）。此时尚未接入 VTK/OCCT/Netgen，界面为骨架占位，不宣称桌面功能。
 
-仍不能构建或启动桌面应用。下面是构建契约与实施要求，不是已验证的安装教程。
+构建图与扩展点：Cargo → launcher 的 build.rs → CMake/Ninja → native targets，单向无环；CMake 侧不回调 Cargo。重建追踪显式列举 native 源/配置与 qml/ 目录；`resources/` 落地时追加（qt_add_resources 扩展点已在 qml/CMakeLists.txt 标注）。Rust 库供 C++ 消费的接入点在 CMake 侧，由任务 006 确定。
+
+仍不能完成 CAE 业务流程：几何导入、网格、渲染与持久化均为后续任务；桌面分发（013）与工具自动供给（020）未实施。下面是构建契约与实施要求，不是已验证的安装教程。
 
 ## 构建职责
 

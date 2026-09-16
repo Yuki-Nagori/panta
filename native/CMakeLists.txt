@@ -31,6 +31,19 @@ endfunction()
 # include(CTest) 定义 BUILD_TESTING 选项（默认 ON）并启用测试；OFF 时不拉取
 # googletest、不注册测试，供 004 的发布链关闭测试面。
 include(CTest)
+
+# Qt 预编译产物供给（任务 005）：缓存于构建树，首次 configure 需联网。
+# 供 given find_package 使用；PANTA_QT_STAGING 暴露路径供诊断。
+include(cmake/qt-provision.cmake)
+find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test
+  PATHS "${QT_STAGING}" NO_DEFAULT_PATH
+)
+# AUTOMOC（QML_ELEMENT 元类型生成必需）与 Qt CMake 策略在此统一；
+# QTP0004(NEW)：子目录（Themes/、Panels/）的 qmldir 自动生成。
+qt_standard_project_setup()
+qt_policy(SET QTP0001 NEW)
+qt_policy(SET QTP0004 NEW)
+
 if(BUILD_TESTING)
   # GoogleTest 固定点见 ai-docs/standards/dependency-acquisition.md：
   # GIT_TAG 用完整 commit SHA（v1.18.0 → 063de7e9578f82b369302001269680b4b1553359）。
@@ -49,7 +62,10 @@ if(BUILD_TESTING)
 endif()
 
 add_subdirectory(foundation)
+add_subdirectory(bridge)
 add_subdirectory(app)
+# qml/ 位于仓库根（repository-layout）；二进制目录固定在 native 构建树内。
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../qml qml)
 
 set(PANTA_NATIVE_INSTALL_CONFIG_DIR lib/cmake/panta-native)
 

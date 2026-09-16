@@ -4,7 +4,7 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置、`ai-docs/`、任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`），以及任务 003 落地的 native 构建骨架（`native/` 顶层 CMakeLists、presets 与 `foundation` target）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
+当前存在根目录文档、许可证、忽略配置、`ai-docs/`、任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`）、任务 003/004 落地的 native 构建骨架，以及任务 005 落地的 Qt 桌面骨架（`native/app`+`native/bridge`、根 `qml/` 模块与 Qt 供给脚本）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
 
 ```text
 panta/
@@ -25,21 +25,21 @@ panta/
 │   ├── solver-client/         # 规划：外部求解器客户端
 │   └── storage/               # 规划：持久化与数据资产索引
 ├── native/
-│   ├── CMakeLists.txt         # native 顶层构建（任务 003 已落地，004 扩展默认值与公共函数）
+│   ├── CMakeLists.txt         # native 顶层构建（003/004/005 演进：Qt 供给、defaults 函数）
 │   ├── CMakePresets.json      # 单配置 Ninja presets：debug / release（任务 003 已落地）
-│   ├── cmake/                 # 安装包配置模板（003 已落地）
+│   ├── cmake/                 # 安装包配置模板与 Qt 供给脚本（qt-provision.cmake，005 已落地）
 │   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
-│   ├── app/                   # 可执行骨架 panta-native（004 已落地；005 接入 Qt 并替换实现）
-│   ├── bridge/                # QObject ViewModel、viewport 桥接
+│   ├── bridge/                # ViewModel（ShellViewModel + GTest 信号测试，005 已落地）
+│   ├── app/                   # Qt 桌面入口 panta-native（005 已落地 Qt 实现）
 │   ├── geometry/{core,occt}/
 │   ├── mesh/{core,netgen}/
 │   └── visualization/{core,vtk}/
 ├── qml/
-│   ├── App.qml
+│   ├── App.qml                # 主窗口（005 已落地；URI Panta.Shell，NO_PLUGIN 资源模块）
 │   ├── Components/
-│   ├── Panels/
+│   ├── Panels/                # PlaceholderPanel 占位（005 已落地）
 │   ├── Viewport/
-│   └── Themes/
+│   └── Themes/                # Theme 单例（005 已落地）
 ├── python/                    # 后续 Python API，包名待定
 ├── schemas/                   # 本地工程 schema、外部契约版本引用
 ├── resources/                 # 图标、主题、样例等资源

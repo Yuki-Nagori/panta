@@ -23,10 +23,17 @@ const RERUN_PATHS: &[&str] = &[
     "../../native/CMakePresets.json",
     "../../native/cmake",
     "../../native/app",
+    "../../native/bridge",
+    "../../native/bridge/src",
+    "../../native/bridge/tests",
     "../../native/foundation",
     "../../native/foundation/src",
     "../../native/foundation/tests",
     "../../native/foundation/include/panta/foundation",
+    "../../qml",
+    "../../qml/Themes",
+    "../../qml/Panels",
+    // 扩展点：resources/ 与更多 QML 子目录落地时在此追加（任务 005 起）。
 ];
 
 /// 影响配置结果的环境变量，变更即重建。CMAKE 可指定 cmake 可执行文件路径。
