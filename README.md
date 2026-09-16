@@ -1,12 +1,24 @@
 # panta
 
+[![CI](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml/badge.svg)](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml)
+
 规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
 
 **当前状态：Rust workspace 骨架可构建、可测试；桌面程序与 native 构建尚未实现。**
 
-## 当前可用命令
+## 环境要求
 
-工具链为 stable 1.98.1，由 [rust-toolchain.toml](rust-toolchain.toml) 固定（选型依据见任务 [001](ai-docs/task/001-cargo-config.md)）。新环境先安装 [rustup](https://rustup.rs)，再执行 `rustup toolchain install 1.98.1`；之后在仓库内使用 `cargo` 会自动命中固定版本。
+必须预装：
+
+| 平台 | 必要环境 |
+|---|---|
+| macOS | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
+| Linux | git、[rustup](https://rustup.rs)、C/C++ 编译器（gcc 或 clang） |
+| Windows | git、[rustup](https://rustup.rs)、MSVC 构建工具（Visual Studio Build Tools） |
+
+Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓库内执行 cargo 命令时按提示 `rustup toolchain install` 即可；其余依赖（CMake、Ninja、Qt、VTK、OCCT、Netgen）由构建引导自动拉取，无需预装，见 [依赖获取与主平台环境](ai-docs/standards/dependency-acquisition.md)。
+
+## 当前可用命令
 
 | 命令 | 当前行为 |
 |---|---|
@@ -21,7 +33,7 @@
 
 1. 从 [任务索引](ai-docs/task-index.md) 选择任务；新增工作先复制 [任务模板](ai-docs/task/_template.md)。
 2. 阅读任务引用的 [架构说明](ai-docs/architecture/README.md) 与 [技术规范](ai-docs/standards/README.md)。
-3. 按任务实施、验证并更新状态。001 Cargo 配置已完成，下一项为 [002 平台与依赖基线](ai-docs/task/002-dependency-baseline.md)。
+3. 按任务实施、验证并更新状态。001、002 已完成，CI（018）已建立；下一项为 [003 CMake/Ninja 原生构建骨架](ai-docs/task/003-cmake-native-skeleton.md)。
 
 完整路由见 [AGENTS.md](AGENTS.md)。
 

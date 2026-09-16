@@ -6,20 +6,20 @@
 
 | 项目 | 项目选择 | 尚需确定/验证 | 责任任务 |
 |---|---|---|---|
-| 主验证平台 | macOS 26.3.1 / arm64，Apple clang 17.0.0（CLT）+ macOS 26.2 SDK + libc++ | 不承诺其他平台；矩阵另立任务 | 002 |
+| 主验证平台 | macOS 26.3.1 / arm64，Apple clang 17.0.0（CLT）+ macOS 26.2 SDK + libc++ | CI 矩阵在 macOS/Linux/Windows 验证 Rust 层（018）；native 层跨平台矩阵随构建任务扩展 | 002 / 018 |
 | C++ | 自有代码 C++20 | 部署目标版本、编译器选项矩阵 | 002 / 003 |
 | Rust | stable，edition 2024 | 版本与 MSRV 已固定（stable 1.98.1；`rust-version` 下限 1.88） | 001 |
 | Cargo | 主开发入口 | launcher 骨架已落地（001）；native 调度待 004 | 001 / 004 |
-| CMake + Ninja | CMake 4.3.3 + Ninja 1.13.2（Cargo 引导供给） | 引导实装与首次 configure | 002 / 003 |
-| Qt | 6.11.1（qtbase/qtdeclarative/qtshadertools/qtsvg 源码 tag；qt5compat 待裁剪） | 源码构建流水线、Quick 运行时与模块裁剪 | 004 / 005 |
-| VTK | V1 渲染后端：9.7.0 源码 tag | QQuickVTKItem、图形后端、ABI | 002 / 007 |
-| OCCT | CAD/STEP：7.9.3（V7_9_3）源码 tag | STEP/元数据路径、模块裁剪；8.0 升级须先确认 Netgen 兼容 | 002 / 009 |
-| Netgen | 自有 Mesh IR 的生成器：v6.2.2604 源码 tag | 与 OCCT 7.9.3 组合一致性、C++ 接口与导出 targets | 002 / 010 |
+| CMake + Ninja | CMake 4.4.3 + Ninja 1.13.2（Cargo 引导供给，均为上游最新） | 引导实装与首次 configure | 002 / 003 |
+| Qt | 6.11.2（qtbase/qtdeclarative/qtshadertools/qtsvg 源码 tag；qt5compat 待裁剪） | 源码构建流水线、Quick 运行时与模块裁剪 | 004 / 005 |
+| VTK | V1 渲染后端：9.7.0 源码 tag（上游最新） | QQuickVTKItem、图形后端、ABI | 002 / 007 |
+| OCCT | CAD/STEP：8.0.1 源码 tag（上游最新；Netgen 守卫级兼容，实测前保留 7.9.3 回退点） | STEP/元数据路径、模块裁剪、与 Netgen 组合实测 | 002 / 009 |
+| Netgen | 自有 Mesh IR 的生成器：v6.2.2604 源码 tag（上游最新） | 与 OCCT 8.0.1 组合实测、C++ 接口与导出 targets | 002 / 010 |
 | Python | 3.12+，后续 | 解释器、环境与工具依赖锁 | 014 |
 | Rust/C++ FFI | CXX 首选候选 | 固定版本、CMake 最终链接与所有权验证 | 006 |
 | Python binding | pybind11 / Rust binding 候选 | 另建 task 决策 | 不在本轮必做范围 |
 
-精确 tag、commit SHA、来源 URL、构建选项候选、许可证入口和集成验证责任见 [依赖获取与主平台环境](dependency-acquisition.md)。
+精确 tag、commit SHA、来源 URL、构建选项候选、依赖间版本关系、许可证入口和集成验证责任见 [依赖获取与主平台环境](dependency-acquisition.md)。
 
 ## 依赖获取与版本固定（2026-09-16 决策）
 

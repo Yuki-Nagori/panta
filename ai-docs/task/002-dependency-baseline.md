@@ -68,6 +68,8 @@ ai-docs/standards/baseline.md、依赖获取配置/说明（路径在执行前�
 | 2026-09-16 | 本机 Qt 现状盘点：`qmake6 --version`、`brew list --versions qtbase …` | 本机有 Qt 6.11.1（Homebrew）——仅作版本旁证，不进基线 |
 | 2026-09-16 | `brew search netgen`、`brew info --json=v2 vtk/opencascade/ninja` | netgen 无 formula（必须源码构建）；brew VTK 9.7.0 formula 依赖 qtbase+qtdeclarative（上游 Qt 集成存在的旁证）；OCCT 7.9.3、Ninja 1.13.2 |
 | 2026-09-16 | GitHub API：上游 release/tag 核实 | OCCT 最新 V8.0.1（2026-07-30），tag `V7_9_3`→commit `a016080bf673`；netgen 最新 `v6.2.2604`→`3ee489c7d58f`；VTK `v9.7.0`→`23f0a095621e`（最新稳定 tag）；Qt 五模块 `v6.11.1` 各 commit SHA 均存在；CMake `v4.3.3` 有 `cmake-4.3.3-macos-universal.tar.gz` 资产 |
+| 2026-09-16 | 升级核实（维护者要求尽量最新）：GitHub API 复查 | CMake 4.4.3（2026-08-25，含 macos-universal 资产）、Qt 6.11.2（五模块 SHA 均核实）为上游最新；Ninja 1.13.2、Netgen v6.2.2604、VTK 9.7.0、Rust 1.98.1 已是最新 |
+| 2026-09-16 | OCCT 8.0.1 兼容性核实：tag `V8.0.1`→commit `b8f597c67781`；`cmake_minimum_required 3.10`；netgen `occ_utils.hpp` 版本守卫 | OCCT 8.0.1 与 CMake 4.4 兼容；netgen 守卫为 `AT_LEAST` 风格（≥7.8 走 TKDE），无排除 8.x 的证据 → 升级固定 8.0.1，回退点 7.9.3，实测归 010 |
 | 2026-09-16 | netgen v6.2.2604 CMakeLists 源文件核对 | `USE_OCC` 默认 ON，`find_package(OpenCascade …)`，含 OCCT ≥7.8 的 TKDE 目标名适配 → 与 OCCT 7.9.3 组合自洽（构建级一致性仍归 010） |
 | 2026-09-16 | netgen tag 源码 LICENSE 核对 | LGPL-2.1 |
 | 2026-09-16 | `brew install ninja`（本机环境） | 本机获得 ninja 1.13.2；仅个人便利与 003 诊断用，不写入任何项目配置 |
@@ -86,7 +88,8 @@ ai-docs/standards/baseline.md、依赖获取配置/说明（路径在执行前�
 - 2026-09-16（实施）版本固定（候选）：CMake 4.3.3（官方 macos-universal 二进制 + SHA256 待回填）；Ninja 1.13.2（源码构建）；Qt 6.11.1 五模块源码 tag（SHA 前缀已记录，qt5compat 由 005 裁剪）；VTK 9.7.0；OCCT 7.9.3（V7_9_3）；Netgen v6.2.2604（USE_OCC 默认 ON，与 OCCT ≥7.8 目标名适配核实）。git tag 以 commit SHA 校验。
 - 2026-09-16（实施）范围调整：未安装 VTK/OCCT/Netgen（无 formula 的 Netgen 必须源码构建；其余依赖在托管方向下由引导统一拉取，手工预装反而偏离基线）。OCCT 保持 7.9.x 而非上游最新 8.0.1：Netgen 未声明支持 8.0，一致性优先。
 - 2026-09-16（实施）显式转交：QQuickVTKItem 可用性与图形后端 → 007；OCCT STEP/元数据与模块裁剪 → 009；Netgen/OCCT 组合 ABI 与 C++ 接口 → 010；托管引导实装与首次 configure → 004；CMake 骨架直接诊断 → 003。
+- 2026-09-16（补充，维护者要求）：选版原则改为"尽量上游最新 + 核对依赖间版本关系"。清单升级：CMake 4.3.3 → 4.4.3、Qt 6.11.1 → 6.11.2（五模块 SHA 重核）、OCCT 7.9.3 → 8.0.1（依据 netgen 守卫级兼容证据；回退点 V7_9_3 记录于依赖获取文档）；Ninja/Netgen/VTK/Rust 已是最新，不动。OCCT 与 Netgen 的关系从"不升级"改为"升级 + 实测前置 + 回退点"，仍由 010 把关。
 
 ## 完成摘要
 
-已交付：主平台记录（macOS arm64 + Apple clang 17）、Cargo 统一托管的依赖获取决策、六项 native 依赖的固定清单（tag/commit SHA/来源/候选选项/许可证入口/验证责任），落地于新增的 [依赖获取与主平台环境](../standards/dependency-acquisition.md)，baseline.md 同步为候选/实测两态。全部集成都标记为待实测，未宣称兼容。剩余限制：引导未实装（004）、二进制 SHA256 未回填、Qt/VTK/OCCT/Netgen 零构建证据。后续：003（CMake/Ninja 骨架）已就绪。
+已交付：主平台记录（macOS arm64 + Apple clang 17）、Cargo 统一托管的依赖获取决策、六项 native 依赖的固定清单（tag/commit SHA/来源/候选选项/依赖间版本关系/许可证入口/验证责任），落地于新增的 [依赖获取与主平台环境](../standards/dependency-acquisition.md)，baseline.md 同步为候选/实测两态。同日按维护者要求升级至各上游最新（CMake 4.4.3、Qt 6.11.2、OCCT 8.0.1；Ninja/Netgen/VTK 已是最新），OCCT 8.0.1 × Netgen v6.2.2604 组合保留 7.9.3 回退点，实测归 010。全部集成都标记为待实测，未宣称兼容。剩余限制：引导未实装（004）、二进制 SHA256 未回填、Qt/VTK/OCCT/Netgen 零构建证据。后续：003（CMake/Ninja 骨架）已就绪；CI 见 018。
