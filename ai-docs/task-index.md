@@ -51,7 +51,7 @@ ai-docs/
 | 004 | [Cargo 调度 CMake 与运行入口](task/004-cargo-native-orchestration.md) | M0 | 001, 003 | done |
 | 005 | [Qt/QML 主窗口与 C++ ViewModel](task/005-qt-qml-shell.md) | M0 | 004 | done |
 | 006 | [Rust/C++ FFI 最小契约](task/006-rust-cpp-boundary.md) | 基础平台 | 004 | ready |
-| 007 | [VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md) | M0 | 005 | ready |
+| 007 | [VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031 | planned |
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | planned |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | planned |
 | 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | planned |
@@ -62,6 +62,7 @@ ai-docs/
 | 018 | [三平台 CI 基础](task/018-cross-platform-ci.md) | 验证基础 | 001, 002 | done |
 | 019 | [GTest 测试配置与规则](task/019-gtest-native-testing.md) | 验证基础 | 003 | done |
 | 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | planned |
+| 031 | [预编译 native 依赖供给与 CMake package](task/031-prebuilt-native-dependencies.md) | 交付基础 | 002, 004 | ready |
 
 ## 应用平台扩展队列
 
@@ -78,6 +79,12 @@ ai-docs/
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | ready |
 | 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
 
+## 验证与质量扩展队列
+
+| 编号 | 任务 | 阶段 | 依赖 | 状态 |
+|---|---|---|---|---|
+| 032 | [跨语言质量工具链与 100% 覆盖率门禁](task/032-cross-language-quality-gates.md) | 验证基础 | 011, 018, 019 | planned |
+
 ## 仓库与文档维护
 
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
@@ -90,14 +97,14 @@ ai-docs/
 
 ## 执行顺序与交付边界
 
-主线：001 → 002 → 003 → 004 → 005 → 007，完成 Cargo 启动 Qt/QML + VTK 的 M0 集成。
+主线：001 → 002 → 003 → 004 → 005 → 031 → 007，完成 Cargo 启动 Qt/QML + 预编译 VTK SDK 的 M0 集成。
 
 平台分支：004 → 006；005 + 006 → 008 → 009 → 010，先建立 FFI、任务生命周期，再验证 OCCT 和 Netgen。两个分支都准备好后，007 + 008 + 010 → 011 → 012 / 013，统一测试、CI 和部署检查。这里是依赖图，编号相邻不意味着必须等待不相关任务；是否并行执行由实际工作安排决定。
 
 主题分支：005 → 029；025 + 029 → 030。先迁移组件及尺寸参数，再接主题 DSL；主题切换不依赖工程打开或引擎重载。
 
-新增分支：005 → 022 / 026；005 + 006 → 023；008 + 023 → 024 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。
+新增分支：005 → 022 / 026；005 + 006 → 023；008 + 023 → 024 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；032 在 011 统一入口上补齐跨语言质量工具与 100% 覆盖率门禁。
 
 014 默认 deferred，当前 MVP 不接入 Python；只有开始第一个真实 Python 工具工作时才推进，不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 
-后续新任务使用当前最大编号加一，不复用已有编号。001–005 已完成；主线下一项建议执行 [007 VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md)（006 可并行）。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。001–005 已完成；主线下一项先执行 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md)，完成后再执行 [007 VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md)（006 可并行）。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

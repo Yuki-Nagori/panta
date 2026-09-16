@@ -13,9 +13,9 @@
 | Cargo | 主开发入口 | launcher 骨架已落地（001）；native 调度待 004 | 001 / 004 |
 | CMake + Ninja | CMake 4.4.3 + Ninja 1.13.2（Cargo 引导供给，均为上游最新） | 引导实装与首次 configure | 002 / 003 |
 | Qt | 6.11.2 预编译包（qtbase+qtdeclarative，维护者决策不源码构建；Quick 运行时已由 005 实测） | 模块扩展（qtsvg 等）、部署 | 005 / 013 |
-| VTK | V1 渲染后端：9.7.0 源码 tag（上游最新） | QQuickVTKItem、图形后端、ABI | 002 / 007 |
-| OCCT | CAD/STEP：8.0.1 源码 tag（上游最新；Netgen 守卫级兼容，实测前保留 7.9.3 回退点） | STEP/元数据路径、模块裁剪、与 Netgen 组合实测 | 002 / 009 |
-| Netgen | 自有 Mesh IR 的生成器：v6.2.2604 源码 tag（上游最新） | 与 OCCT 8.0.1 组合实测、C++ 接口与导出 targets | 002 / 010 |
+| VTK | V1 渲染后端：9.7.0；优先使用包含 `GUISupportQtQuick` 的预编译 SDK | QQuickVTKItem、图形后端、ABI 与可用 CMake package | 002 / 007 / 031 |
+| OCCT | CAD/STEP：8.0.1；优先使用与目标 ABI 匹配的预编译 SDK（实测前保留 7.9.3 回退点） | STEP/元数据路径、模块裁剪、与 Netgen 组合实测 | 002 / 009 / 031 |
+| Netgen | 自有 Mesh IR 的生成器：v6.2.2604；优先使用与 OCCT 匹配的预编译 SDK | 与 OCCT 8.0.1 组合实测、C++ 接口与导出 targets | 002 / 010 / 031 |
 | Python | 3.12+，后续 | 解释器、环境与工具依赖锁 | 014 |
 | Rust/C++ FFI | CXX 首选候选 | 固定版本、CMake 最终链接与所有权验证 | 006 |
 | Python binding | pybind11 / Rust binding 候选 | 另建 task 决策 | 不在本轮必做范围 |
@@ -24,7 +24,9 @@
 
 ## 依赖获取与版本固定（2026-09-16 决策）
 
-Cargo 统一托管：开发者只需安装 git、rustup 与 Apple 命令行工具，`cargo build` 触发的构建引导在首次构建时按固定清单拉取其余全部依赖到构建树。不以 Homebrew 等系统包管理器作为项目基线；本机同名包只是个人便利，不构成兼容性证据。git tag 以 commit SHA 校验，二进制以 SHA256 校验（004 实装时回填）。
+Cargo 统一托管：开发者只需安装 git、rustup 与 Apple 命令行工具，`cargo build` 触发的构建引导在首次构建时按固定清单获取预编译依赖到构建树。不以 Homebrew 等系统包管理器作为项目基线；本机同名包只是个人便利，不构成兼容性证据。git tag 以 commit SHA 校验，预编译包以 SHA256 及平台/架构/ABI 元数据校验（031 实装时回填）。
+
+预编译优先是 native 依赖的默认策略：VTK、OpenCASCADE、Netgen 和 Qt 应优先使用上游或项目发布的预编译 SDK；无法获得匹配包时，由独立制品任务评估一次性构建并分发，不能让每个开发者在本地重复编译。源码构建只是记录充分理由后的兜底路径，不作为普通 `cargo build` 的隐式行为。
 
 ## 决策记录要求
 
