@@ -47,9 +47,9 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 ## 验收标准
 
-- [ ] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 key、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。
+- [ ] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 source、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。
 - [ ] pest grammar 提供准确 source span；kind variables/theme/language 分派明确，未知域与重复字段返回稳定诊断。
-- [ ] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/key/source、占位符和 locale 基线不丢失。
+- [ ] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/source、自动生成的内部 id、占位符和 locale 基线不丢失。
 - [ ] CLI 为单文件可执行物，任意 cwd 可运行且不访问网络/系统 Qt；输出临时 TS 后由锁定的预编译 `lrelease` 生成 QM。
 - [ ] Cargo 测试、fmt、clippy 与关键失败夹具通过；自有可执行代码覆盖率按 032 达到 line/branch 100%。
 - [ ] 022、025、030 的文档和构建入口只依赖此共享核心，不保留第二套 parser 或 TS XML 生成实现。
@@ -71,7 +71,8 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、version/kin
 
 - 2026-09-16：创建任务；确认这是应用平台的配置/资源引擎工作，Rust library + 单文件 CLI 是唯一解析实现。
 - 2026-09-16：首选 pest；quick-xml 将语言 Artifact 生成 Qt TS XML，serde 负责 DTO，QM 保持 Qt 运行期格式；`.pa` 源码不暴露 XML。
-- 2026-09-16：开始实现 `panta-dsl-core` 与 `panta-dslc`，首期采用 YAML 风格缩进和无引号标量；变量/Theme 的类型表达式保留 `=`。
+- 2026-09-17：语言 `.pa` 改为直接以 English source 文案作为条目键，不维护 `app.ok` 之类人工 msgid；locale 允许 `cn` 简写，编译器归一化为 `zh-CN`。
+- 2026-09-17：开始实现 `panta-dsl-core` 与 `panta-dslc`，首期采用 YAML 风格缩进和无引号标量；变量/Theme 的类型表达式保留 `=`。
 
 ## 完成摘要
 

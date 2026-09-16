@@ -6,7 +6,7 @@
 
 UI 源文案统一使用 English，默认语言为英文；用户通过语言设置选择翻译。项目约定采用简洁的 `.pa` 字典源码作为唯一权威数据，Artifact 引擎按 `kind` 聚合成语言、Theme 或变量产物。Rust 编译器在构建目录自动生成临时 Qt TS XML，再由 QtTools 的 `lrelease` 生成 QM。仓库不直接维护或要求用户编写 `*.ts`，首批验证英文与简体中文；代码标识、工程数据和 DSL 关键字不随语言变化。
 
-QML 使用稳定 message key 的 `qsTrId()`，C++ 展示文本使用 `qtTrId()`；`.pa` 只保存 key、英文基线和各 locale 文本，编译器负责生成 Qt TS 所需的 context/source/translation 节点。相同文案在不同语境使用不同 key。整句翻译并传入占位参数，不拼接已翻译片段；处理复数和翻译说明。源文案修改时重新校验 key、占位符和失效条目。机制依据：[Qt 翻译源代码指南](https://doc.qt.io/qt-6/i18n-source-translation.html)、[QTranslator](https://doc.qt.io/qt-6/qtranslator.html)（查阅 2026-09-16，页面 Qt 6.11；实施核对锁定版本）。
+QML 使用完整 English source 的 `qsTr()`，C++ 展示文本使用 `qtTr()`；`.pa` 直接保存 source 与各 locale 文本，编译器负责生成 Qt TS 所需的 context/source/translation 节点。相同文案在不同语境可通过不同 context 处理。整句翻译并传入占位参数，不拼接已翻译片段；处理复数和翻译说明。源文案修改时重新校验 source、占位符和失效条目。机制依据：[Qt 翻译源代码指南](https://doc.qt.io/qt-6/i18n-source-translation.html)、[QTranslator](https://doc.qt.io/qt-6/qtranslator.html)（查阅 2026-09-16，页面 Qt 6.11；实施核对锁定版本）。
 
 ## 数据流与生命周期
 
@@ -18,7 +18,7 @@ QML 使用稳定 message key 的 `qsTrId()`，C++ 展示文本使用 `qtTrId()`�
 
 ## 构建与边界
 
-规划在 `resources/i18n/panta-ui.pa` 保存全局字典。Rust 编译器使用 034 的共享 parser 校验后，按 locale 在构建树写出临时 `panta_en.ts`、`panta_zh_CN.ts`，调用锁定的 Qt Linguist 预编译 `lrelease` 生成对应 QM，再嵌入只读资源；临时 TS 和 QM 不作为源码提交。构建入口由 CMake 管理，Cargo 继续负责统一调度；QtTools 缺失时按预编译依赖规范补供给，不源码构建 Qt。
+规划在 `resources/i18n/panta-ui.pa` 保存全局字典。Rust 编译器使用 034 的共享 parser 校验后，按 locale 在构建树写出临时 `panta_en.ts`、`panta_zh_CN.ts`，调用锁定的 Qt Linguist 预编译 `lrelease` 生成对应 QM，再嵌入只读资源；临时 TS 和 QM 不作为源码提交。构建入口由 CMake 管理，Cargo 继续负责统一调度；QtTools 缺失时按预编译依赖规范补供给，不源码构建 Qt。`.pa` 中可用 `cn` 作为 `zh-CN` 的简写。
 
 ## `.pa` 字典语法约定
 
@@ -29,20 +29,14 @@ version: 1
 kind: language
 catalog: panta-ui
 
-msgid app.advance-revision:
-  source: Advance revision
-  translation zh-CN: 推进修订
-  translation ja: Advance revision
-
-  @source-note: Imperative action label
-  @translation-note zh-CN: Keep the imperative tone
-  @unfinished ja
+Advance revision:
+  translation cn: 推进修订
 ```
 
-编译器以 `msgid` 生成 TS 的 message id，以 source 填充英文节点，再按 locale 选择 translation；QML/C++ 通过 `qsTrId()`/`qtTrId()` 查找，不需要把 XML 结构暴露给开发者。`msgid` 的每个点分段都使用 ASCII kebab-case（短横线 `-`），禁止下划线；locale 仍允许标准的 `zh-CN`/`en_US`。source/translation 为 UTF-8 行尾标量，行尾空白会被规范化，需要保留前后空格时使用反斜杠转义。`%1`、`%n` 等占位符必须在 source 与每个已完成 translation 间一致。缺失或 `@unfinished` 的译文由 QM 回退 source，重复 msgid、重复 locale、占位符不一致、非法 locale 或损坏文件拒绝整个字典。
+编译器直接以 English source 生成 TS 的 source 节点，并按 locale 选择 translation；QML/C++ 通过 `qsTr()`/`qtTr()` 做精确 source 查找，不需要把 XML 结构暴露给开发者。业务 key 不再另行维护，source 文案就是条目键；locale 采用标准写法，`.pa` 允许用 `cn` 简写并归一化为 `zh-CN`/`zh_CN`。source/translation 为 UTF-8 行尾标量，行尾空白会被规范化，需要保留前后空格时使用反斜杠转义。`%1`、`%n` 等占位符必须在 source 与每个已完成 translation 间一致。缺失或 `@unfinished` 的译文由 QM 回退 source，重复 source、重复 locale、占位符不一致、非法 locale 或损坏文件拒绝整个字典。
 
 `.pa` 也用于主题和变量，由 `kind theme`、`kind variables` 区分域；所有域共用 025 的 lexer、parser、版本和诊断格式。国际化域由 Rust 生成 TS XML 以使用 Qt 的成熟工具和 QM 查找，不把 XML 解析放入运行时。
 
-同一 context 的 source-text 兼容查找采用最长匹配：`ok ok` 先于 `ok`，同长度候选直接报错；正常 QML/C++ 路径始终用 `msgid` 精确查找，避免在任意用户文本中替换短词。
+同一 context 的 source-text 兼容查找采用最长匹配：`ok ok` 先于 `ok`，同长度候选直接报错；正常 QML/C++ 路径始终用完整 source 精确查找，避免在任意用户文本中替换短词。
 
 022 验证界面、占位参数、缺项回退、加载失败和语言偏好；完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。
