@@ -4,11 +4,15 @@
 
 ## 当前可用范围
 
-Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、唯一成员 `crates/launcher` 与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行；`cargo run` 只输出"桌面尚未接入"诊断并以退出码 69 结束，不会启动 GUI。
+Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、唯一成员 `crates/launcher` 与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行。
 
-native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 最小 target 与 CTest 测试、单配置 Ninja presets（`debug`/`release`）。在 `native/` 下可用命令：`cmake --preset debug`、`cmake --build --preset debug`、`ctest --preset debug`、`cmake --install build/debug`；安装树可被 `find_package(panta-native)` 消费。此时尚未接入 Qt/VTK/OCCT/Netgen，也不经 Cargo 调度（004）。
+native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 库、`native/app` 可执行骨架与 CTest 测试；单配置 Ninja presets（`debug`/`release`），安装树可被 `find_package(panta-native)` 消费。
 
-仍不能构建或启动桌面应用：仓库尚无 `build.rs`、Qt 入口或 CI 中的 native 构建，托管引导由任务 004 接入。下面是构建契约与实施要求，不是已验证的安装教程。
+Cargo 调度已接通（任务 004）：`crates/launcher/build.rs` 以与 presets 一致的有效配置构建 native 树（构建树在 `target/` 内 OUT_DIR 下），`cargo run` 启动 `panta-native` 并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。此时尚未接入 Qt/VTK/OCCT/Netgen，CMake/Ninja 二进制仍要求本机可用（自动供给见任务 020），native 骨架不等于桌面。
+
+构建图与扩展点：Cargo → launcher 的 build.rs → CMake/Ninja → native targets，单向无环；CMake 侧不回调 Cargo。重建追踪显式列举 native 源/配置目录，`qml/`、`resources/` 落地时（任务 005）追加；Rust 库供 C++ 消费的接入点在 CMake 侧，由任务 006 确定。
+
+仍不能构建或启动桌面应用。下面是构建契约与实施要求，不是已验证的安装教程。
 
 ## 构建职责
 

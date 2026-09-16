@@ -1,6 +1,6 @@
 # 依赖获取与主平台环境
 
-查阅 / 决策日期：2026-09-16。状态：主平台与固定清单已由任务 002 记录，同日按维护者要求升级至各上游最新稳定版并核对依赖间版本关系；CI 三平台矩阵由任务 018 建立。Cargo 托管引导尚未实装，实装与首次配置验证在任务 003/004。版本与兼容性结论的维护规则见 [技术基线](baseline.md)，本文只负责可复核的获取、重建、升级与回退步骤。
+查阅 / 决策日期：2026-09-16。状态：主平台与固定清单已由任务 002 记录，同日按维护者要求升级至各上游最新稳定版并核对依赖间版本关系；CI 三平台矩阵由任务 018 建立。Cargo→CMake 调度已由任务 004 接通（本机需具备 CMake/Ninja，缺失诊断可定位）；工具二进制的自动供给拆分为任务 020，Qt/VTK/OCCT/Netgen 的托管获取随对应任务落地。版本与兼容性结论的维护规则见 [技术基线](baseline.md)，本文只负责可复核的获取、重建、升级与回退步骤。
 
 ## 托管原则（2026-09-16 决策）
 
@@ -26,8 +26,8 @@
 
 | 依赖 | 固定版本（tag） | 来源 | 校验 | 获取形态 | 关键候选选项 | CMake package / targets | 许可证入口 | 集成验证 |
 |---|---|---|---|---|---|---|---|---|
-| CMake | 4.4.3 | `github.com/Kitware/CMake` release 资产 `cmake-4.4.3-macos-universal.tar.gz` | SHA256 待 004 首次下载时记录 | 官方二进制解包 | — | 可执行工具（非 CMake 包） | BSD-3（发布包 Copyright.txt） | 003 |
-| Ninja | 1.13.2 | `github.com/ninja-build/ninja` tag `v1.13.2`（当前最新 release） | tag commit；SHA256 待 004 记录 | 源码构建（备选 release 资产 `ninja-mac.zip`） | — | 可执行工具 | Apache-2.0（仓库 COPYING） | 003 |
+| CMake | 4.4.3 | `github.com/Kitware/CMake` release 资产 `cmake-4.4.3-macos-universal.tar.gz` | SHA256 待 020 首次下载时记录 | 官方二进制解包（020）；当前要求本机可用（如 Homebrew），缺失诊断由 004 调度给出 | — | 可执行工具（非 CMake 包） | BSD-3（发布包 Copyright.txt） | 003/004 |
+| Ninja | 1.13.2 | `github.com/ninja-build/ninja` tag `v1.13.2`（当前最新 release） | tag commit；SHA256 待 020 记录 | 源码构建（备选 release 资产 `ninja-mac.zip`） | — | 可执行工具 | Apache-2.0（仓库 COPYING） | 003/004 |
 | Qt | 6.11.2：qtbase `ef55f427f2c8`、qtdeclarative `4e3399c26ec5`、qtshadertools `c70b59ea4a47`、qtsvg `17ca512f903f`、qt5compat `abebcdb4964a`（均可选 SHA 前缀） | `github.com/qt/{qtbase,qtdeclarative,qtshadertools,qtsvg,qt5compat}` tag `v6.11.2`（当前最新稳定 tag） | 上列 commit SHA | 源码构建；qt5compat 是否需要由 005 按 QML import 裁剪 | examples/tests OFF；具体配置 004/005 定；`cmake_minimum_required 3.16` | `find_package(Qt6)`、`qt_add_qml_module()` | LGPL-3.0（源码树 LICENSES/） | 005 |
 | VTK | 9.7.0（commit `23f0a095621e`，当前最新稳定 tag） | `github.com/Kitware/VTK` tag `v9.7.0`（官方镜像；上游 `gitlab.kitware.com/vtk/vtk`） | tag commit SHA | 源码构建 | testing OFF；启用 Qt 组（GUISupportQtQuick）；其余 007 定；`cmake_minimum_required 3.12...3.21` | `find_package(VTK)` 模块化 targets | BSD-3（源码树 Copyright.txt） | 007 |
 | OCCT | 8.0.1（tag `V8.0.1`，commit `b8f597c67781`，2026-07-30，当前最新 release） | `github.com/Open-Cascade-SAS/OCCT` tag `V8.0.1` | tag commit SHA | 源码构建 | 渲染/DRAW/Tcl-TK 相关关闭、模块裁剪由 009 定；`cmake_minimum_required 3.10` | `find_package(OpenCASCADE)` | LGPL-2.1 + OCCT 例外（源码树 LICENSE.txt） | 009 |
@@ -52,11 +52,11 @@
 
 ## 干净重建步骤
 
-目标流程（第 3 步的引导行为在 004 实装前不存在；当前 `cargo build` 只构建 Rust 骨架）：
+当前流程（004 已接通调度；Qt/VTK/OCCT/Netgen 与二进制自动供给分别随任务 005+ 与 020 落地）：
 
-1. 按 [README 环境要求](../../README.md#环境要求) 安装平台前置（macOS：Apple CLT；Linux：gcc/clang；Windows：MSVC）与 rustup。
+1. 按 [README 环境要求](../../README.md#环境要求) 安装平台前置（macOS：Apple CLT；Linux：gcc/clang；Windows：MSVC）、rustup 与 CMake/Ninja（暂时手动，020 后免除）。
 2. 在仓库内执行 `rustup toolchain install 1.98.1`（或首次 cargo 命令时按 rustup 提示安装）。
-3. `cargo build --locked`：构建引导按固定清单拉取 CMake/Ninja 并构建 Qt/VTK/OCCT/Netgen 到构建树，再链接 native 与 Rust 产物；全部产物不离开构建树。
+3. `cargo build --locked`：launcher 的 build.rs 调度 CMake/Ninja 构建 native 骨架（构建树在 `target/` 内 OUT_DIR 下）；`cargo run` 启动 `panta-native` 并转发参数与退出码。
 
 验证入口见 [构建与开发](../architecture/build-and-development.md)；每项依赖的集成验证任务见固定清单最后一列。
 

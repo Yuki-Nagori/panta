@@ -1,8 +1,8 @@
 # 005 — Qt/QML 主窗口与 C++ ViewModel
 
-- 状态：planned
+- 状态：ready
 - 阶段：M0
-- 依赖：[004](004-cargo-native-orchestration.md)
+- 依赖：[004](004-cargo-native-orchestration.md)（已完成：Cargo 调度与运行入口就绪）
 - 优先级：P0
 - 负责人：待分配
 - 创建 / 更新：2026-09-16 / 2026-09-16

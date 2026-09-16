@@ -25,11 +25,11 @@ panta/
 │   ├── solver-client/         # 规划：外部求解器客户端
 │   └── storage/               # 规划：持久化与数据资产索引
 ├── native/
-│   ├── CMakeLists.txt         # native 顶层构建（任务 003 已落地）
-│   ├── CMakePresets.json      # 单配置 Ninja presets：debug / release（003 已落地）
+│   ├── CMakeLists.txt         # native 顶层构建（任务 003 已落地，004 扩展默认值与公共函数）
+│   ├── CMakePresets.json      # 单配置 Ninja presets：debug / release（任务 003 已落地）
 │   ├── cmake/                 # 安装包配置模板（003 已落地）
 │   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
-│   ├── app/                   # Qt 桌面入口
+│   ├── app/                   # 可执行骨架 panta-native（004 已落地；005 接入 Qt 并替换实现）
 │   ├── bridge/                # QObject ViewModel、viewport 桥接
 │   ├── geometry/{core,occt}/
 │   ├── mesh/{core,netgen}/
