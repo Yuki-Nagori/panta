@@ -18,6 +18,7 @@
 | 技术/主题 | 文档 | 适用范围 |
 |---|---|---|
 | 版本与依赖选型 | [技术基线](baseline.md) | 所有任务 |
+| 依赖获取与主平台 | [依赖获取](dependency-acquisition.md) | 环境搭建、依赖升级与回退 |
 | C++20 | [C++](cpp.md) | native 核心与适配器 |
 | Rust 2024 | [Rust](rust.md) | 应用平台 |
 | Cargo | [Cargo](cargo.md) | workspace 与调度 |

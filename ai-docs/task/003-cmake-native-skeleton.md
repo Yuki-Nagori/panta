@@ -1,8 +1,8 @@
 # 003 — CMake/Ninja 原生构建骨架
 
-- 状态：planned
+- 状态：ready
 - 阶段：M0
-- 依赖：[002](002-dependency-baseline.md)
+- 依赖：[002](002-dependency-baseline.md)（已完成：主平台与依赖固定清单就绪）
 - 优先级：P0
 - 负责人：待分配
 - 创建 / 更新：2026-09-16 / 2026-09-16

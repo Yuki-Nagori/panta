@@ -1,26 +1,33 @@
 # 技术基线与版本决策
 
-查阅日期：2026-09-16。状态：架构基线已记录，精确依赖版本与兼容矩阵待任务验证。
+查阅日期：2026-09-16。状态：主验证平台、依赖获取方式与候选版本已由任务 002 记录；除 Rust 骨架外，各项集成都尚未实测，实测通过前全部视为候选。
 
 ## 当前基线
 
 | 项目 | 项目选择 | 尚需确定/验证 | 责任任务 |
 |---|---|---|---|
-| C++ | 自有代码 C++20 | 编译器、标准库、ABI | 002 / 003 |
-| Rust | stable，edition 2024 | 版本与 MSRV 已由 001 固定（stable 1.98.1；`rust-version` 下限 1.88）；跨平台覆盖待验证 | 001 / 002 |
+| 主验证平台 | macOS 26.3.1 / arm64，Apple clang 17.0.0（CLT）+ macOS 26.2 SDK + libc++ | 不承诺其他平台；矩阵另立任务 | 002 |
+| C++ | 自有代码 C++20 | 部署目标版本、编译器选项矩阵 | 002 / 003 |
+| Rust | stable，edition 2024 | 版本与 MSRV 已固定（stable 1.98.1；`rust-version` 下限 1.88） | 001 |
 | Cargo | 主开发入口 | launcher 骨架已落地（001）；native 调度待 004 | 001 / 004 |
-| CMake + Ninja | native 构建 | 精确版本、preset schema、配置模式 | 002 / 003 |
-| Qt | Qt 6 Quick / QML | 次版本、模块、部署与图形后端 | 002 / 005 |
-| VTK | V1 渲染后端 | release、Qt Quick 支持、ABI | 002 / 007 |
-| OCCT | CAD/STEP | release、元数据路径、Netgen 兼容性 | 002 / 009 |
-| Netgen | 自有 Mesh IR 的生成器 | release、OCC/C++ 接口和构建选项 | 002 / 010 |
+| CMake + Ninja | CMake 4.3.3 + Ninja 1.13.2（Cargo 引导供给） | 引导实装与首次 configure | 002 / 003 |
+| Qt | 6.11.1（qtbase/qtdeclarative/qtshadertools/qtsvg 源码 tag；qt5compat 待裁剪） | 源码构建流水线、Quick 运行时与模块裁剪 | 004 / 005 |
+| VTK | V1 渲染后端：9.7.0 源码 tag | QQuickVTKItem、图形后端、ABI | 002 / 007 |
+| OCCT | CAD/STEP：7.9.3（V7_9_3）源码 tag | STEP/元数据路径、模块裁剪；8.0 升级须先确认 Netgen 兼容 | 002 / 009 |
+| Netgen | 自有 Mesh IR 的生成器：v6.2.2604 源码 tag | 与 OCCT 7.9.3 组合一致性、C++ 接口与导出 targets | 002 / 010 |
 | Python | 3.12+，后续 | 解释器、环境与工具依赖锁 | 014 |
 | Rust/C++ FFI | CXX 首选候选 | 固定版本、CMake 最终链接与所有权验证 | 006 |
 | Python binding | pybind11 / Rust binding 候选 | 另建 task 决策 | 不在本轮必做范围 |
 
+精确 tag、commit SHA、来源 URL、构建选项候选、许可证入口和集成验证责任见 [依赖获取与主平台环境](dependency-acquisition.md)。
+
+## 依赖获取与版本固定（2026-09-16 决策）
+
+Cargo 统一托管：开发者只需安装 git、rustup 与 Apple 命令行工具，`cargo build` 触发的构建引导在首次构建时按固定清单拉取其余全部依赖到构建树。不以 Homebrew 等系统包管理器作为项目基线；本机同名包只是个人便利，不构成兼容性证据。git tag 以 commit SHA 校验，二进制以 SHA256 校验（004 实装时回填）。
+
 ## 决策记录要求
 
-任务 002 先选择主验证平台，记录操作系统、CPU 架构、编译器及来源。当前工作目录所在机器不自动构成所有发布平台的承诺。每项依赖记录精确版本/tag、来源与校验信息、链接方式、启用模块、CMake package/targets、许可证入口和对应测试。
+主平台已由 002 记录（操作系统、架构、编译器及来源）；当前工作目录所在机器不自动构成所有发布平台的承诺。依赖升级或新增时记录精确版本/tag、来源与校验信息、链接方式、启用模块、CMake package/targets、许可证入口和对应测试。
 
 依赖基线分“候选”和“实测通过”；安装完成或 configure 成功不能单独证明 ABI 与运行时兼容。Qt/VTK 需实际窗口验证；OCCT/Netgen 需实际几何到网格验证。Python 工具链可独立推进，不反向阻塞 M0。
 
@@ -30,4 +37,4 @@
 
 C++20、模块隔离、Cargo 主入口是项目选择；各工具实际支持的 API 由官方资料决定；组合是否可用由任务验收决定。任务索引中的 ready 只表示可开始，不代表任何依赖已经安装。
 
-本页不复制完整兼容矩阵，实施记录先写入任务 002，稳定后更新本页并保留来源。各技术依据见 [规范索引](README.md)，开始工作见 [任务索引](../task-index.md)。
+固定清单与升级记录维护在依赖获取文档；本页保留结论与责任分工，实施证据写入对应任务。各技术依据见 [规范索引](README.md)，开始工作见 [任务索引](../task-index.md)。
