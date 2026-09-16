@@ -6,17 +6,31 @@
 
 DSL 用于可审阅地声明软件内的变量、参数及逻辑资源引用。先做声明式文本与受限表达式，不引入通用脚本执行；运行时消费校验后的变量快照，路径解析调用 023 的服务。它不替代 QML、不直接调用 OCCT/Netgen/VTK，也不改变外部求解器协议。
 
-以下仅为待实现语法示意，扩展名、关键字及 API 尚未发布：
+Panta DSL 的源码统一使用 `.pa` 后缀（Panta Artifact）；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。`.pa` 面向人读写，Artifact 引擎按 `kind` 聚合为字典、Theme 或变量快照。国际化 `.pa` 由 Rust 编译器转换为构建树中的临时 TS XML，再交给 QtTools 生成 QM，源码目录不需要出现 `.ts`。以下为待实现的变量域语法示意，完整关键字和 API 仍由 025 冻结：
 
 ```text
 version 1
+kind variables
 let divisions: int = 24
 let scale: real = 0.5
 let visible: bool = true
-let label: string = "Inlet"
-let mesh: resource = resource("project:/assets/mesh.vtu")
+let label: string = Inlet
+let mesh: resource = project:/assets/mesh.vtu
 let half: real = divisions * scale
 ```
+
+国际化字典复用同一文件头和诊断格式，使用简洁的 message 声明；TS XML 仅是编译中间文件：
+
+```text
+version 1
+kind language
+locale en
+fallback en
+
+message app.advance_revision = Advance revision
+```
+
+语言字典放在 `resources/i18n/<locale>.pa`，主题和变量也使用 `.pa` 文本；域由 `kind` 明确区分。声明使用首个 `=` 分隔，值默认取到行尾，不写引号；注释使用 `//`，反斜杠用于转义 `=`、换行和行尾空白。`.pa` 必须是 UTF-8，不能执行脚本、import、网络或 shell。语言域的 key、fallback、占位符和缺项规则见[国际化模块](internationalization.md)。
 
 V1 包含 bool、int、有限 real、string、resource；类型显式声明，int 算术检查溢出，int 到 real 的提升规则固定并测试。字符串定义 UTF-8 与转义规则；关键字、标识与小数点均不随 UI 语言变化。标识符初期限定 ASCII，用户可读标签允许 Unicode。表达式仅允许引用、括号及类型允许的算术，不提供 eval、循环、函数定义、import、网络或 shell。
 
@@ -34,7 +48,7 @@ Rust 端作为唯一解析和求值实现：UTF-8 源文本 → 带源位置的 
 
 DSL 文本保存用户声明；求值快照是可重建派生产物。V1 提供读写往返，序列化采用明确规范形式并允许丢失排版/注释，但不得丢失声明类型、表达式与语义；不宣称提供保留原格式的编辑器。内存解析成功不代表保存完成，写入须使用临时文件与提交策略，失败保留上一份有效文件。
 
-变量按消费场景区分作用域：工程参数属于工程数据，主题变量属于应用级主题配置，局部输入框、选中项与窗口位置属于会话/UI 状态，不能塞入同一全局字典。主题复用 DSL 解析器，但由独立主题服务校验/发布，不要求打开工程，不污染工程修订。主题键映射与默认值归属见[组件库与主题 DSL](qml-components-and-theme.md)，由任务 030 接入。CLI 与 UI 如同时编辑，应基于预期 revision 拒绝覆盖过时快照。未支持版本直接拒绝，未来真实迁移需求另建任务，不预先保留多版本兼容分支。
+变量按消费场景区分作用域：工程参数属于工程数据，主题变量属于应用级主题配置，局部输入框、选中项与窗口位置属于会话/UI 状态，不能塞入同一全局字典。主题和语言复用 DSL 解析器，但由独立服务校验/发布，不要求打开工程，不污染工程修订。主题键映射与默认值归属见[组件库与主题 DSL](qml-components-and-theme.md)，由任务 030 接入；语言字典由任务 022 接入。CLI 与 UI 如同时编辑，应基于预期 revision 拒绝覆盖过时快照。未支持版本直接拒绝，未来真实迁移需求另建任务，不预先保留多版本兼容分支。
 
 ## 延后能力
 

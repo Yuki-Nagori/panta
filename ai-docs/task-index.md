@@ -70,10 +70,10 @@ ai-docs/
 
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
-| 022 | [UI 英文源文案与语言字典](task/022-ui-internationalization.md) | 应用平台扩展 | 005 | ready |
+| 022 | [UI 英文源文案与语言字典](task/022-ui-internationalization.md) | 应用平台扩展 | 005, 034 | planned |
 | 023 | [跨平台路径与资源引用服务](task/023-cross-platform-paths.md) | 应用平台扩展 | 005, 006 | planned |
 | 024 | [工程运行时上下文与变量快照](task/024-runtime-context.md) | 应用平台扩展 | 008, 023 | planned |
-| 025 | [变量 DSL 解析、求值与存储](task/025-variable-dsl.md) | 应用平台扩展 | 024 | planned |
+| 025 | [变量 DSL 解析、求值与存储](task/025-variable-dsl.md) | 应用平台扩展 | 024, 034 | planned |
 | 026 | [C++ 静态库边界与 QML 自动注册](task/026-static-qml-modules.md) | 应用平台扩展 | 005 | ready |
 | 027 | [开发模式 QML 重载与状态恢复](task/027-qml-state-reload.md) | 应用平台扩展 | 007, 024, 026 | planned |
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | in-progress |
@@ -84,6 +84,8 @@ ai-docs/
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
 | 032 | [跨语言质量工具链与 100% 覆盖率门禁](task/032-cross-language-quality-gates.md) | 验证基础 | 011, 018, 019 | planned |
+| 033 | [高 DPI 缩放与多显示屏基础](task/033-display-scaling-and-multi-monitor.md) | 应用平台扩展 | 005, 007 | planned |
+| 034 | [Rust Panta Artifact 解析与 TS/QM 编译入口](task/034-rust-panta-artifact-parser.md) | 应用平台扩展 | 001 | ready |
 
 ## 仓库与文档维护
 
@@ -103,7 +105,7 @@ ai-docs/
 
 主题分支：005 → 029；025 + 029 → 030。先迁移组件及尺寸参数，再接主题 DSL；主题切换不依赖工程打开或引擎重载。
 
-新增分支：005 → 022 / 026；005 + 006 → 023；008 + 023 → 024 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；032 在 011 统一入口上补齐跨语言质量工具与 100% 覆盖率门禁。
+新增分支：001 → 034；005 + 034 → 022；005 → 026；005 + 006 → 023；008 + 023 → 024，024 + 034 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；032 在 011 统一入口上补齐跨语言质量工具与 100% 覆盖率门禁。
 
 014 默认 deferred，当前 MVP 不接入 Python；只有开始第一个真实 Python 工具工作时才推进，不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 

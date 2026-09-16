@@ -40,10 +40,11 @@ UI 尺寸统一采用 Qt Quick 逻辑像素语义，不自行乘设备像素比�
 
 规划流向：内置默认主题 DSL + 用户选择的主题覆盖 → 共用 DSL 解析器 → 主题 schema 校验与完整快照 → C++ ThemeViewModel → Theme.qml → 组件输入属性 → 拼装界面。QML 不解析 DSL、不访问文件、不直接连接 Rust；沿用服务经 C++ ViewModel 暴露的边界。
 
-示意主题文本（文法沿用 025；键映射尚未实现）：
+示意主题文本（`.pa` 文法沿用 025；键映射尚未实现）：
 
 ```text
 version 1
+kind theme
 let spacing_small: real = 8
 let control_height: real = 32
 let font_body: real = 14
