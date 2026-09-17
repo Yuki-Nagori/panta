@@ -35,7 +35,7 @@ elseif(UNIX)
   set(_qt_repo "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.linux_gcc_64")
   set(_qt_archives
     "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
-    "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723db6e923142adb860c146ecaf93c68197feda5307f22dd"
+    "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
     "6.11.2-0-202608131018qttools-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|42d5f3dbfc25647d9d95ef8b64401dc7e3ef7c83a39a29b548dfa0985f71c0ca"
   )
   # Qt Linux 工具使用与该发行版配套的 ICU 73。此归档由 Qt 官方仓库提供，
@@ -78,6 +78,15 @@ foreach(entry IN LISTS _qt_archives)
       INACTIVITY_TIMEOUT 120
       TIMEOUT 900
       EXPECTED_HASH SHA256=${_archive_sha})
+    # file(DOWNLOAD) 的哈希不符是延迟错误（configure 会继续跑完）：立即
+    # 复验并 FATAL，防止错误哈希进入解包指纹、污染后续缓存判定。
+    file(SHA256 "${_archive_path}" _archive_actual)
+    if(NOT _archive_actual STREQUAL _archive_sha)
+      file(REMOVE "${_archive_path}")
+      message(FATAL_ERROR "Qt 归档 SHA256 不符（下载结果）：${_archive_name}"
+        " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，"
+        "请核对 manifest 与上游资产")
+    endif()
   endif()
   message(STATUS "解包 Qt 预编译包：${_archive_name}")
   execute_process(
@@ -110,6 +119,13 @@ if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.
         INACTIVITY_TIMEOUT 120
         TIMEOUT 900
         EXPECTED_HASH SHA256=${_archive_sha})
+      file(SHA256 "${_archive_path}" _archive_actual)
+      if(NOT _archive_actual STREQUAL _archive_sha)
+        file(REMOVE "${_archive_path}")
+        message(FATAL_ERROR "Qt ICU 归档 SHA256 不符（下载结果）：${_archive_name}"
+          " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，"
+          "请核对 manifest 与上游资产")
+      endif()
     endif()
     message(STATUS "解包 Qt ICU 预编译包：${_archive_name}")
     execute_process(
