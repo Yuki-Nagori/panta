@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–005、018、019、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证）；006 最小 CXX 双向调用与 opaque 句柄所有权已本机验证、新增句柄的三平台 CI 复跑进行中，031 已开始官方预编译资产盘点，007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、018、019、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证）；031 已开始官方预编译资产盘点，007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -50,7 +50,7 @@ ai-docs/
 | 003 | [CMake/Ninja 原生构建骨架](task/003-cmake-native-skeleton.md) | M0 | 002 | done |
 | 004 | [Cargo 调度 CMake 与运行入口](task/004-cargo-native-orchestration.md) | M0 | 001, 003 | done |
 | 005 | [Qt/QML 主窗口与 C++ ViewModel](task/005-qt-qml-shell.md) | M0 | 004 | done |
-| 006 | [Rust/C++ FFI 最小契约](task/006-rust-cpp-boundary.md) | 基础平台 | 004 | in-progress |
+| 006 | [Rust/C++ FFI 最小契约](task/006-rust-cpp-boundary.md) | 基础平台 | 004 | done |
 | 007 | [VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031 | planned |
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | planned |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | planned |
@@ -115,4 +115,4 @@ ai-docs/
 
 014 默认 deferred，当前 MVP 不接入 Python；只有开始第一个真实 Python 工具工作时才推进，不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 
-后续新任务使用当前最大编号加一，不复用已有编号。001–005 已完成；主线下一项先执行 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md)，完成后再执行 [007 VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md)（006 可并行）。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。001–006 已完成；主线下一项先执行 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md)，完成后再执行 [007 VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

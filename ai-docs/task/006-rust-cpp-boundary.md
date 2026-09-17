@@ -1,6 +1,6 @@
 # 006 — Rust/C++ FFI 最小契约
 
-- 状态：in-progress
+- 状态：done
 - 阶段：基础平台
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成：Cargo 调度与运行入口就绪）
 - 优先级：P1
@@ -79,6 +79,7 @@
 | 2026-09-17 | opaque 句柄：桥接新增 `Session`（`rust::Box` 唯一所有权）与 `session_create/label/close/live_count`；`cargo test -p panta-ffi --locked` | 通过：7/7，含创建 2 句柄→存活 2→逆序 close→存活 0、空/超长标签结构化拒绝且不残留、Box 直接 drop 走同一 Drop 路径；测试以进程级锁串行化共享计数 |
 | 2026-09-17 | `cargo build -p panta-ffi --locked` 刷新 staticlib 与生成头；重配 `native/build/debug` 指向新 include（f50a…）后 `cmake --build` + `ctest`（macOS arm64） | 通过：native 9/9；boundary 二进制 5/5，新增 `OpaqueSessionCreateUseAndRelease`（逆序释放、计数平衡）与 `OpaqueSessionRejectsInvalidLabel`（空标签转 `rust::Error` 且存活数为 0） |
 | 2026-09-17 | `cargo test --locked --workspace --exclude panta-launcher`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；`cargo fmt --all -- --check`；`git diff --check` | 通过：Rust 18/18，workspace Clippy 0 warning，格式与补丁检查干净 |
+| 2026-09-17 | GitHub Actions run `35208203564`（`a4b2d9b`，三平台） | 新增 opaque 句柄代码的三平台干净/增量构建与全部检查 | 通过：Build/Test/Format/Clippy 全绿，含 panta-ffi 7 测试与 launcher 经 CMake 最终链接的完整构建 |
 
 ## 风险与回退
 
@@ -99,4 +100,4 @@ CXX 生成器版本不一致、glue 重复编译或双向符号未链接会破�
 
 ## 完成摘要
 
-验收项均已取得本机证据（Rust 7 测试 + native GTest 5 用例含 opaque 句柄创建/释放/无效输入 + CMake 最终链接）；干净/增量构建有 CI 冷缓存与本机重建证据。新增句柄代码的三平台 CI 干净复跑进行中，全绿后标 done。
+已完成。最小 CXX 双向边界落地：DTO 请求/响应、结构化错误（`Result`→`rust::Error`）与 panic-abort 区分、opaque 句柄 `Session`（`rust::Box` 唯一所有权，创建/释放/无效输入由两侧可运行验证）。证据：Rust 7 测试、native GTest 5 用例（含 death test 与句柄平衡）、CMake 最终链接，以及三平台 CI run `35203709898`（冷缓存干净构建）、`35208203564`（含句柄代码）。限制：当前仅为最小边界验收，不含业务服务；CI 不在 Windows 上执行 GTest（聚合归 011）。
