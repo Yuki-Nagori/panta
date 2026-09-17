@@ -6,7 +6,7 @@
       "name": "base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/${presetName}"
+      "binaryDir": "${sourceDir}/../target/native/${presetName}"
     },
     {
       "name": "debug",

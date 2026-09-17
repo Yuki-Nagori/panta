@@ -4,7 +4,8 @@
 # SHA256 于 2026-09-16 下载实测记录于此，下载与缓存均强校验；升级 Qt 时
 # 同步更新三平台的 URL/SHA 并回写 ai-docs/standards/dependency-acquisition.md。
 # 解包使用 `cmake -E tar`（内建 libarchive 支持 7z，三平台零额外工具）。
-# 供给结果缓存在构建树（OUT_DIR）；清除构建树即重新下载。
+# 供给结果缓存在 QT_PROVISION_DIR（默认构建树 qt/；任务 041 起由
+# build.rs 传入 target/panta-deps/qt，跨 profile 与 presets 共享）。
 
 if(NOT DEFINED QT_PROVISION_DIR)
   set(QT_PROVISION_DIR "${CMAKE_BINARY_DIR}/qt")

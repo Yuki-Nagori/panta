@@ -1,0 +1,4 @@
+# clangd 索引配置：编译数据库由 CMake 生成在共享构建树（任务 041），
+# 不落源码树；debug 是日常开发配置，release 需要时手动切换该路径。
+CompileFlags:
+  CompilationDatabase: target/native/debug/compile_commands.json

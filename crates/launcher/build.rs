@@ -98,14 +98,19 @@ fn orchestrate() -> Result<PathBuf, String> {
     if !native_dir.is_dir() {
         return Err(format!("native 目录不可达：{}", native_dir.display()));
     }
-    let binary_dir = PathBuf::from(&out_dir).join("native-build");
     // OUT_DIR = <target>/<profile>/build/<hash>/out；ancestors 跳过 out、
-    // hash、build、profile 四层得到 target 根，托管工具缓存与 profile 无关。
+    // hash、build、profile 四层得到 target 根。
     let target_root = PathBuf::from(&out_dir)
         .ancestors()
         .nth(4)
         .ok_or_else(|| format!("无法从 launcher OUT_DIR 推导 target 根：{out_dir}"))?
         .to_path_buf();
+    // 产物归一（任务 041）：native 构建树与第三方缓存都放在 target 根下，
+    // 与 profile 绑定、与 launcher 哈希目录无关——build.rs 变更换 OUT_DIR
+    // 时不再整树重配、不再重下 Qt/googletest。presets 的 binaryDir 指向
+    // 同一位置（native/<presetName> 与 <profile> 同名）。
+    let binary_dir = target_root.join("native").join(&profile);
+    let deps_root = target_root.join("panta-deps");
 
     // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
     let cmake = provision::resolve_cmake(&target_root)?;
@@ -142,6 +147,14 @@ fn orchestrate() -> Result<PathBuf, String> {
         .arg(format!(
             "-DPANTA_FFI_STATIC_LIB={}",
             ffi_staticlib.display()
+        ))
+        .arg(format!(
+            "-DQT_PROVISION_DIR={}",
+            deps_root.join("qt").display()
+        ))
+        .arg(format!(
+            "-DFETCHCONTENT_BASE_DIR={}",
+            deps_root.join("fetchcontent").display()
         ));
     if let Some(ninja) = &ninja {
         // 托管供给的 Ninja 不依赖 PATH；系统 Ninja 传显式路径同样无害。

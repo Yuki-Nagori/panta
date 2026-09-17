@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证），031 已开始官方预编译资产盘点，009 因 OCCT 缺 macOS/Linux 预编译 SDK 阻塞（解除条件为 031/038 供给制品），007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证），031 已开始官方预编译资产盘点，009 因 OCCT 缺 macOS/Linux 预编译 SDK 阻塞（解除条件为 031/038 供给制品），007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。041 正在把 native 产物归一到 `target/native/<profile>` 并共享 Qt/googletest 缓存（消除 `native/build` 与 OUT_DIR 哈希目录的重复产物）。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -67,6 +67,7 @@ ai-docs/
 | 038 | [Native SDK 制品生产与发布](task/038-native-sdk-artifact-production.md) | 交付基础 | 031, 020 | planned |
 | 039 | [CI FFI 构建链修复](task/039-ci-ffi-build-fix.md) | 验证基础 | 006, 018, 036 | done |
 | 040 | [统一 Cargo 构建编排入口](task/040-cargo-build-orchestration.md) | 验证基础 | 004, 039 | done |
+| 041 | [构建产物归一与第三方缓存共享](task/041-build-artifact-consolidation.md) | 验证基础 | 004, 020 | in-progress |
 
 ## 应用平台扩展队列
 
