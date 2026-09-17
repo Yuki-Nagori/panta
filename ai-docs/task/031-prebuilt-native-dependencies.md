@@ -9,7 +9,7 @@
 
 ## 目标与背景
 
-建立 VTK、OpenCASCADE、Netgen 及工具链的预编译优先供给，使开发者和 CI 消费固定 SDK，而不是每次本地从源码编译第三方库。当前已完成第一轮官方发布资产盘点；供给脚本、manifest、CMake package 注入和三平台 configure 仍未实施。
+建立 VTK、OpenCASCADE、Netgen 及工具链的预编译优先供给，使开发者和 CI 消费固定 SDK，而不是每次本地从源码编译第三方库。当前已完成第一轮官方发布资产盘点；供给脚本、manifest、CMake package 注入和三平台 configure 仍未实施。缺少上游 SDK 的受信制品生产由 [038](038-native-sdk-artifact-production.md) 承接。
 
 ## 必读
 
