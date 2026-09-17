@@ -95,6 +95,13 @@ fn orchestrate() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("cmake"));
     let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
+    // Cargo 的默认 feature 是唯一用户入口；把 feature 状态转换成 CMake
+    // 选项，避免开发者在日常命令中重复维护两套开关。
+    let bridge_module = if std::env::var_os("CARGO_FEATURE_BRIDGE_MODULE").is_some() {
+        "ON"
+    } else {
+        "OFF"
+    };
     let (ffi_include, ffi_staticlib) = ffi_artifacts(&PathBuf::from(&out_dir))?;
 
     // 有效配置与 native/CMakePresets.json 一致：差异项只有构建类型，
@@ -108,6 +115,7 @@ fn orchestrate() -> Result<PathBuf, String> {
         .arg("-G")
         .arg(&generator)
         .arg(format!("-DCMAKE_BUILD_TYPE={build_type}"))
+        .arg(format!("-DPANTA_ENABLE_BRIDGE_MODULE={bridge_module}"))
         .arg("-DPANTA_ENABLE_FFI_TEST=ON")
         .arg(format!("-DPANTA_FFI_INCLUDE_DIR={}", ffi_include.display()))
         .arg(format!(

@@ -9,11 +9,15 @@
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
+#endif
 #include <cstdio>
 #include <string_view>
 
+#ifdef PANTA_ENABLE_BRIDGE_MODULE
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
+#endif
 
 namespace {
 
@@ -54,7 +58,11 @@ int main(int argc, char* argv[]) {
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         []() { QCoreApplication::exit(kExitUnavailable); }, Qt::QueuedConnection);
+#ifdef PANTA_ENABLE_BRIDGE_MODULE
     engine.loadFromModule("Panta.Shell", "App");
+#else
+    engine.loadFromModule("Panta.Shell", "AppNoBridge");
+#endif
     if (engine.rootObjects().isEmpty()) {
         return kExitUnavailable;
     }

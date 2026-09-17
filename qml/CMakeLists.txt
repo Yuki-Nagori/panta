@@ -7,6 +7,24 @@ set_source_files_properties(Themes/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TR
 # 路径，便于 qmllint、qmltestrunner 和 IDE 通过标准 import 解析模块。
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
 
+set(PANTA_SHELL_QML_FILES
+  App.qml
+  Themes/Theme.qml
+  Components/Atoms/ThemedLabel.qml
+  Components/Atoms/ThemedButton.qml
+  Components/Atoms/PanelSurface.qml
+  Panels/PlaceholderPanel.qml
+)
+set(PANTA_SHELL_QML_DEPENDENCIES)
+if(PANTA_ENABLE_BRIDGE_MODULE)
+  list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge)
+endif()
+if(NOT PANTA_ENABLE_BRIDGE_MODULE)
+  # 提供无 Bridge 的最小 Shell，避免关闭可选模块后残留 Panta.Bridge import。
+  list(REMOVE_ITEM PANTA_SHELL_QML_FILES App.qml)
+  list(APPEND PANTA_SHELL_QML_FILES AppNoBridge.qml)
+endif()
+
 if(UNIX AND NOT APPLE)
   # 与 Panta.Bridge 保持一致：Linux runner 的预编译 Qt qtpaths 需要未提供的
   # ICU 73；qmlls.build.ini 是编辑器辅助产物，跳过不影响 QML 资源和 typeinfo。
@@ -18,15 +36,9 @@ qt_add_qml_module(panta_shell
   VERSION 1.0
   RESOURCE_PREFIX /qt/qml
   NO_PLUGIN
-  DEPENDENCIES TARGET panta_bridge
+  ${PANTA_SHELL_QML_DEPENDENCIES}
   ${PANTA_QML_MODULE_OPTIONS}
-  QML_FILES
-    App.qml
-    Themes/Theme.qml
-    Components/Atoms/ThemedLabel.qml
-    Components/Atoms/ThemedButton.qml
-    Components/Atoms/PanelSurface.qml
-    Panels/PlaceholderPanel.qml
+  QML_FILES ${PANTA_SHELL_QML_FILES}
 )
 
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)

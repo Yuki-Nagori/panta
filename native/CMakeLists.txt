@@ -7,6 +7,9 @@ project(panta_native VERSION 0.1.0 LANGUAGES CXX)
 option(PANTA_ENABLE_FFI_TEST
   "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF
 )
+option(PANTA_ENABLE_BRIDGE_MODULE
+  "Build and register the Panta.Bridge QML module" ON
+)
 
 # 默认值单一来源（cargo.md：Cargo 调度与直接诊断构建共用一套有效配置）：
 # presets 与 crates/launcher/build.rs 只传显式差异项（构建类型），未指定时
@@ -67,7 +70,9 @@ if(BUILD_TESTING)
 endif()
 
 add_subdirectory(foundation)
-add_subdirectory(bridge)
+if(PANTA_ENABLE_BRIDGE_MODULE)
+  add_subdirectory(bridge)
+endif()
 add_subdirectory(app)
 # qml/ 位于仓库根（repository-layout）；二进制目录固定在 native 构建树内。
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../qml qml)
