@@ -4,11 +4,11 @@
 
 ## 当前可用范围
 
-Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、唯一成员 `crates/launcher` 与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行。
+Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、launcher、DSL 和 FFI 成员与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行。
 
 native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 库、`native/app` 可执行骨架与 CTest 测试；单配置 Ninja presets（`debug`/`release`），安装树可被 `find_package(panta-native)` 消费。
 
-Cargo 调度已接通（任务 004）：`crates/launcher/build.rs` 以与 presets 一致的有效配置构建 native 树（构建树在 `target/` 内 OUT_DIR 下），`cargo run` 启动 native 产物并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。
+Cargo 调度已接通（任务 004）：Cargo manifest 通过 panta-ffi 的普通依赖 + build-dependency 双边确保 staticlib 先于 launcher build script 生成，`crates/launcher/build.rs` 再以与 presets 一致的有效配置构建 native 树（构建树在 `target/` 内 OUT_DIR 下）；构建完成后 `cargo run` 启动 native 产物并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。
 
 Qt Quick 主窗口已可用（任务 005）：`native/app` 为 Qt 入口，`native/bridge` 提供 ViewModel（GTest 信号测试），`qml/`（URI `Panta.Shell`，NO_PLUGIN 资源模块）承载界面；Qt 6.11.2 预编译包由 `native/cmake/qt-provision.cmake` 按三平台固定清单下载到构建树。任务 006 的 `panta-ffi` 以 CXX 1.0.202 生成 Rust/C++ 桥接静态库和 native 边界测试，launcher build.rs 将生成头与静态库路径传入 CMake；该最小路径仍待跨平台编译证据。QML/资源目录已纳入 build.rs 重建追踪（改 QML 即重跑 qmlcachegen）。此时尚未接入 VTK/OCCT/Netgen，界面为骨架占位，不宣称桌面功能。
 
@@ -28,7 +28,7 @@ Qt 桌面可执行文件由 CMake 生成，使 moc、rcc、QML 模块处理和�
 
 | 目标入口 | 预期行为 | 必须补齐的实现 |
 |---|---|---|
-| `cargo build` | 构建 Rust 与 native desktop | 原生调度、依赖发现、失败码传递 |
+| `cargo build` | 由 Cargo 依赖图先构建 FFI staticlib，再构建 Rust 与 native desktop | 编排入口、原生调度、依赖发现、失败码传递 |
 | `cargo run` | 启动 CMake 生成的桌面程序 | Cargo 可运行 launcher、可执行文件定位、参数转发 |
 | `cargo test` | 提供统一验证入口 | Rust 测试及 native/集成检查的明确调度 |
 

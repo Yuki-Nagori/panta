@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–005、018、019、036 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口和跨平台 native CI 修复均落地并验证）；006 最小 CXX 边界双向调用已本机验证、收尾验收进行中，031 已开始官方预编译资产盘点，039 正在修复 FFI 接入后的三平台干净构建，007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–005、018、019、036 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口和跨平台 native CI 修复均落地并验证）；006 最小 CXX 边界双向调用已本机验证、收尾验收进行中，031 已开始官方预编译资产盘点，039 正在修复 FFI 接入后的三平台干净构建，040 正在把 FFI staticlib 顺序收回统一 Cargo 编排入口，007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -66,6 +66,7 @@ ai-docs/
 | 036 | [三平台 CI native 构建修复](task/036-ci-native-build-fix.md) | 验证基础 | 004, 005, 018 | done |
 | 038 | [Native SDK 制品生产与发布](task/038-native-sdk-artifact-production.md) | 交付基础 | 031, 020 | planned |
 | 039 | [CI FFI 构建链修复](task/039-ci-ffi-build-fix.md) | 验证基础 | 006, 018, 036 | in-progress |
+| 040 | [统一 Cargo 构建编排入口](task/040-cargo-build-orchestration.md) | 验证基础 | 004, 039 | in-progress |
 
 ## 应用平台扩展队列
 

@@ -11,7 +11,7 @@
 
 GitHub Actions 最新 run `35195983722`（提交 `993ff89`）在三平台的 Build 阶段失败。Linux/macOS 的干净构建中，Cargo 将 `panta-ffi` staticlib 生成在 profile 根目录，但 `panta-launcher` 构建脚本只从 `target/debug/deps` 读取，因此报告未找到静态库。Windows 还暴露出 CXX build script 只传递 GCC 风格的 `-std=c++20`，MSVC 因未启用 C++17 以上标准而拒绝嵌套命名空间定义。
 
-完成后，CI 的三平台干净构建应先显式产生可供 native CMake 链接的 `panta-ffi` staticlib，CXX bridge 在 MSVC 上应使用 `/std:c++20`，并保持 GCC/Clang 的 `-std=c++20` 路径。
+完成后，CI 的三平台干净构建应在 launcher 的 native CMake 阶段前拥有可供链接的 `panta-ffi` staticlib，CXX bridge 在 MSVC 上应使用 `/std:c++20`，并保持 GCC/Clang 的 `-std=c++20` 路径。staticlib 的先后顺序最终由任务 040 收回 Cargo 构建图，不要求 CI 额外记忆预构建命令。
 
 ## 必读
 
@@ -35,13 +35,13 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 ## 实施步骤
 
 1. 在隔离 target 目录复现普通 `cargo build --locked` 的 staticlib 缺失行为，并确认 `cargo build -p panta-ffi --locked` 的产物位置。
-2. 通过 workflow 在 workspace 构建前显式执行 `cargo build --locked -p panta-ffi`，不在 launcher build script 中递归调用 Cargo；launcher 继续使用当前 profile、target 和生成器对应的 staticlib。
+2. 先用 workflow 的独立 `panta-ffi` 预构建验证竞态根因；随后由任务 040 将相同约束收回 launcher manifest，最终 workflow 只调用 `cargo build --locked`，不在 launcher build script 中递归调用 Cargo。
 3. 按目标编译器选择 C++20 选项：MSVC 使用 `/std:c++20`，GCC/Clang 使用 `-std=c++20`。
 4. 运行 Rust 格式、测试、Clippy 和可用的 native/CMake 验证；更新索引与本文真实结果。
 
 ## 预计改动
 
-`.github/workflows/ci.yml`、`crates/panta-ffi/build.rs`、`crates/launcher/build.rs` 及本文件；CI 在 workspace 构建前显式运行 `cargo build --locked -p panta-ffi`，launcher 保留 profile 根目录和 deps/的定位逻辑。
+`.github/workflows/ci.yml`、`crates/panta-ffi/build.rs`、`crates/launcher/build.rs` 及本文件；任务 040 另调整 launcher manifest 的依赖边，最终 CI 保留单一 `cargo build --locked` 入口，launcher 保留 profile 根目录和 deps/的定位逻辑。
 
 ## 清理与兼容例外
 
@@ -49,7 +49,7 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 
 ## 验收标准
 
-- [ ] 三平台干净 `cargo build --locked` 均能完成 FFI staticlib、native CMake 和 launcher 构建。
+- [ ] 三平台干净 `cargo build --locked` 均能完成 FFI staticlib、native CMake 和 launcher 构建（顺序约束由任务 040 的 Cargo manifest 提供）。
 - [ ] MSVC 日志显示 `/std:c++20`，GCC/Clang 继续使用 `-std=c++20`，CXX bridge 不再因嵌套命名空间失败。
 - [x] staticlib 由当前 Cargo profile 生成并被 native 链接；不依赖工作区历史构建残留，也不在 build script 中递归执行 Cargo。
 - [x] 可用范围内的 Rust 测试、格式、Clippy 与 native FFI 测试通过；三平台 CI 完整复跑仍待推送后验证。
@@ -74,6 +74,7 @@ Cargo crate-type 调度、CMake 链接和 CXX bridge 的编译器选项属于不
 
 - 2026-09-17：根据 GitHub Actions run `35195983722` 创建任务；确认失败分为 staticlib 供给顺序和 MSVC C++ 标准选项两类。
 - 2026-09-17（实施）：launcher 优先定位 Cargo profile 根目录 staticlib，并以 deps/作为布局兜底；panta-ffi 按 target 环境向 MSVC 传递 `/std:c++20`，非 MSVC 保持 `-std=c++20`。
+- 2026-09-17（收敛）：CI 预构建曾验证为有效但不适合作为长期入口；任务 040 通过 launcher 的普通依赖 + build-dependency 双边表达静态库先后顺序，workflow 恢复为单一 `cargo build --locked`。
 
 ## 完成摘要
 

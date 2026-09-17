@@ -18,11 +18,14 @@ jobs:
         include:
           - os: macos-latest
             cmake_generator: Ninja
+            cache_compiler: apple-clang-17
           - os: ubuntu-latest
             cmake_generator: Ninja
+            cache_compiler: gcc-rhel9
           - os: windows-2022
             cmake_generator: Visual Studio 17 2022
             cmake_generator_platform: x64
+            cache_compiler: msvc2022
     runs-on: ${{ matrix.os }}
     env:
       CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
@@ -42,8 +45,16 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
-      - name: Build FFI static library
-        run: cargo build --locked -p panta-ffi
+      - name: Cache Cargo and native build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: panta-${{ runner.os }}-${{ runner.arch }}-${{ matrix.cache_compiler }}-${{ matrix.cmake_generator }}-${{ matrix.cmake_generator_platform }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.github/workflows/ci.yml', 'native/CMakePresets.json', 'native/**/*.cmake', 'native/**/CMakeLists.txt', 'qml/**/*.cmake', 'qml/CMakeLists.txt') }}
+          restore-keys: |
+            panta-${{ runner.os }}-${{ runner.arch }}-${{ matrix.cache_compiler }}-${{ matrix.cmake_generator }}-
 
       - name: Build
         run: cargo build --locked
