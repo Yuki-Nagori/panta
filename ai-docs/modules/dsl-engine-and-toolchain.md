@@ -39,6 +39,8 @@ open-file:
 
 构建流程为：读取 `.pa` → pest 解析与领域校验 → Artifact 聚合器按 `kind` 生成语言/Theme/变量快照 → 按目标 locale 由 quick-xml 写出构建树临时 TS → 调用锁定的 Qt Linguist 预编译 `lrelease` → 生成并嵌入 QM。QM 是唯一的运行期翻译输入；应用启动和语言切换不解析 `.pa` 或 XML。`panta-dslc` 不自行下载、编译或寻找系统 Qt，`lrelease` 路径由 CMake 供给并记录版本。
 
+构建入口已落地（034，2026-09-17）：launcher build.rs 以 build-dependency 复用 `panta-dsl-core` 解析 `resources/i18n/*.pa`，把语言字典原子写入构建树 `target/native/<profile>/i18n/*.ts`（解析失败立即终止且保留旧 TS），经 `PANTA_I18N_TS_DIR` 交给 `native/i18n`；该 CMake 模块从 Qt 供给（qttools 归档，`qt-provision.cmake` 锁定）解析 `lrelease` 编译 QM，以 qrc 列表嵌入 `:/i18n/<catalog>_<locale>.qm`，并由 ctest `I18n.CompiledQmLoads` 用 QTranslator 验证端到端加载。presets 纯净 configure 缺 TS 时立即失败并提示先 `cargo build`（与 FFI 输入同边界）。
+
 临时 TS 和 QM 不作为源码提交；失败时不覆盖上一份有效 TS/QM。编译器限制输入字节、token、嵌套深度和 message/变量数，拒绝未知必需版本、重复 context/ID、非法 locale、占位符不一致和任意脚本/文件访问。
 
 catalog 的 source-text 兼容索引按 `src` 长度降序构建，`ok ok` 优先于 `ok`，同长度冲突在校验阶段失败；QML/C++ 不走这个索引而使用 context + ID 或完整 source 精确查找。

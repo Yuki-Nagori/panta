@@ -64,6 +64,11 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 | 2026-09-17 | `cargo fmt --all`；`cargo test -p panta-dsl-core`；`cargo run -p panta-dslc -- check/emit-ts ...` | parser/TS 生成、kebab-case 约束、最长 source 规则和 CLI crate 通过 | 5 个核心单元测试、2 个 fixture 集成测试通过；CLI 成功校验 fixture 并生成 `zh_CN` TS。workspace 级 launcher/Qt 验证仍待预编译 Qt 供给可用后执行 |
 | 2026-09-17 | QM 冒烟：`panta-dslc emit-ts resources/i18n/panta-cn.pa → TS`；任务 005 staging 的锁定 `lrelease 6.11.2`（macOS arm64）编译 QM | TS 被 lrelease 接受并产出 QM | 通过：TS 2.1/zh_CN/id/source/translation/%1 占位符完整；lrelease 报 4 翻译全部 finished，QM 245B。`-idbased` 在 Qt 6 已废弃（lrelease 直接拒绝），后续 CMake 接入使用默认参数 |
 | 2026-09-17 | 任意 cwd（/tmp）执行 CLI：`check` cn/en、`format --check`、负例 tab 缩进/非法 UTF-8/未知 kind/重复 header | 校验通过返回 0；失败返回 2 且带稳定 span 诊断、不写文件 | 通过：`pa.tab_indentation at 3:5`、`pa.invalid_utf8 at byte 15`、未知 kind 的 pest span `1:7`、`pa.duplicate_header at 3:1`；失败路径均未修改文件 |
+| 2026-09-17 | Qt 6.11.2 在线仓库基础包归档清单核查（mac/linux/windows Updates.xml）与 qttools 归档下载实测 | 基础包内含 qttools；三平台归档 SHA256 记录进 `qt-provision.cmake` | mac `415b5008…07d3719`（41M）、windows `5f2b387a…56946`（26M）、linux `42d5f3db…71c0ca`（28M）；三归档均含平铺 `bin/lrelease`（另有 lrelease-pro） |
+| 2026-09-17 | `cargo build --locked`（macOS arm64，共享树 `target/native/debug`） | TS 生成 → lrelease QM → qrc 嵌入全链接通 | 通过：`i18n/panta_en.ts`、`panta_zh_CN.ts` 由 build.rs 写出（`PANTA_I18N_TS_DIR`），staging 锁定 lrelease 6.11.2 编译 QM 并经 qrc 嵌入 `:/i18n/`；qttools 归档按新解包指纹一次性迁移（旧缓存无指纹，三归档全量重解，之后按指纹跳过），幂等二跑 0.03s |
+| 2026-09-17 | `ctest --preset debug`（macOS arm64） | 既有测试不受影响，i18n 链路有端到端证据 | 17/17 全绿，含新增 `I18n.CompiledQmLoads`（QTranslator 从 `:/i18n/` 加载 zh_CN/en QM，`Revision %1 → 修订 %1`、`Error → 错误` 断言通过） |
+| 2026-09-17 | 增量与失败路径：`touch resources/i18n/panta-cn.pa` 后重建；向 panta-cn.pa 追加语法错误后 `cargo build`；纯净目录 `cmake -S native -B /tmp/fresh-boundary` | .pa 变更传播到 TS；解析失败保留旧 TS 并给稳定诊断；缺 TS 的 configure 立即失败 | 通过：touch 后 TS mtime 更新；损坏 .pa 构建失败（`panta-cn.pa：pa.syntax at 23:1`）且旧 TS 未动，恢复后全绿；无 `PANTA_I18N_TS_DIR` 的 configure 报错并指引先 `cargo build`（与 FFI 同边界） |
+| 2026-09-17 | `cargo test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`git diff --check` | Rust 侧检查全绿 | 通过 |
 
 ## 风险与回退
 
@@ -75,11 +80,12 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 - 2026-09-16：首选 pest；quick-xml 将语言 Artifact 生成 Qt TS XML，serde 负责 DTO，QM 保持 Qt 运行期格式；`.pa` 源码不暴露 XML。
 - 2026-09-17：根据 TS 兼容示例，语言 `.pa` 改为 `[Context]` + 短 ID + `src/tr` 元数据结构；支持 `st`、`oldsrc`、`comment`、`extra`、`numerus` 和 plural forms，`cn` 简写归一化为 `zh-CN`。
 - 2026-09-17：开始实现 `panta-dsl-core` 与 `panta-dslc`，首期采用 YAML 风格缩进和无引号标量；变量/Theme 的类型表达式保留 `=`。
+- 2026-09-17（TS/QM 构建入口增量，实施中）：查明 Qt 6.11.2 在线仓库基础包（clang_64 / linux_gcc_64 / win64_msvc2022_64）的归档清单内含 `qttools-*.7z`（lrelease/lupdate 所在），此前 qt-provision 只取 qtbase/qtdeclarative。实施：qt-provision 增补三平台 qttools 固定归档（下载实测 SHA256）；launcher build.rs 以 build-dependency 复用 `panta-dsl-core` 解析 `resources/i18n/*.pa` 并原子写出构建树 TS（失败保留旧 TS），传 `PANTA_I18N_TS_DIR` 给 CMake；新增 native/i18n 模块用 staging 锁定 `lrelease` 编 QM、`qt_add_resources` 嵌入并附 QTranslator 加载冒烟 ctest。presets 纯净 configure 依赖先 `cargo build` 生成 TS（与 FFI 同边界）。
 
 ## 完成摘要
 
-未完成，等待实现与跨平台验证。
+未完成，等待跨平台验证与消费方接入。已落地：解析内核/CLI/formatter（与 035 共享）、QM 冒烟、以及 TS/QM 构建入口（qttools 锁定 lrelease 供给 + build.rs TS 生成 + `native/i18n` QM 编译/qrc 嵌入 + 端到端 ctest）。剩余见“当前进展”。
 
 ## 当前进展（2026-09-17）
 
-核心 parser、TS 生成入口和 formatter 消费契约已实现；实际 language 源文件已加入 resources/i18n/panta-en.pa 与 resources/i18n/panta-cn.pa。QM 冒烟已用任务 005 staging 的锁定 lrelease 打通（emit-ts → lrelease → QM），CLI 任意 cwd 与失败夹具验证完成。剩余：TS/QM 的 CMake 构建入口接入、三平台确定性快照、032 覆盖率门禁与 022/025/030 消费方接入。
+核心 parser、TS 生成入口和 formatter 消费契约已实现；实际 language 源文件已加入 resources/i18n/panta-en.pa 与 resources/i18n/panta-cn.pa。QM 冒烟已用任务 005 staging 的锁定 lrelease 打通（emit-ts → lrelease → QM），CLI 任意 cwd 与失败夹具验证完成。TS/QM 的 CMake 构建入口已接通：qt-provision 增补三平台 qttools 锁定归档（lrelease），launcher build.rs 复用 `panta-dsl-core` 生成构建树 TS，`native/i18n` 编 QM、以 qrc 嵌入 `:/i18n/` 并由 `I18n.CompiledQmLoads` 端到端验证；`.pa` 变更增量传播与失败路径（保留旧 TS、纯净 configure 边界）有实测记录。剩余：三平台确定性快照证据（CI 已跑 TS 生成，缺逐平台比对）、032 覆盖率门禁与 022/025/030 消费方接入。

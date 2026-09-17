@@ -30,6 +30,7 @@ const RERUN_PATHS: &[&str] = &[
     "../../native/CMakePresets.json",
     "../../native/cmake",
     "../../native/app",
+    "../../native/i18n",
     "../../native/bridge",
     "../../native/bridge/src",
     "../../native/bridge/tests",
@@ -48,6 +49,7 @@ const RERUN_PATHS: &[&str] = &[
     "../../qml",
     "../../qml/Themes",
     "../../qml/Panels",
+    "../../resources/i18n",
     // 扩展点：resources/ 与更多 QML 子目录落地时在此追加（任务 005 起）。
 ];
 
@@ -94,7 +96,7 @@ fn orchestrate() -> Result<PathBuf, String> {
     // 保留标准绝对路径表示，不调用 canonicalize：Windows 上它会把盘符路径
     // 转成 `//?/D:` 长路径前缀，MinGW 会将其错误解析为 POSIX 根路径。路径可能
     // 含空格，全程走参数数组；CMake 会在读取 -S 时消解 `..`。
-    let native_dir = PathBuf::from(manifest_dir).join("../../native");
+    let native_dir = PathBuf::from(&manifest_dir).join("../../native");
     if !native_dir.is_dir() {
         return Err(format!("native 目录不可达：{}", native_dir.display()));
     }
@@ -112,6 +114,12 @@ fn orchestrate() -> Result<PathBuf, String> {
     let binary_dir = target_root.join("native").join(&profile);
     let deps_root = target_root.join("panta-deps");
 
+    // i18n（任务 034）：解析 resources/i18n/*.pa 并把语言字典写成构建树
+    // TS，供 CMake 侧锁定 lrelease 编 QM。解析失败立即终止构建，旧 TS 保持
+    // 不动；与 panta-dslc CLI 共享 panta-dsl-core，无第二套 parser。
+    let i18n_dir = PathBuf::from(&manifest_dir).join("../../resources/i18n");
+    let ts_dir = binary_dir.join("i18n");
+    emit_translation_sources(&i18n_dir, &ts_dir)?;
     // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
     let cmake = provision::resolve_cmake(&target_root)?;
     let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
@@ -161,7 +169,8 @@ fn orchestrate() -> Result<PathBuf, String> {
         .arg(format!(
             "-DPANTA_SDK_PROVISION_DIR={}",
             deps_root.join("sdk").display()
-        ));
+        ))
+        .arg(format!("-DPANTA_I18N_TS_DIR={}", ts_dir.display()));
     if let Some(ninja) = &ninja {
         // 托管供给的 Ninja 不依赖 PATH；系统 Ninja 传显式路径同样无害。
         configure.arg(format!("-DCMAKE_MAKE_PROGRAM={}", ninja.display()));
@@ -278,6 +287,65 @@ fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
             )
         })?;
     Ok((include, staticlib))
+}
+
+fn emit_translation_sources(i18n_dir: &Path, ts_dir: &Path) -> Result<(), String> {
+    let entries = fs::read_dir(i18n_dir)
+        .map_err(|error| format!("读取 i18n 目录 {} 失败：{error}", i18n_dir.display()))?;
+    let mut sources = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "pa"))
+        .collect::<Vec<_>>();
+    sources.sort();
+    if sources.is_empty() {
+        return Err(format!(
+            "{} 下没有 .pa 字典；语言字典缺失时构建不支持继续",
+            i18n_dir.display()
+        ));
+    }
+
+    fs::create_dir_all(ts_dir)
+        .map_err(|error| format!("创建 TS 目录 {} 失败：{error}", ts_dir.display()))?;
+    for source in &sources {
+        let bytes =
+            fs::read(source).map_err(|error| format!("读取 {} 失败：{error}", source.display()))?;
+        let text = String::from_utf8(bytes).map_err(|error| {
+            format!(
+                "pa.invalid_utf8 at byte {} in {}",
+                error.utf8_error().valid_up_to(),
+                source.display()
+            )
+        })?;
+        let document = panta_dsl_core::parse(&text)
+            .map_err(|error| format!("{}：{error}", source.display()))?;
+        if document.kind != panta_dsl_core::Kind::Language {
+            // theme/variables 字典在此只做校验；其消费方（025/030）接入前不
+            // 生成任何产物。
+            continue;
+        }
+        let locale = document.language.clone().ok_or_else(|| {
+            format!(
+                "{}：语言字典缺少 language 头，无法生成 TS",
+                source.display()
+            )
+        })?;
+        let catalog = document
+            .catalog
+            .clone()
+            .unwrap_or_else(|| "panta".to_owned());
+        let ts_name = locale.replace('-', "_");
+        let ts = panta_dsl_core::emit_ts(&document, &locale)
+            .map_err(|error| format!("{}：{error}", source.display()))?;
+        let destination = ts_dir.join(format!("{catalog}_{ts_name}.ts"));
+        // 临时文件 + rename：写一半失败不破坏上一份有效 TS。
+        let temporary = destination.with_extension("ts.tmp");
+        fs::write(&temporary, ts.as_bytes())
+            .map_err(|error| format!("写 {} 失败：{error}", temporary.display()))?;
+        fs::rename(&temporary, &destination)
+            .map_err(|error| format!("替换 {} 失败：{error}", destination.display()))?;
+    }
+    Ok(())
 }
 
 fn run_step(name: &str, command: &mut Command) -> Result<(), String> {

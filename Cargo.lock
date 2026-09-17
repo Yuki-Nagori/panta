@@ -260,6 +260,7 @@ dependencies = [
 name = "panta-launcher"
 version = "0.1.0"
 dependencies = [
+ "panta-dsl-core",
  "panta-ffi",
  "sha2",
 ]

@@ -10,6 +10,7 @@ panta_native_defaults(panta_native_app)
 target_link_libraries(panta_native_app PRIVATE
   panta::foundation
   panta::shell
+  panta::i18n
   Qt6::Gui
   Qt6::Qml
   Qt6::Quick

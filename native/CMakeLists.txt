@@ -83,6 +83,8 @@ if(BUILD_TESTING)
 endif()
 
 add_subdirectory(foundation)
+# QM 编译与资源入口（任务 034）：依赖 Qt 供给的 lrelease 与 Cargo 生成的 TS。
+add_subdirectory(i18n)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   add_subdirectory(bridge)
 endif()
