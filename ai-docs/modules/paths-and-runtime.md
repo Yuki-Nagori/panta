@@ -1,4 +1,4 @@
-# 跨平台路径与轻量运行时（规划）
+# 跨平台路径与轻量运行时（规划；路径层已落地）
 
 [模块导航](README.md) · [023 路径服务](../task/023-cross-platform-paths.md) · [024 运行时上下文](../task/024-runtime-context.md)
 
@@ -25,6 +25,8 @@
 C++ Qt 宿主负责平台目录发现与 URL/QString 转换；Rust 应用层负责工程引用规则和运行时服务，跨语言契约通过 006 明确。Rust 使用 Path/PathBuf，C++ 不在业务层手工拼分隔符。FFI 必须明确可表示范围：若当前契约仅支持可往返的 Unicode 路径，应明确拒绝非 Unicode 路径，禁止有损转换后访问其他文件。
 
 处理 Windows 盘符、UNC 与保留名称、Linux 大小写、macOS Unicode 文件名差异；不全局转小写或擅自规范化磁盘文件名。file URL 只解码一次，区分 URL 与路径字符串。默认拒绝工程相对引用中的绝对路径和根外跳转；结合符号链接、Windows junction、未创建目标的现存父目录检查边界。逻辑根检查不等于对恶意并发文件系统操作的安全隔离。
+
+路径层实现已落地（023，2026-09-17）：`panta-core::path` 提供根类别（`project`/`user-config`/`app-data`/`cache`/`session`/`qrc`）、逻辑引用 `scheme:/relative` 与三层解析（纯逻辑 `resolve`、存在性 + 规范化包含的 `resolve_existing`、未创建目标按最深现存祖先检查的 `resolve_write_target`）；拒绝矩阵见任务记录。FFI 经 `panta-ffi` 的 `PathService`/`PathRef` 传递（仅可往返 UTF-8，越界枚举值按 `path.invalid_kind` 拒绝）；Qt 宿主适配在 `native/bridge` 的 `PathHost`：QStandardPaths 注入（user-config→AppConfigLocation、app-data→AppDataLocation、cache→CacheLocation、session→TempLocation——此映射即 013 打包时的安装布局接口）、QString↔UTF-8 往返校验（不可往返即 `path.non_unicode` 拒绝，非 Unicode 策略落点）、file URL 单次解码（`QUrl::toLocalFile`，qrc/其它 scheme 拒绝为本机路径）。024 的 RuntimeContext 以 `PathService` 为资源解析起点。
 
 ## 运行时层：状态和权限边界
 

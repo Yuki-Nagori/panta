@@ -21,6 +21,8 @@ qt_add_qml_module(panta_bridge
   src/shell_view_model.cpp
   src/task_host.hpp
   src/task_host.cpp
+  src/path_host.hpp
+  src/path_host.cpp
 )
 panta_native_defaults(panta_bridge)
 # 测试和 C++ 消费者按 <shell_view_model.hpp> 引用头文件。
@@ -60,4 +62,15 @@ if(BUILD_TESTING)
     Qt6::Test
   )
   gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE PRE_TEST)
+
+  # 路径宿主（023）覆盖标准目录注入、cwd 无关、拒绝矩阵、file URL 与
+  # 非 Unicode 策略；symlink 用例仅在 Unix 编译（Windows junction 记录待测）。
+  add_executable(panta_bridge_path_host_test tests/path_host_test.cpp)
+  panta_native_defaults(panta_bridge_path_host_test)
+  target_link_libraries(panta_bridge_path_host_test PRIVATE
+    panta::bridge
+    GTest::gtest
+    Qt6::Test
+  )
+  gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE PRE_TEST)
 endif()

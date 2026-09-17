@@ -76,7 +76,7 @@ ai-docs/
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
 | 022 | [UI 英文源文案与语言字典](task/022-ui-internationalization.md) | 应用平台扩展 | 005, 034 | planned |
-| 023 | [跨平台路径与资源引用服务](task/023-cross-platform-paths.md) | 应用平台扩展 | 005, 006 | ready |
+| 023 | [跨平台路径与资源引用服务](task/023-cross-platform-paths.md) | 应用平台扩展 | 005, 006 | in-progress |
 | 024 | [工程运行时上下文与变量快照](task/024-runtime-context.md) | 应用平台扩展 | 008, 023 | planned |
 | 025 | [变量 DSL 解析、求值与存储](task/025-variable-dsl.md) | 应用平台扩展 | 024, 034 | planned |
 | 026 | [C++ 静态库边界与 QML 自动注册](task/026-static-qml-modules.md) | 应用平台扩展 | 005 | in-progress |

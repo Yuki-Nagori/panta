@@ -1,5 +1,5 @@
 //! 最小 CXX 双向边界：验证 DTO、opaque 句柄所有权、错误转换、C++ 实现
-//! 调用，以及 Rust 拥有的任务生命周期（任务 008）。
+//! 调用，以及 Rust 拥有的任务生命周期（任务 008）与路径服务（任务 023）。
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -53,6 +53,26 @@ pub mod bridge {
         pub message: String,
     }
 
+    /// 逻辑根类别（任务 023），与 panta_core::path::RootCategory 一一对应；
+    /// qrc 只读、无本机根。跨语言按数值传递。
+    pub enum PathRootKind {
+        Project = 0,
+        UserConfig = 1,
+        AppData = 2,
+        Cache = 3,
+        Session = 4,
+        Qrc = 5,
+    }
+
+    /// 结构化逻辑资源引用；字符串形态 `scheme:/relative`（`path_ref_parse`
+    /// /`path_ref_to_logical` 互逆）。相对片段只跨边界传可往返 UTF-8。
+    /// CXX 共享枚举不支持自定义 derive，与 TaskEvent 同规则不派生 Debug。
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct PathRef {
+        pub kind: PathRootKind,
+        pub relative: String,
+    }
+
     unsafe extern "C++" {
         include!("panta/ffi.hpp");
 
@@ -88,6 +108,31 @@ pub mod bridge {
 
         fn process(request: &FfiRequest) -> Result<FfiResponse>;
         fn panic_probe();
+
+        /// 路径服务（panta_core::path::PathService 的包装）：根由宿主注入，
+        /// 解析与 cwd 无关；错误以 `path.*: detail` 文本传递，UI 只按前缀分支。
+        type PathService;
+
+        fn path_service_new() -> Box<PathService>;
+        fn path_service_set_root(
+            service: &mut PathService,
+            kind: PathRootKind,
+            utf8_root: String,
+        ) -> Result<()>;
+        fn path_ref_parse(reference: String) -> Result<PathRef>;
+        fn path_ref_to_logical(reference: &PathRef) -> Result<String>;
+        /// 纯逻辑解析：结构校验 + 根拼接，不访问文件系统。
+        fn path_service_resolve(service: &PathService, reference: &PathRef) -> Result<String>;
+        /// 读解析：目标必须存在，规范化后仍在根内（拒绝符号链接越界）。
+        fn path_service_resolve_existing(
+            service: &PathService,
+            reference: &PathRef,
+        ) -> Result<String>;
+        /// 写目标解析：目标可不存在，最深现存祖先仍需在根内。
+        fn path_service_resolve_write_target(
+            service: &PathService,
+            reference: &PathRef,
+        ) -> Result<String>;
     }
 }
 
@@ -234,6 +279,118 @@ fn task_service_running(service: &TaskService) -> u32 {
     u32::try_from(service.manager.running_tasks()).unwrap_or(u32::MAX)
 }
 
+/// 路径服务的 FFI 包装（任务 023）：只做枚举/DTO 与错误文本映射，
+/// 规则与包含检查全部在 panta-core 实现，不在边界复制。
+pub struct PathService {
+    service: panta_core::path::PathService,
+}
+
+fn path_service_new() -> Box<PathService> {
+    Box::new(PathService {
+        service: panta_core::path::PathService::new(),
+    })
+}
+
+fn path_service_set_root(
+    service: &mut PathService,
+    kind: bridge::PathRootKind,
+    utf8_root: String,
+) -> Result<(), String> {
+    let category = core_category(kind)?;
+    service
+        .service
+        .set_root(category, std::path::Path::new(&utf8_root))
+        .map_err(|error| error.to_string())
+}
+
+fn path_ref_parse(reference: String) -> Result<bridge::PathRef, String> {
+    let parsed =
+        panta_core::path::ResourceRef::parse(&reference).map_err(|error| error.to_string())?;
+    Ok(bridge::PathRef {
+        kind: bridge_kind(parsed.category),
+        relative: parsed.relative,
+    })
+}
+
+fn path_ref_to_logical(reference: &bridge::PathRef) -> Result<String, String> {
+    let category = core_category(reference.kind)?;
+    Ok(panta_core::path::ResourceRef {
+        category,
+        relative: reference.relative.clone(),
+    }
+    .to_logical())
+}
+
+fn path_service_resolve(
+    service: &PathService,
+    reference: &bridge::PathRef,
+) -> Result<String, String> {
+    resolve_with(service, reference, panta_core::path::PathService::resolve)
+}
+
+fn path_service_resolve_existing(
+    service: &PathService,
+    reference: &bridge::PathRef,
+) -> Result<String, String> {
+    resolve_with(
+        service,
+        reference,
+        panta_core::path::PathService::resolve_existing,
+    )
+}
+
+fn path_service_resolve_write_target(
+    service: &PathService,
+    reference: &bridge::PathRef,
+) -> Result<String, String> {
+    resolve_with(
+        service,
+        reference,
+        panta_core::path::PathService::resolve_write_target,
+    )
+}
+
+fn resolve_with(
+    service: &PathService,
+    reference: &bridge::PathRef,
+    resolver: fn(
+        &panta_core::path::PathService,
+        &panta_core::path::ResourceRef,
+    ) -> Result<std::path::PathBuf, panta_core::path::PathError>,
+) -> Result<String, String> {
+    let core_ref = panta_core::path::ResourceRef {
+        category: core_category(reference.kind)?,
+        relative: reference.relative.clone(),
+    };
+    resolver(&service.service, &core_ref)
+        .map(|path| path.display().to_string())
+        .map_err(|error| error.to_string())
+}
+
+/// CXX 枚举跨边界可能携带越界表示；未知取值按稳定错误码拒绝，不猜测。
+fn core_category(kind: bridge::PathRootKind) -> Result<panta_core::path::RootCategory, String> {
+    match kind {
+        bridge::PathRootKind::Project => Ok(panta_core::path::RootCategory::Project),
+        bridge::PathRootKind::UserConfig => Ok(panta_core::path::RootCategory::UserConfig),
+        bridge::PathRootKind::AppData => Ok(panta_core::path::RootCategory::AppData),
+        bridge::PathRootKind::Cache => Ok(panta_core::path::RootCategory::Cache),
+        bridge::PathRootKind::Session => Ok(panta_core::path::RootCategory::Session),
+        bridge::PathRootKind::Qrc => Ok(panta_core::path::RootCategory::Qrc),
+        _ => Err("path.invalid_kind".to_owned()),
+    }
+}
+
+fn bridge_kind(category: panta_core::path::RootCategory) -> bridge::PathRootKind {
+    match category {
+        panta_core::path::RootCategory::Project => bridge::PathRootKind::Project,
+        panta_core::path::RootCategory::UserConfig => bridge::PathRootKind::UserConfig,
+        panta_core::path::RootCategory::AppData => bridge::PathRootKind::AppData,
+        panta_core::path::RootCategory::Cache => bridge::PathRootKind::Cache,
+        panta_core::path::RootCategory::Session => bridge::PathRootKind::Session,
+        panta_core::path::RootCategory::Qrc => bridge::PathRootKind::Qrc,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -345,6 +502,79 @@ mod tests {
         // 不经 session_close 的 Box 析构走同一 Drop 路径。
         drop(session);
         assert_eq!(session_live_count(), 0);
+    }
+
+    #[test]
+    fn path_service_round_trips_references_and_rejects_escapes() {
+        let parsed = match crate::path_ref_parse("project:/资产 齿轮/a.step".to_owned()) {
+            Ok(parsed) => parsed,
+            Err(error) => panic!("合法引用被拒绝: {error}"),
+        };
+        assert!(matches!(parsed.kind, bridge::PathRootKind::Project));
+        assert_eq!(parsed.relative, "资产 齿轮/a.step");
+        let logical = match crate::path_ref_to_logical(&parsed) {
+            Ok(logical) => logical,
+            Err(error) => panic!("生成逻辑地址失败: {error}"),
+        };
+        assert_eq!(logical, "project:/资产 齿轮/a.step");
+        match crate::path_ref_parse("workspace:/x".to_owned()) {
+            Ok(parsed) => panic!("未知 scheme 被接受: {:?}", parsed.relative),
+            Err(error) => assert_eq!(error, "path.unknown_scheme: workspace"),
+        }
+
+        let base =
+            std::fs::canonicalize(std::env::temp_dir()).unwrap_or_else(|_| std::env::temp_dir());
+        let root = base.join(format!("panta-ffi-path-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
+        let mut service = crate::path_service_new();
+        if let Err(error) = crate::path_service_set_root(
+            &mut service,
+            bridge::PathRootKind::Project,
+            root.display().to_string(),
+        ) {
+            panic!("注入根失败: {error}");
+        }
+        let resolved = match crate::path_service_resolve(
+            &service,
+            &bridge::PathRef {
+                kind: bridge::PathRootKind::Project,
+                relative: "out/../a.pa".to_owned(),
+            },
+        ) {
+            Ok(path) => path,
+            Err(error) => panic!("合法引用被拒绝: {error}"),
+        };
+        assert_eq!(resolved, root.join("a.pa").display().to_string());
+
+        for (relative, code) in [
+            ("../escape", "path.parent_escape"),
+            ("C:/win", "path.absolute_rejected"),
+            ("COM1", "path.reserved_name"),
+        ] {
+            let error = match crate::path_service_resolve(
+                &service,
+                &bridge::PathRef {
+                    kind: bridge::PathRootKind::Project,
+                    relative: relative.to_owned(),
+                },
+            ) {
+                Ok(path) => panic!("{relative} 意外通过: {path}"),
+                Err(error) => error,
+            };
+            assert!(error.starts_with(code), "{relative} -> {error}");
+        }
+        match crate::path_service_resolve(
+            &service,
+            &bridge::PathRef {
+                kind: bridge::PathRootKind::Qrc,
+                relative: "icons/x.svg".to_owned(),
+            },
+        ) {
+            Ok(path) => panic!("qrc 被解析为本机路径: {path}"),
+            Err(error) => assert_eq!(error, "path.qrc_not_native"),
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
