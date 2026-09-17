@@ -1,6 +1,6 @@
 # 040 — 统一 Cargo 构建编排入口
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[004](004-cargo-native-orchestration.md)、[039](039-ci-ffi-build-fix.md)
 - 优先级：P1
@@ -48,11 +48,11 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 
 ## 验收标准
 
-- [ ] 干净 target 执行 `cargo build --locked` 时，Cargo 先完成 `panta-ffi` staticlib，再执行 launcher build script/native 构建。
+- [x] 干净 target 执行 `cargo build --locked` 时，Cargo 先完成 `panta-ffi` staticlib，再执行 launcher build script/native 构建。
 - [x] `DEP_PANTA_FFI_INCLUDE` 仍注入 launcher build script；`CMAKE_GENERATOR`、`CMAKE_GENERATOR_PLATFORM`、`CMAKE_PREFIX_PATH`、`CARGO_TARGET_DIR` 等既有参数传递不变。
 - [x] staticlib 缺失或任一构建失败时，诊断原样输出且入口返回非零码；不引入 Cargo 递归调用。
 - [x] CI、README、架构文档和 task-index 使用 `cargo build` 同一入口；不再存在重复的 FFI 预构建步骤。
-- [ ] CI 缓存键区分 OS、架构、编译器 ABI、CMake generator、锁文件和 native/Qt 构建配置；缓存删除后仍可完整构建。
+- [x] CI 缓存键区分 OS、架构、编译器 ABI、CMake generator、锁文件和 native/Qt 构建配置；缓存删除后仍可完整构建。
 - [x] `cargo fmt`、相关 Rust 测试/Clippy、workflow 静态检查和可用 native 测试通过；无死代码或未登记兼容分支。
 
 ## 验证计划与结果
@@ -65,6 +65,7 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 | 2026-09-17 | `CARGO_TARGET_DIR=/private/tmp/panta-cargo-build-order.TZyGyN cargo build --locked` | FFI staticlib 先生成，随后 native 构建 | 通过顺序验证：日志先出现 `Compiling panta-ffi`，再出现 `Compiling panta-launcher`；launcher 已进入 CMake/Qt configure，随后因当前沙箱无法解析 `download.qt.io` 失败，未掩盖 staticlib 缺失问题 |
 | 2026-09-17 | `cargo metadata --locked --no-deps`、`cargo fmt --all -- --check`、`actionlint .github/workflows/ci.yml`、`git diff --check` | 清单、格式、workflow 和补丁静态检查通过 | 全部通过 |
 | 2026-09-17 | `cargo test --locked --workspace --exclude panta-launcher`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；完整 workspace Clippy 使用已缓存 Qt staging | Rust 侧回归检查通过 | 测试 15/15 通过；完整 workspace Clippy 通过且无 warning |
+| 2026-09-17 | GitHub Actions run `35203709898`（`5a6f452`，Windows 日志确认 `Cache not found` 冷缓存）与 run `35204747014`（`ab0a130`，`Cache hit for restore-key`）三平台 | 干净树单一 `cargo build --locked`；缓存删除后仍可完整构建 | 通过：冷缓存 run 三平台完成全量 Build/Test/Format/Clippy（Windows 5m10s 含 Qt staging 与 native 构建），缓存命中 run 增量复跑全绿；run 日志可见缓存键含 OS/arch/compiler/generator/platform 与 Cargo.lock、rust-toolchain.toml、CI workflow、native CMake 文件哈希 |
 
 ## 风险与回退
 
@@ -73,7 +74,8 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 ## 决策与工作记录
 
 - 2026-09-17：根据用户反馈创建任务；初步考虑独立编排 package，最小 Cargo workspace 复现后改用同一 `panta-ffi` 的普通依赖 + build-dependency 双边，让原生 `cargo build` 自身表达构建顺序。
+- 2026-09-17（收尾）：三平台 CI 冷缓存 run `35203709898` 以单一 `cargo build --locked` 完成全量构建，缓存命中 run `35204747014` 增量复跑全绿，缓存删除后可完整构建的验收由前者证明；任务关闭。
 
 ## 完成摘要
 
-未完成。完成后记录统一入口的隔离 target、失败路径、native 测试和 CI run 证据，并同步状态。
+已完成。统一入口保持 `cargo build --locked`：launcher manifest 以 `panta-ffi` 普通依赖 + build-dependency 双边表达 staticlib → build script 顺序；CI 删除独立 FFI 预构建步骤并加入按平台/编译器/generator/锁文件分键的缓存；冷缓存 run `35203709898` 证明干净树与缓存删除后均可完整构建，`35204747014` 证明缓存命中增量路径。遗留复查点：Cargo 升级后需复查 staticlib 是否仍在 launcher build script 前落盘（见风险与回退）。

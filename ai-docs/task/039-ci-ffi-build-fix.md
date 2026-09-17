@@ -1,6 +1,6 @@
 # 039 — CI FFI 构建链修复
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[006](006-rust-cpp-boundary.md)、[018](018-cross-platform-ci.md)、[036](036-ci-native-build-fix.md)
 - 优先级：P0
@@ -52,12 +52,12 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 
 ## 验收标准
 
-- [ ] 三平台干净 `cargo build --locked` 均能完成 FFI staticlib、native CMake 和 launcher 构建（顺序约束由任务 040 的 Cargo manifest 提供）。
-- [ ] MSVC 日志显示 `/std:c++20`，GCC/Clang 继续使用 `-std=c++20`，CXX bridge 不再因嵌套命名空间失败。
-- [ ] Windows FFI 边界测试的 MSVC runtime 与 iterator ABI 和 Rust staticlib 一致，且 Rust std 所需 Windows 系统库均可解析。
+- [x] 三平台干净 `cargo build --locked` 均能完成 FFI staticlib、native CMake 和 launcher 构建（顺序约束由任务 040 的 Cargo manifest 提供）。
+- [x] MSVC 日志显示 `/std:c++20`，GCC/Clang 继续使用 `-std=c++20`，CXX bridge 不再因嵌套命名空间失败。
+- [x] Windows FFI 边界测试的 MSVC runtime 与 iterator ABI 和 Rust staticlib 一致，且 Rust std 所需 Windows 系统库均可解析。
 - [x] staticlib 由当前 Cargo profile 生成并被 native 链接；不依赖工作区历史构建残留，也不在 build script 中递归执行 Cargo。
-- [x] 可用范围内的 Rust 测试、格式、Clippy 与 native FFI 测试通过；三平台 CI 完整复跑仍待推送后验证。
-- [ ] task、workflow、构建脚本和索引一致，无死代码、失效路径或未登记兼容代码。
+- [x] 可用范围内的 Rust 测试、格式、Clippy 与 native FFI 测试通过；三平台 CI 完整复跑已由 run `35203709898`（冷缓存）与 `35204747014`（缓存命中）覆盖。
+- [x] task、workflow、构建脚本和索引一致，无死代码、失效路径或未登记兼容代码。
 
 ## 验证计划与结果
 
@@ -71,7 +71,7 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 | 2026-09-17 | macOS arm64；隔离 Ninja CMake configure/build + `ctest --test-dir /private/tmp/panta-native-ci.4sY0dA --output-on-failure`，使用当前 profile staticlib 和已有 Qt/GTest staging | native 构建及 FFI 边界测试通过 | 84 个构建步骤完成，native 7/7 测试通过，`Ffi.RustCppBoundary` death test 通过 |
 | 2026-09-17 | macOS arm64；独立 FFI CMake 构建，开启 `PANTA_ENABLE_FFI_TEST`，链接当前 `panta-ffi` staticlib；`ctest -R Ffi.RustCppBoundary` | Windows 链接规则改动不破坏 Unix FFI 边界 | CMake 构建与 `Ffi.RustCppBoundary` 通过；macOS 仍使用 `Threads::Threads`/`CMAKE_DL_LIBS` 路径 |
 | 2026-09-17 | GitHub Actions run `35201746062`，Windows Build | 修复后 native 测试与 GTest 的 MSVC CRT/iterator ABI 一致 | 仍失败：Bridge/Foundation 测试使用 Debug ABI，而 FFI 修复把共享 GTest target 固定为 `/MD`、iterator 0；根因扩大为所有 native target 需统一 ABI，已在本轮移至 native 根配置 |
-| — | 本轮修复后 GitHub Actions 三平台 run | Build、Test、Format、Clippy 全部成功 | 待提交并复跑 |
+| 2026-09-17 | GitHub Actions run `35203709898`（`5a6f452`，三平台，Windows 日志确认 `Cache not found` 冷缓存）；run `35204747014`（`ab0a130`，恢复缓存后复跑） | Build、Test、Format、Clippy 全部成功 | 两轮三平台全绿：冷缓存 run 以单一 `cargo build --locked` 完成 Qt staging、native CMake、launcher 全量构建（Windows 5m10s），此前 staticlib 缺失、LNK2038、`ws2_32`/`userenv`/`ntdll` 未解析等失败模式全部消失。成功 run 中 cargo 隐藏 build script 输出，`/std:c++20` 无直接日志行；以行为证据收口——run `35199280596` 因缺少该开关使 CXX bridge 编译失败，补上后 Windows 冷构建成功链接 `panta_ffi_boundary_test`，GCC/Clang 路径不变 |
 | 2026-09-17 | run `35202550564`（`8e35810`）Windows Build | 定位剩余生成目标差异 | `panta_bridgeplugin_init.obj` 仍为 `/MDd`、iterator 2，App/Bridge 为 `/MD`、iterator 0；存在 LNK2038 与 LNK4098。确认逐目标 helper 不覆盖 Qt 生成目标 |
 | 2026-09-17 | macOS arm64、AppleClang 17；`native/build/debug` 完整 build 后 CTest 与 `all_qmllint` | 保持默认 Shell | 7/7 既有测试及 lint 通过 |
 | 2026-09-17 | 新目录 `/private/tmp/panta-cmake-039.k1DDcn/multi`，Ninja Multi-Config；复用已缓存 Qt/GTest，FFI 链接已有 Cargo Debug staticlib；`cmake --build … --config Debug/Release --parallel 4` 后 `ctest --test-dir … -C Debug/Release --output-on-failure` | 双配置构建、运行并验证 ABI 策略回归 | Debug/Release 各 9/9 通过；Debug 再构建无额外工作。Release 的 Rust 库仍为 Debug 产物，本结果不代表完整 Cargo Release 验证；链接器提示已有 Rust 对象最低 macOS 26.2 高于 CMake 26.0 |
@@ -93,4 +93,4 @@ Cargo crate-type 调度、CMake 链接和 CXX bridge 的编译器选项属于不
 
 ## 完成摘要
 
-未完成。代码与本地验证已完成；待推送后取得三平台 CI 新 run，并据此同步最终状态。
+已完成。FFI staticlib 供给顺序（最终由 040 的 manifest 双边表达）、MSVC `/std:c++20`、native 全图 CRT/iterator ABI 统一（`build-policy.cmake` + 递归审计）与 Windows 系统库链接，均由三平台 CI 冷缓存 run `35203709898` 与缓存命中 run `35204747014` 验证通过；本地另有多配置构建、失败诊断与 ABI 审计正反例证据。遗留限制：CI 只链接 Windows 边界测试而未执行（执行验证目前在本机 macOS ctest），GTest 运行聚合由 011 统一入口承接。
