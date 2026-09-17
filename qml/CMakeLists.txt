@@ -7,12 +7,19 @@ set_source_files_properties(Themes/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TR
 # 路径，便于 qmllint、qmltestrunner 和 IDE 通过标准 import 解析模块。
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
 
+if(UNIX AND NOT APPLE)
+  # 与 Panta.Bridge 保持一致：Linux runner 的预编译 Qt qtpaths 需要未提供的
+  # ICU 73；qmlls.build.ini 是编辑器辅助产物，跳过不影响 QML 资源和 typeinfo。
+  set(PANTA_QML_MODULE_OPTIONS __QT_INTERNAL_NO_GENERATE_QMLLS_BUILD_INI)
+endif()
+
 qt_add_qml_module(panta_shell
   URI Panta.Shell
   VERSION 1.0
   RESOURCE_PREFIX /qt/qml
   NO_PLUGIN
   DEPENDENCIES TARGET panta_bridge
+  ${PANTA_QML_MODULE_OPTIONS}
   QML_FILES
     App.qml
     Themes/Theme.qml

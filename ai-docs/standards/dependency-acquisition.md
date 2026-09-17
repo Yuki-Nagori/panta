@@ -48,6 +48,7 @@
 ## CI（018）
 
 - GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。Windows 使用 Visual Studio 17 2022 与 Qt MSVC2022 预编译包；Ubuntu 在 configure 前安装 `libgl1-mesa-dev`，仅补齐 Qt Gui 的 OpenGL 开发文件，不替代项目托管的 Qt 供给。
+- Qt 6.11.2 Linux 预编译归档面向 RHEL9，Qt 工具的 `qtpaths`/`qmlimportscanner` 需要 ICU 73；Ubuntu CI 不伪造 ABI 或源码编译 ICU，而是跳过仅供 IDE 使用的 `.qmlls.build.ini` 和当前 app 的空 import scan，保留 QML typeinfo、cachegen、资源和运行时验证。
 - 每个平台执行与本地一致的最小检查：按 rust-toolchain.toml 安装固定工具链（minimal + rustfmt + clippy）→ `cargo build --locked` → `cargo test --locked` → `cargo fmt --all -- --check` → `cargo clippy --locked --all-targets`。
 - runner 需要镜像自带的平台编译器与 rustup；Ubuntu 额外安装上面列出的 OpenGL 开发包，以满足预编译 Qt 的 CMake 探测。
 - 边界：当前 CI 通过 Cargo 同步验证 Rust 与已有 native/Qt 构建；VTK、OCCT、Netgen 的 SDK 供给与集成仍由 031 及后续任务扩展，测试聚合与质量门禁归 011，依赖缓存归 012。
