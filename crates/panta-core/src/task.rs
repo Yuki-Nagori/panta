@@ -27,6 +27,8 @@ const LOG_RING_CAPACITY: usize = 256;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskEventKind {
     Started,
+    /// 阶段内进度；事件携带 0-100 的 percent。
+    Progress,
     Succeeded,
     Failed,
     Cancelled,
@@ -36,6 +38,7 @@ impl TaskEventKind {
     fn label(&self) -> &'static str {
         match self {
             TaskEventKind::Started => "started",
+            TaskEventKind::Progress => "progress",
             TaskEventKind::Succeeded => "succeeded",
             TaskEventKind::Failed => "failed",
             TaskEventKind::Cancelled => "cancelled",
@@ -44,7 +47,7 @@ impl TaskEventKind {
 
     fn phase(&self) -> Phase {
         match self {
-            TaskEventKind::Started => Phase::Running,
+            TaskEventKind::Started | TaskEventKind::Progress => Phase::Running,
             TaskEventKind::Succeeded => Phase::Succeeded,
             TaskEventKind::Failed => Phase::Failed,
             TaskEventKind::Cancelled => Phase::Cancelled,
@@ -53,11 +56,12 @@ impl TaskEventKind {
 }
 
 /// 一次状态转换的事件；`code` 为机器可读错误码（仅 Failed 非空），
-/// 与用户可读摘要分离。
+/// 与用户可读摘要分离；`percent` 仅 Progress 事件有意义（0-100）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskEvent {
     pub task_id: u64,
     pub kind: TaskEventKind,
+    pub percent: u32,
     pub code: String,
     pub detail: String,
 }
@@ -272,8 +276,16 @@ impl Drop for TaskManager {
 
 fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, fail: bool) {
     let started = Instant::now();
-    transition(&inner, task_id, TaskEventKind::Started, "", label.clone());
+    transition(
+        &inner,
+        task_id,
+        TaskEventKind::Started,
+        "",
+        0,
+        label.clone(),
+    );
 
+    let mut last_percent: u32 = 0;
     loop {
         if inner.is_shutdown() {
             transition(
@@ -281,6 +293,7 @@ fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, 
                 task_id,
                 TaskEventKind::Cancelled,
                 "task.shutdown",
+                0,
                 label,
             );
             return;
@@ -291,6 +304,7 @@ fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, 
                 task_id,
                 TaskEventKind::Cancelled,
                 "task.cancelled",
+                0,
                 label,
             );
             return;
@@ -299,6 +313,15 @@ fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, 
             break;
         }
         thread::sleep(TICK);
+        // 进度按 10% 步进发布，控制事件量；只增不减。
+        let percent =
+            u32::try_from(started.elapsed().as_millis() * 100 / duration.as_millis().max(1))
+                .unwrap_or(100)
+                .min(100);
+        if percent >= last_percent + 10 {
+            last_percent = percent;
+            publish_progress(&inner, task_id, percent);
+        }
     }
 
     if fail {
@@ -307,10 +330,11 @@ fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, 
             task_id,
             TaskEventKind::Failed,
             "task.simulated_failure",
+            0,
             format!("{label}: simulated failure"),
         );
     } else {
-        transition(&inner, task_id, TaskEventKind::Succeeded, "", label);
+        transition(&inner, task_id, TaskEventKind::Succeeded, "", 0, label);
     }
 }
 
@@ -324,7 +348,14 @@ fn cancel_requested(inner: &Arc<Inner>, task_id: u64) -> bool {
 
 /// 状态转换与事件/日志发布在锁内完成：仅 Running 可迁移，迟到/重复
 /// 事件被拒绝，保证终态不可回退。
-fn transition(inner: &Arc<Inner>, task_id: u64, kind: TaskEventKind, code: &str, detail: String) {
+fn transition(
+    inner: &Arc<Inner>,
+    task_id: u64,
+    kind: TaskEventKind,
+    code: &str,
+    percent: u32,
+    detail: String,
+) {
     let mut state = inner.lock_state();
     let Some(record) = state.tasks.get_mut(&task_id) else {
         return;
@@ -336,11 +367,30 @@ fn transition(inner: &Arc<Inner>, task_id: u64, kind: TaskEventKind, code: &str,
     state.events.push_back(TaskEvent {
         task_id,
         kind: kind.clone(),
+        percent,
         code: code.to_owned(),
         detail: detail.clone(),
     });
     let reason = if detail.is_empty() { code } else { &detail };
     state.log(task_id, format!("{}: {reason}", kind.label()));
+}
+
+/// 发布运行中进度；不写日志（日志环留给状态转换与诊断）。
+fn publish_progress(inner: &Arc<Inner>, task_id: u64, percent: u32) {
+    let mut state = inner.lock_state();
+    let Some(record) = state.tasks.get_mut(&task_id) else {
+        return;
+    };
+    if record.phase.is_terminal() {
+        return;
+    }
+    state.events.push_back(TaskEvent {
+        task_id,
+        kind: TaskEventKind::Progress,
+        percent,
+        code: String::new(),
+        detail: String::new(),
+    });
 }
 
 #[cfg(test)]
@@ -376,7 +426,11 @@ mod tests {
             Duration::from_secs(2)
         ));
         let events = manager.drain_events();
-        let kinds: Vec<TaskEventKind> = events.iter().map(|event| event.kind.clone()).collect();
+        let kinds: Vec<TaskEventKind> = events
+            .iter()
+            .filter(|event| event.kind != TaskEventKind::Progress)
+            .map(|event| event.kind.clone())
+            .collect();
         assert_eq!(
             kinds,
             vec![TaskEventKind::Started, TaskEventKind::Succeeded]
@@ -397,6 +451,33 @@ mod tests {
             logs.iter()
                 .any(|record| record.task_id == id && record.message.contains("succeeded"))
         );
+    }
+
+    #[test]
+    fn progress_events_are_bounded_and_monotonic() {
+        let manager = TaskManager::new();
+        let id = submit(&manager, "progress-θ", 200, false);
+
+        assert!(wait_for(
+            || manager.running_tasks() == 0,
+            Duration::from_secs(2)
+        ));
+        let percents: Vec<u32> = manager
+            .drain_events()
+            .into_iter()
+            .filter(|event| event.task_id == id && event.kind == TaskEventKind::Progress)
+            .map(|event| event.percent)
+            .collect();
+        // 10% 步进：事件量有界、单调递增且不超过 100。
+        assert!(!percents.is_empty(), "no progress events");
+        assert!(
+            percents.len() <= 10,
+            "too many progress events: {percents:?}"
+        );
+        for pair in percents.windows(2) {
+            assert!(pair[0] < pair[1], "progress not increasing: {percents:?}");
+        }
+        assert!(*percents.last().unwrap_or(&0) <= 100);
     }
 
     #[test]

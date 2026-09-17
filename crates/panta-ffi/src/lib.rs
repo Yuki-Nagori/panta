@@ -29,17 +29,20 @@ pub mod bridge {
     /// 任务生命周期事件种类，与 panta_core::task::TaskEventKind 一一对应。
     pub enum TaskEventKind {
         Started = 0,
-        Succeeded = 1,
-        Failed = 2,
-        Cancelled = 3,
+        Progress = 1,
+        Succeeded = 2,
+        Failed = 3,
+        Cancelled = 4,
     }
 
     /// 一次状态转换的事件；`code` 为机器可读错误码（仅 Failed 非空），
-    /// `detail` 为诊断上下文，面向日志/Console 而非用户摘要。
+    /// `detail` 为诊断上下文，面向日志/Console 而非用户摘要；
+    /// `percent` 仅 Progress 事件有意义（0-100）。
     /// CXX 共享枚举不支持自定义 derive，因此本结构不派生 Debug/Clone。
     pub struct TaskEvent {
         pub task_id: u64,
         pub kind: TaskEventKind,
+        pub percent: u32,
         pub code: String,
         pub detail: String,
     }
@@ -203,10 +206,12 @@ fn task_service_drain(service: &TaskService) -> Vec<bridge::TaskEvent> {
             task_id: event.task_id,
             kind: match event.kind {
                 panta_core::task::TaskEventKind::Started => bridge::TaskEventKind::Started,
+                panta_core::task::TaskEventKind::Progress => bridge::TaskEventKind::Progress,
                 panta_core::task::TaskEventKind::Succeeded => bridge::TaskEventKind::Succeeded,
                 panta_core::task::TaskEventKind::Failed => bridge::TaskEventKind::Failed,
                 panta_core::task::TaskEventKind::Cancelled => bridge::TaskEventKind::Cancelled,
             },
+            percent: event.percent,
             code: event.code,
             detail: event.detail,
         })

@@ -19,11 +19,27 @@ qt_add_qml_module(panta_bridge
   SOURCES
   src/shell_view_model.hpp
   src/shell_view_model.cpp
+  src/task_host.hpp
+  src/task_host.cpp
 )
 panta_native_defaults(panta_bridge)
 # 测试和 C++ 消费者按 <shell_view_model.hpp> 引用头文件。
 target_include_directories(panta_bridge PUBLIC src)
-target_link_libraries(panta_bridge PUBLIC Qt6::Core)
+# TaskHost 消费 Rust TaskService：生成头路径与其引用的手写支持头
+# （panta/ffi.hpp）公开给消费者，staticlib 及其系统库依赖随 target
+# 传播到最终链接者（与 native/ffi 测试同规则）。
+target_include_directories(panta_bridge PUBLIC
+  "${PANTA_FFI_INCLUDE_DIR}"
+  "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include"
+)
+target_link_libraries(panta_bridge PUBLIC Qt6::Core "${PANTA_FFI_STATIC_LIB}")
+if(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(panta_bridge PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+elseif(WIN32)
+  # Rust std 需要的 Windows 系统库不由 CMake target 传播，在此显式声明。
+  target_link_libraries(panta_bridge PUBLIC ws2_32 userenv ntdll)
+endif()
 
 if(BUILD_TESTING)
   include(GoogleTest)
@@ -35,4 +51,13 @@ if(BUILD_TESTING)
     Qt6::Test
   )
   gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE PRE_TEST)
+
+  add_executable(panta_bridge_task_host_test tests/task_host_test.cpp)
+  panta_native_defaults(panta_bridge_task_host_test)
+  target_link_libraries(panta_bridge_task_host_test PRIVATE
+    panta::bridge
+    GTest::gtest
+    Qt6::Test
+  )
+  gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE PRE_TEST)
 endif()

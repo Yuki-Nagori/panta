@@ -47,7 +47,7 @@
 
 crates/core 或 workflow 的实际必要部分、native service/bridge、诊断配置。执行前根据真实结构修订；不得顺手实现非目标功能。
 
-本轮实际边界：新增 `crates/panta-core`（任务状态机、事件队列、结构化日志环、销毁 join）；`panta-ffi` 桥接 `TaskService` opaque 与 `TaskEvent`/`TaskLogLine` DTO（拉取式，无跨语言回调）；`native/ffi` 新增 `task_service_test`；launcher build.rs 重建追踪补 panta-core。staticlib 仍只有 `panta_ffi.a` 一个（panta-core 被打包其中），040 的双边顺序约束不变。Qt/ViewModel 轮询集成与日志落盘未实施。
+本轮实际边界：新增 `crates/panta-core`（任务状态机、Progress/终态事件、结构化日志环、销毁 join）；`panta-ffi` 桥接 `TaskService` opaque 与 `TaskEvent`/`TaskLogLine` DTO（拉取式，无跨语言回调）；`native/bridge` 新增 `TaskHost`（QML 可注册，GUI 线程 QTimer 轮询转 Qt 信号）；`native/ffi` 新增 `task_service_test`、`native/bridge` 新增 `task_host_test`；launcher build.rs 重建追踪补 panta-core。staticlib 仍只有 `panta_ffi.a` 一个（panta-core 被打包其中），040 的双边顺序约束不变。错误摘要的界面本地化归 022；QML 面板消费与日志落盘由后续任务承接。
 
 ## 清理与兼容例外
 
@@ -55,9 +55,9 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 
 ## 验收标准
 
-- [ ] 启动、成功、失败、取消及迟到事件路径均可验证，UI 不被模拟慢任务阻塞。
-- [ ] 关闭窗口后不存在访问销毁对象，跨语言错误保持可追踪上下文。
-- [ ] 日志能定位任务与原因，重复/迟到事件不使终态回到运行中。
+- [x] 启动、成功、失败、取消及迟到事件路径均可验证，UI 不被模拟慢任务阻塞。
+- [x] 关闭窗口后不存在访问销毁对象，跨语言错误保持可追踪上下文。
+- [x] 日志能定位任务与原因，重复/迟到事件不使终态回到运行中。
 - [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
 - [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
@@ -75,6 +75,10 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 | 2026-09-17 | `ctest --test-dir native/build/debug`（重配指向新生成头后） | 10/10 全部通过（含原 7 项与 FFI 两目标） |
 | 2026-09-17 | `cargo fmt --all -- --check`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；`cargo test --locked --workspace --exclude panta-launcher`；`git diff --check` | 通过：Rust 25/25（6+9+2+8），Clippy 0 warning，格式与补丁检查干净 |
 | 2026-09-17 | GitHub Actions run `35210392688`（`cf82161`，三平台） | 新增任务服务层的干净/增量构建与检查 | 通过：Build/Test/Format/Clippy 全绿；panta-core 6 + panta-ffi 8 个 Rust 测试在三平台执行，native CMake 完成构建与链接（CTest 执行仍在本机覆盖，聚合归 011） |
+| 2026-09-17 | `cargo test -p panta-core --locked`（macOS arm64，新增 Progress） | 7/7：进度事件 ≤10 条、单调递增、不超 100；其余生命周期断言不回归 |
+| 2026-09-17 | native GTest `panta_bridge_task_host_test`（Qt6::Test + QSignalSpy/QTRY，macOS arm64） | 5/5：提交→Started/成功信号与运行数 1→0 通知、取消信号带 `task.cancelled` 且重复/迟到取消被拒、无效提交记录 `task.empty_label`/`task.invalid_duration`、进度信号有界单调、500ms 慢任务期间 GUI 心跳 ≥20 次（事件循环不被阻塞） |
+| 2026-09-17 | `ctest --test-dir native/build/debug`（重配指向含 Progress 的新生成头） | 15/15 全部通过（含既有 Foundation/Shell/QML 与 FFI 测试） |
+| 2026-09-17 | `cargo fmt --all -- --check`；`git diff --check` | 通过 |
 
 ## 风险与回退
 
@@ -86,8 +90,9 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 - 2026-09-17：依赖 005、006 均已完成且范围/验收明确，状态调整为 ready；FFI 边界的 `Result`/panic 语义以 panta-ffi 实测为准。
 - 2026-09-17（方案）：任务所有权按架构归 Rust，落地 `panta-core`；事件采用拉取队列而非跨语言回调（[cxx](../standards/cxx.md) 允许的简化），C++/QML 侧后续由 ViewModel 在 GUI 线程轮询并转 Qt 信号，工作线程不触碰 UI。取消为协作式（10ms 检查点，决定取消与 join 延迟上界）；终态转换与事件发布在同一锁内完成，迟到/重复事件被拒绝，终态不可回退；关闭语义 = shutdown 位 + join，析构后不存在可触达的工作线程。错误为稳定码（`task.*`）+ 诊断 detail，与用户摘要分离；结构化日志以 task_id 关联、有界环保留。
 - 2026-09-17（实施）：落地上表服务层；`cargo build` 后 staticlib 刷新、native 重配链接验证通过。剩余：Qt/ViewModel 集成与"UI 不被阻塞"验证、日志落盘/Console 通路决策、三平台 CI 覆盖。
+- 2026-09-17（Qt 集成）：`TaskHost` 以 QML_ELEMENT 注册进 Panta.Bridge；GUI 线程 10ms QTimer 常开轮询（停表需先证明无事件丢失，常开换取正确性简单），drain→信号（Started/Progress/Succeeded/Failed/Cancelled），`runningTasks` 仅变化时通知，submit 失败捕获 `rust::Error` 记入 lastError。进度按 10% 步进发布以控制事件量，进度不写日志环。窗口关闭语义 = 析构 Box → Rust shutdown+join。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要
 
-未完成。服务层已落地：panta-core 任务状态机（事件队列、协作取消、终态不可回退、结构化日志环、销毁 join）与 panta-ffi `TaskService` 桥接，本机 Rust 25 测试 + native GTest 5 用例 + CTest 10/10 验证通过。剩余：Qt/ViewModel 集成（GUI 线程轮询转信号、"UI 不被模拟慢任务阻塞"验证）、日志落盘/Console 通路、推送后三平台 CI 覆盖；全部验收有证据后再标 done。
+服务层与 Qt 集成已落地并验证：panta-core 任务状态机（Progress/终态事件、协作取消、终态不可回退、结构化日志环、销毁 join）、panta-ffi `TaskService` 桥接、`TaskHost`（GUI 线程轮询转信号）。本机证据：Rust 26 测试、native 15/15 CTest（含 TaskHost 5 用例：事件信号、取消/迟到拒绝、结构化错误、进度有界单调、GUI 心跳证明不阻塞）。三平台 CI run 复跑进行中，全绿后标 done。
