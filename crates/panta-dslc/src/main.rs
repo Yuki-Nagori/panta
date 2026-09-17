@@ -1,9 +1,10 @@
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
 
-use panta_dsl_core::{Kind, emit_ts, parse};
+use panta_dsl_core::{Kind, emit_ts, format_source, parse};
 
 fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
@@ -45,6 +46,25 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
             let ts = emit_ts(&document, locale).map_err(|error| error.to_string())?;
             write_atomically(output, ts.as_bytes())
         }
+        "format" => {
+            let check = arguments.get(1).is_some_and(|value| value == "--check");
+            let input_index = usize::from(check) + 1;
+            let input = required_path(&arguments, input_index)?;
+            let source = fs::read_to_string(input)
+                .map_err(|error| format!("read {}: {error}", input.display()))?;
+            let formatted = format_source(&source).map_err(|error| error.to_string())?;
+            if check {
+                if formatted == source {
+                    Ok(())
+                } else {
+                    Err(format!("{} requires formatting", input.display()))
+                }
+            } else if formatted == source {
+                Ok(())
+            } else {
+                write_atomically(input, formatted.as_bytes())
+            }
+        }
         _ => Err(usage()),
     }
 }
@@ -60,11 +80,15 @@ fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), String> {
             .and_then(|value| value.to_str())
             .unwrap_or("out")
     ));
-    fs::write(&temporary, contents)
+    let mut file = fs::File::create(&temporary)
         .map_err(|error| format!("write {}: {error}", temporary.display()))?;
+    file.write_all(contents)
+        .map_err(|error| format!("write {}: {error}", temporary.display()))?;
+    file.sync_all()
+        .map_err(|error| format!("sync {}: {error}", temporary.display()))?;
     fs::rename(&temporary, path).map_err(|error| format!("replace {}: {error}", path.display()))
 }
 
 fn usage() -> String {
-    "usage: panta-dslc check <input.pa> | emit-ts <input.pa> <output.ts> [locale]".to_owned()
+    "usage: panta-dslc check <input.pa> | emit-ts <input.pa> <output.ts> [locale] | format [--check] <input.pa>".to_owned()
 }

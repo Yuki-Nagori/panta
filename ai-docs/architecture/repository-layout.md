@@ -21,7 +21,7 @@ panta/
 ├── crates/
 │   ├── launcher/              # 统一运行入口（任务 001 骨架：仅未接入诊断）
 │   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034 实施中）
-│   ├── panta-dslc/             # 单文件 .pa 校验/TS 输出 CLI（034 实施中）
+│   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035 实施中）
 │   ├── core/                  # 规划：通用 ID、错误和应用契约
 │   ├── project/               # 规划：工程模型与命令
 │   ├── workflow/              # 规划：任务、作业和流程编排
@@ -57,7 +57,7 @@ C++ 各模块的 `core` 定义自有类型与行为，`occt`、`netgen`、`vtk` 
 
 `schemas/` 若包含共享协议，应明确其上游来源、版本及生成方式，不能与候选外部协议仓库分别维护两个权威版本。跨语言 FFI 优先验证 CXX，实际 crate、生成工具及目录由任务 006 确定，不预设它们已经存在。QML 模块可在 qml/ 下设置自己的 CMakeLists.txt，由 native 顶层纳入构建。
 
-`.pa` 源文件由 `panta-dsl-core` 统一解析，按 `kind` 聚合成 language、theme 或 variables Artifact；`panta-dslc` 只负责命令编排。国际化构建树中的临时 TS 由 quick-xml 生成、QM 由预编译 QtTools 生成，源码目录不保存这两类产物。格式化/校验规则和 fixtures 归 035，不能在各业务目录复制 parser。
+`.pa` 源文件由 `panta-dsl-core` 统一解析，按 `kind` 聚合成 language、theme 或 variables Artifact；`panta-dslc` 编排 check、format/format --check 和 TS 输出。格式化复用核心 AST，写回前通过临时文件同步并替换；国际化构建树中的临时 TS 由 quick-xml 生成、QM 由预编译 QtTools 生成，源码目录不保存这两类产物。格式化/校验规则和 fixtures 归 035，不能在各业务目录复制 parser。
 
 ## 新增文件原则
 

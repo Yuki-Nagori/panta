@@ -1,6 +1,6 @@
 //! Shared parser and artifact aggregation for the human-readable `.pa` DSL.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 
 use pest::Parser as PestParser;
@@ -86,6 +86,12 @@ pub struct Document {
     pub language: Option<String>,
     pub source_language: String,
     pub messages: BTreeMap<String, Message>,
+    /// Message keys in source declaration order. The map remains the lookup index.
+    #[serde(default)]
+    pub message_order: Vec<String>,
+    /// Standalone comments retained by the formatter.
+    #[serde(default)]
+    pub comments: Vec<String>,
     pub values: Vec<Variable>,
 }
 
@@ -148,6 +154,14 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             source,
         ));
     }
+    if let Some(offset) = source.find('\t') {
+        return Err(Diagnostics::one(
+            "pa.tab_indentation",
+            "tabs are not allowed; use two spaces for indentation",
+            offset,
+            source,
+        ));
+    }
 
     let Some(document_pair) = PaParser::parse(Rule::document, source)
         .map_err(|error| pest_diagnostic(error, source))?
@@ -168,6 +182,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
         language: None,
         source_language: "en".to_owned(),
         messages: BTreeMap::new(),
+        message_order: Vec::new(),
+        comments: Vec::new(),
         values: Vec::new(),
     };
     let mut seen_version = false;
@@ -186,7 +202,13 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
         };
         let body_offset = body.as_span().start();
         match body.as_rule() {
-            Rule::blank | Rule::comment_line => {}
+            Rule::blank => {}
+            Rule::comment_line => {
+                let comment = body.as_str().trim();
+                if !comment.is_empty() {
+                    result.comments.push(comment.to_owned());
+                }
+            }
             Rule::version => {
                 if seen_version {
                     push_diagnostic(
@@ -598,6 +620,216 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     }
 }
 
+/// Parses a .pa document and returns its canonical representation.
+pub fn format_source(source: &str) -> Result<String, Diagnostics> {
+    let document = parse(source)?;
+    Ok(format_document(&document))
+}
+
+/// Formats an already validated document without changing its semantic order.
+pub fn format_document(document: &Document) -> String {
+    let mut lines = vec![
+        format!("version: {}", document.version),
+        format!("kind: {}", kind_name(document.kind)),
+    ];
+    if let Some(catalog) = document.catalog.as_deref() {
+        lines.push(format!("catalog: {catalog}"));
+    }
+    if let Some(language) = document.language.as_deref() {
+        lines.push(format!("language: {language}"));
+    }
+    if document.kind == Kind::Language {
+        lines.push(format!("sourcelanguage: {}", document.source_language));
+    }
+    lines.push(String::new());
+    for comment in &document.comments {
+        lines.push(comment.clone());
+    }
+    if !document.comments.is_empty() {
+        lines.push(String::new());
+    }
+
+    match document.kind {
+        Kind::Language => format_messages(document, &mut lines),
+        Kind::Theme | Kind::Variables => format_values(document, &mut lines),
+    }
+
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    lines.push(String::new());
+    lines.join("\n")
+}
+
+fn kind_name(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Language => "language",
+        Kind::Theme => "theme",
+        Kind::Variables => "variables",
+    }
+}
+
+fn format_messages(document: &Document, lines: &mut Vec<String>) {
+    let messages = ordered_messages(document);
+    let mut context: Option<&str> = None;
+    for message in messages {
+        if context != Some(message.context.as_str()) {
+            ensure_blank(lines);
+            lines.push(format!("[{}]", message.context));
+            context = Some(message.context.as_str());
+        } else {
+            ensure_blank(lines);
+        }
+        lines.push(format!("{}:", render_key(&message.id)));
+        lines.push(format!("  src: {}", render_scalar(&message.source)));
+        if let Some(old_source) = message.old_source.as_deref() {
+            lines.push(format!("  oldsrc: {}", render_scalar(old_source)));
+        }
+        if message.numerus {
+            lines.push("  numerus: true".to_owned());
+        }
+        let translation = document
+            .language
+            .as_ref()
+            .and_then(|locale| message.translations.get(locale))
+            .or_else(|| message.translations.values().next());
+        if let Some(translation) = translation {
+            if message.numerus {
+                let forms = translation
+                    .forms
+                    .iter()
+                    .map(|form| render_quoted(form))
+                    .collect::<Vec<_>>();
+                if forms.is_empty() {
+                    lines.push("  tr: \"\"".to_owned());
+                } else {
+                    lines.push(format!("  tr: [{}]", forms.join(", ")));
+                }
+            } else {
+                lines.push(format!(
+                    "  tr: {}",
+                    translation
+                        .forms
+                        .first()
+                        .map_or_else(|| "\"\"".to_owned(), |form| render_scalar(form))
+                ));
+            }
+        }
+        if let Some(status) = message.status {
+            lines.push(format!("  st: {}", status_name(status)));
+        }
+        if let Some(comment) = message.comment.as_deref() {
+            lines.push(format!("  comment: {}", render_scalar(comment)));
+        }
+        if let Some(extra) = message.extra.as_deref() {
+            lines.push(format!("  extra: {}", render_scalar(extra)));
+        }
+    }
+}
+
+fn format_values(document: &Document, lines: &mut Vec<String>) {
+    lines.push("values:".to_owned());
+    for value in &document.values {
+        lines.push(format!(
+            "  {}: {} = {}",
+            value.name,
+            value_type_name(&value.value_type),
+            render_scalar(&value.expression)
+        ));
+    }
+}
+
+fn ordered_messages(document: &Document) -> Vec<&Message> {
+    let mut result = Vec::with_capacity(document.messages.len());
+    let mut seen = BTreeSet::new();
+    for key in &document.message_order {
+        if let Some(message) = document.messages.get(key)
+            && seen.insert(key)
+        {
+            result.push(message);
+        }
+    }
+    for (key, message) in &document.messages {
+        if seen.insert(key) {
+            result.push(message);
+        }
+    }
+    result
+}
+
+fn ensure_blank(lines: &mut Vec<String>) {
+    if !lines.last().is_some_and(String::is_empty) {
+        lines.push(String::new());
+    }
+}
+
+fn render_key(key: &str) -> String {
+    if is_bare_key(key) {
+        key.to_owned()
+    } else {
+        render_quoted(key)
+    }
+}
+
+fn is_bare_key(value: &str) -> bool {
+    value.split('.').all(|part| {
+        let mut chars = part.chars();
+        chars
+            .next()
+            .is_some_and(|first| first.is_ascii_alphabetic())
+            && chars.all(|character| {
+                character.is_ascii_alphanumeric() || character == '_' || character == '-'
+            })
+    })
+}
+
+fn render_scalar(value: &str) -> String {
+    if value.is_empty()
+        || value.starts_with([' ', '\t'])
+        || value.ends_with([' ', '\t'])
+        || value.contains(['\\', '"', '\n', '\r', '\t'])
+    {
+        render_quoted(value)
+    } else {
+        value.to_owned()
+    }
+}
+
+fn render_quoted(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len() + 2);
+    escaped.push('"');
+    for character in value.chars() {
+        match character {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            other => escaped.push(other),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
+fn status_name(status: Status) -> &'static str {
+    match status {
+        Status::Finished => "finished",
+        Status::Unfinished => "unfinished",
+        Status::Vanished => "vanished",
+    }
+}
+
+fn value_type_name(value_type: &ValueType) -> &'static str {
+    match value_type {
+        ValueType::Bool => "bool",
+        ValueType::Int => "int",
+        ValueType::Real => "real",
+        ValueType::String => "string",
+        ValueType::Resource => "resource",
+    }
+}
+
 pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics> {
     if document.kind != Kind::Language {
         return Err(Diagnostics::one(
@@ -798,7 +1030,7 @@ fn flush_message(
             source,
         );
     }
-    if result.messages.insert(key, message).is_some() {
+    if result.messages.insert(key.clone(), message).is_some() {
         push_diagnostic(
             diagnostics,
             "pa.duplicate_message",
@@ -806,6 +1038,8 @@ fn flush_message(
             0,
             source,
         );
+    } else {
+        result.message_order.push(key);
     }
 }
 
@@ -965,6 +1199,24 @@ fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Di
                 0,
                 source,
             );
+        }
+        if message.status != Some(Status::Unfinished) && message.status != Some(Status::Vanished) {
+            for translation in message.translations.values() {
+                if translation
+                    .forms
+                    .iter()
+                    .any(|form| placeholders(&message.source) != placeholders(form))
+                {
+                    push_diagnostic(
+                        diagnostics,
+                        "pa.placeholder_mismatch",
+                        format!("message '{}' has different placeholders", message.id),
+                        0,
+                        source,
+                    );
+                    break;
+                }
+            }
         }
     }
 }
@@ -1168,6 +1420,53 @@ mod tests {
                 .diagnostics
                 .iter()
                 .any(|item| item.code == "pa.source_length_conflict")
+        );
+    }
+
+    #[test]
+    fn formatter_is_canonical_and_preserves_message_order() {
+        let source = "version: 1\nkind: language\nlanguage: cn\nsourcelanguage: en\n\n// keep this note\n[Z]\nz:\n  src: \"A\\\\B\"\n  tr: \"甲\\\\乙\"\n\n[A]\na:\n  src: A\n  tr: A\n";
+        let formatted = format_source(source).expect("format");
+        assert!(formatted.starts_with("version: 1\nkind: language\nlanguage: zh-CN\n"));
+        assert!(formatted.contains("// keep this note\n"));
+        assert!(formatted.contains("  src: \"A\\\\B\"\n"));
+        assert!(formatted.find("[Z]").expect("Z") < formatted.find("[A]").expect("A"));
+        assert_eq!(format_source(&formatted).expect("idempotent"), formatted);
+    }
+
+    #[test]
+    fn formatter_handles_variables_and_plural_forms() {
+        let source = "version: 1\nkind: variables\n\nvalues:\n  scale: real = 0.5\n  mesh: resource = project:/assets/mesh.vtu\n";
+        let formatted = format_source(source).expect("variables");
+        assert_eq!(
+            formatted,
+            "version: 1\nkind: variables\n\nvalues:\n  scale: real = 0.5\n  mesh: resource = project:/assets/mesh.vtu\n"
+        );
+
+        let language = "version: 1\nkind: language\nlanguage: zh-CN\n\n[Menu]\nitems:\n  src: \"%n item\"\n  numerus: true\n  tr: [\"%n 项\", \"%n 项目\"]\n";
+        let formatted_language = format_source(language).expect("plural");
+        assert!(formatted_language.contains("  tr: [\"%n 项\", \"%n 项目\"]\n"));
+        assert_eq!(
+            format_source(&formatted_language).expect("plural idempotent"),
+            formatted_language
+        );
+    }
+
+    #[test]
+    fn validator_rejects_tabs_and_finished_placeholder_mismatch() {
+        let tab_error = parse("version: 1\nkind: variables\n\nvalues:\n\twidth: int = 1\n")
+            .expect_err("tabs are invalid");
+        assert_eq!(tab_error.diagnostics[0].code, "pa.tab_indentation");
+
+        let placeholder_error = parse(
+            "version: 1\nkind: language\nlanguage: en\n\n[Menu]\ncount:\n  src: \"%n item\"\n  tr: item\n",
+        )
+        .expect_err("placeholder mismatch");
+        assert!(
+            placeholder_error
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.placeholder_mismatch")
         );
     }
 }
