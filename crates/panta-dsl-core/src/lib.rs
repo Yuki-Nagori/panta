@@ -711,7 +711,7 @@ fn format_messages(document: &Document, lines: &mut Vec<String>) {
                     translation
                         .forms
                         .first()
-                        .map_or_else(|| "\"\"".to_owned(), |form| render_scalar(form))
+                        .map_or_else(|| "\"\"".to_owned(), |form| render_translation_scalar(form))
                 ));
             }
         }
@@ -792,6 +792,14 @@ fn render_scalar(value: &str) -> String {
         render_quoted(value)
     } else {
         value.to_owned()
+    }
+}
+
+fn render_translation_scalar(value: &str) -> String {
+    if value.starts_with('[') {
+        render_quoted(value)
+    } else {
+        render_scalar(value)
     }
 }
 
@@ -1449,6 +1457,14 @@ mod tests {
         assert_eq!(
             format_source(&formatted_language).expect("plural idempotent"),
             formatted_language
+        );
+
+        let bracket = "version: 1\nkind: language\nlanguage: en\n\n[Menu]\nsyntax:\n  src: Brackets\n  tr: \"[literal]\"\n";
+        let formatted_bracket = format_source(bracket).expect("bracket");
+        assert!(formatted_bracket.contains("  tr: \"[literal]\"\n"));
+        assert_eq!(
+            format_source(&formatted_bracket).expect("bracket idempotent"),
+            formatted_bracket
         );
     }
 
