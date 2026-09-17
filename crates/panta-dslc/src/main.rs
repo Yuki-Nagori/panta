@@ -23,8 +23,7 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
     match command {
         "check" | "validate" => {
             let input = required_path(&arguments, 1)?;
-            let source = fs::read_to_string(input)
-                .map_err(|error| format!("read {}: {error}", input.display()))?;
+            let source = read_source(input)?;
             parse(&source)
                 .map(|_| ())
                 .map_err(|error| error.to_string())
@@ -32,8 +31,7 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
         "emit-ts" => {
             let input = required_path(&arguments, 1)?;
             let output = required_path(&arguments, 2)?;
-            let source = fs::read_to_string(input)
-                .map_err(|error| format!("read {}: {error}", input.display()))?;
+            let source = read_source(input)?;
             let document = parse(&source).map_err(|error| error.to_string())?;
             if document.kind != Kind::Language {
                 return Err("emit-ts requires kind: language".to_owned());
@@ -50,8 +48,7 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
             let check = arguments.get(1).is_some_and(|value| value == "--check");
             let input_index = usize::from(check) + 1;
             let input = required_path(&arguments, input_index)?;
-            let source = fs::read_to_string(input)
-                .map_err(|error| format!("read {}: {error}", input.display()))?;
+            let source = read_source(input)?;
             let formatted = format_source(&source).map_err(|error| error.to_string())?;
             if check {
                 if formatted == source {
@@ -71,6 +68,17 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
 
 fn required_path(arguments: &[String], index: usize) -> Result<&Path, String> {
     arguments.get(index).map(Path::new).ok_or_else(usage)
+}
+
+fn read_source(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    String::from_utf8(bytes).map_err(|error| {
+        format!(
+            "pa.invalid_utf8 at byte {} in {}",
+            error.utf8_error().valid_up_to(),
+            path.display()
+        )
+    })
 }
 
 fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), String> {
