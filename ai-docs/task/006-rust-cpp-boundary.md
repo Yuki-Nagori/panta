@@ -55,8 +55,8 @@
 ## 验收标准
 
 - [x] 跨语言成功/失败路径返回结构化结果；非 ASCII 文本与空输入行为定义明确。
-- [ ] 重复创建/释放、无效输入和错误转换有可运行验证；不存在未经处理的跨边界异常展开。
-- [ ] 干净构建与增量构建保持正确，没有第二套 Cargo 递归编译链。
+- [x] 重复创建/释放、无效输入和错误转换有可运行验证；不存在未经处理的跨边界异常展开。
+- [x] 干净构建与增量构建保持正确，没有第二套 Cargo 递归编译链。
 - [x] CXX 两侧生成版本一致；双向调用及 CMake 最终链接通过，Result/异常与 panic-abort 行为被明确区分。
 - [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 - [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
@@ -76,6 +76,9 @@
 | 2026-09-17 | 手动以等效 cargo 环境变量驱动 launcher build.rs 完成 CMake 全量构建（Qt staging 与 googletest 复用本地缓存，零下载；DEP 注入规则另由最小复现验证）。首跑暴露 build.rs E0382、DEP 不注入、boundary_test 缺 main 三处阻塞 | 修复后构建通过：84 个 ninja 目标全绿，panta_ffi_boundary_test 链接成功，产出 panta-native。 |
 | 2026-09-17 | `ctest -R Ffi`（上条构建树，macOS 26 arm64 / c++ 20 / Qt 6.11.2 staging） | 通过：`Ffi.RustCppBoundary` 1/1，覆盖 C++ 调 Rust 非 ASCII 往返（"界"×2 → "ffi:界界"）与 Rust 结构化错误转 `rust::Error` 异常。 |
 | 2026-09-17 | panic-abort 区分验证：桥接新增 `panic_probe` 验收探针；`cargo test -p panta-ffi`（4 测试含 `#[should_panic]`）+ 重建静态库后 `ctest -R Ffi` | 通过：Rust 侧 4/4；C++ 侧 `EXPECT_DEATH(panic_probe())` 确认 panic 中止进程而非以异常穿越，与 `Result`→`rust::Error` 可恢复路径构成对照。注意改 lib.rs 后须 `cargo build` 刷新 staticlib，`cargo test` 不重建该产物。 |
+| 2026-09-17 | opaque 句柄：桥接新增 `Session`（`rust::Box` 唯一所有权）与 `session_create/label/close/live_count`；`cargo test -p panta-ffi --locked` | 通过：7/7，含创建 2 句柄→存活 2→逆序 close→存活 0、空/超长标签结构化拒绝且不残留、Box 直接 drop 走同一 Drop 路径；测试以进程级锁串行化共享计数 |
+| 2026-09-17 | `cargo build -p panta-ffi --locked` 刷新 staticlib 与生成头；重配 `native/build/debug` 指向新 include（f50a…）后 `cmake --build` + `ctest`（macOS arm64） | 通过：native 9/9；boundary 二进制 5/5，新增 `OpaqueSessionCreateUseAndRelease`（逆序释放、计数平衡）与 `OpaqueSessionRejectsInvalidLabel`（空标签转 `rust::Error` 且存活数为 0） |
+| 2026-09-17 | `cargo test --locked --workspace --exclude panta-launcher`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；`cargo fmt --all -- --check`；`git diff --check` | 通过：Rust 18/18，workspace Clippy 0 warning，格式与补丁检查干净 |
 
 ## 风险与回退
 
@@ -91,8 +94,9 @@ CXX 生成器版本不一致、glue 重复编译或双向符号未链接会破�
 - 2026-09-17：修复 `DEP_PANTA_FFI_INCLUDE` 不注入的问题。本机 cargo 1.95.0/1.98.1（Homebrew 与 rustup 双渠道）最小复现均证实：links 包的 metadata 只沿普通 `[dependencies]` 边注入下游构建脚本，仅列在 `[build-dependencies]` 时不注入；将 panta-ffi 移入 launcher 的 `[dependencies]`。判别过程与证据记录于验证表；该行为与既有 cargo 文档表述不一致，后续升级工具链时需复查。
 - 2026-09-17：boundary_test 初次真实链接即失败：测试无自定义 `main` 却只链 `GTest::gtest`（fd0d228 从未本地链接验证过该目标）；按 foundation 先例改链 `GTest::gtest_main`。同轮发现 launcher build.rs 重建追踪缺 `native/ffi` 目录，一并补入。
 - 2026-09-17：为 panic-abort 验收新增 `panic_probe` 探针（仅验收用，不承载业务功能）：C++ 侧 `EXPECT_DEATH` 证实 panic 中止进程、不以异常穿越，与 `Result` 错误路径区分。本地单平台已验证；三平台干净/增量构建待推送后由 CI 覆盖。
+- 2026-09-17（opaque 句柄）：按实施步骤的句柄释放/所有权要求补齐最小 opaque 验证：Rust 拥有 `Session`，C++ 经 `rust::Box` 唯一持有，释放只能 move 回 Rust（`session_close` 或 Box 析构），无裸指针与复制语义；存活计数（原子）让两侧都能断言创建/释放真实平衡。无效输入为空标签与超 64 字节标签的结构化错误，经 CXX `Result` 转 `rust::Error` 异常，拒绝路径不残留句柄。干净/增量构建：CI 冷缓存 run `35203709898` 证明干净树正确，本机重配+重建证明增量路径正确；新增句柄代码的三平台干净构建随本次推送由 CI 复跑覆盖。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要
 
-未完成。最小双向路径与错误/panic 行为区分已在本机验证（Rust 4 测试 + native GTest 含 death test + CMake 最终链接）；剩余：三平台干净/增量构建（推送后 CI 覆盖）、以及重复创建/释放验收项——当前 DTO-only 范围尚无 opaque 句柄，待该场景引入时补验证。全部验收完成后再标 done。
+验收项均已取得本机证据（Rust 7 测试 + native GTest 5 用例含 opaque 句柄创建/释放/无效输入 + CMake 最终链接）；干净/增量构建有 CI 冷缓存与本机重建证据。新增句柄代码的三平台 CI 干净复跑进行中，全绿后标 done。
