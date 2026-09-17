@@ -27,7 +27,7 @@ target_compile_definitions(panta_foundation PRIVATE
 if(BUILD_TESTING)
   include(GoogleTest)
   add_executable(panta_foundation_version_test tests/version_test.cpp)
-  panta_native_defaults(panta_foundation_version_test)
+  panta_native_test_defaults(panta_foundation_version_test)
   target_link_libraries(panta_foundation_version_test PRIVATE
     panta::foundation
     GTest::gtest_main

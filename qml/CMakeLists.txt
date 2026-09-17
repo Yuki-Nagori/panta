@@ -46,7 +46,7 @@ add_library(panta::shell ALIAS panta_shell)
 
 if(BUILD_TESTING)
   add_executable(panta_qml_theme_component_test Tests/theme_component_test.cpp)
-  panta_native_defaults(panta_qml_theme_component_test)
+  panta_native_test_defaults(panta_qml_theme_component_test)
   target_link_libraries(panta_qml_theme_component_test PRIVATE
     panta_shell
     Qt6::Gui

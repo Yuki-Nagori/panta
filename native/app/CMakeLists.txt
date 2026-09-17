@@ -27,7 +27,7 @@ endif()
 
 if(BUILD_TESTING)
   add_executable(panta_qml_shell_module_test tests/shell_module_load_test.cpp)
-  panta_native_defaults(panta_qml_shell_module_test)
+  panta_native_test_defaults(panta_qml_shell_module_test)
   target_link_libraries(panta_qml_shell_module_test PRIVATE
     panta::shell
     Qt6::Gui

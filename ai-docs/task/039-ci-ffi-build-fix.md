@@ -24,7 +24,7 @@ GitHub Actions 最新 run `35199280596`（提交 `e9e20ac`）的 Windows Build �
 
 ## 范围与非目标
 
-范围：修复 `panta-ffi` staticlib 在 CI 干净构建中的供给顺序；修正 CXX bridge 的 MSVC C++ 标准选项；对 Windows FFI 边界测试统一 MSVC runtime/迭代器 ABI 并补齐 Rust std 系统库；补充能复现这些环境差异的本地/CI 验证和任务记录。
+范围：修复 `panta-ffi` staticlib 在 CI 干净构建中的供给顺序；修正 CXX bridge 的 MSVC C++ 标准选项；对 Windows native 测试统一 MSVC runtime/迭代器 ABI 并补齐 Rust std 系统库；补充能复现这些环境差异的本地/CI 验证和任务记录。
 
 非目标：不改变 FFI DTO、错误语义、Qt 版本、CMake 生成器矩阵或 native 业务实现；不引入依赖缓存和统一质量入口。
 
@@ -37,12 +37,12 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 1. 在隔离 target 目录复现普通 `cargo build --locked` 的 staticlib 缺失行为，并确认 `cargo build -p panta-ffi --locked` 的产物位置。
 2. 先用 workflow 的独立 `panta-ffi` 预构建验证竞态根因；随后由任务 040 将相同约束收回 launcher manifest，最终 workflow 只调用 `cargo build --locked`，不在 launcher build script 中递归调用 Cargo。
 3. 按目标编译器选择 C++20 选项：MSVC 使用 `/std:c++20`，GCC/Clang 使用 `-std=c++20`。
-4. Windows FFI 边界测试使用与 Rust staticlib 一致的 `/MD`、`_ITERATOR_DEBUG_LEVEL=0`，并显式链接 `ws2_32`、`userenv`、`ntdll`。
+4. Windows native 测试及 GoogleTest 使用与 Rust staticlib 一致的 `/MD`、`_ITERATOR_DEBUG_LEVEL=0`，并显式链接 FFI 边界测试所需的 `ws2_32`、`userenv`、`ntdll`。
 5. 运行 Rust 格式、测试、Clippy 和可用的 native/CMake 验证；更新索引与本文真实结果。
 
 ## 预计改动
 
-`.github/workflows/ci.yml`、`crates/panta-ffi/build.rs`、`crates/launcher/build.rs`、`native/ffi/CMakeLists.txt` 及本文件；任务 040 另调整 launcher manifest 的依赖边，最终 CI 保留单一 `cargo build --locked` 入口，launcher 保留 profile 根目录和 deps/的定位逻辑。
+`.github/workflows/ci.yml`、`crates/panta-ffi/build.rs`、`crates/launcher/build.rs`、native 根/test CMake 配置及本文件；任务 040 另调整 launcher manifest 的依赖边，最终 CI 保留单一 `cargo build --locked` 入口，launcher 保留 profile 根目录和 deps/的定位逻辑。
 
 ## 清理与兼容例外
 
@@ -68,7 +68,8 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 | 2026-09-17 | macOS arm64；`cargo fmt --all -- --check`、`cargo test --locked --workspace --exclude panta-launcher`、`cargo clippy --locked --workspace --all-targets --exclude panta-launcher`、`git diff --check` | Rust 侧检查通过 | 全部退出 0；DSL 11 个测试、FFI 4 个测试通过；Clippy 仅报告既有测试/构建脚本 `expect` 警告 |
 | 2026-09-17 | macOS arm64；隔离 Ninja CMake configure/build + `ctest --test-dir /private/tmp/panta-native-ci.4sY0dA --output-on-failure`，使用当前 profile staticlib 和已有 Qt/GTest staging | native 构建及 FFI 边界测试通过 | 84 个构建步骤完成，native 7/7 测试通过，`Ffi.RustCppBoundary` death test 通过 |
 | 2026-09-17 | macOS arm64；独立 FFI CMake 构建，开启 `PANTA_ENABLE_FFI_TEST`，链接当前 `panta-ffi` staticlib；`ctest -R Ffi.RustCppBoundary` | Windows 链接规则改动不破坏 Unix FFI 边界 | CMake 构建与 `Ffi.RustCppBoundary` 通过；macOS 仍使用 `Threads::Threads`/`CMAKE_DL_LIBS` 路径 |
-| — | 修复后 GitHub Actions 三平台 run | Build、Test、Format、Clippy 全部成功 | 待推送后验证 |
+| 2026-09-17 | GitHub Actions run `35201746062`，Windows Build | 修复后 native 测试与 GTest 的 MSVC CRT/iterator ABI 一致 | 仍失败：Bridge/Foundation 测试使用 Debug ABI，而 FFI 修复把共享 GTest target 固定为 `/MD`、iterator 0；根因扩大为所有 native 测试需统一 ABI，已在本轮移至 native 根配置 |
+| — | 本轮修复后 GitHub Actions 三平台 run | Build、Test、Format、Clippy 全部成功 | 待提交并复跑 |
 
 ## 风险与回退
 

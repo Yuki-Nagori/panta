@@ -35,6 +35,17 @@ function(panta_native_defaults target)
   )
 endfunction()
 
+# MSVC 的 Rust staticlib 使用动态 Release CRT 和 iterator ABI 0。native 测试
+# 统一采用同一组 ABI；否则多配置生成器会让 Debug 测试与 gtest/FFI 在链接期混用
+# /MDd、/MD 或不同的 _ITERATOR_DEBUG_LEVEL。
+function(panta_native_test_defaults target)
+  panta_native_defaults(${target})
+  if(MSVC)
+    set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    target_compile_definitions(${target} PRIVATE _ITERATOR_DEBUG_LEVEL=0)
+  endif()
+endfunction()
+
 # include(CTest) 定义 BUILD_TESTING 选项（默认 ON）并启用测试；OFF 时不拉取
 # googletest、不注册测试，供 004 的发布链关闭测试面。
 include(CTest)
@@ -67,6 +78,14 @@ if(BUILD_TESTING)
   set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
   set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
+  if(MSVC)
+    foreach(gtest_target IN ITEMS gtest gtest_main)
+      if(TARGET ${gtest_target})
+        set_property(TARGET ${gtest_target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+        target_compile_definitions(${gtest_target} PRIVATE _ITERATOR_DEBUG_LEVEL=0)
+      endif()
+    endforeach()
+  endif()
 endif()
 
 add_subdirectory(foundation)
