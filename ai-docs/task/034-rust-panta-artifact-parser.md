@@ -70,6 +70,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 | 2026-09-17 | 增量与失败路径：`touch resources/i18n/panta-cn.pa` 后重建；向 panta-cn.pa 追加语法错误后 `cargo build`；纯净目录 `cmake -S native -B /tmp/fresh-boundary` | .pa 变更传播到 TS；解析失败保留旧 TS 并给稳定诊断；缺 TS 的 configure 立即失败 | 通过：touch 后 TS mtime 更新；损坏 .pa 构建失败（`panta-cn.pa：pa.syntax at 23:1`）且旧 TS 未动，恢复后全绿；无 `PANTA_I18N_TS_DIR` 的 configure 报错并指引先 `cargo build`（与 FFI 同边界） |
 | 2026-09-17 | `cargo test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`git diff --check` | Rust 侧检查全绿 | 通过 |
 | 2026-09-17 | 三平台 CI（push 2f62a69，run [35233366640](https://github.com/Yuki-Nagori/panta/actions/runs/35233366640)） | 三平台走通 qttools 下载 + TS/QM 链路 | macOS/Windows 全绿（含锁定 lrelease 编 QM、qrc 嵌入与链接）；Linux 暴露 qtdeclarative 历史记录哈希笔误（`…db6e92…` 应为 `…dbb6e92…`，此前被 CI 缓存掩盖，新的每归档指纹强制复验后失败）。修复：实测回填正确哈希，并在两处 `file(DOWNLOAD)` 后立即复验 + FATAL——该命令的哈希不符是延迟错误，会继续跑完 configure 并写入带错哈希的解包指纹，毒化后续缓存判定。 |
+| 2026-09-17 | 三平台 CI 复跑（push 0c16681，run [35234986184](https://github.com/Yuki-Nagori/panta/actions/runs/35234986184)） | 哈希修正后三平台全绿 | windows-2022 / macos-latest / ubuntu-latest 全部 success：qttools 下载校验、build.rs TS 生成、锁定 lrelease 编 QM、qrc 嵌入与链接在三平台干净环境成立（QTranslator 加载为 ctest，CI 执行待 011 聚合）。 |
 
 ## 风险与回退
 
