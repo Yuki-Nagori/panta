@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、018、019、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证）；031 已开始官方预编译资产盘点，007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、018、019、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证）；008 已落地 Rust 任务生命周期服务层、Qt/ViewModel 集成进行中，031 已开始官方预编译资产盘点，007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -52,7 +52,7 @@ ai-docs/
 | 005 | [Qt/QML 主窗口与 C++ ViewModel](task/005-qt-qml-shell.md) | M0 | 004 | done |
 | 006 | [Rust/C++ FFI 最小契约](task/006-rust-cpp-boundary.md) | 基础平台 | 004 | done |
 | 007 | [VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031 | planned |
-| 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | ready |
+| 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | in-progress |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | planned |
 | 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | planned |
 | 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | in-progress |

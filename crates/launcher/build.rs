@@ -35,6 +35,10 @@ const RERUN_PATHS: &[&str] = &[
     "../panta-ffi",
     "../panta-ffi/include",
     "../panta-ffi/src",
+    // panta-ffi 静态链接 panta-core；其源码变化刷新 staticlib 内容，
+    // 需触发 CMake 重新链接。
+    "../panta-core",
+    "../panta-core/src",
     "../../native/ffi",
     "../../qml",
     "../../qml/Themes",

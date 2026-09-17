@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/launcher",
+    "crates/panta-core",
     "crates/panta-dsl-core",
     "crates/panta-dslc",
     "crates/panta-ffi",
@@ -20,6 +21,7 @@ repository = "https://github.com/Yuki-Nagori/panta"
 [workspace.dependencies]
 cxx = "1.0.202"
 cxx-build = "1.0.202"
+panta-core = { path = "crates/panta-core" }
 pest = "2.8"
 pest_derive = "2.8"
 quick-xml = { version = "0.38", features = ["serialize"] }
