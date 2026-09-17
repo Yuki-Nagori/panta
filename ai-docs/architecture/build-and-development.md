@@ -16,7 +16,7 @@ Qt Quick 主窗口已可用（任务 005）：`native/app` 为 Qt 入口，`nati
 
 构建图与扩展点：Cargo → launcher 的 build.rs → CMake/Ninja → native targets，单向无环；CMake 侧不回调 Cargo。重建追踪显式列举 native 源/配置与 qml/ 目录；`resources/` 落地时追加（qt_add_resources 扩展点已在 qml/CMakeLists.txt 标注）。Rust 库供 C++ 消费的接入点在 CMake 侧，由任务 006 确定。
 
-仍不能完成 CAE 业务流程：几何导入、网格、渲染与持久化均为后续任务；桌面分发（013）与工具自动供给（020）未实施。下面是构建契约与实施要求，不是已验证的安装教程。
+仍不能完成 CAE 业务流程：几何导入、网格、渲染与持久化均为后续任务；桌面分发（013）未实施。工具二进制供给（020）已落地：PATH 无 CMake/Ninja 时由构建引导按固定资产下载校验到根 `target/panta-tools/`，`CMAKE` 环境变量与 PATH 上的本机工具优先（Linux aarch64 无官方 CMake 资产，需走该旁路）。下面是构建契约与实施要求，不是已验证的安装教程。
 
 ## 构建职责
 

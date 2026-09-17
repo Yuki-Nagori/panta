@@ -1,6 +1,6 @@
 # 020 — 托管引导：CMake/Ninja 二进制供给
 
-- 状态：ready
+- 状态：in-progress
 - 阶段：M0
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成）
 - 优先级：P1
@@ -38,21 +38,29 @@
 
 `crates/launcher/build.rs`（或新调度模块）、依赖获取文档、README 环境要求。
 
+本轮实际边界：新增 `crates/launcher/src/provision.rs`（build.rs 经 `#[path]` 复用，单元测试挂 launcher 测试构建）；build.rs 接入"定位 → 下载 → SHA256 校验 → 解包 → 注入路径"，托管 Ninja 时向 CMake 传 `CMAKE_MAKE_PROGRAM`；`sha2` 进入 workspace/build/dev 依赖。缓存位于根 `target/panta-tools/`（archives + 解包目录 + marker）。README 环境要求已是最终形态（写明工具由构建引导拉取），本任务使其成真，未改动；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖。
+
 ## 清理与兼容例外
 
 移除"要求预装 CMake/Ninja"的临时说明；无兼容层。
 
 ## 验收标准
 
-- [ ] 干净环境（PATH 无 cmake/ninja）`cargo build --locked` 全链成功且产物可运行。
-- [ ] 下载校验（SHA256）生效，损坏产物被拒绝并给出可定位诊断。
-- [ ] 三平台资产清单与校验和回填文档；README 环境要求同步收敛。
+- [x] 干净环境（PATH 无 cmake/ninja）`cargo build --locked` 全链成功且产物可运行。
+- [x] 下载校验（SHA256）生效，损坏产物被拒绝并给出可定位诊断。
+- [x] 三平台资产清单与校验和回填文档；README 环境要求同步收敛。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
 | — | 尚未执行 | 无实现证据 |
+| 2026-09-17 | 首次下载实测（macOS arm64 下载三平台资产）：CMake mac universal `0c5d…64fa`、linux x86_64 `d6c8…c6cc`、windows x86_64 `4d52…26ab`；Ninja mac `c990…321b`、linux `5749…bead6`、win `07fc…8dc65` | SHA256 已回填 dependency-acquisition.md；解包布局与 `cmake --version`/`ninja --version`（4.4.3 / 1.13.2）逐一验证 |
+| 2026-09-17 | `cargo test -p panta-launcher --locked`（macOS arm64） | 9/9：launcher 现有 4 测试 + provision 单元测试 5（hex、宿主资产表、SHA256 已知向量、嵌套布局定位、缺失返回 None）。cargo test 不执行 build script 内测试，故 provision.rs 由 build.rs `#[path]` 与 main.rs cfg(test) 模块共享 |
+| 2026-09-17 | 干净 PATH E2E：`PATH=/tmp/panta-clean-bin:/usr/bin:/bin:/usr/sbin:/sbin cargo build --locked`（无系统 cmake/ninja，/tmp/panta-clean-bin 仅含 cargo/rustc 符号链接） | 通过：自动下载并校验 cmake/ninja 至 `target/panta-tools/`；新构建树 CMakeCache 中 `CMAKE_COMMAND`/`CMAKE_MAKE_PROGRAM` 均指向托管产物；全链构建成功，产物 `panta-native` 离屏启动存活（QT_QPA_PLATFORM=offscreen，进程 4 秒存活确认） |
+| 2026-09-17 | 损坏下载拒绝：假 curl 替身注入损坏归档（marker/解包目录/归档清空后强制重跑） | 通过：退出码 101，诊断"ninja 归档 SHA256 不符，已拒绝进入构建：预期 c990…/实际 8bd9…；归档已删除，重试将重新下载（URL）"，归档与解包目录均未残留 |
+| 2026-09-17 | 离线复用：真实归档放回（假 curl 仍在 PATH 最前，联网即失败） | 通过：归档哈希命中跳过下载，解包后全链成功；再次强制重跑（archives 目录移走），marker+二进制命中，构建成功 |
+| 2026-09-17 | `cargo fmt --all -- --check`；`cargo clippy --locked --workspace --all-targets -- -D warnings`；`git diff --check` | 通过，Clippy 0 warning |
 
 ## 风险与回退
 
@@ -62,7 +70,9 @@
 
 - 2026-09-16：自任务 004 的托管原则拆分立task；004 交付调度与诊断，本任务交付二进制供给。
 - 2026-09-17：依赖 004 已完成且范围/验收明确，状态调整为 ready。根据预编译优先规则，CMake/Ninja 只消费带 SHA256 的官方或可信预编译资产；缺少资产时另立项目制品任务，不回退本地源码构建。
+- 2026-09-17（方案）：定位顺序为 `CMAKE` 环境变量 → PATH → `target/panta-tools/` 托管缓存 → 固定资产下载；marker 记录资产 SHA256，与解包二进制同时有效即可离线复用，marker 不符（版本升级）先清场不覆盖。下载用平台自带 curl，CMake 包用平台自带 tar 解压（macOS/Windows bsdtar 兼容 zip），Ninja zip 用 `cmake -E tar`（libarchive）；解包后显式 chmod 可执行位。托管 Ninja 向 CMake 传 `CMAKE_MAKE_PROGRAM`，不依赖 PATH。SHA256 于首次下载实测并回填固定清单；Linux aarch64 无官方 CMake 资产，走 `CMAKE` 旁路并给出诊断。
+- 2026-09-17（实施）：落地上表。已知限制：下载进度在成功 run 中被 cargo 隐藏（失败时完整输出）；CI runner 自带 cmake/ninja，走 PATH 定位路径，托管下载路径由本机 E2E 覆盖，三平台 CI 验证编译与 PATH 路径无回归。
 
 ## 完成摘要
 
-未完成。完成时填写实现行为、验证证据、剩余限制和后续 task；全部验收有证据后才标 done。
+托管工具供给已落地并验证：干净 PATH 全链构建成功（CMakeCache 指向托管 cmake/ninja，产物离屏启动存活）、损坏归档 SHA256 拒绝（退出 101 + 预期/实际/URL 诊断）、归档命中与 marker 命中两档离线复用通过、单元测试 5 项与 launcher 回归 4 项通过。三平台 CI 复跑进行中，绿后标 done。

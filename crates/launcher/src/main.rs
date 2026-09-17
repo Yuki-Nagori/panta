@@ -8,6 +8,13 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+// 托管引导（任务 020）的单元测试挂在本 crate 的测试构建上；生产二进制
+// 不编译该模块，build.rs 经 #[path] 复用同一实现文件。测试构建只调用
+// 测试函数，其余条目由 build.rs 使用，故放开 dead_code。
+#[cfg(test)]
+#[allow(dead_code)]
+mod provision;
+
 /// native 产物缺失或无法启动；取 BSD sysexits.h 的 EX_UNAVAILABLE。
 const EXIT_PRODUCT_UNAVAILABLE: u8 = 69;
 /// 子进程被信号终止且平台无法给出信号号时的回退退出码（对应 SIGINT 约定）。

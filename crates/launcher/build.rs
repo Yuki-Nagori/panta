@@ -13,6 +13,11 @@
 //! 构建脚本产物只写 OUT_DIR；失败时继承子进程输出并原样退出，不掩盖
 //! 编译器/CMake 诊断。
 
+// 供给逻辑与 build.rs 共享同一文件；单元测试经 src/main.rs 的 cfg(test)
+// 模块运行（cargo test 不执行 build script 内的测试）。
+#[path = "src/provision.rs"]
+mod provision;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -94,11 +99,23 @@ fn orchestrate() -> Result<PathBuf, String> {
         return Err(format!("native 目录不可达：{}", native_dir.display()));
     }
     let binary_dir = PathBuf::from(&out_dir).join("native-build");
+    // OUT_DIR = <target>/<profile>/build/<hash>/out；ancestors 跳过 out、
+    // hash、build、profile 四层得到 target 根，托管工具缓存与 profile 无关。
+    let target_root = PathBuf::from(&out_dir)
+        .ancestors()
+        .nth(4)
+        .ok_or_else(|| format!("无法从 launcher OUT_DIR 推导 target 根：{out_dir}"))?
+        .to_path_buf();
 
-    let cmake = std::env::var_os("CMAKE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("cmake"));
+    // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
+    let cmake = provision::resolve_cmake(&target_root)?;
     let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
+    let ninja = if generator.to_ascii_lowercase().contains("ninja") {
+        Some(provision::resolve_ninja(&target_root, &cmake)?)
+    } else {
+        None
+    };
+
     // Cargo 的默认 feature 是唯一用户入口；把 feature 状态转换成 CMake
     // 选项，避免开发者在日常命令中重复维护两套开关。
     let bridge_module = if std::env::var_os("CARGO_FEATURE_BRIDGE_MODULE").is_some() {
@@ -126,6 +143,10 @@ fn orchestrate() -> Result<PathBuf, String> {
             "-DPANTA_FFI_STATIC_LIB={}",
             ffi_staticlib.display()
         ));
+    if let Some(ninja) = &ninja {
+        // 托管供给的 Ninja 不依赖 PATH；系统 Ninja 传显式路径同样无害。
+        configure.arg(format!("-DCMAKE_MAKE_PROGRAM={}", ninja.display()));
+    }
     run_step("configure", &mut configure)?;
 
     let mut build = Command::new(&cmake);
