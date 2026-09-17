@@ -9,3 +9,6 @@ publish = false
 
 [lints]
 workspace = true
+
+[build-dependencies]
+panta-ffi = { path = "../panta-ffi" }

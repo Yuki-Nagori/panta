@@ -4,6 +4,10 @@
 cmake_minimum_required(VERSION 3.22)
 project(panta_native VERSION 0.1.0 LANGUAGES CXX)
 
+option(PANTA_ENABLE_FFI_TEST
+  "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF
+)
+
 # 默认值单一来源（cargo.md：Cargo 调度与直接诊断构建共用一套有效配置）：
 # presets 与 crates/launcher/build.rs 只传显式差异项（构建类型），未指定时
 # 用 Debug 与构建目录内 install，避免两处默认值漂移。
@@ -67,6 +71,18 @@ add_subdirectory(bridge)
 add_subdirectory(app)
 # qml/ 位于仓库根（repository-layout）；二进制目录固定在 native 构建树内。
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../qml qml)
+
+if(PANTA_ENABLE_FFI_TEST)
+  if(NOT BUILD_TESTING)
+    message(FATAL_ERROR "PANTA_ENABLE_FFI_TEST requires BUILD_TESTING=ON")
+  endif()
+  if(NOT PANTA_FFI_INCLUDE_DIR OR NOT PANTA_FFI_STATIC_LIB)
+    message(FATAL_ERROR
+      "PANTA_ENABLE_FFI_TEST requires PANTA_FFI_INCLUDE_DIR and PANTA_FFI_STATIC_LIB"
+    )
+  endif()
+  add_subdirectory(ffi)
+endif()
 
 set(PANTA_NATIVE_INSTALL_CONFIG_DIR lib/cmake/panta-native)
 

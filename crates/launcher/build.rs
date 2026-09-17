@@ -13,8 +13,10 @@
 //! 构建脚本产物只写 OUT_DIR；失败时继承子进程输出并原样退出，不掩盖
 //! 编译器/CMake 诊断。
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::time::SystemTime;
 
 /// 需要 CMake 增量感知的仓库路径（相对本 package 根；目录不递归）。
 const RERUN_PATHS: &[&str] = &[
@@ -30,6 +32,9 @@ const RERUN_PATHS: &[&str] = &[
     "../../native/foundation/src",
     "../../native/foundation/tests",
     "../../native/foundation/include/panta/foundation",
+    "../panta-ffi",
+    "../panta-ffi/include",
+    "../panta-ffi/src",
     "../../qml",
     "../../qml/Themes",
     "../../qml/Panels",
@@ -89,6 +94,7 @@ fn orchestrate() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("cmake"));
     let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
+    let (ffi_include, ffi_staticlib) = ffi_artifacts(&PathBuf::from(&out_dir))?;
 
     // 有效配置与 native/CMakePresets.json 一致：差异项只有构建类型，
     // 其余默认值（安装前缀、compile_commands 导出）由 native/CMakeLists.txt 统一。
@@ -100,7 +106,13 @@ fn orchestrate() -> Result<PathBuf, String> {
         .arg(&binary_dir)
         .arg("-G")
         .arg(&generator)
-        .arg(format!("-DCMAKE_BUILD_TYPE={build_type}"));
+        .arg(format!("-DCMAKE_BUILD_TYPE={build_type}"))
+        .arg("-DPANTA_ENABLE_FFI_TEST=ON")
+        .arg(format!("-DPANTA_FFI_INCLUDE_DIR={}", ffi_include.display()))
+        .arg(format!(
+            "-DPANTA_FFI_STATIC_LIB={}",
+            ffi_staticlib.display()
+        ));
     run_step("configure", &mut configure)?;
 
     let mut build = Command::new(&cmake);
@@ -149,6 +161,53 @@ fn locate_product(
                 "CMake 构建成功但未找到产物（尝试：{expected}）；检查 native/app 的 OUTPUT_NAME 与生成器配置"
             )
         })
+}
+
+fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
+    let include = std::env::var_os("DEP_PANTA_FFI_INCLUDE")
+        .map(PathBuf::from)
+        .ok_or_else(|| "Cargo 未提供 DEP_PANTA_FFI_INCLUDE，panta-ffi 桥接头不可用".to_owned())?;
+    if !include.join("panta_ffi.h").is_file() {
+        return Err(format!(
+            "panta-ffi 生成头不存在：{}",
+            include.join("panta_ffi.h").display()
+        ));
+    }
+
+    // build.rs 的 OUT_DIR 位于 target/<profile>/build/<pkg-hash>/out；CXX
+    // staticlib 则位于同一 profile 的 deps。只选当前 package 名称，避免把
+    // rlib 或其它 profile 的旧产物传进 CMake。
+    let profile_dir = out_dir.ancestors().nth(3).ok_or_else(|| {
+        format!(
+            "无法从 launcher OUT_DIR 推导 profile：{}",
+            out_dir.display()
+        )
+    })?;
+    let deps_dir = profile_dir.join("deps");
+    let mut candidates = fs::read_dir(&deps_dir)
+        .map_err(|error| format!("读取 panta-ffi 产物目录 {}：{error}", deps_dir.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                return false;
+            };
+            let is_library = path
+                .extension()
+                .is_some_and(|extension| extension == "a" || extension == "lib");
+            is_library && (name.starts_with("libpanta_ffi") || name.starts_with("panta_ffi"))
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by_key(|path| {
+        fs::metadata(path)
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or(SystemTime::UNIX_EPOCH)
+    });
+    let staticlib = candidates
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("未找到 panta-ffi staticlib：{}", deps_dir.display()))?;
+    Ok((include, staticlib))
 }
 
 fn run_step(name: &str, command: &mut Command) -> Result<(), String> {

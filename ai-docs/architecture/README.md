@@ -47,7 +47,7 @@ QML 界面
 
 ## 技术基线
 
-技术选型、版本验证状态和责任任务集中维护在 [技术基线](../standards/baseline.md)，编码与库使用规则见 [规范索引](../standards/README.md)。Rust/C++ 桥接优先验证 [CXX](../standards/cxx.md)，尚未完成集成；架构文档只说明模块职责与交互，不另维护一份版本表。
+技术选型、版本验证状态和责任任务集中维护在 [技术基线](../standards/baseline.md)，编码与库使用规则见 [规范索引](../standards/README.md)。Rust/C++ 桥接由任务 006 开始验证 [CXX](../standards/cxx.md) 的最小双向路径，完整应用集成尚未完成；架构文档只说明模块职责与交互，不另维护一份版本表。
 
 ## 外部边界
 

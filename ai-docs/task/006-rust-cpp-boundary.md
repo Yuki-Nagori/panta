@@ -1,17 +1,17 @@
 # 006 — Rust/C++ FFI 最小契约
 
-- 状态：ready
+- 状态：in-progress
 - 阶段：基础平台
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成：Cargo 调度与运行入口就绪）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-17
 
 ## 目标与背景
 
 以最小调用验证跨语言所有权、错误和链接顺序，为应用服务建立边界。
 
-本任务尚未实施；拟改路径不代表文件已存在，执行前核对依赖任务的实际产物。
+已开始实施最小 CXX 双向调用；完整 Project/Storage 仍不在本任务范围。
 
 ## 必读
 
@@ -33,7 +33,7 @@
 
 ## 前置条件与待决策
 
-开始条件：所列依赖任务完成且有验证记录；动手前核实所需工具和主平台。步骤中尚未确定的版本、接口、目录或工具须先写入下方决策记录，并同步受影响规范。依赖未完成时保持 planned；外部条件无法满足时改 blocked 并写具体原因。
+004 已完成且 Cargo→CMake 入口可用。实施前冻结 CXX 版本、桥接 DTO、错误编码和静态库传递；未验证的跨平台 ABI 仍保留在验收项中。
 
 ## 实施步骤
 
@@ -45,6 +45,8 @@
 ## 预计改动
 
 最小 FFI crate、native 应用服务适配、生成/链接规则、FFI 规范。执行前根据真实结构修订；不得顺手实现非目标功能。
+
+本轮实际边界：新增 `crates/panta-ffi` 作为 `staticlib`/Rust 测试 crate；CXX 生成头由 Cargo build script 暴露给 native CMake，CMake 只消费该静态库并编译一个 GTest 边界测试。没有把 Qt、OCCT、Netgen 或 VTK 类型放入桥接。
 
 ## 清理与兼容例外
 
@@ -66,7 +68,9 @@
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| — | 尚未执行 | 无实现证据 |
+| 2026-09-17 | CXX 双向最小路径：Rust `process` 调 C++ `cpp_prefix`；native GTest 调 Rust `process` | 待实现后验证 DTO、非 ASCII、空输入和错误转换 |
+| 2026-09-17 | `cargo fmt --all -- --check`；`cargo metadata --locked --no-deps`；`git diff --check` | 通过；workspace 成员、CXX 1.0.202 依赖和锁文件结构可解析。 |
+| 2026-09-17 | `CARGO_TARGET_DIR=/private/tmp/panta-ffi-dedicated cargo test -p panta-ffi --locked` | 未取得编译结果：本机新编译 Rust build script/可执行文件停留在 macOS `_dyld_start`，与项目源码无关；已终止本轮孤儿进程。需在 CI 或可正常启动新 Rust 二进制的环境补跑。 |
 
 ## 风险与回退
 
@@ -75,8 +79,10 @@ CXX 生成器版本不一致、glue 重复编译或双向符号未链接会破�
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施；根据用户提出的 CXX 方案及官方文档，将 CXX 列为首选验证路线。
+- 2026-09-17：开始实施；冻结 `cxx`/`cxx-build` 使用同一 `1.0.x` release，`FfiRequest`/`FfiResponse` 只含受支持的 UTF-8 字符串和整数；Rust 错误通过 CXX `Result` 转为 C++ 异常，调用方必须捕获，空输入和超大 repeat 明确拒绝。
+- 2026-09-17：CMake 最终链接通过 launcher build dependency 传递 `panta-ffi` 静态库与生成头；CMake 不回调 Cargo，桥接 glue 只由 Rust build script 编译一次。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要
 
-未完成。完成时填写实现行为、验证证据、剩余限制和后续 task；全部验收有证据后才标 done。
+未完成。最小双向路径实现后仍需三平台干净/增量构建、ABI 和错误失败证据，全部验收完成后再标 done。
