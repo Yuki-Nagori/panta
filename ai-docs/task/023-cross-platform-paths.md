@@ -65,6 +65,7 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 | 2026-09-17 | `cargo test -p panta-ffi --locked`（macOS arm64） | 9 项通过（8 项既有 + 路径服务 1 项）：`PathRef` 往返、未知 scheme、中文/空格路径解析、`../`/`C:`/`COM1` 错误码前缀、qrc → `path.qrc_not_native` |
 | 2026-09-17 | `ctest --preset debug`（macOS arm64） | 24/24 全绿，含 7 项 `PathHostTest`：QStandardPaths 测试模式注入（cache 落 `.qttest` 隔离目录）、切换 cwd 结果不变、工程根搬迁后引用跟随新根、写目标解析→落盘→读解析 canonical 一致、拒绝矩阵（`../`、`C:/`、`CON`、尾随点、未知 scheme、缺 scheme、qrc、未注入根 `path.root_missing`）、file URL 单次解码（`%20` 不二次解码、qrc 拒绝）、未配对代理项 `path.non_unicode`、Unix 符号链接越界 |
 | 2026-09-17 | `cargo build/test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`git diff --check` | 通过 |
+| 2026-09-17 | 三平台 CI（push 81e98e3，run [35237992065](https://github.com/Yuki-Nagori/panta/actions/runs/35237992065)；含 7919c7f 的 023 代码，前序 run 35237494179 因并发被该 push 取消） | 三平台 success：cargo build/test 在 Windows（`C:/win` 走 Prefix 分支拒绝）与 Linux/macOS 跑通全部路径单测；PathHost C++ 测试不在 CI（CTest 聚合归 011），Windows junction 证据仍待补 |
 
 ## 风险与回退
 
