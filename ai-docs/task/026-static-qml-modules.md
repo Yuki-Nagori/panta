@@ -1,11 +1,11 @@
 # 026 — C++ 静态库边界与 QML 自动注册
 
-- 状态：ready
+- 状态：in-progress
 - 阶段：应用平台扩展
 - 依赖：[005](005-qt-qml-shell.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-17
 
 ## 目标与背景
 
@@ -32,6 +32,8 @@
 
 005 已完成。实施核对 Qt 锁定版本与现存 NO_PLUGIN 布局；分别验证 backing target、静态 plugin/import scan 方案，失败时记录证据，不以关闭 lint 掩盖问题。
 
+本轮采用 `panta_bridge` 静态库作为 `Panta.Bridge` QML 模块 backing target，由 `qt_add_qml_module` 生成 typeinfo 和静态 plugin；`Panta.Shell` 通过模块依赖声明消费它，应用目标由 Qt 的 plugin import 入口保留注册代码。
+
 ## 实施步骤
 
 1. 梳理现存模块依赖与 URI，验证最小自动注册/静态链接组合。
@@ -48,7 +50,7 @@
 
 ## 验收标准
 
-- [ ] ShellViewModel 自动注册可用，生成类型信息使 qmllint 可识别，现有信号行为保持。
+- [x] ShellViewModel 自动注册可用，生成类型信息使 qmllint 可识别，现有信号行为保持。
 - [ ] 静态链接及优化构建保留注册与资源，macOS/Linux/Windows 构建和运行证据明确。
 - [ ] 开关关闭可选模块时主界面无悬空 import；启用时类型可用，依赖图无环。
 - [ ] 脱离源码 cwd 可启动；旧手动注册与重复路径已删除，不同时保留两套注册实现。
@@ -61,6 +63,7 @@ Cargo 构建、CTest、all_qmllint，可选开关开/关与 Release 构建；真
 | 日期 | 场景 | 实际结果 |
 |---|---|---|
 | 2026-09-16 | 本次仅完成规划 | 实现与功能验证未执行 |
+| 2026-09-17 | `cmake --preset debug`；`cmake --build build/debug`；`cmake --build build/debug --target all_qmllint`；`ctest --test-dir build/debug --output-on-failure`；Qt offscreen 启动 | 静态 QML 模块迁移后配置、构建、lint、测试和运行时加载通过 | 生成 `Panta.Bridge` typeinfo/qmldir/static plugin；qmllint 无告警；6/6 native tests 通过；offscreen 运行 2 秒后由测试终止且无 QML 加载错误 |
 
 ## 风险与回退
 
@@ -69,6 +72,7 @@ Cargo 构建、CTest、all_qmllint，可选开关开/关与 Release 构建；真
 ## 决策与工作记录
 
 - 2026-09-16：由任务 021 编排；长期设计见模块说明，不将文档完成等同功能完成。
+- 2026-09-17：开始实施；优先验证 `panta_bridge` backing target + `Panta.Bridge` 静态 plugin + `Panta.Shell` TARGET 依赖，移除 main.cpp 手动注册。
 
 ## 完成摘要
 

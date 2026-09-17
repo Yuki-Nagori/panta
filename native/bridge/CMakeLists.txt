@@ -1,17 +1,19 @@
-# C++ ViewModel 静态库。
-# 注册方式偏离 qt.md 的"模块化优先"：Panta.Shell 为 NO_PLUGIN 纯资源模块，
-# 跨静态 QML 模块插件的链接依赖 qmlimportscanner 扫描 exe 自身 QML，与
-# "App.qml 独立于 exe 目录（repository-layout 的根 qml/）"冲突，故在
-# native/app/main.cpp 中用 qmlRegisterType 显式注册（任务 005 决策记录）。
+# C++ ViewModel 静态库，同时作为 Panta.Bridge QML 模块的 backing target。
+# qt_add_qml_module 生成 typeinfo 和静态 plugin，应用通过 Panta.Shell 的
+# TARGET 依赖导入 plugin；不在 main.cpp 里维护第二套手动注册入口。
 add_library(panta_bridge STATIC)
 add_library(panta::bridge ALIAS panta_bridge)
 
-target_sources(panta_bridge PRIVATE
+qt_add_qml_module(panta_bridge
+  URI Panta.Bridge
+  VERSION 1.0
+  OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Panta/Bridge"
+  SOURCES
   src/shell_view_model.hpp
   src/shell_view_model.cpp
 )
 panta_native_defaults(panta_bridge)
-# main.cpp 的显式注册与测试按 <shell_view_model.hpp> 引用头文件。
+# 测试和 C++ 消费者按 <shell_view_model.hpp> 引用头文件。
 target_include_directories(panta_bridge PUBLIC src)
 target_link_libraries(panta_bridge PUBLIC Qt6::Core)
 

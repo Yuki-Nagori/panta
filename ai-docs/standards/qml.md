@@ -1,6 +1,6 @@
 # QML 组件与声明式界面
 
-查阅日期：2026-09-16。状态：Qt 6.11.2 预编译链路已由任务 005 落地验证（qmllint 经 `all_qmllint` 目标接入；手动注册类型对 qmllint 不可见为已知限制）。
+查阅日期：2026-09-17。状态：Qt 6.11.2 预编译链路已由任务 005 落地验证；任务 026 已将 Bridge 迁移为带 typeinfo 的静态 QML 模块，qmllint 可识别其类型。
 
 适用于 `qml/`；Qt 对象模型参见 [Qt](qt.md)，视口参见 [VTK](vtk.md)，高 DPI 与多显示屏参见[显示缩放模块](../modules/display-scaling-and-multi-monitor.md)。
 

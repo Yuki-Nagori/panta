@@ -4,7 +4,7 @@
 
 ## 当前实现与目标边界
 
-当前 `native/bridge` 是普通静态库，`native/app/main.cpp` 手动注册 `Panta.Bridge`，`qml/` 提供 `Panta.Shell` 的 NO_PLUGIN 资源模块。005 记录了静态插件扫描/链接与 lint 可见性问题，026 负责验证并替换这条路径。
+当前 `native/bridge` 是 `Panta.Bridge` QML 模块的静态 backing target，`qt_add_qml_module` 生成 typeinfo 和静态 plugin，`qml/` 提供 `Panta.Shell` 的 NO_PLUGIN 资源模块。应用显式链接并导入 Bridge plugin，运行时和 qmllint 共用模块注册结果；026 已移除 main.cpp 的手动注册路径。
 
 借鉴用户提出的 Quickshell 思路，分三层推进：静态库管编译边界，Qt 类型注册管 QML 可见性，Reloadable 契约管运行期状态延续。不是所有底层静态库都需要对应 QML URI；只有公开 UI API 的 bridge 模块需要注册，领域与适配器继续隐藏在服务后。
 
@@ -14,7 +14,7 @@ Quickshell 的具体引擎替换顺序、对象匹配和窗口移交仍需在 02
 
 ## 编译期模块
 
-026 先将现有 Bridge 转为可被 lint 和运行时识别的正式模块，保持现有 URI，使用 `QML_ELEMENT` 等声明；只有确实是单例且所有权清晰的类型才使用 `QML_SINGLETON`。增加一个有实际验收用途的可选示例模块，验证构建开关关闭后主界面不再静态引用它；验收后不留下无用途示例代码。
+026 将现有 Bridge 转为可被 lint 和运行时识别的正式模块，保持现有 URI，使用 `QML_ELEMENT` 等声明；只有确实是单例且所有权清晰的类型才使用 `QML_SINGLETON`。可选模块开关与示例模块仍待后续有实际用途时验证，不在当前静态注册迁移中预建。
 
 构建依赖采用单向图：Shell → UI bridge → 应用服务；C++ 业务库不反向引用 Shell。CMake 拥有 native 构建图，Cargo 仍是统一入口。026 完成时删除被替代的手动注册、过期注释和重复构建配置；无需保留双注册兼容路径。
 

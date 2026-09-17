@@ -72,11 +72,12 @@ native/app 的非 Qt 骨架实现（打印版本退出）被 Qt 实现替换；`
 | 2026-09-16 | `cargo test --locked`；`ctest --test-dir <OUT_DIR>/native-build` | launcher 4 passed；native ctest 5 passed（foundation 1 + ShellViewModel 4，含重复写入零通知断言） |
 | 2026-09-16 | SIGTERM 转发：`kill -TERM <launcher 子进程>` | launcher 退出码 143（128+15），与 004 定义一致；首次测试因 pgrep 误选旧 detached 进程得出不可信结果，改 `pgrep -P` 后重测（过程记录于工作记录） |
 | 2026-09-16 | 非源码 cwd 资源加载：`/tmp` 下启动安装树/构建树产物 | QML 全部经 qrc 资源系统（qrc:/qt/qml/Panta/Shell/...）加载，无 cwd 依赖 |
-| 2026-09-16 | qmllint：`cmake --build <树> --target all_qmllint` | exit 0；唯一告警类别为手动注册类型（ShellViewModel）对 qmllint 不可见——NO_PLUGIN+手动注册方案的已知限制（决策记录） |
+| 2026-09-16 | qmllint：`cmake --build <树> --target all_qmllint` | exit 0；当时唯一告警类别为手动注册类型（ShellViewModel）对 qmllint 不可见，已由 026 的正式 Bridge QML 模块迁移消除 |
+| 2026-09-17 | 026 静态 QML 模块迁移后的 `cmake --preset debug`、`cmake --build build/debug`、`all_qmllint`、CTest 与 offscreen 启动 | 自动注册、typeinfo、静态 plugin 链接和运行时加载通过；6/6 native tests 通过 |
 | 2026-09-16 | 增量重建：修改 qml/App.qml（加窗口背景色）后 `cargo build` | build.rs 重跑 → qmlcachegen 重跑 → 重链，1.6s 完成；QML/资源重建追踪实测生效 |
 | 2026-09-16 | `cargo fmt --all -- --check`、`cargo clippy --locked --all-targets` | 均通过 |
 
-未覆盖：Linux/Windows 运行时（预编译资产与供给逻辑三端就绪，运行验证待 012 runner；Linux 需 glibc ≥2.34，Windows 需 MSVC2022）；窗口 resize 拖拽未自动化实测；qmllint 对手动注册类型的可见性（随类型增多需重评模块化注册）。
+未覆盖：Linux/Windows 运行时（预编译资产与供给逻辑三端就绪，运行验证待 012 runner；Linux 需 glibc ≥2.34，Windows 需 MSVC2022）；窗口 resize 拖拽未自动化实测。
 
 ## 风险与回退
 
@@ -91,9 +92,10 @@ native/app 的非 Qt 骨架实现（打印版本退出）被 Qt 实现替换；`
 - 2026-09-16（决策）失败路径：QML objectCreationFailed 或根对象为空 → 打印引擎错误并以 69（EX_UNAVAILABLE）退出；`--version` 保留（不进事件循环）；未知参数 64，`--` 后参数透传给 QGuiApplication。
 - 2026-09-16（决策）lint 接入：`all_qmllint` CMake 目标（qml.md 的 qmllint 要求落地）；qmlformat 未纳入门禁（011 决定格式门禁范围）。
 - 2026-09-16（实施）实施坑位记录：Theme 单例的 `set_source_files_properties(QT_QML_SINGLETON_TYPE)` 必须先于 qt_add_qml_module，否则 qmldir 缺 singleton 标记且运行时属性全 undefined；`qt_import_qml_plugins_to_target` 实名 `qt_import_qml_plugins`；Windows 归档下载首测因 curl 未加 `-f` 把 404 页面存成归档（哈希相同暴露），重下修正。
+- 2026-09-17（转交 026）：`ShellViewModel` 改由 `Panta.Bridge` 静态 QML plugin 自动注册；App 显式链接 plugin 并使用 `Q_IMPORT_QML_PLUGIN` 保证静态链接器保留注册代码。
 - 2026-09-16（范围外修正）.vscode/README 徽章等此前的维护者反馈项不属本任务，保持原样。
 - 待记录：007 需确认预编译 Qt 的图形后端（Metal）与 VTK 的兼容；模块化注册恢复条件。
 
 ## 完成摘要
 
-已交付：Qt 6.11.2 预编译供给链（三平台固定清单 + SHA256 强校验 + `cmake -E tar` 解包，缓存于构建树）；Qt Quick 主窗口（深色主题、命令按钮、修订计数、占位面板、错误展示入口）经 `cargo run` 一键启动；ShellViewModel（caption 去重通知 / tick 命令 / error 属性）以 GTest+QSignalSpy 全量断言；qmllint 经 `all_qmllint` 接入；QML 修改触发增量重建实测。验证包括真实 GUI 交互（维护者人工 9 次点击 + AX 程序化点击 + SIGTERM 143 转发）。剩余限制：Linux/Windows 运行验证待 012；resize 拖拽未自动化实测；手动注册类型对 qmllint 不可见。后续：007（VTK 视口）已 ready，主线推进；006（FFI）可并行。
+已交付：Qt 6.11.2 预编译供给链（三平台固定清单 + SHA256 强校验 + `cmake -E tar` 解包，缓存于构建树）；Qt Quick 主窗口（深色主题、命令按钮、修订计数、占位面板、错误展示入口）经 `cargo run` 一键启动；ShellViewModel（caption 去重通知 / tick 命令 / error 属性）以 GTest+QSignalSpy 全量断言；qmllint 经 `all_qmllint` 接入；QML 修改触发增量重建实测。验证包括真实 GUI 交互（维护者人工 9 次点击 + AX 程序化点击 + SIGTERM 143 转发）。剩余限制：Linux/Windows 运行验证待 012；resize 拖拽未自动化实测。026 已消除手动注册类型对 qmllint 不可见的限制。后续：007（VTK 视口）已 ready，主线推进；006（FFI）可并行。

@@ -43,6 +43,7 @@ find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test
 qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
+qt_policy(SET QTP0005 NEW)
 
 if(BUILD_TESTING)
   # GoogleTest 固定点见 ai-docs/standards/dependency-acquisition.md：

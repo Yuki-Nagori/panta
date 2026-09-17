@@ -12,6 +12,7 @@ qt_add_qml_module(panta_shell
   VERSION 1.0
   RESOURCE_PREFIX /qt/qml
   NO_PLUGIN
+  DEPENDENCIES TARGET panta_bridge
   QML_FILES
     App.qml
     Themes/Theme.qml

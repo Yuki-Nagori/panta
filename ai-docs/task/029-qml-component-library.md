@@ -61,7 +61,7 @@
 | 日期 | 场景 | 实际结果 |
 |---|---|---|
 | 2026-09-16 | `cmake --preset debug` → `cmake --build build/debug` | 预编译 Qt 已缓存后配置与构建成功；生成三个原子组件并完成 QML cache 编译 |
-| 2026-09-16 | `cmake --build build/debug --target all_qmllint` | 命令成功；仅有既存 `Panta.Bridge` 手动注册类型不可见警告，无新增组件错误 |
+| 2026-09-16 | `cmake --build build/debug --target all_qmllint` | 命令成功；当时仅有既存 `Panta.Bridge` 手动注册类型不可见警告，无新增组件错误；该限制已由 026 在 2026-09-17 消除 |
 | 2026-09-16 | Qt 6.11.2 `qmlformat` 输出与 `qml/` 文件逐个 diff | 新增及迁移的 QML 文件格式一致 |
 | 2026-09-16 | `ctest --test-dir build/debug --output-on-failure` | 6/6 native tests 通过，含 `Qml.ThemeComponentParameters` |
 | 2026-09-16 | `cargo build --locked`、`cargo test --locked` | Rust 构建成功；4/4 launcher tests 通过 |

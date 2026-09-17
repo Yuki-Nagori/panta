@@ -9,11 +9,11 @@
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-#include <QtQml/qqml.h>
+#include <QtQml/qqmlextensionplugin.h>
 #include <cstdio>
 #include <string_view>
 
-#include <shell_view_model.hpp>
+Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 
 namespace {
 
@@ -49,10 +49,6 @@ int main(int argc, char* argv[]) {
 
     const QGuiApplication app(argc, argv);
     // 图形后端（Metal/OpenGL 等）不在此锁定；视口集成时由任务 007 统一决策。
-
-    // ViewModel 显式注册（任务 005 决策：与 NO_PLUGIN 资源模块配合，
-    // 偏离 qt.md 模块化优先的原因见 bridge/CMakeLists.txt 注释）。
-    qmlRegisterType<panta::bridge::ShellViewModel>("Panta.Bridge", 1, 0, "ShellViewModel");
 
     QQmlApplicationEngine engine;
     QObject::connect(
