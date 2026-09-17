@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QStandardPaths>
+#include <QTemporaryFile>
 
 #include <functional>
 
@@ -9,29 +10,57 @@ namespace panta::bridge {
 
 std::unique_ptr<PathHost> PathHost::create(QString* error)
 {
-    std::unique_ptr<PathHost> host(new PathHost());
-    struct StandardRoot {
+    struct Location {
         QStandardPaths::StandardLocation location;
         panta::ffi::PathRootKind kind;
         const char* label;
     };
-    const StandardRoot roots[] = {
+    const Location locations[] = {
         {QStandardPaths::AppConfigLocation, panta::ffi::PathRootKind::UserConfig, "user-config"},
         {QStandardPaths::AppDataLocation, panta::ffi::PathRootKind::AppData, "app-data"},
         {QStandardPaths::CacheLocation, panta::ffi::PathRootKind::Cache, "cache"},
         {QStandardPaths::TempLocation, panta::ffi::PathRootKind::Session, "session"},
     };
+    std::vector<StandardRoot> roots;
+    roots.reserve(std::size(locations));
+    for (const auto& entry : locations) {
+        roots.push_back(StandardRoot{
+            entry.kind, QStandardPaths::writableLocation(entry.location),
+            QLatin1String(entry.label)});
+    }
+    return createWithStandardRoots(roots, error);
+}
+
+std::unique_ptr<PathHost> PathHost::createWithStandardRoots(
+    const std::vector<StandardRoot>& roots, QString* error)
+{
+    std::unique_ptr<PathHost> host(new PathHost());
     for (const auto& root : roots) {
-        const QString directory = QStandardPaths::writableLocation(root.location);
-        if (directory.isEmpty() || !QDir::isAbsolutePath(directory)) {
+        if (root.directory.isEmpty() || !QDir::isAbsolutePath(root.directory)) {
             if (error != nullptr) {
-                *error = QStringLiteral("path.standard_dir_unavailable: %1").arg(QLatin1String(root.label));
+                *error = QStringLiteral("path.standard_dir_unavailable: %1").arg(root.label);
             }
             return nullptr;
         }
+        // 标准目录由宿主在注入时确保可用：缺失即创建（首次启动建立布局），
+        // 写探针验证真实可写；探针临时文件析构即清理，不残留。
+        if (!QDir(root.directory).exists() && !QDir().mkpath(root.directory)) {
+            if (error != nullptr) {
+                *error = QStringLiteral("path.standard_dir_unavailable: %1").arg(root.label);
+            }
+            return nullptr;
+        }
+        QTemporaryFile probe(root.directory + QStringLiteral("/.panta-write-probe-XXXXXX"));
+        if (!probe.open()) {
+            if (error != nullptr) {
+                *error = QStringLiteral("path.standard_dir_unwritable: %1").arg(root.label);
+            }
+            return nullptr;
+        }
+
         std::string utf8;
         QString conversionError;
-        if (!toBoundaryUtf8(directory, &utf8, &conversionError)) {
+        if (!toBoundaryUtf8(root.directory, &utf8, &conversionError)) {
             if (error != nullptr) {
                 *error = conversionError;
             }

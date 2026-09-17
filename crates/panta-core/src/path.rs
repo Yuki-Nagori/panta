@@ -488,6 +488,24 @@ mod tests {
     }
 
     #[test]
+    fn resolve_preserves_component_case_without_folding() {
+        let fixture = FixtureRoot::new("case");
+        let service = fixture.service();
+        let upper = service
+            .resolve(&reference("Assets/GearBox.PA"))
+            .unwrap_or_else(|error| panic!("大写引用被拒绝: {error}"));
+        let lower = service
+            .resolve(&reference("assets/gearbox.pa"))
+            .unwrap_or_else(|error| panic!("小写引用被拒绝: {error}"));
+        // 服务层不做任何大小写折叠：两种写法保持各自的字节形态。磁盘的
+        // 大小写敏感性由平台文件系统决定（macOS/Windows 默认不敏感），
+        // 引用语义层的区分交给调用方。
+        assert_ne!(upper, lower);
+        assert!(upper.ends_with("Assets/GearBox.PA"));
+        assert!(lower.ends_with("assets/gearbox.pa"));
+    }
+
+    #[test]
     fn resolve_existing_requires_present_contained_target() {
         let fixture = FixtureRoot::new("existing");
         let assets = fixture.root.join("assets");

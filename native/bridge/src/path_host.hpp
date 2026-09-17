@@ -16,16 +16,31 @@
 #include <QString>
 #include <QUrl>
 #include <memory>
+#include <vector>
 
 namespace panta::bridge {
+
+/// 待注入的标准目录描述；label 为诊断用 scheme 名。
+struct StandardRoot {
+    panta::ffi::PathRootKind kind;
+    QString directory;
+    QString label;
+};
 
 class PathHost {
 public:
     /// 创建并注入标准目录（user-config→AppConfigLocation、
     /// app-data→AppDataLocation、cache→CacheLocation、
-    /// session→TempLocation）。目录为空即失败：不静默回退 cwd。
-    /// 测试经 QStandardPaths::setTestModeEnabled 定位到隔离目录。
+    /// session→TempLocation）。注入时确保目录存在（缺失即创建，首次
+    /// 启动建立布局）并以写探针验证可写；目录为空/不可创建/不可写立即
+    /// 失败：不静默回退 cwd。测试经 QStandardPaths::setTestModeEnabled
+    /// 定位到隔离目录，或直接用 createWithStandardRoots 注入夹具目录。
     [[nodiscard]] static std::unique_ptr<PathHost> create(QString* error);
+
+    /// 以显式根列表创建（create 的可测入口）；每个根按 create 同一语义
+    /// 校验：绝对路径、缺失创建、写探针、UTF-8 往返。
+    [[nodiscard]] static std::unique_ptr<PathHost> createWithStandardRoots(
+        const std::vector<StandardRoot>& roots, QString* error);
 
     /// 注入显式工程根（打开工程时调用）；必须为绝对路径。
     [[nodiscard]] bool setProjectRoot(const QString& root, QString* error);

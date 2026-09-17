@@ -49,9 +49,9 @@
 ## 验收标准
 
 - [x] 切换 cwd 与搬迁工程根后，相对资产仍正确解析；内置 qrc 资源只读且不当作本机路径。
-- [ ] 覆盖空格、中文、file URL 编码、Windows 盘符/UNC、大小写与非 Unicode 策略，三平台记录实际结果。（空格/中文/file URL/非 Unicode 已在 macOS 实测；盘符拒绝为跨平台规则本地已测，UNC 与三平台 CI 记录待补；大小写策略=不做任何大小写折叠，显式断言待补）
+- [ ] 覆盖空格、中文、file URL 编码、Windows 盘符/UNC、大小写与非 Unicode 策略，三平台记录实际结果。（空格/中文/file URL/非 Unicode/大小写不折叠已实测——大小写断言随 CI 三平台执行；盘符拒绝为跨平台规则本地已测，UNC 与 C++ 侧三平台记录待补）
 - [ ] 拒绝绝对路径冒充相对引用、`..` 越界及符号链接/junction 越界，覆盖尚不存在的写入目标。（绝对路径/`..`/未创建写目标/Unix 符号链接已测；Windows junction 待 Windows 平台证据）
-- [ ] 标准目录为空、不可写、资产缺失返回明确错误，不静默退到 cwd；FFI 往返无有损编码。（资产缺失/未注入根/非 Unicode 往返已测；标准目录为空与不可写目录的显式夹具待补）
+- [x] 标准目录为空、不可写、资产缺失返回明确错误，不静默退到 cwd；FFI 往返无有损编码。（空/相对路径注入、不可写目录（Unix 只读 + 写探针）、缺失目录自动创建且无探针残留、资产缺失 `path.not_found`、非 Unicode 往返均有夹具；注入语义：标准目录缺失即创建、写探针验证真实可写）
 - [x] 代码、测试、配置和文档一致，删除废弃实现；记录真实验证并同步索引。（无被替代的旧路径实现，记录为无废弃项）
 
 ## 验证计划与结果
@@ -66,6 +66,7 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 | 2026-09-17 | `ctest --preset debug`（macOS arm64） | 24/24 全绿，含 7 项 `PathHostTest`：QStandardPaths 测试模式注入（cache 落 `.qttest` 隔离目录）、切换 cwd 结果不变、工程根搬迁后引用跟随新根、写目标解析→落盘→读解析 canonical 一致、拒绝矩阵（`../`、`C:/`、`CON`、尾随点、未知 scheme、缺 scheme、qrc、未注入根 `path.root_missing`）、file URL 单次解码（`%20` 不二次解码、qrc 拒绝）、未配对代理项 `path.non_unicode`、Unix 符号链接越界 |
 | 2026-09-17 | `cargo build/test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`git diff --check` | 通过 |
 | 2026-09-17 | 三平台 CI（push 81e98e3，run [35237992065](https://github.com/Yuki-Nagori/panta/actions/runs/35237992065)；含 7919c7f 的 023 代码，前序 run 35237494179 因并发被该 push 取消） | 三平台 success：cargo build/test 在 Windows（`C:/win` 走 Prefix 分支拒绝）与 Linux/macOS 跑通全部路径单测；PathHost C++ 测试不在 CI（CTest 聚合归 011），Windows junction 证据仍待补 |
+| 2026-09-17 | 标准目录注入语义收尾（macOS arm64）：`createWithStandardRoots` 夹具——缺失多级目录自动创建且写探针无残留、空/相对路径条目 `path.standard_dir_unavailable`、Unix 只读目录写探针 `path.standard_dir_unwritable`；Rust 大小写断言（`Assets/GearBox.PA` ≠ `assets/gearbox.pa`，服务层不折叠） | `cargo test -p panta-core` 18 项通过；`ctest --preset debug` 27/27（新增 3 项注入夹具）；cargo build/fmt/clippy、`git diff --check` 通过 |
 
 ## 风险与回退
 
@@ -79,4 +80,4 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 
 ## 完成摘要
 
-未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（QStandardPaths 注入映射——同时作为 013 的安装布局接口、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 17+9、C++ 7 项，ctest 24/24）。待补：三平台 CI 记录（Rust 测试随 CI 跑，C++ PathHost 测试待 011 把 CTest 纳入 CI）、Windows junction 实测、标准目录为空/不可写的显式夹具、大小写策略显式断言。
+未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵/大小写不折叠，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（QStandardPaths 注入映射——同时作为 013 的安装布局接口、注入时缺失目录自动创建 + 写探针验证可写、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 18+9、C++ 10 项，ctest 27/27），Rust 侧随 CI 三平台通过。待补：Windows junction 实测、UNC/C++ 侧三平台记录（PathHost 测试进 CI 归 011）。

@@ -184,6 +184,73 @@ TEST(PathHostTest, NonRoundTrippableTextIsRejected)
     EXPECT_EQ(error, QStringLiteral("path.non_unicode"));
 }
 
+TEST(PathHostTest, StandardRootInjectionCreatesMissingDirectories)
+{
+    QTemporaryDir scratch;
+    ASSERT_TRUE(scratch.isValid());
+    const QString nested = scratch.path() + QStringLiteral("/laid/out/cache");
+    QString error;
+    auto host = panta::bridge::PathHost::createWithStandardRoots(
+        {panta::bridge::StandardRoot{
+            panta::ffi::PathRootKind::Cache, QDir(nested).absolutePath(), QStringLiteral("cache")}},
+        &error);
+    ASSERT_NE(host, nullptr) << error.toStdString();
+    EXPECT_TRUE(QDir(nested).exists());
+    // 写探针由临时文件承担,注入完成后不残留。
+    const auto entries = QDir(nested).entryList(QDir::Files | QDir::NoDotAndDotDot);
+    EXPECT_TRUE(entries.isEmpty()) << entries.join(QStringLiteral(",")).toStdString();
+}
+
+TEST(PathHostTest, StandardRootInjectionRejectsEmptyAndRelativeEntries)
+{
+    QString error;
+    auto host = panta::bridge::PathHost::createWithStandardRoots(
+        {panta::bridge::StandardRoot{
+            panta::ffi::PathRootKind::Cache, QString(), QStringLiteral("cache")}},
+        &error);
+    EXPECT_EQ(host, nullptr);
+    EXPECT_TRUE(error.startsWith(QStringLiteral("path.standard_dir_unavailable")))
+        << error.toStdString();
+
+    error.clear();
+    host = panta::bridge::PathHost::createWithStandardRoots(
+        {panta::bridge::StandardRoot{
+            panta::ffi::PathRootKind::AppData, QStringLiteral("relative/dir"),
+            QStringLiteral("app-data")}},
+        &error);
+    EXPECT_EQ(host, nullptr);
+    EXPECT_TRUE(error.startsWith(QStringLiteral("path.standard_dir_unavailable")))
+        << error.toStdString();
+}
+
+#ifdef Q_OS_UNIX
+TEST(PathHostTest, StandardRootInjectionRejectsUnwritableDirectory)
+{
+    QTemporaryDir scratch;
+    ASSERT_TRUE(scratch.isValid());
+    const QString locked = scratch.path() + QStringLiteral("/locked");
+    ASSERT_TRUE(QDir().mkpath(locked));
+    // 只读目录(含执行位,可进入不可写):写探针必须失败并给出明确错误。
+    QFile permissions(locked);
+    ASSERT_TRUE(permissions.setPermissions(
+        QFileDevice::ReadOwner | QFileDevice::ExeOwner | QFileDevice::ReadGroup
+        | QFileDevice::ExeGroup | QFileDevice::ReadOther | QFileDevice::ExeOther));
+
+    QString error;
+    auto host = panta::bridge::PathHost::createWithStandardRoots(
+        {panta::bridge::StandardRoot{
+            panta::ffi::PathRootKind::Cache, QDir(locked).absolutePath(), QStringLiteral("cache")}},
+        &error);
+    EXPECT_EQ(host, nullptr);
+    EXPECT_TRUE(error.startsWith(QStringLiteral("path.standard_dir_unwritable")))
+        << error.toStdString();
+
+    // 恢复权限以便 QTemporaryDir 清理。
+    (void)permissions.setPermissions(
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+}
+#endif
+
 #ifdef Q_OS_UNIX
 TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected)
 {
