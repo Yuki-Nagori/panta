@@ -48,9 +48,9 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 ## 验收标准
 
 - [ ] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 context/ID、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。
-- [ ] pest grammar 提供准确 source span；kind variables/theme/language 分派明确，未知域与重复字段返回稳定诊断。
-- [ ] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/source、自动生成的内部 id、占位符和 locale 基线不丢失。
-- [ ] CLI 为单文件可执行物，任意 cwd 可运行且不访问网络/系统 Qt；输出临时 TS 后由锁定的预编译 `lrelease` 生成 QM。
+- [x] pest grammar 提供准确 source span；kind variables/theme/language 分派明确，未知域与重复字段返回稳定诊断。
+- [x] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/source、自动生成的内部 id、占位符和 locale 基线不丢失。
+- [x] CLI 为单文件可执行物，任意 cwd 可运行且不访问网络/系统 Qt；输出临时 TS 后由锁定的预编译 `lrelease` 生成 QM。
 - [ ] Cargo 测试、fmt、clippy 与关键失败夹具通过；自有可执行代码覆盖率按 032 达到 line/branch 100%。
 - [ ] 022、025、030 的文档和构建入口只依赖此共享核心，不保留第二套 parser 或 TS XML 生成实现。
 
@@ -62,6 +62,8 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 |---|---|---|---|
 | 2026-09-16 | 完成 Rust parser/CLI 架构与 `.pa` 简洁语法设计 | 明确 pest、quick-xml、serde、TS/QM 和 CMake 边界 | 设计已提交；实现与构建验证进行中 |
 | 2026-09-17 | `cargo fmt --all`；`cargo test -p panta-dsl-core`；`cargo run -p panta-dslc -- check/emit-ts ...` | parser/TS 生成、kebab-case 约束、最长 source 规则和 CLI crate 通过 | 5 个核心单元测试、2 个 fixture 集成测试通过；CLI 成功校验 fixture 并生成 `zh_CN` TS。workspace 级 launcher/Qt 验证仍待预编译 Qt 供给可用后执行 |
+| 2026-09-17 | QM 冒烟：`panta-dslc emit-ts resources/i18n/panta-cn.pa → TS`；任务 005 staging 的锁定 `lrelease 6.11.2`（macOS arm64）编译 QM | TS 被 lrelease 接受并产出 QM | 通过：TS 2.1/zh_CN/id/source/translation/%1 占位符完整；lrelease 报 4 翻译全部 finished，QM 245B。`-idbased` 在 Qt 6 已废弃（lrelease 直接拒绝），后续 CMake 接入使用默认参数 |
+| 2026-09-17 | 任意 cwd（/tmp）执行 CLI：`check` cn/en、`format --check`、负例 tab 缩进/非法 UTF-8/未知 kind/重复 header | 校验通过返回 0；失败返回 2 且带稳定 span 诊断、不写文件 | 通过：`pa.tab_indentation at 3:5`、`pa.invalid_utf8 at byte 15`、未知 kind 的 pest span `1:7`、`pa.duplicate_header at 3:1`；失败路径均未修改文件 |
 
 ## 风险与回退
 
@@ -80,4 +82,4 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 当前进展（2026-09-17）
 
-核心 parser、TS 生成入口和 formatter 消费契约已实现；实际 language 源文件已加入 resources/i18n/panta-en.pa 与 resources/i18n/panta-cn.pa。测试夹具仍只用于 parser 回归，构建入口接入和 QM 生成待本任务后续步骤。
+核心 parser、TS 生成入口和 formatter 消费契约已实现；实际 language 源文件已加入 resources/i18n/panta-en.pa 与 resources/i18n/panta-cn.pa。QM 冒烟已用任务 005 staging 的锁定 lrelease 打通（emit-ts → lrelease → QM），CLI 任意 cwd 与失败夹具验证完成。剩余：TS/QM 的 CMake 构建入口接入、三平台确定性快照、032 覆盖率门禁与 022/025/030 消费方接入。
