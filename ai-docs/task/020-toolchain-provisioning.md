@@ -1,6 +1,6 @@
 # 020 — 托管引导：CMake/Ninja 二进制供给
 
-- 状态：in-progress
+- 状态：done
 - 阶段：M0
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成）
 - 优先级：P1
@@ -61,6 +61,8 @@
 | 2026-09-17 | 损坏下载拒绝：假 curl 替身注入损坏归档（marker/解包目录/归档清空后强制重跑） | 通过：退出码 101，诊断"ninja 归档 SHA256 不符，已拒绝进入构建：预期 c990…/实际 8bd9…；归档已删除，重试将重新下载（URL）"，归档与解包目录均未残留 |
 | 2026-09-17 | 离线复用：真实归档放回（假 curl 仍在 PATH 最前，联网即失败） | 通过：归档哈希命中跳过下载，解包后全链成功；再次强制重跑（archives 目录移走），marker+二进制命中，构建成功 |
 | 2026-09-17 | `cargo fmt --all -- --check`；`cargo clippy --locked --workspace --all-targets -- -D warnings`；`git diff --check` | 通过，Clippy 0 warning |
+| 2026-09-17 | GitHub Actions run `35222847994` | Windows 分支回归 | 失败：`set_executable` 参数在非 unix 构建未使用（`-D unused-variables`）；本机 macOS clippy 覆盖不到该 cfg 分支 |
+| 2026-09-17 | 修复后 GitHub Actions run `35223745676`（`9063cae`，三平台） | 供给模块在三平台编译、PATH 定位路径无回归 | 通过：Build/Test/Format/Clippy 全绿（Windows 8m49s），runner 自带 cmake/ninja 走 PATH 路径 |
 
 ## 风险与回退
 
@@ -75,4 +77,4 @@
 
 ## 完成摘要
 
-托管工具供给已落地并验证：干净 PATH 全链构建成功（CMakeCache 指向托管 cmake/ninja，产物离屏启动存活）、损坏归档 SHA256 拒绝（退出 101 + 预期/实际/URL 诊断）、归档命中与 marker 命中两档离线复用通过、单元测试 5 项与 launcher 回归 4 项通过。三平台 CI 复跑进行中，绿后标 done。
+已完成。开发者环境要求收敛为 git + rustup + 平台编译器：PATH 无 CMake/Ninja 时构建引导按固定资产（SHA256 实测回填固定清单）自动下载校验到根 `target/panta-tools/`，干净 PATH 全链构建、损坏归档拒绝、两档离线复用均在本机 E2E 验证；三平台 CI run `35223745676` 确认供给模块编译与 PATH 定位路径无回归。已知边界：下载进度走 curl 的 stderr 实时可见（stdout 诊断在成功 run 中被 cargo 隐藏）；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖；Windows 非 unix 分支的 cfg 错误由 CI 抓出并已修复（`9063cae`）。

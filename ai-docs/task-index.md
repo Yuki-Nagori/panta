@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、018、019、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证）；020 正在实现 CMake/Ninja 托管供给（本机 E2E 已过、CI 复跑中），031 已开始官方预编译资产盘点，009 因 OCCT 缺 macOS/Linux 预编译 SDK 阻塞（解除条件为 031/038 供给制品），007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039、040 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复与统一 Cargo 构建编排入口均落地并验证），031 已开始官方预编译资产盘点，009 因 OCCT 缺 macOS/Linux 预编译 SDK 阻塞（解除条件为 031/038 供给制品），007 等待 031 提供匹配的预编译 VTK SDK，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -61,7 +61,7 @@ ai-docs/
 | 014 | [后续 Python 工具环境](task/014-python-tooling-foundation.md) | MVP 后续能力 | 001 | deferred |
 | 018 | [三平台 CI 基础](task/018-cross-platform-ci.md) | 验证基础 | 001, 002 | done |
 | 019 | [GTest 测试配置与规则](task/019-gtest-native-testing.md) | 验证基础 | 003 | done |
-| 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | in-progress |
+| 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | done |
 | 031 | [预编译 native 依赖供给与 CMake package](task/031-prebuilt-native-dependencies.md) | 交付基础 | 002, 004 | in-progress |
 | 036 | [三平台 CI native 构建修复](task/036-ci-native-build-fix.md) | 验证基础 | 004, 005, 018 | done |
 | 038 | [Native SDK 制品生产与发布](task/038-native-sdk-artifact-production.md) | 交付基础 | 031, 020 | planned |
