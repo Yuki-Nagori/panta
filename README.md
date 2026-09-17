@@ -5,7 +5,7 @@
 
 规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
 
-**当前状态：Rust workspace、Cargo 调度 native 构建与 Qt Quick/C++ ViewModel 桌面骨架已落地；完整 CAE 业务尚未实现。**
+**当前状态：Rust workspace、Cargo 调度 native 构建、Qt Quick/C++ ViewModel 桌面骨架和 `.pa` parser/formatter CLI 已落地；完整 CAE 业务尚未实现。**
 
 ## 环境要求
 
@@ -24,8 +24,10 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 | 命令 | 当前行为 |
 |---|---|
 | `cargo build --locked` | 构建 Rust workspace 并经 build.rs 调度 CMake/Ninja 构建 native（Qt 预编译包等首次自动下载到 `target/`） |
-| `cargo test --locked` | 运行 launcher 单元测试（native 测试经 ctest 运行，见任务 019） |
+| `cargo test --locked` | 运行 workspace 的 parser、CLI、launcher 单元测试（native 测试经 ctest 运行，见任务 019） |
 | `cargo fmt --all -- --check` | Rust 格式检查（C++/QML 格式与 lint 见任务 003/005） |
+| `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典 |
+| `cargo run -p panta-dslc -- format --check resources/i18n/panta-cn.pa` | 检查 `.pa` 是否为规范格式；写回使用 `format <file>` |
 | `cargo run` | 启动 Qt Quick 主窗口（当前为骨架界面：主题、命令按钮、占位面板、错误展示入口） |
 
 作为完整 CAE 桌面（工程树/视口/属性区等）的体验仍是目标：[构建说明](ai-docs/architecture/build-and-development.md) 列出落地条件；托管引导（CMake/Ninja 二进制自动供给）见任务 020。
