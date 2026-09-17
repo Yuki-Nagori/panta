@@ -11,7 +11,7 @@
 
 GitHub Actions 最新 run `35195983722`（提交 `993ff89`）在三平台的 Build 阶段失败。Linux/macOS 的干净构建中，Cargo 将 `panta-ffi` staticlib 生成在 profile 根目录，但 `panta-launcher` 构建脚本只从 `target/debug/deps` 读取，因此报告未找到静态库。Windows 还暴露出 CXX build script 只传递 GCC 风格的 `-std=c++20`，MSVC 因未启用 C++17 以上标准而拒绝嵌套命名空间定义。
 
-完成后，CI 的三平台干净构建应先产生可供 native CMake 链接的 `panta-ffi` staticlib，CXX bridge 在 MSVC 上应使用 `/std:c++20`，并保持 GCC/Clang 的 `-std=c++20` 路径。
+完成后，CI 的三平台干净构建应先显式产生可供 native CMake 链接的 `panta-ffi` staticlib，CXX bridge 在 MSVC 上应使用 `/std:c++20`，并保持 GCC/Clang 的 `-std=c++20` 路径。
 
 ## 必读
 
@@ -35,13 +35,13 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 ## 实施步骤
 
 1. 在隔离 target 目录复现普通 `cargo build --locked` 的 staticlib 缺失行为，并确认 `cargo build -p panta-ffi --locked` 的产物位置。
-2. 选择不递归调用 Cargo 的最小调度修复，使 launcher 使用当前 profile、target 和生成器对应的 `panta-ffi` staticlib。
+2. 通过 workflow 在 workspace 构建前显式执行 `cargo build --locked -p panta-ffi`，不在 launcher build script 中递归调用 Cargo；launcher 继续使用当前 profile、target 和生成器对应的 staticlib。
 3. 按目标编译器选择 C++20 选项：MSVC 使用 `/std:c++20`，GCC/Clang 使用 `-std=c++20`。
 4. 运行 Rust 格式、测试、Clippy 和可用的 native/CMake 验证；更新索引与本文真实结果。
 
 ## 预计改动
 
-`crates/panta-ffi/build.rs`、`crates/launcher/build.rs` 及本文件；当前 workflow 无需改变，Cargo 已在 profile 根目录生成 staticlib，修复 launcher 的定位即可。
+`.github/workflows/ci.yml`、`crates/panta-ffi/build.rs`、`crates/launcher/build.rs` 及本文件；CI 在 workspace 构建前显式运行 `cargo build --locked -p panta-ffi`，launcher 保留 profile 根目录和 deps/的定位逻辑。
 
 ## 清理与兼容例外
 
@@ -60,6 +60,7 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-17 | GitHub Actions run `35195983722`，`gh run view --log-failed` | 固定 CI 失败根因 | Linux/macOS 缺少 `target/debug/deps` 中的 `panta-ffi` staticlib；Windows MSVC 缺少 C++20 标准开关 |
+| 2026-09-17 | GitHub Actions run `35197347393`，`gh run view --log-failed` | 验证 039 首次修复 | 三平台仍在 launcher build script 中找不到 staticlib；确认 Cargo 并发编译未保证依赖包的 staticlib 在 build script 执行前产出，需在 workflow 显式预构建 |
 | 2026-09-17 | 隔离 target `CARGO_TARGET_DIR=/private/tmp/panta-ci-target.2KJV8J`，`cargo build --locked` | 确认 Cargo staticlib 实际布局 | `target/debug/libpanta_ffi.a` 生成在 profile 根目录；原 launcher 扫描 `deps/` 无法找到它；Qt 下载因沙箱 DNS 失败，未完成 launcher configure |
 | 2026-09-17 | macOS arm64；`cargo fmt --all -- --check`、`cargo test --locked --workspace --exclude panta-launcher`、`cargo clippy --locked --workspace --all-targets --exclude panta-launcher`、`git diff --check` | Rust 侧检查通过 | 全部退出 0；DSL 11 个测试、FFI 4 个测试通过；Clippy 仅报告既有测试/构建脚本 `expect` 警告 |
 | 2026-09-17 | macOS arm64；隔离 Ninja CMake configure/build + `ctest --test-dir /private/tmp/panta-native-ci.4sY0dA --output-on-failure`，使用当前 profile staticlib 和已有 Qt/GTest staging | native 构建及 FFI 边界测试通过 | 84 个构建步骤完成，native 7/7 测试通过，`Ffi.RustCppBoundary` death test 通过 |

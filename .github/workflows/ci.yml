@@ -42,6 +42,9 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
+      - name: Build FFI static library
+        run: cargo build --locked -p panta-ffi
+
       - name: Build
         run: cargo build --locked
 
