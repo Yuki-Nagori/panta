@@ -74,6 +74,7 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 | 2026-09-17 | native GTest `Ffi.TaskServiceLifecycle`（staticlib 最终链接，macOS arm64） | 5/5：提交→有序事件、失败结构化 code/detail、取消+迟到取消拒绝、无效提交转 `rust::Error`、双 30s 任务析构快速 join |
 | 2026-09-17 | `ctest --test-dir native/build/debug`（重配指向新生成头后） | 10/10 全部通过（含原 7 项与 FFI 两目标） |
 | 2026-09-17 | `cargo fmt --all -- --check`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；`cargo test --locked --workspace --exclude panta-launcher`；`git diff --check` | 通过：Rust 25/25（6+9+2+8），Clippy 0 warning，格式与补丁检查干净 |
+| 2026-09-17 | GitHub Actions run `35210392688`（`cf82161`，三平台） | 新增任务服务层的干净/增量构建与检查 | 通过：Build/Test/Format/Clippy 全绿；panta-core 6 + panta-ffi 8 个 Rust 测试在三平台执行，native CMake 完成构建与链接（CTest 执行仍在本机覆盖，聚合归 011） |
 
 ## 风险与回退
 
