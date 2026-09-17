@@ -28,7 +28,7 @@ target_link_libraries(panta_bridge PUBLIC Qt6::Core)
 if(BUILD_TESTING)
   include(GoogleTest)
   add_executable(panta_bridge_shell_view_model_test tests/shell_view_model_test.cpp)
-  panta_native_test_defaults(panta_bridge_shell_view_model_test)
+  panta_native_defaults(panta_bridge_shell_view_model_test)
   target_link_libraries(panta_bridge_shell_view_model_test PRIVATE
     panta::bridge
     GTest::gtest

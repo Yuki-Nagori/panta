@@ -42,11 +42,12 @@ qt_add_qml_module(panta_shell
 )
 
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
+panta_native_msvc_abi(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
 
 if(BUILD_TESTING)
   add_executable(panta_qml_theme_component_test Tests/theme_component_test.cpp)
-  panta_native_test_defaults(panta_qml_theme_component_test)
+  panta_native_defaults(panta_qml_theme_component_test)
   target_link_libraries(panta_qml_theme_component_test PRIVATE
     panta_shell
     Qt6::Gui

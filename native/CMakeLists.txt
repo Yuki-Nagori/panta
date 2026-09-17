@@ -26,6 +26,15 @@ endif()
 
 # 自有 target 公共约束（cpp.md）：C++20 必需（PUBLIC 向消费者传播）、无编译器
 # 扩展、告警基线仅作用于自身。须在 add_executable/add_library 之后调用。
+function(panta_native_msvc_abi target)
+  if(MSVC)
+    # Rust staticlib 和 Qt 预编译库使用动态 CRT；所有自有 target 统一到
+    # /MD 与 iterator ABI 0，避免库/消费者在 Visual Studio Debug 配置下混链。
+    set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    target_compile_definitions(${target} PRIVATE _ITERATOR_DEBUG_LEVEL=0)
+  endif()
+endfunction()
+
 function(panta_native_defaults target)
   target_compile_features(${target} PUBLIC cxx_std_20)
   set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
@@ -33,17 +42,7 @@ function(panta_native_defaults target)
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
   )
-endfunction()
-
-# MSVC 的 Rust staticlib 使用动态 Release CRT 和 iterator ABI 0。native 测试
-# 统一采用同一组 ABI；否则多配置生成器会让 Debug 测试与 gtest/FFI 在链接期混用
-# /MDd、/MD 或不同的 _ITERATOR_DEBUG_LEVEL。
-function(panta_native_test_defaults target)
-  panta_native_defaults(${target})
-  if(MSVC)
-    set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-    target_compile_definitions(${target} PRIVATE _ITERATOR_DEBUG_LEVEL=0)
-  endif()
+  panta_native_msvc_abi(${target})
 endfunction()
 
 # include(CTest) 定义 BUILD_TESTING 选项（默认 ON）并启用测试；OFF 时不拉取

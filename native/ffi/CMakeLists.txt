@@ -1,6 +1,6 @@
 # CMake 最终链接 Rust staticlib，验证 CXX 生成头和双向调用只编译/链接一次。
 add_executable(panta_ffi_boundary_test tests/boundary_test.cpp)
-panta_native_test_defaults(panta_ffi_boundary_test)
+panta_native_defaults(panta_ffi_boundary_test)
 target_include_directories(panta_ffi_boundary_test PRIVATE
   "${PANTA_FFI_INCLUDE_DIR}"
   "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include"

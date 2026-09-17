@@ -68,7 +68,7 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 | 2026-09-17 | macOS arm64；`cargo fmt --all -- --check`、`cargo test --locked --workspace --exclude panta-launcher`、`cargo clippy --locked --workspace --all-targets --exclude panta-launcher`、`git diff --check` | Rust 侧检查通过 | 全部退出 0；DSL 11 个测试、FFI 4 个测试通过；Clippy 仅报告既有测试/构建脚本 `expect` 警告 |
 | 2026-09-17 | macOS arm64；隔离 Ninja CMake configure/build + `ctest --test-dir /private/tmp/panta-native-ci.4sY0dA --output-on-failure`，使用当前 profile staticlib 和已有 Qt/GTest staging | native 构建及 FFI 边界测试通过 | 84 个构建步骤完成，native 7/7 测试通过，`Ffi.RustCppBoundary` death test 通过 |
 | 2026-09-17 | macOS arm64；独立 FFI CMake 构建，开启 `PANTA_ENABLE_FFI_TEST`，链接当前 `panta-ffi` staticlib；`ctest -R Ffi.RustCppBoundary` | Windows 链接规则改动不破坏 Unix FFI 边界 | CMake 构建与 `Ffi.RustCppBoundary` 通过；macOS 仍使用 `Threads::Threads`/`CMAKE_DL_LIBS` 路径 |
-| 2026-09-17 | GitHub Actions run `35201746062`，Windows Build | 修复后 native 测试与 GTest 的 MSVC CRT/iterator ABI 一致 | 仍失败：Bridge/Foundation 测试使用 Debug ABI，而 FFI 修复把共享 GTest target 固定为 `/MD`、iterator 0；根因扩大为所有 native 测试需统一 ABI，已在本轮移至 native 根配置 |
+| 2026-09-17 | GitHub Actions run `35201746062`，Windows Build | 修复后 native 测试与 GTest 的 MSVC CRT/iterator ABI 一致 | 仍失败：Bridge/Foundation 测试使用 Debug ABI，而 FFI 修复把共享 GTest target 固定为 `/MD`、iterator 0；根因扩大为所有 native target 需统一 ABI，已在本轮移至 native 根配置 |
 | — | 本轮修复后 GitHub Actions 三平台 run | Build、Test、Format、Clippy 全部成功 | 待提交并复跑 |
 
 ## 风险与回退
