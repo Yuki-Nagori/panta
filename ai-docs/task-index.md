@@ -61,7 +61,7 @@ ai-docs/
 | 014 | [后续 Python 工具环境](task/014-python-tooling-foundation.md) | MVP 后续能力 | 001 | deferred |
 | 018 | [三平台 CI 基础](task/018-cross-platform-ci.md) | 验证基础 | 001, 002 | done |
 | 019 | [GTest 测试配置与规则](task/019-gtest-native-testing.md) | 验证基础 | 003 | done |
-| 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | planned |
+| 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | ready |
 | 031 | [预编译 native 依赖供给与 CMake package](task/031-prebuilt-native-dependencies.md) | 交付基础 | 002, 004 | in-progress |
 | 036 | [三平台 CI native 构建修复](task/036-ci-native-build-fix.md) | 验证基础 | 004, 005, 018 | done |
 | 038 | [Native SDK 制品生产与发布](task/038-native-sdk-artifact-production.md) | 交付基础 | 031, 020 | planned |
