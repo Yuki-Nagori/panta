@@ -18,6 +18,7 @@
 - [提交规范](../standards/commits.md)
 - [代码生命周期](../standards/code-lifecycle.md)
 - [Rust 规范](../standards/rust.md)、[C++ 规范](../standards/cpp.md)、[GTest 规范](../standards/gtest.md)、[QML 规范](../standards/qml.md)、[CMake 规范](../standards/cmake.md)
+- [质量工具链模块](../modules/quality-tooling.md)
 
 ## 范围与非目标
 

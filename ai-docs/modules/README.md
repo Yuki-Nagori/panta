@@ -14,6 +14,7 @@
 | 变量声明、表达式与快照 | [变量 DSL](variable-dsl.md) | [025](../task/025-variable-dsl.md) |
 | 静态库、QML 注册与状态重载 | [模块与热重载](qml-modules-and-reload.md) | [026](../task/026-static-qml-modules.md)、[027](../task/027-qml-state-reload.md) |
 | 高 DPI 缩放与多显示屏 | [显示缩放与多屏](display-scaling-and-multi-monitor.md) | [033](../task/033-display-scaling-and-multi-monitor.md) |
+| 跨语言格式、测试、审计与 100% 覆盖率 | [质量工具链](quality-tooling.md) | [032](../task/032-cross-language-quality-gates.md) |
 | `.pa` 解析、聚合与 TS/QM 工具链 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [034](../task/034-rust-panta-artifact-parser.md) |
 | `.pa` 格式化与校验 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [035](../task/035-pa-formatter-and-validator.md) |
 | 打包后软件内增量更新、签名、回滚 | [软件内增量更新](incremental-updates.md) | [037](../task/037-incremental-update-foundation.md) |
