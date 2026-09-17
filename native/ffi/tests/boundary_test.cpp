@@ -20,3 +20,7 @@ TEST(FfiBoundary, RustErrorBecomesCppException) {
 
     EXPECT_THROW(static_cast<void>(panta::ffi::process(request)), rust::Error);
 }
+
+TEST(FfiBoundary, RustPanicAbortsInsteadOfThrowing) {
+    EXPECT_DEATH(panta::ffi::panic_probe(), "");
+}

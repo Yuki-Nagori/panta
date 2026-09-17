@@ -29,6 +29,7 @@ pub mod bridge {
 
     extern "Rust" {
         fn process(request: &FfiRequest) -> Result<FfiResponse>;
+        fn panic_probe();
     }
 }
 
@@ -53,9 +54,15 @@ fn process(request: &FfiRequest) -> Result<FfiResponse, String> {
     })
 }
 
+/// 边界验收专用：验证 Rust panic 在 CXX 胶水中被中止而非以异常穿越到 C++，
+/// 与 `Result` 错误的可恢复路径区分；不承载业务功能。
+fn panic_probe() {
+    panic!("ffi.panic_probe");
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{FfiRequest, FfiResponse, process};
+    use super::{FfiRequest, FfiResponse, panic_probe, process};
 
     #[test]
     fn round_trip_calls_cpp_and_preserves_unicode() {
@@ -93,5 +100,11 @@ mod tests {
             .expect_err("invalid repeat must fail");
             assert!(error.starts_with("ffi.invalid_repeat:"));
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "ffi.panic_probe")]
+    fn panic_probe_panics_with_boundary_code() {
+        panic_probe();
     }
 }
