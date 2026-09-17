@@ -32,7 +32,7 @@ serde = { version = "1.0", features = ["derive"] }
 unsafe_code = "deny"
 
 [workspace.lints.clippy]
-all = { level = "warn", priority = -1 }
-# 与 rust.md 的错误处理约定对应；完整 Clippy 策略由任务 011 固定。
-unwrap_used = "warn"
-expect_used = "warn"
+all = { level = "deny", priority = -1 }
+# 测试和 build script 也必须显式处理失败；完整质量入口由任务 011 继续扩展。
+unwrap_used = "deny"
+expect_used = "deny"

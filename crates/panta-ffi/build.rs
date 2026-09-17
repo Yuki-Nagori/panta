@@ -1,8 +1,9 @@
 use std::env;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
-fn main() {
+fn main() -> Result<(), io::Error> {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/ffi_support.cc");
     println!("cargo:rerun-if-changed=include/panta/ffi.hpp");
@@ -19,25 +20,35 @@ fn main() {
         .flag_if_supported(cxx_standard_flag)
         .compile("panta_ffi_bridge");
 
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must set OUT_DIR"));
-    let generated_header = find_generated_header(&out_dir).unwrap_or_else(|| {
-        panic!(
-            "cxx-build did not generate panta FFI header in {}",
-            out_dir.display()
+    let out_dir = PathBuf::from(
+        env::var_os("OUT_DIR")
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Cargo must set OUT_DIR"))?,
+    );
+    let generated_header = find_generated_header(&out_dir).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "cxx-build did not generate panta FFI header in {}",
+                out_dir.display()
+            ),
         )
-    });
+    })?;
     let cxx_include = out_dir.join("cxxbridge").join("include");
     let public_header = cxx_include.join("panta_ffi.h");
-    fs::copy(&generated_header, &public_header).unwrap_or_else(|error| {
-        panic!(
-            "copy generated CXX header {} to {}: {error}",
-            generated_header.display(),
-            public_header.display()
+    fs::copy(&generated_header, &public_header).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "copy generated CXX header {} to {}: {error}",
+                generated_header.display(),
+                public_header.display()
+            ),
         )
-    });
+    })?;
 
     // launcher/build.rs passes this directory and the staticlib to native CMake.
     println!("cargo:include={}", cxx_include.display());
+    Ok(())
 }
 
 fn find_generated_header(root: &Path) -> Option<PathBuf> {

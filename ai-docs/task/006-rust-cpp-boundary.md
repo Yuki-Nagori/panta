@@ -71,7 +71,7 @@
 | 2026-09-17 | `cargo fmt --all -- --check`；`cargo metadata --locked --no-deps`；`git diff --check` | 通过；workspace 成员、CXX 1.0.202 依赖和锁文件结构可解析。 |
 | 2026-09-17 | `CARGO_TARGET_DIR=/private/tmp/panta-ffi-dedicated cargo test -p panta-ffi --locked` | 未取得编译结果：本机新编译 Rust build script/可执行文件停留在 macOS `_dyld_start`，与项目源码无关；已终止本轮孤儿进程。需在 CI 或可正常启动新 Rust 二进制的环境补跑。 |
 | 2026-09-17 | `cargo check -p panta-ffi --all-targets`；`cargo fmt --all -- --check` | 通过：桥接模块加 `#[allow(unsafe_code)]` 后，workspace `-D unsafe-code` 不再拦截 CXX 生成胶水（原 4 个错误清零）；格式检查通过。 |
-| 2026-09-17 | `cargo clippy -p panta-ffi --all-targets` | 通过：仅测试代码 3 处 `expect_used` 警告（workspace 设为 warn，策略归任务 011）。 |
+| 2026-09-17 | `cargo clippy -p panta-ffi --all-targets -- -D warnings` | 通过：build script 与 3 处测试 `expect/expect_err` 已改为显式错误分支，无 warning。 |
 | 2026-09-17 | `cargo test -p panta-ffi --locked`（默认 target 目录） | 通过：3 个测试全部成功，含 Rust→C++ 调用与非 ASCII 往返；上一轮 dyld 卡挂未复现，补齐此前欠的运行证据。 |
 | 2026-09-17 | 手动以等效 cargo 环境变量驱动 launcher build.rs 完成 CMake 全量构建（Qt staging 与 googletest 复用本地缓存，零下载；DEP 注入规则另由最小复现验证）。首跑暴露 build.rs E0382、DEP 不注入、boundary_test 缺 main 三处阻塞 | 修复后构建通过：84 个 ninja 目标全绿，panta_ffi_boundary_test 链接成功，产出 panta-native。 |
 | 2026-09-17 | `ctest -R Ffi`（上条构建树，macOS 26 arm64 / c++ 20 / Qt 6.11.2 staging） | 通过：`Ffi.RustCppBoundary` 1/1，覆盖 C++ 调 Rust 非 ASCII 往返（"界"×2 → "ffi:界界"）与 Rust 结构化错误转 `rust::Error` 异常。 |

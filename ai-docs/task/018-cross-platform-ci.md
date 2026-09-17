@@ -20,7 +20,7 @@
 
 ## 范围与非目标
 
-范围：一个 GitHub Actions workflow，三平台矩阵执行 pinned 工具链安装与当前全部可用 Rust 检查。Windows runner 固定为 `windows-2022`，以匹配预编译 Qt 的 MSVC2022 ABI；Linux 在 configure 前安装 Qt Gui 所需的 OpenGL 开发包。
+范围：一个 GitHub Actions workflow，三平台矩阵执行 pinned 工具链安装与当前全部可用 Rust 检查，Clippy warning 作为错误处理。Windows runner 固定为 `windows-2022`，以匹配预编译 Qt 的 MSVC2022 ABI；Linux 在 configure 前安装 Qt Gui 所需的 OpenGL 开发包。
 
 非目标：native 依赖的托管构建接入 CI（随 004 之后扩展）；测试聚合与质量门禁（011）；依赖缓存（012）；额外测试框架。
 
@@ -31,7 +31,7 @@
 ## 实施步骤
 
 1. 新增 `.github/workflows/ci.yml`：push main 与全部 PR 触发；矩阵 macos-latest / ubuntu-latest / windows-2022。
-2. 每平台执行：安装 pinned 工具链（minimal + rustfmt + clippy）→ `cargo build --locked` → `cargo test --locked` → `cargo fmt --all -- --check` → `cargo clippy --locked --all-targets`。
+2. 每平台执行：安装 pinned 工具链（minimal + rustfmt + clippy）→ `cargo build --locked` → `cargo test --locked` → `cargo fmt --all -- --check` → `cargo clippy --locked --all-targets -- -D warnings`。
 3. README 加 CI 徽章与环境要求；依赖获取文档记录 CI 环境与边界；task-index 同步验证节奏描述。
 
 ## 预计改动
@@ -66,7 +66,7 @@ runner 的 rustup 若不支持按 rust-toolchain.toml 自动解析，安装步�
 
 - 2026-09-16：维护者要求基础阶段配三平台 CI；本任务从 012 的前置范围中拆出并立即实施。
 - 2026-09-16（实施）工具链安装从 rust-toolchain.toml 读取 channel（awk 提取，bash 兼容三平台），不在 workflow 中重复版本号。
-- 2026-09-16（实施）不加 `--deny warnings` 等门禁参数：质量门禁由 011 统一定义，当前 CI 只做可用性验证。
+- 2026-09-17：根据 011 的 Rust 质量门禁切片，Clippy 命令加入 `-D warnings`；workspace `unwrap_used`/`expect_used` 同步设为 deny，warning 不再作为可接受输出。
 - 2026-09-16（范围调整，维护者决定）：CI 验证整体留待 012（首次绿灯确认、缓存与演进）；本任务交付以 workflow 配置与本地验证为界，原验收第 4 项转出。
 - 2026-09-17：首次 run 的 Ubuntu OpenGL 与 Windows MinGW/长路径失败由 [036](036-ci-native-build-fix.md) 修复；本任务的三平台基线 runner 描述同步为 macOS/Linux 最新 runner 与 Windows 2022 固定镜像。
 

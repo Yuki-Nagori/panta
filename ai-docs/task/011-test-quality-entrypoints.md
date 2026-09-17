@@ -1,17 +1,17 @@
 # 011 — 统一测试与质量入口
 
-- 状态：planned
+- 状态：in-progress
 - 阶段：验证基础
 - 依赖：[007](007-vtk-quick-viewport.md)、[008](008-tasks-errors-logging.md)、[010](010-netgen-adapter-smoke.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-17
 
 ## 目标与背景
 
 让统一入口可证明 Rust、native 与 QML 的检查实际执行，形成 CI 可复用命令。
 
-本任务尚未实施；拟改路径不代表文件已存在，执行前核对依赖任务的实际产物。
+本任务整体仍未完成；本次先落地当前 Rust workspace 的 Clippy 质量门禁。依赖任务尚未全部完成，因此不把 CTest/QML 聚合和覆盖率能力提前标成完成。
 
 ## 必读
 
@@ -29,7 +29,7 @@
 
 ## 范围与非目标
 
-范围：完成下列步骤与验收所需的最小基础设施。
+范围：完成下列步骤与验收所需的最小基础设施。本轮范围收窄为：清理现有 Clippy warning，并让 workspace 的 Clippy warning 在本地和 CI 中直接失败。
 
 非目标：不要求文档/无代码目录执行不存在的检查，不建设大型测试框架。
 
@@ -43,6 +43,7 @@
 2. 实现 cargo test 的原生聚合调度，防止从聚合测试递归调用自身；失败返回非零。
 3. 接入 rustfmt、Clippy、C++ 格式/选定静态分析及文档链接检查，并记录真实命令。
 4. 区分默认自动检查、目标平台图形检查和可选 sanitizer，规定跳过必须显式报告。
+5. 当前 Rust workspace 以 `-D warnings` 运行 Clippy；测试与 build script 不通过 `expect`/`unwrap` 警告豁免掩盖问题。
 
 ## 预计改动
 
@@ -55,6 +56,7 @@
 ## 验收标准
 
 - [ ] cargo test --locked 实际执行约定 Rust/native 套件；受控失败能导致顶层命令失败。
+- [x] 当前 Rust workspace 的 Clippy warning 直接失败；既有 warning 已清理，CI 与本地命令保持一致。
 - [ ] 报告含测试数量和跳过原因；零个意外缺失的 native 测试不能视作通过。
 - [ ] QML 检查与真实图形冒烟有明确执行方式，格式/静态检查针对实际源码。
 - [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
@@ -67,7 +69,7 @@
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| — | 尚未执行 | 无实现证据 |
+| 2026-09-17 | `cargo clippy --locked --workspace --all-targets -- -D warnings`（完整 workspace，复用已缓存 Qt staging）；`cargo fmt --all -- --check`；`cargo test --locked --workspace --exclude panta-launcher` | Rust warning 直接失败且测试/格式通过 | 完整 workspace Clippy 通过且无 warning；Rust 测试 15/15；fmt 通过 |
 
 ## 风险与回退
 
@@ -76,7 +78,8 @@
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施。
-- 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
+- 2026-09-17：根据质量要求先收敛 Rust workspace 门禁；workspace lints 将 Clippy warning 提升为 deny，CI 额外传入 `-D warnings`，并清理 FFI build script/测试中的 `expect` warning。
+- 待记录：CTest/QML 聚合、跨语言静态分析和覆盖率方案，依赖任务完成后继续实施。
 
 ## 完成摘要
 

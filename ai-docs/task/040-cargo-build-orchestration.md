@@ -64,7 +64,7 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 | 2026-09-17 | workflow cache 静态检查 | 验证缓存覆盖 Cargo registry/git、target/Qt staging，并按平台/ABI/generator/配置分键 | 已加入 `actions/cache@v4`；命中/删除缓存后的真实 run 待 CI 复跑 |
 | 2026-09-17 | `CARGO_TARGET_DIR=/private/tmp/panta-cargo-build-order.TZyGyN cargo build --locked` | FFI staticlib 先生成，随后 native 构建 | 通过顺序验证：日志先出现 `Compiling panta-ffi`，再出现 `Compiling panta-launcher`；launcher 已进入 CMake/Qt configure，随后因当前沙箱无法解析 `download.qt.io` 失败，未掩盖 staticlib 缺失问题 |
 | 2026-09-17 | `cargo metadata --locked --no-deps`、`cargo fmt --all -- --check`、`actionlint .github/workflows/ci.yml`、`git diff --check` | 清单、格式、workflow 和补丁静态检查通过 | 全部通过 |
-| 2026-09-17 | `cargo test --locked --workspace --exclude panta-launcher`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher` | Rust 侧回归检查通过 | 测试 15/15 通过；Clippy 通过，仅保留既有测试/build.rs 的 `expect` 警告 |
+| 2026-09-17 | `cargo test --locked --workspace --exclude panta-launcher`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；完整 workspace Clippy 使用已缓存 Qt staging | Rust 侧回归检查通过 | 测试 15/15 通过；完整 workspace Clippy 通过且无 warning |
 
 ## 风险与回退
 

@@ -70,7 +70,7 @@ mod tests {
             text: "界".to_owned(),
             repeat: 2,
         })
-        .expect("valid request");
+        .unwrap_or_else(|error| panic!("valid request failed: {error}"));
         assert_eq!(
             response,
             FfiResponse {
@@ -82,22 +82,26 @@ mod tests {
 
     #[test]
     fn empty_text_is_a_structured_error() {
-        let error = process(&FfiRequest {
+        let error = match process(&FfiRequest {
             text: String::new(),
             repeat: 1,
-        })
-        .expect_err("empty input must fail");
+        }) {
+            Ok(response) => panic!("empty input unexpectedly succeeded: {response:?}"),
+            Err(error) => error,
+        };
         assert_eq!(error, "ffi.empty_input");
     }
 
     #[test]
     fn repeat_bounds_are_rejected() {
         for repeat in [0, 9] {
-            let error = process(&FfiRequest {
+            let error = match process(&FfiRequest {
                 text: "x".to_owned(),
                 repeat,
-            })
-            .expect_err("invalid repeat must fail");
+            }) {
+                Ok(response) => panic!("invalid repeat unexpectedly succeeded: {response:?}"),
+                Err(error) => error,
+            };
             assert!(error.starts_with("ffi.invalid_repeat:"));
         }
     }

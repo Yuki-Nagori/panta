@@ -55,7 +55,7 @@ ai-docs/
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | planned |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | planned |
 | 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | planned |
-| 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | planned |
+| 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | in-progress |
 | 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | planned |
 | 013 | [桌面安装布局与部署冒烟](task/013-desktop-deployment-smoke.md) | 交付基础 | 011 | planned |
 | 014 | [后续 Python 工具环境](task/014-python-tooling-foundation.md) | MVP 后续能力 | 001 | deferred |
