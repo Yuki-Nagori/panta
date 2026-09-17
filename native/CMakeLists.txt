@@ -11,48 +11,31 @@ option(PANTA_ENABLE_BRIDGE_MODULE
   "Build and register the Panta.Bridge QML module" ON
 )
 
-# 默认值单一来源（cargo.md：Cargo 调度与直接诊断构建共用一套有效配置）：
-# presets 与 crates/launcher/build.rs 只传显式差异项（构建类型），未指定时
-# 用 Debug 与构建目录内 install，避免两处默认值漂移。
-if(NOT DEFINED CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING "构建类型（Debug/Release）" FORCE)
-endif()
-if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "安装前缀" FORCE)
-endif()
-if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "导出 compile_commands.json" FORCE)
-endif()
-
-# 自有 target 公共约束（cpp.md）：C++20 必需（PUBLIC 向消费者传播）、无编译器
-# 扩展、告警基线仅作用于自身。须在 add_executable/add_library 之后调用。
-function(panta_native_msvc_abi target)
-  if(MSVC)
-    # Rust staticlib 和 Qt 预编译库使用动态 CRT；所有自有 target 统一到
-    # /MD 与 iterator ABI 0，避免库/消费者在 Visual Studio Debug 配置下混链。
-    set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-    target_compile_definitions(${target} PRIVATE _ITERATOR_DEBUG_LEVEL=0)
-  endif()
-endfunction()
-
-function(panta_native_defaults target)
-  target_compile_features(${target} PUBLIC cxx_std_20)
-  set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
-  target_compile_options(${target} PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
-  )
-  panta_native_msvc_abi(${target})
-endfunction()
+include(cmake/build-policy.cmake)
 
 # include(CTest) 定义 BUILD_TESTING 选项（默认 ON）并启用测试；OFF 时不拉取
 # googletest、不注册测试，供 004 的发布链关闭测试面。
 include(CTest)
 
+# 输入错误应在依赖下载之前报告。
+if(PANTA_ENABLE_FFI_TEST)
+  if(NOT BUILD_TESTING)
+    message(FATAL_ERROR "PANTA_ENABLE_FFI_TEST requires BUILD_TESTING=ON")
+  endif()
+  if(NOT EXISTS "${PANTA_FFI_INCLUDE_DIR}/panta_ffi.h" OR
+     NOT EXISTS "${PANTA_FFI_STATIC_LIB}" OR IS_DIRECTORY "${PANTA_FFI_STATIC_LIB}")
+    message(FATAL_ERROR "PANTA_ENABLE_FFI_TEST requires existing PANTA_FFI_INCLUDE_DIR/panta_ffi.h and PANTA_FFI_STATIC_LIB; build via Cargo")
+  endif()
+endif()
+
 # Qt 预编译产物供给（任务 005）：缓存于构建树，首次 configure 需联网。
-# 供 given find_package 使用；PANTA_QT_STAGING 暴露路径供诊断。
+# QT_STAGING 暴露路径供 find_package 和诊断使用。
 include(cmake/qt-provision.cmake)
-find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test
+set(_panta_qt_components Core Gui Qml Quick QuickControls2)
+if(BUILD_TESTING)
+  list(APPEND _panta_qt_components Test)
+endif()
+find_package(Qt6 6.11 REQUIRED COMPONENTS ${_panta_qt_components}
   PATHS "${QT_STAGING}" NO_DEFAULT_PATH
 )
 # AUTOMOC（QML_ELEMENT 元类型生成必需）与 Qt CMake 策略在此统一；
@@ -63,6 +46,12 @@ qt_policy(SET QTP0004 NEW)
 qt_policy(SET QTP0005 NEW)
 
 if(BUILD_TESTING)
+  add_test(NAME Build.MsvcAbiPolicy
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/abi-policy-test"
+      "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-abi.cmake"
+  )
   # GoogleTest 固定点见 ai-docs/standards/dependency-acquisition.md：
   # GIT_TAG 用完整 commit SHA（v1.18.0 → 063de7e9578f82b369302001269680b4b1553359）。
   # configure 阶段联网拉取到构建树，与 Cargo 托管原则一致（gtest.md）。
@@ -77,33 +66,17 @@ if(BUILD_TESTING)
   set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
   set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
-  if(MSVC)
-    foreach(gtest_target IN ITEMS gtest gtest_main)
-      if(TARGET ${gtest_target})
-        set_property(TARGET ${gtest_target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-        target_compile_definitions(${gtest_target} PRIVATE _ITERATOR_DEBUG_LEVEL=0)
-      endif()
-    endforeach()
-  endif()
 endif()
 
 add_subdirectory(foundation)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   add_subdirectory(bridge)
 endif()
-add_subdirectory(app)
 # qml/ 位于仓库根（repository-layout）；二进制目录固定在 native 构建树内。
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../qml qml)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../qml" qml)
+add_subdirectory(app)
 
 if(PANTA_ENABLE_FFI_TEST)
-  if(NOT BUILD_TESTING)
-    message(FATAL_ERROR "PANTA_ENABLE_FFI_TEST requires BUILD_TESTING=ON")
-  endif()
-  if(NOT PANTA_FFI_INCLUDE_DIR OR NOT PANTA_FFI_STATIC_LIB)
-    message(FATAL_ERROR
-      "PANTA_ENABLE_FFI_TEST requires PANTA_FFI_INCLUDE_DIR and PANTA_FFI_STATIC_LIB"
-    )
-  endif()
   add_subdirectory(ffi)
 endif()
 
@@ -130,3 +103,6 @@ install(FILES
   "${CMAKE_BINARY_DIR}/cmake/panta-native-config-version.cmake"
   DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}"
 )
+
+# 等 Qt 的延迟目标创建完成后审计，包括 plugin_init/resource object targets。
+cmake_language(DEFER CALL panta_verify_msvc_abi "${CMAKE_CURRENT_SOURCE_DIR}")

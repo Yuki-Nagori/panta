@@ -1,0 +1,62 @@
+# 在 find_package/FetchContent/qt_add_qml_module 之前包含：Qt 生成的 object
+# library 与 GTest 也必须继承 ABI，不能仅修改业务 target。
+include_guard(GLOBAL)
+
+get_property(_panta_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT _panta_multi_config AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING "构建类型" FORCE)
+endif()
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "安装前缀" FORCE)
+endif()
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
+if(MSVC)
+  # 当前 Rust/CXX staticlib 使用 /MD；Debug 保留调试符号及未优化代码，
+  # 但整个 native 图统一使用 release CRT/STL ABI，包括 Qt 生成目标。
+  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+  add_compile_definitions(_ITERATOR_DEBUG_LEVEL=0)
+  # Qt 也选择 release ABI，避免 /MD 对象链接 Qt Debug DLL 导致混用 CRT。
+  # 空元素允许无配置 imported 工具；不回退到 Debug 库。
+  set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG "Release;RelWithDebInfo;")
+endif()
+
+# 告警仅应用到自有代码；生成代码和第三方只继承上面的 ABI 策略。
+function(panta_native_defaults target)
+  target_compile_features(${target} PUBLIC cxx_std_20)
+  set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+  target_compile_options(${target} PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
+  )
+endfunction()
+
+# 递归核对真实构建图（包括 Qt 生成的 object libraries），提前阻断上游或
+# 子目录覆盖运行库策略。依赖自己的源文件也必须遵守相同 ABI。
+function(panta_verify_msvc_abi directory)
+  if(NOT MSVC)
+    return()
+  endif()
+  get_property(_targets DIRECTORY "${directory}" PROPERTY BUILDSYSTEM_TARGETS)
+  get_property(_directory_defines DIRECTORY "${directory}" PROPERTY COMPILE_DEFINITIONS)
+  foreach(_target IN LISTS _targets)
+    get_target_property(_type ${_target} TYPE)
+    if(_type MATCHES "^(EXECUTABLE|STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY|OBJECT_LIBRARY)$")
+      get_target_property(_runtime ${_target} MSVC_RUNTIME_LIBRARY)
+      get_property(_defines TARGET ${_target} PROPERTY COMPILE_DEFINITIONS)
+      list(APPEND _defines ${_directory_defines})
+      if(NOT _runtime STREQUAL "MultiThreadedDLL" OR
+         NOT "_ITERATOR_DEBUG_LEVEL=0" IN_LIST _defines OR
+         "_ITERATOR_DEBUG_LEVEL=1" IN_LIST _defines OR
+         "_ITERATOR_DEBUG_LEVEL=2" IN_LIST _defines)
+        message(FATAL_ERROR "${_target}: inconsistent MSVC ABI (${_runtime}; ${_defines}); expected /MD and _ITERATOR_DEBUG_LEVEL=0")
+      endif()
+    endif()
+  endforeach()
+  get_property(_directories DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
+  foreach(_directory IN LISTS _directories)
+    panta_verify_msvc_abi("${_directory}")
+  endforeach()
+endfunction()

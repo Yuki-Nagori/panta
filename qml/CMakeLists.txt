@@ -42,7 +42,7 @@ qt_add_qml_module(panta_shell
 )
 
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
-panta_native_msvc_abi(panta_shell)
+panta_native_defaults(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
 
 if(BUILD_TESTING)

@@ -24,6 +24,8 @@ GitHub Actions 最新 run `35199280596`（提交 `e9e20ac`）的 Windows Build �
 
 ## 范围与非目标
 
+2026-09-17 本轮扩展：根据 run `35202550564` 中 Qt 生成的 `panta_bridgeplugin_init` 仍使用 Debug CRT/iterator ABI 的证据，统一目标创建前的构建策略，覆盖 Qt 自动生成目标和第三方源码目标；整理默认配置、依赖顺序、FFI 输入检查，并更新 `ai-docs/standards/cmake.md`。删除逐目标 ABI 修补；本机验证与 Windows runner 验证分开记录。
+
 范围：修复 `panta-ffi` staticlib 在 CI 干净构建中的供给顺序；修正 CXX bridge 的 MSVC C++ 标准选项；对 Windows native 测试统一 MSVC runtime/迭代器 ABI 并补齐 Rust std 系统库；补充能复现这些环境差异的本地/CI 验证和任务记录。
 
 非目标：不改变 FFI DTO、错误语义、Qt 版本、CMake 生成器矩阵或 native 业务实现；不引入依赖缓存和统一质量入口。
@@ -70,12 +72,20 @@ GitHub Actions 的 `ubuntu-latest`、`macos-latest` 和 `windows-2022` 均应继
 | 2026-09-17 | macOS arm64；独立 FFI CMake 构建，开启 `PANTA_ENABLE_FFI_TEST`，链接当前 `panta-ffi` staticlib；`ctest -R Ffi.RustCppBoundary` | Windows 链接规则改动不破坏 Unix FFI 边界 | CMake 构建与 `Ffi.RustCppBoundary` 通过；macOS 仍使用 `Threads::Threads`/`CMAKE_DL_LIBS` 路径 |
 | 2026-09-17 | GitHub Actions run `35201746062`，Windows Build | 修复后 native 测试与 GTest 的 MSVC CRT/iterator ABI 一致 | 仍失败：Bridge/Foundation 测试使用 Debug ABI，而 FFI 修复把共享 GTest target 固定为 `/MD`、iterator 0；根因扩大为所有 native target 需统一 ABI，已在本轮移至 native 根配置 |
 | — | 本轮修复后 GitHub Actions 三平台 run | Build、Test、Format、Clippy 全部成功 | 待提交并复跑 |
+| 2026-09-17 | run `35202550564`（`8e35810`）Windows Build | 定位剩余生成目标差异 | `panta_bridgeplugin_init.obj` 仍为 `/MDd`、iterator 2，App/Bridge 为 `/MD`、iterator 0；存在 LNK2038 与 LNK4098。确认逐目标 helper 不覆盖 Qt 生成目标 |
+| 2026-09-17 | macOS arm64、AppleClang 17；`native/build/debug` 完整 build 后 CTest 与 `all_qmllint` | 保持默认 Shell | 7/7 既有测试及 lint 通过 |
+| 2026-09-17 | 新目录 `/private/tmp/panta-cmake-039.k1DDcn/multi`，Ninja Multi-Config；复用已缓存 Qt/GTest，FFI 链接已有 Cargo Debug staticlib；`cmake --build … --config Debug/Release --parallel 4` 后 `ctest --test-dir … -C Debug/Release --output-on-failure` | 双配置构建、运行并验证 ABI 策略回归 | Debug/Release 各 9/9 通过；Debug 再构建无额外工作。Release 的 Rust 库仍为 Debug 产物，本结果不代表完整 Cargo Release 验证；链接器提示已有 Rust 对象最低 macOS 26.2 高于 CMake 26.0 |
+| 2026-09-17 | `minimal` 新目录，Ninja、Bridge OFF、BUILD_TESTING OFF，再启用测试并 build/CTest/lint | 默认 Debug、无测试依赖构建及开关切换 | OFF/OFF 完整构建成功；安装前缀默认位于构建树 install；启用测试后 4/4 与 lint 通过 |
+| 2026-09-17 | FFI ON + 测试 OFF；FFI ON + 缺少生成头/staticlib | 下载依赖前失败 | 两种 configure 均准确报错，未创建 Qt 下载目录 |
+| 2026-09-17 | `Build.MsvcAbiPolicy` | 生成 object target 继承 ABI，拒绝不一致覆盖 | 正例通过；注入 `/MDd` 或 iterator 2 均被审计拒绝。非 Windows 仅检查 CMake 元数据，不替代 MSVC 编译链接 |
 
 ## 风险与回退
 
 Cargo crate-type 调度、CMake 链接和 CXX bridge 的编译器选项属于不同阶段；若调整后仍有平台差异，保留原始构建诊断并分别定位，不通过复用旧 target 产物掩盖问题。回退时仅撤销本 task 的构建调度和标准选项改动，保留工作区已有的 FFI 功能。
 
 ## 决策与工作记录
+
+- 2026-09-17（整体整理）：新增 `cmake/build-policy.cmake`，在创建依赖/Qt 目标前设置整个 native 图的 CRT/iterator ABI；Windows Debug 映射 Release ABI 的预编译 Qt；删除逐目标 helper 与 GTest 二次覆盖。顶层提前验证 FFI 输入，按基础库→Bridge→Shell→App 创建目标，关闭测试时不发现 Qt Test。增加递归 ABI 审计和正反例配置测试，更新 `standards/cmake.md`；039 在索引中继续保持 in-progress，Windows 新 run 待验证。
 
 - 2026-09-17：根据 GitHub Actions run `35195983722` 创建任务；确认失败分为 staticlib 供给顺序和 MSVC C++ 标准选项两类。
 - 2026-09-17（实施）：launcher 优先定位 Cargo profile 根目录 staticlib，并以 deps/作为布局兜底；panta-ffi 按 target 环境向 MSVC 传递 `/std:c++20`，非 MSVC 保持 `-std=c++20`。
