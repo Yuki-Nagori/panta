@@ -347,6 +347,11 @@ fn set_executable(path: &Path) -> Result<(), String> {
         fs::set_permissions(path, permissions)
             .map_err(|error| format!("设置 {} 可执行位失败：{error}", path.display()))?;
     }
+    #[cfg(not(unix))]
+    {
+        // Windows zip 内的 .exe 自带可执行语义，无需额外处理。
+        let _ = path;
+    }
     Ok(())
 }
 
