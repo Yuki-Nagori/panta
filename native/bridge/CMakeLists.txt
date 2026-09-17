@@ -26,5 +26,5 @@ if(BUILD_TESTING)
     GTest::gtest
     Qt6::Test
   )
-  gtest_discover_tests(panta_bridge_shell_view_model_test)
+  gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE PRE_TEST)
 endif()

@@ -78,7 +78,7 @@ FetchContent 使 configure 依赖网络（与托管原则一致，首次构建�
 - 2026-09-16（决策）版本与获取：googletest v1.18.0（当前最新 release）；FetchContent `GIT_TAG` 用完整 commit SHA——仍属 Cargo 托管原则（CMake 侧按固定清单拉取到构建树），configure 阶段联网与 004 引导一致；`INSTALL_GTEST=OFF`、`EXCLUDE_FROM_ALL`，安装树与导出不含测试依赖。
 - 2026-09-16（决策）门控：`include(CTest)` + `BUILD_TESTING`（默认 ON）；OFF 时零拉取零构建（实测），004 的发布链可关闭测试。
 - 2026-09-16（决策）`BUILD_GMOCK=OFF`：当前无 mock 场景，需要时按对应 task 打开并说明边界；规则已写入 gtest.md。
-- 2026-09-16（决策）注册用 `gtest_discover_tests`（每用例独立 CTest 项），不用整体 `add_test`；测试名即过滤名。
+- 2026-09-16（决策）注册用 `gtest_discover_tests`（每用例独立 CTest 项），不用整体 `add_test`；测试名即过滤名。2026-09-17 起多配置生成器使用 `DISCOVERY_MODE PRE_TEST`，把测试发现延后到 ctest，避免构建阶段缺少 Qt runtime 阻断产物生成。
 - 2026-09-16（补充，维护者反馈）：编辑器对 `EXPECT_EQ` 展开报"非 bool"（cpptools error 711）属 IntelliSense 未使用真实编译配置的误报；共享 `.vscode/settings.json` 增加 `cmake.copyCompileCommands` + `C_Cpp.default.compileCommands`（指向 gitignored 的 `native/compile_commands.json`）与 `cppStandard=c++20`，处理指引写入 gtest.md。判定依据：真实编译带 `-std=c++20` 且 ctest 绿（见验证表）。
 - 2026-09-16（实施）实施中修正两处自身问题并记录：初稿在注释里写了 `include(GoogleTest)` 却漏了实际命令（报 Unknown CMake command）；失败还原用 `mv` 保留了旧 mtime，ninja 判定无需重编导致"复绿"假阳性——以 `touch` 强制重建后真实验证。此坑对增量构建验证有普遍意义，收录于验证表。
 - 待记录：gmock 启用时机（首个模块边界 mock 场景的 task）。

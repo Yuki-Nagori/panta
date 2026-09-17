@@ -38,7 +38,7 @@ GitHub Actions 可访问 `Yuki-Nagori/panta`，并已确认 Qt 6.11.2 的 Linux 
 
 ## 预计改动
 
-`.github/workflows/ci.yml`、`crates/launcher/build.rs`、`ai-docs/task-index.md`、`ai-docs/task/018-cross-platform-ci.md`、`ai-docs/standards/dependency-acquisition.md` 与本文件。
+`.github/workflows/ci.yml`、`crates/launcher/build.rs`、`native/app/CMakeLists.txt`、`native/foundation/CMakeLists.txt`、`native/bridge/CMakeLists.txt`、`ai-docs/task-index.md`、`ai-docs/task/018-cross-platform-ci.md`、`ai-docs/standards/dependency-acquisition.md` 与本文件。
 
 ## 清理与兼容例外
 
@@ -70,6 +70,7 @@ Visual Studio 生成器可能随 runner 镜像升级而变化；若 `windows-202
 
 - 2026-09-17：通过 `gh` 复核两个失败 run，确定 Ubuntu OpenGL 依赖和 Windows 路径/ABI 两类根因，创建本任务。
 - 2026-09-17（实施）：build script 改为保留普通绝对路径，构建阶段显式传递 profile 配置并探测单/多配置产物；CI 使用 Ubuntu `libgl1-mesa-dev` 与 Windows 2022/MSVC 生成器。
+- 2026-09-17（第二轮 run）：OpenGL 与 compiler/path 根因已分别解除；Windows 进一步暴露多配置产物位于构建树根部，以及 GTest discovery 在构建阶段缺少 Qt DLL；Ubuntu 暴露 Qt `qmlimportscanner` 依赖 ICU 73。对应修复为补充根部产物候选、将 GTest discovery 延后到 `ctest`，并移除当前无源可扫描且结果为空的 app 级 import scan。
 
 ## 完成摘要
 

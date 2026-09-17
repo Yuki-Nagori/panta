@@ -17,9 +17,9 @@ target_link_libraries(panta_native_app PRIVATE
   Qt6::QuickControls2
 )
 
-# 由 Panta.Shell 的 TARGET 依赖扫描并链接 Panta.Bridge 静态 plugin，
-# 保证 QML_ELEMENT 注册代码在最终 executable 中保留。
-qt_import_qml_plugins(panta_native_app)
+# Panta.Bridge 的静态 plugin 由 main.cpp 中的 Q_IMPORT_QML_PLUGIN 显式保留。
+# App.qml 已作为 Panta.Shell 模块资源编译，app 目标没有可供 qmlimportscanner
+# 扫描的源文件；调用扫描器只会产生空结果，并要求工具额外加载平台 ICU。
 
 install(TARGETS panta_native_app EXPORT pantaNativeTargets
   RUNTIME DESTINATION bin

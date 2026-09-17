@@ -128,8 +128,13 @@ fn locate_product(
 ) -> Result<PathBuf, String> {
     let base = binary_dir.join("app");
     // Ninja 等单配置生成器把产物直接放在 app/；Visual Studio 等多配置生成器
-    // 通常放在 app/<Config>/。同时检查两种布局，避免生成器选择泄漏到 launcher。
-    let candidates = [base.join(exe_name), base.join(build_type).join(exe_name)];
+    // 可能放在构建树根部或 app/<Config>/。同时检查三种布局，避免生成器选择
+    // 泄漏到 launcher。
+    let candidates = [
+        binary_dir.join(build_type).join(exe_name),
+        base.join(exe_name),
+        base.join(build_type).join(exe_name),
+    ];
     candidates
         .iter()
         .find(|path| path.is_file())

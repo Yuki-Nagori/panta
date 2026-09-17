@@ -32,7 +32,7 @@
 
 005 已完成。实施核对 Qt 锁定版本与现存 NO_PLUGIN 布局；分别验证 backing target、静态 plugin/import scan 方案，失败时记录证据，不以关闭 lint 掩盖问题。
 
-本轮采用 `panta_bridge` 静态库作为 `Panta.Bridge` QML 模块 backing target，由 `qt_add_qml_module` 生成 typeinfo 和静态 plugin；`Panta.Shell` 通过模块依赖声明消费它，应用目标由 Qt 的 plugin import 入口保留注册代码。
+本轮采用 `panta_bridge` 静态库作为 `Panta.Bridge` QML 模块 backing target，由 `qt_add_qml_module` 生成 typeinfo 和静态 plugin；`Panta.Shell` 通过模块依赖声明消费它，应用目标由 `Q_IMPORT_QML_PLUGIN` 显式保留注册代码。App.qml 已编译进 Shell 模块资源，app 目标没有可供 qmlimportscanner 扫描的源文件，因此不调用空结果的 app 级 import scan。
 
 ## 实施步骤
 
@@ -73,6 +73,7 @@ Cargo 构建、CTest、all_qmllint，可选开关开/关与 Release 构建；真
 
 - 2026-09-16：由任务 021 编排；长期设计见模块说明，不将文档完成等同功能完成。
 - 2026-09-17：开始实施；优先验证 `panta_bridge` backing target + `Panta.Bridge` 静态 plugin + `Panta.Shell` TARGET 依赖，移除 main.cpp 手动注册。
+- 2026-09-17（CI 兼容）：保留显式 `Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)`，删除 app 级 `qt_import_qml_plugins` 空扫描，避免预编译 Qt Linux 工具的 ICU 运行时依赖；后续 app 有可扫描 QML 源时再按 Qt 版本重新评估。
 
 ## 完成摘要
 

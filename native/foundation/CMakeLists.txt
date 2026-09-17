@@ -37,7 +37,9 @@ if(BUILD_TESTING)
     PANTA_TEST_EXPECT_MINOR=${PROJECT_VERSION_MINOR}
     PANTA_TEST_EXPECT_PATCH=${PROJECT_VERSION_PATCH}
   )
-  gtest_discover_tests(panta_foundation_version_test)
+  # 多配置生成器（Windows Visual Studio）在构建阶段可能尚未准备好 Qt
+  # runtime；延后发现用例到 ctest，避免 configure/build 被测试启动阻断。
+  gtest_discover_tests(panta_foundation_version_test DISCOVERY_MODE PRE_TEST)
 endif()
 
 install(TARGETS panta_foundation EXPORT pantaNativeTargets
