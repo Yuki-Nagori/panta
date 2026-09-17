@@ -33,7 +33,7 @@
 
 ## 实施步骤
 
-1. 盘点各平台可用预编译 SDK、官方发布资产或可信制品源，记录 URL、版本、SHA256、架构、编译器/运行库 ABI、Qt 兼容范围、模块和许可证。
+1. 盘点各平台可用预编译 SDK、官方发布资产或可信制品源，记录 URL、版本、SHA256、架构、编译器/运行库 ABI、Qt 兼容范围、模块和许可证。（首轮已完成，见验证表）
 2. 设计统一 staging 布局和 manifest，下载使用固定哈希、断点/缓存策略和清晰失败诊断；禁止覆盖已校验的不同版本资产。
 3. 将 staging 目录注入 CMake `find_package(... CONFIG)`，验证 VTK/OCCT/Netgen imported targets 与 transitive runtime；不把平台库名散落在适配器中。
 4. 在三平台至少完成 configure/package smoke；检查缺包、哈希错误、架构/ABI 不匹配、缺模块、离线缓存和任意工作目录，记录无法覆盖的平台。
@@ -59,7 +59,7 @@
 
 ## 验证计划与结果
 
-执行供给脚本/manifest 的哈希、缓存、离线、失败诊断测试；对每个平台运行 CMake configure 与最小链接/运行冒烟。第三方库本体测试不在此重复，由 007/009/010 负责集成行为。当前未执行。
+执行供给脚本/manifest 的哈希、缓存、离线、失败诊断测试；对每个平台运行 CMake configure 与最小链接/运行冒烟。第三方库本体测试不在此重复，由 007/009/010 负责集成行为。fixture 级供给路径验证已执行（见下表）；真实 SDK 的三平台 configure/package 冒烟待资产齐备后补齐。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
@@ -67,6 +67,9 @@
 | 2026-09-17 | `gh api repos/Open-Cascade-SAS/OCCT/releases/latest`；下载并检查 `opencascade-release-no-pch.zip` | OCCT `V8.0.1` 提供官方 Windows 预编译 SDK；外层归档 SHA256 为 `307f694f1d4a280c7f58ee2ddb69a7f7e2b78d82749339efd40ce8b8b116d76c`，内层 `opencascade-8.0.1-vc14-64.zip` SHA256 为 `24d947bf045e8da43f559592d28eee4df389dd8034754d70f3ab341346a22ca8`；归档含 `cmake/OpenCASCADEConfig.cmake`、头文件、Windows DLL/库和许可证。尚未证明其与本项目 Qt/编译器 ABI 的集成。 |
 | 2026-09-17 | [VTK 官方下载页](https://vtk.org/download/) 与最新 tag `v9.7.0` 资产盘点 | 官方页面明确提供源码归档、Python wheels，并提到 SDK packages；本轮未找到可直接消费的、包含 `GUISupportQtQuick`/`QQuickVTKItem` 的 macOS arm64、Linux 或 Windows C++ SDK 及 SHA256。因此不能将 Python wheel 或源码归档当作 C++ 预编译依赖；需另立项目制品生产/发布任务。 |
 | 2026-09-17 | Netgen tag/release 资产盘点（当前清单仍固定 `v6.2.2604`） | 更新 tag `v6.2.2607` 可见但没有对应 GitHub release 预编译资产；当前 `v6.2.2604` 也未取得三平台 SDK。保持现有版本候选和 commit pin，不在本任务内擅自升级或触发源码构建；需要与 OCCT ABI 一起由后续制品任务验证。 |
+| 2026-09-17 | `ctest --preset debug -R Build.SdkProvision`（macOS arm64，native 构建树 `target/native/debug`） | 通过：10 组场景全绿——038 布局成功供给（下载/SHA256 校验/解包/原子发布/marker/`find_package` CONFIG/imported target 自检）、归档缓存离线复用（删除源归档后新 consumer 成功）、marker 损坏按缓存归档重建、版本目录隔离（v1/v2 并存互不覆盖）、哈希不符拒收并清场、生产 manifest 缺资产诊断（vtk 报出固定版本 9.7.0 并指向 038）、OCCT 内嵌归档+包装目录布局（内层 SHA256 校验、外层残留不进 staging）、归档内配置歧义拒绝、未登记名诊断、SHA256 格式登记校验。测试自清理工作目录，连续两次运行均通过。 |
+| 2026-09-17 | `ctest --preset debug`（macOS arm64） | 16/16 全绿（15 项既有 + Build.SdkProvision），SDK 供给接入未影响既有构建与测试。 |
+| 2026-09-17 | `cargo build --locked`（macOS arm64） | 通过：build.rs 注入 `PANTA_SDK_PROVISION_DIR=target/panta-deps/sdk`，共享树重新 configure 引入 sdk-provision.cmake（manifest 登记 + 函数定义，不触发下载）；消费方任务未接入，生产构建零 SDK 下载。 |
 
 ## 风险与回退
 
@@ -77,7 +80,8 @@
 - 2026-09-16：根据维护者要求将 native 第三方依赖改为预编译优先，新增本任务统一供给；007 暂不接入源码构建。
 - 2026-09-17（官方资产盘点）：OCCT `V8.0.1` 的 Windows 官方归档是当前唯一取得可复核 CMake SDK 的候选，URL 为 `https://github.com/Open-Cascade-SAS/OCCT/releases/download/V8.0.1/opencascade-release-no-pch.zip`；其余平台仍未覆盖。VTK 官方渠道本轮只确认源码归档/Python wheels/SDK 提示，未确认可用 C++ SDK；Netgen `v6.2.2607` 只有 tag、没有 release 资产。以上只作为供给实现的输入，不代表集成通过。
 - 2026-09-17（范围决策）：在 macOS arm64、Linux x86_64/aarch64、Windows x86_64 的固定平台资产完成 URL/SHA256/ABI/CMake target 记录前，031 保持 `in-progress`，007/009/010 不启动第三方源码构建；缺少上游资产时另立可缓存、可校验的项目制品任务。
+- 2026-09-17（供给基础设施增量，已实施）：`native/cmake/sdk-provision.cmake` 落地：`panta_sdk_declare_version`/`panta_sdk_declare_asset` 登记 manifest，`panta_require_sdk` 完成归档下载（`EXPECTED_HASH` 强校验、缓存哈希复检）、两段临时目录解包（支持 OCCT 内嵌归档）、恰一配置文件定位与 find_package 前缀推导、原子 rename 发布（`.panta-sdk-provisioned` marker 记录哈希与前缀）与 imported target 自检；缺资产/哈希不符/配置缺失或歧义/缺 target 均立即失败并给出指向 038 的修复动作。staging 布局 `target/panta-deps/sdk/<name>/<version>/<triple>/`（build.rs 注入共享根，presets 默认构建树内）。OCCT Windows 资产按盘点数据登记为首个条目（ABI 集成未验证，留待 009/038）；VTK/Netgen 全平台无条目。验证证据见上表（Build.SdkProvision 10 场景 + ctest 16/16 + cargo build）。剩余：三平台 CI 尚未跑 ctest（011 聚合前 CTest 不在 CI 检查内，Windows/Linux 的 Build.SdkProvision 执行待 CI 扩展或本地证据补齐）、全平台资产登记（038 制品）、真实 SDK configure/package 冒烟。
 
 ## 完成摘要
 
-未完成。已完成首轮官方资产盘点并确认 OCCT Windows 候选；仍等待全平台 SDK manifest、供给实现及 configure/package 冒烟证据。
+未完成（保持 in-progress）。已落地：官方资产首轮盘点（OCCT Windows 唯一候选，VTK/Netgen 无官方 C++ SDK）、SDK 供给模块 `native/cmake/sdk-provision.cmake`（manifest、下载/校验/缓存/原子 staging、CONFIG 注入、失败诊断）及其 fixture 驱动验证（ctest `Build.SdkProvision`，macOS arm64 实测 10 场景全绿）。仍等待：全平台 SDK 资产登记（038 制品生产）、真实 SDK 三平台 configure/package 冒烟、007/009/010 以 imported targets 接入的集成证据。

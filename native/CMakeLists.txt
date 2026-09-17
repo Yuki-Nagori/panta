@@ -45,12 +45,26 @@ qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 qt_policy(SET QTP0005 NEW)
 
+# VTK/OCCT/Netgen 预编译 SDK 供给（任务 031）：manifest 登记与 staging 供给
+# API；消费方（007/009/010）经 panta_require_sdk 使用。当前仅 OCCT Windows
+# 有固定资产，其余平台请求即失败并指向 038，不回退源码构建。
+include(cmake/sdk-provision.cmake)
+
 if(BUILD_TESTING)
   add_test(NAME Build.MsvcAbiPolicy
     COMMAND "${CMAKE_COMMAND}"
       "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/abi-policy-test"
       "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-abi.cmake"
+  )
+  # SDK 供给逻辑（031）用 fixture 归档驱动：不联网（file://）、不编译
+  # （consumer 为 project NONE），三平台 CI 与本地同路径。
+  add_test(NAME Build.SdkProvision
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-provision-test"
+      "-DPANTA_SDK_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk-provision.cmake"
+      "-DCONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/sdk/consumer"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-sdk-provision.cmake"
   )
   # GoogleTest 固定点见 ai-docs/standards/dependency-acquisition.md：
   # GIT_TAG 用完整 commit SHA（v1.18.0 → 063de7e9578f82b369302001269680b4b1553359）。

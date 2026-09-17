@@ -155,6 +155,12 @@ fn orchestrate() -> Result<PathBuf, String> {
         .arg(format!(
             "-DFETCHCONTENT_BASE_DIR={}",
             deps_root.join("fetchcontent").display()
+        ))
+        // VTK/OCCT/Netgen 预编译 SDK 缓存根（任务 031）：与 Qt/ googletest
+        // 一样跨 profile 共享；presets 直接 configure 时默认构建树内。
+        .arg(format!(
+            "-DPANTA_SDK_PROVISION_DIR={}",
+            deps_root.join("sdk").display()
         ));
     if let Some(ninja) = &ninja {
         // 托管供给的 Ninja 不依赖 PATH；系统 Ninja 传显式路径同样无害。
