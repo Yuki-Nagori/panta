@@ -29,6 +29,12 @@ elseif(UNIX)
     "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
     "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
   )
+  # Qt Linux 工具使用与该发行版配套的 ICU 73。此归档由 Qt 官方仓库提供，
+  # 文件直接放入 staging/lib，供 rcc、qtpaths、qmlimportscanner 等工具通过
+  # $ORIGIN/../lib 解析；不使用系统 ICU，也不在本地编译 ICU。
+  set(_qt_runtime_archives
+    "6.11.2-0-202608131018icu-linux-Rhel8.6-x86_64.7z|111bdae30a66fff6ef65620e95766170fa5a6f425c360ea33b79cb2ec7e2fd86"
+  )
 else()
   message(FATAL_ERROR "Qt 预编译供给暂不支持平台：${CMAKE_SYSTEM_NAME}（记录到 dependency-acquisition.md 再扩展）")
 endif()
@@ -68,8 +74,42 @@ if(NOT EXISTS "${QT_STAGING}/bin")
     "Qt 6.11.2 预编译产物；来源与校验见 ai-docs/standards/dependency-acquisition.md\n")
 endif()
 
+if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.73")
+  file(MAKE_DIRECTORY "${QT_PROVISION_DIR}/archives" "${QT_STAGING}/lib")
+  foreach(entry IN LISTS _qt_runtime_archives)
+    string(REPLACE "|" ";" _kv "${entry}")
+    list(GET _kv 0 _archive_name)
+    list(GET _kv 1 _archive_sha)
+    set(_archive_path "${QT_PROVISION_DIR}/archives/${_archive_name}")
+    if(EXISTS "${_archive_path}")
+      file(SHA256 "${_archive_path}" _archive_actual)
+      if(NOT _archive_actual STREQUAL _archive_sha)
+        file(REMOVE "${_archive_path}")
+        message(STATUS "Qt ICU 归档校验不符，已删除并重新下载：${_archive_name}")
+      endif()
+    endif()
+    if(NOT EXISTS "${_archive_path}")
+      message(STATUS "下载 Qt ICU 预编译包：${_archive_name}")
+      file(DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
+        INACTIVITY_TIMEOUT 120
+        TIMEOUT 900
+        EXPECTED_HASH SHA256=${_archive_sha})
+    endif()
+    message(STATUS "解包 Qt ICU 预编译包：${_archive_name}")
+    execute_process(
+      COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive_path}"
+      WORKING_DIRECTORY "${QT_STAGING}/lib"
+      RESULT_VARIABLE _extract_result
+    )
+    if(NOT _extract_result EQUAL 0)
+      message(FATAL_ERROR "Qt ICU 归档解包失败（${_extract_result}）：${_archive_name}")
+    endif()
+  endforeach()
+endif()
+
 unset(_qt_repo)
 unset(_qt_archives)
 unset(_archive_path)
 unset(_archive_name)
 unset(_archive_sha)
+unset(_qt_runtime_archives)

@@ -21,7 +21,7 @@ GitHub Actions 的首次三平台运行暴露了 native 构建的环境差异：
 
 ## 范围与非目标
 
-范围：修正 launcher 的 native 源路径和多配置产物定位；为 Windows 选择与 Qt 预编译包匹配的 MSVC 生成器；为 Ubuntu 安装 Qt 配置所需的 OpenGL 开发包；通过 GitHub Actions 复跑 build、test、fmt 与 clippy。
+范围：修正 launcher 的 native 源路径和多配置产物定位；为 Windows 选择与 Qt 预编译包匹配的 MSVC 生成器；为 Ubuntu 安装 Qt 配置所需的 OpenGL 开发包，并将 Qt 官方提供的 ICU 73 预编译运行库纳入 Linux Qt 供给；通过 GitHub Actions 复跑 build、test、fmt 与 clippy。
 
 非目标：不引入依赖缓存、统一质量门禁、VTK/OCCT/Netgen SDK 或新的业务代码；这些范围分别由 012、032 和 031 管理。
 
@@ -34,11 +34,12 @@ GitHub Actions 可访问 `Yuki-Nagori/panta`，并已确认 Qt 6.11.2 的 Linux 
 1. 从 `gh run view --log-failed` 固定记录 Ubuntu 与 Windows 的失败上下文。
 2. 去除 Windows 不兼容的长路径前缀转换，扩展 build script 对多配置 CMake 产物的处理，并将生成器平台变化加入重建追踪。
 3. 更新 CI 矩阵：Linux 安装 OpenGL 开发包，Windows 使用 Visual Studio 17 2022 x64，其他平台继续使用 Ninja。
-4. 先运行本地 Rust/CMake 等价检查，再推送并用 `gh` 观察新的三平台 run；将真实结果回填本文与索引。
+4. 将 Qt 官方仓库中与 6.11.2 工具匹配的 ICU 73 预编译归档按 SHA256 纳入 Linux staging/lib，确保 rcc、qtpaths、qmlimportscanner 等工具使用匹配 ABI。
+5. 先运行本地 Rust/CMake 等价检查，再推送并用 `gh` 观察新的三平台 run；将真实结果回填本文与索引。
 
 ## 预计改动
 
-`.github/workflows/ci.yml`、`crates/launcher/build.rs`、`native/app/CMakeLists.txt`、`native/foundation/CMakeLists.txt`、`native/bridge/CMakeLists.txt`、`qml/CMakeLists.txt`、`ai-docs/task-index.md`、`ai-docs/task/018-cross-platform-ci.md`、`ai-docs/standards/dependency-acquisition.md` 与本文件。
+`.github/workflows/ci.yml`、`crates/launcher/build.rs`、`native/cmake/qt-provision.cmake`、`native/app/CMakeLists.txt`、`native/foundation/CMakeLists.txt`、`native/bridge/CMakeLists.txt`、`qml/CMakeLists.txt`、`ai-docs/task-index.md`、`ai-docs/task/018-cross-platform-ci.md`、`ai-docs/standards/dependency-acquisition.md` 与本文件。
 
 ## 清理与兼容例外
 
@@ -59,7 +60,8 @@ GitHub Actions 可访问 `Yuki-Nagori/panta`，并已确认 Qt 6.11.2 的 Linux 
 | 2026-09-17 | `gh run view 35123228708 --log-failed`、`gh run view 35105702071 --log-failed` | 固定失败根因 | Ubuntu 缺少 OpenGL；Windows 为 MinGW/`//?/D:` 路径错误 |
 | 2026-09-17 | macOS 26.3.1 arm64；`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --all-targets` | Rust/Cargo 调度 native 检查通过 | 全部通过；Rust 测试 12/12，使用 Qt 6.11.2 预编译归档 |
 | 2026-09-17 | 同一构建树 `ctest --test-dir <OUT_DIR>/native-build --output-on-failure` | native 测试通过 | 6/6 通过 |
-| 2026-09-17 | `actionlint .github/workflows/ci.yml`、Python YAML/矩阵断言、`python3 /tmp/panta-check-docs.py` | workflow 与文档结构有效 | 全部通过；检查 85 个 Markdown、36 个任务 |
+| 2026-09-17 | `actionlint .github/workflows/ci.yml`、Python YAML/矩阵断言、`python3 /tmp/panta-check-docs.py` | workflow 与文档结构有效 | 全部通过；检查 87 个 Markdown、37 个任务 |
+| 2026-09-17 | GitHub Actions run `35176149286`（`994b730`） | 三平台四项检查全绿 | macOS、Windows 的 Build/Test/Format/Clippy 全部通过；Ubuntu 在 `rcc` 资源生成阶段因 Qt 工具缺少 `libicui18n.so.73` 失败 |
 | — | GitHub Actions 新 run（`gh run watch`/`gh run view`） | 三平台四项检查全绿 | 待执行 |
 
 ## 风险与回退
@@ -72,6 +74,7 @@ Visual Studio 生成器可能随 runner 镜像升级而变化；若 `windows-202
 - 2026-09-17（实施）：build script 改为保留普通绝对路径，构建阶段显式传递 profile 配置并探测单/多配置产物；CI 使用 Ubuntu `libgl1-mesa-dev` 与 Windows 2022/MSVC 生成器。
 - 2026-09-17（第二轮 run）：OpenGL 与 compiler/path 根因已分别解除；Windows 进一步暴露多配置产物位于构建树根部，以及 GTest discovery 在构建阶段缺少 Qt DLL；Ubuntu 暴露 Qt `qmlimportscanner` 依赖 ICU 73。对应修复为补充根部产物候选、将 GTest discovery 延后到 `ctest`，并移除当前无源可扫描且结果为空的 app 级 import scan。
 - 2026-09-17（第三轮准备）：Ubuntu 构建继续暴露 `qtpaths` 仅用于生成 `.qmlls.build.ini` 的 ICU 73 依赖；Linux 跳过该 IDE 辅助文件生成，保留 QML typeinfo、cachegen、资源和运行时路径。
+- 2026-09-17（第三轮 run）：Ubuntu 在 `rcc` 资源生成阶段仍因 Qt 官方 RHEL9 工具缺少 `libicui18n.so.73` 失败；macOS、Windows 四项检查均已通过。确认应消费 Qt 官方仓库同版本的 `icu-linux-Rhel8.6-x86_64.7z` 预编译归档，而不是使用系统 ICU 或本地编译。
 
 ## 完成摘要
 
