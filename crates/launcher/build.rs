@@ -175,9 +175,10 @@ fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
         ));
     }
 
-    // build.rs 的 OUT_DIR 位于 target/<profile>/build/<pkg-hash>/out；CXX
-    // staticlib 则位于同一 profile 的 deps。只选当前 package 名称，避免把
-    // rlib 或其它 profile 的旧产物传进 CMake。
+    // build.rs 的 OUT_DIR 位于 target/<profile>/build/<pkg-hash>/out；Cargo
+    // 将 staticlib 放在同一 profile 根目录（例如 target/debug/libpanta_ffi.a），
+    // 而不是 deps/。只选当前 package 名称，避免把 rlib 或其它 profile 的旧产物
+    // 传进 CMake；保留 deps/作为对旧版 Cargo/平台布局的兜底。
     let profile_dir = out_dir.ancestors().nth(3).ok_or_else(|| {
         format!(
             "无法从 launcher OUT_DIR 推导 profile：{}",
@@ -185,29 +186,45 @@ fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
         )
     })?;
     let deps_dir = profile_dir.join("deps");
-    let mut candidates = fs::read_dir(&deps_dir)
-        .map_err(|error| format!("读取 panta-ffi 产物目录 {}：{error}", deps_dir.display()))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
-                return false;
-            };
-            let is_library = path
-                .extension()
-                .is_some_and(|extension| extension == "a" || extension == "lib");
-            is_library && (name.starts_with("libpanta_ffi") || name.starts_with("panta_ffi"))
-        })
-        .collect::<Vec<_>>();
-    candidates.sort_by_key(|path| {
-        fs::metadata(path)
-            .and_then(|metadata| metadata.modified())
-            .unwrap_or(SystemTime::UNIX_EPOCH)
-    });
+    let mut candidates = Vec::new();
+    for directory in [profile_dir, deps_dir.as_path()] {
+        let entries = fs::read_dir(directory)
+            .map_err(|error| format!("读取 panta-ffi 产物目录 {}：{error}", directory.display()))?;
+        candidates.extend(
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                        return false;
+                    };
+                    let is_library = path
+                        .extension()
+                        .is_some_and(|extension| extension == "a" || extension == "lib");
+                    is_library
+                        && (name.starts_with("libpanta_ffi") || name.starts_with("panta_ffi"))
+                }),
+        );
+    }
     let staticlib = candidates
-        .into_iter()
-        .next()
-        .ok_or_else(|| format!("未找到 panta-ffi staticlib：{}", deps_dir.display()))?;
+        .iter()
+        .find(|path| path.parent() == Some(profile_dir))
+        .cloned()
+        .or_else(|| {
+            candidates.sort_by_key(|path| {
+                fs::metadata(path)
+                    .and_then(|metadata| metadata.modified())
+                    .unwrap_or(SystemTime::UNIX_EPOCH)
+            });
+            candidates.into_iter().next_back()
+        })
+        .ok_or_else(|| {
+            format!(
+                "未找到 panta-ffi staticlib（检查 {} 与 {}）",
+                profile_dir.display(),
+                deps_dir.display()
+            )
+        })?;
     Ok((include, staticlib))
 }
 

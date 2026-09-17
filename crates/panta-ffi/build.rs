@@ -8,10 +8,15 @@ fn main() {
     println!("cargo:rerun-if-changed=include/panta/ffi.hpp");
 
     let mut builder = cxx_build::bridge("src/lib.rs");
+    let cxx_standard_flag = if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        "/std:c++20"
+    } else {
+        "-std=c++20"
+    };
     builder
         .file("src/ffi_support.cc")
         .include("include")
-        .flag_if_supported("-std=c++20")
+        .flag_if_supported(cxx_standard_flag)
         .compile("panta_ffi_bridge");
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must set OUT_DIR"));
