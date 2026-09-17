@@ -1,6 +1,6 @@
 # 036 — 三平台 CI native 构建修复
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[004](004-cargo-native-orchestration.md)、[005](005-qt-qml-shell.md)、[018](018-cross-platform-ci.md)
 - 优先级：P0
@@ -47,11 +47,11 @@ GitHub Actions 可访问 `Yuki-Nagori/panta`，并已确认 Qt 6.11.2 的 Linux 
 
 ## 验收标准
 
-- [ ] Ubuntu、macOS、Windows CI 的 Build、Test、Format、Clippy 全部成功。
-- [ ] Windows 构建日志显示 Visual Studio 生成器与 MSVC 编译器，且 launcher 能定位 `panta-native.exe`。
-- [ ] Ubuntu configure 能找到 `WrapOpenGL`/Qt6Gui，不依赖个人机器全局包。
-- [ ] 单配置 Ninja 与多配置 Visual Studio 都能按 Cargo profile 选择 Debug/Release；失败时保留 CMake 原始诊断。
-- [ ] task、workflow、依赖规范和索引描述一致，无失效路径或未登记兼容代码。
+- [x] Ubuntu、macOS、Windows CI 的 Build、Test、Format、Clippy 全部成功。
+- [x] Windows 构建日志显示 Visual Studio 生成器与 MSVC 编译器，且 launcher 能定位 `panta-native.exe`。
+- [x] Ubuntu configure 能找到 `WrapOpenGL`/Qt6Gui，不依赖个人机器全局包。
+- [x] 单配置 Ninja 与多配置 Visual Studio 都能按 Cargo profile 选择 Debug/Release；失败时保留 CMake 原始诊断。
+- [x] task、workflow、依赖规范和索引描述一致，无失效路径或未登记兼容代码。
 
 ## 验证计划与结果
 
@@ -62,7 +62,7 @@ GitHub Actions 可访问 `Yuki-Nagori/panta`，并已确认 Qt 6.11.2 的 Linux 
 | 2026-09-17 | 同一构建树 `ctest --test-dir <OUT_DIR>/native-build --output-on-failure` | native 测试通过 | 6/6 通过 |
 | 2026-09-17 | `actionlint .github/workflows/ci.yml`、Python YAML/矩阵断言、`python3 /tmp/panta-check-docs.py` | workflow 与文档结构有效 | 全部通过；检查 87 个 Markdown、37 个任务 |
 | 2026-09-17 | GitHub Actions run `35176149286`（`994b730`） | 三平台四项检查全绿 | macOS、Windows 的 Build/Test/Format/Clippy 全部通过；Ubuntu 在 `rcc` 资源生成阶段因 Qt 工具缺少 `libicui18n.so.73` 失败 |
-| — | GitHub Actions 新 run（`gh run watch`/`gh run view`） | 三平台四项检查全绿 | 待执行 |
+| 2026-09-17 | GitHub Actions run `35176747521`（`8ffb76d`） | 三平台四项检查全绿 | Ubuntu、macOS、Windows 的 Build/Test/Format/Clippy 全部通过；Ubuntu 使用 Qt 官方 ICU 73 预编译归档后成功构建 |
 
 ## 风险与回退
 
@@ -75,7 +75,8 @@ Visual Studio 生成器可能随 runner 镜像升级而变化；若 `windows-202
 - 2026-09-17（第二轮 run）：OpenGL 与 compiler/path 根因已分别解除；Windows 进一步暴露多配置产物位于构建树根部，以及 GTest discovery 在构建阶段缺少 Qt DLL；Ubuntu 暴露 Qt `qmlimportscanner` 依赖 ICU 73。对应修复为补充根部产物候选、将 GTest discovery 延后到 `ctest`，并移除当前无源可扫描且结果为空的 app 级 import scan。
 - 2026-09-17（第三轮准备）：Ubuntu 构建继续暴露 `qtpaths` 仅用于生成 `.qmlls.build.ini` 的 ICU 73 依赖；Linux 跳过该 IDE 辅助文件生成，保留 QML typeinfo、cachegen、资源和运行时路径。
 - 2026-09-17（第三轮 run）：Ubuntu 在 `rcc` 资源生成阶段仍因 Qt 官方 RHEL9 工具缺少 `libicui18n.so.73` 失败；macOS、Windows 四项检查均已通过。确认应消费 Qt 官方仓库同版本的 `icu-linux-Rhel8.6-x86_64.7z` 预编译归档，而不是使用系统 ICU 或本地编译。
+- 2026-09-17（第四轮 run）：`8ffb76d` 将上述 ICU 归档纳入 `qt-provision.cmake` 并按 SHA256 解包到 Linux `staging/lib`；GitHub Actions run `35176747521` 三个平台四项检查全部通过。
 
 ## 完成摘要
 
-未完成。待三平台新 run 全绿并回填验证证据后，将本任务与索引标记为 done。
+已完成。三平台 CI 已验证 Qt 预编译工具、Rust workspace 和 native/QML 构建链；后续缓存、统一质量门禁和更大 native SDK 仍由 012、011、031 管理。
