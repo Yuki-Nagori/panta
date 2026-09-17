@@ -5,6 +5,8 @@
 
 规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
 
+> **命名**：Panta 取自赫拉克利特的名言 *Panta rhei*（希腊语 **πάντα ῥεῖ**，意为"万物皆流"）。注塑过程中，聚合物熔体、温度场、压力场与材料形态始终处于动态演化之中；CAE 的本质，正是对这一"流变万物"过程的数值再现。
+
 **当前状态：Rust workspace、Cargo 调度 native 构建、Qt Quick/C++ ViewModel 桌面骨架和 `.pa` parser/formatter CLI 已落地；完整 CAE 业务尚未实现。**
 
 ## 环境要求
