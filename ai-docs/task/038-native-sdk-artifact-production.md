@@ -67,6 +67,7 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-17 | `cmake -S tools/sdk -B target/sdk-production/superbuild -G Ninja -DQT_PROVISION_DIR=<共享 Qt 缓存>` → `cmake --build`（macOS arm64，Apple Silicon 全并行） | 全程约 13 分钟：clone ≈2min、configure ≈1min、编译+安装 ≈10min。安装树 `out/vtk/9.7.0/macos-arm64/`（295MB）：bin/include/lib/share/licenses + `panta-sdk.json`；Qt 模块 dylib 齐备（GUISupportQt/GUISupportQtQuick/GUISupportQtSQL/RenderingQt/ViewsQt）。**构建级证实 VTK 9.7.0 × Qt 6.11.2 可产出 GUISupportQtQuick**（窗口运行时行为仍归 007） |
 | 2026-09-17 | 自检 `cmake -S tools/sdk/selfcheck -B … -DPSDK_ROOT=<安装树> -DPSDK_PACKAGE=VTK -DPSDK_REQUIRED_TARGETS="VTK::GUISupportQtQuick VTK::RenderingQt" -DCMAKE_PREFIX_PATH=<Qt staging>` | 通过。两轮教训记档：`cmake -P` 脚本模式无法执行 `add_library(IMPORTED)`，VTK config 加载半途而断且脚本仍退出 0（假阳性）——自检必须是真实 configure 工程；VTK config 会调用 FindThreads 等编译探测，工程需启用 CXX。必需 target 以 `VTK::` 命名空间断言 |
 | 2026-09-17 | 打包 `cmake -DPKG_ROOT=<安装树> … -P tools/sdk/package.cmake` | `vtk-9.7.0-macos-arm64.tar.gz`（平铺布局，56MB），SHA256 `0cc143dc6545d96f25d537b4ee31f76f4d6e3cc7dfb147bc205c7fdd1e1b6a0f`，与 `.sha256` 文件一致 |
+| 2026-09-17 | 增量二本地回归：vtk.cmake 去除子工程硬编码 Ninja（继承外层生成器）后 `cmake -S tools/sdk …` 重配 + `cmake --build`；`python3 -c "yaml.safe_load(...)"` 校验 `sdk-vtk.yml` 与 `ci.yml` | 重配/幂等构建通过（已产出的 stamp 不重编）；两个 workflow YAML 解析通过。dispatch 级验证（三平台真实生产/发布）待推送后执行 |
 
 ## 风险与回退
 
@@ -75,7 +76,8 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 ## 决策与工作记录
 
 - 2026-09-17：由 031 官方资产盘点拆分；上游缺少全平台 C++ SDK 时，采用受信 CI 生成一次、开发者复用的制品路线。任务不授权普通本地构建源码。
-- 2026-09-17（增量一，已实施）：建立可审计构建描述 `tools/sdk/`——CMake superbuild（ExternalProject）+ 自检/打包脚本，首个目标 VTK 9.7.0。源码固定 tag `v9.7.0` 解引用 commit `23f0a095621e91bbdbeace8451e22b950c8e5f46`（git ls-remote 复核）；Qt 依赖复用 qt-provision 锁定预编译 staging；构建开关冻结：共享库、Release、`VTK_QT_VERSION=6`、`VTK_GROUP_ENABLE_Qt=YES`、显式 `VTK_MODULE_ENABLE_VTK_GUISupportQtQuick=YES`；安装布局含 `panta-sdk.json` 与 `share/licenses/`。本机（macOS arm64）真实生产一次并自检/打包通过（见验证表），开发机生产仅为构建描述验证与 007 前置证据，不改变"受信 CI 生产、开发者只下载"的目标形态。剩余：CI workflow（workflow_dispatch 矩阵 + artifact 上传 + Ubuntu 图形库/Windows 工具链适配）、发布存储决策（候选 GitHub Releases）、OCCT（macOS/Linux 补齐）与 Netgen 的构建描述、SBOM/provenance、031 manifest 正式登记。
+- 2026-09-17（增量一，已实施）：建立可审计构建描述 `tools/sdk/`——CMake superbuild（ExternalProject）+ 自检/打包脚本，首个目标 VTK 9.7.0。源码固定 tag `v9.7.0` 解引用 commit `23f0a095621e91bbdbeace8451e22b950c8e5f46`（git ls-remote 复核）；Qt 依赖复用 qt-provision 锁定预编译 staging；构建开关冻结：共享库、Release、`VTK_QT_VERSION=6`、`VTK_GROUP_ENABLE_Qt=YES`、显式 `VTK_MODULE_ENABLE_VTK_GUISupportQtQuick=YES`；安装布局含 `panta-sdk.json` 与 `share/licenses/`。本机（macOS arm64）真实生产一次并自检/打包通过（见验证表），开发机生产仅为构建描述验证与 007 前置证据，不改变"受信 CI 生产、开发者只下载"的目标形态。
+- 2026-09-17（增量二，CI 生产管线）：新增 `.github/workflows/sdk-vtk.yml`（workflow_dispatch，三平台矩阵：macos-latest/Ninja、ubuntu-latest/Ninja + GL/X 开发包、windows-2022/VS17-x64——生成器经 CMAKE_GENERATOR 继承进 ExternalProject 子构建，vtk.cmake 不再硬编码 Ninja 并显式 `--config Release` 应对多配置）。流程：qt-provision（actions/cache 加速层，键=qt-provision.cmake 哈希）→ 生产 → selfcheck 真实 configure 消费 → package → upload-artifact；`publish` 输入开启时以 `gh release` 幂等发布到 tag `sdk-vtk-9.7.0`，发布说明模板 `tools/sdk/releases/vtk-9.7.0.md` 承载合规元数据：源码 pin + unmodified 声明、BSD-3 随包许可证、Qt LGPL-3 只链接不复分发、`.sha256` 校验与 panta-sdk.json provenance。工具链取 runner 预装 cmake/ninja（受信生产环境，非开发者基线）。workflow 需推送后 dispatch 验证，当前未执行；031 manifest 的 vtk 三平台登记待首个 Release 落地后按实际 URL/SHA256 回填。剩余：workflow dispatch 实测、OCCT（macOS/Linux）与 Netgen 构建描述、SBOM/provenance 自动化、031 manifest 正式登记。
 
 ## 完成摘要
 

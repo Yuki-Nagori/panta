@@ -17,7 +17,10 @@ ExternalProject_Add(vtk_sdk
   GIT_TAG ${PANTA_VTK_COMMIT}
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
-  CMAKE_GENERATOR Ninja
+  # 子工程继承外层生成器（macOS/Linux 为 Ninja；Windows CI 传 Visual
+  # Studio 17 2022 + x64，Ninja 子构建在无 vcvars 的 runner 上找不到 cl）。
+  # 多配置生成器的构建/安装显式选 Release，单配置忽略 --config。
+  BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
   CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=Release
     -DBUILD_SHARED_LIBS=ON
