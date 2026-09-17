@@ -37,7 +37,13 @@ const RERUN_PATHS: &[&str] = &[
 ];
 
 /// 影响配置结果的环境变量，变更即重建。CMAKE 可指定 cmake 可执行文件路径。
-const RERUN_ENVS: &[&str] = &["CMAKE", "CXX", "CMAKE_GENERATOR", "CMAKE_PREFIX_PATH"];
+const RERUN_ENVS: &[&str] = &[
+    "CMAKE",
+    "CXX",
+    "CMAKE_GENERATOR",
+    "CMAKE_GENERATOR_PLATFORM",
+    "CMAKE_PREFIX_PATH",
+];
 
 fn main() -> ExitCode {
     for path in RERUN_PATHS {
@@ -70,11 +76,13 @@ fn orchestrate() -> Result<PathBuf, String> {
         other => return Err(format!("未知 PROFILE '{other}'，无法映射 CMAKE_BUILD_TYPE")),
     };
 
+    // 保留标准绝对路径表示，不调用 canonicalize：Windows 上它会把盘符路径
+    // 转成 `//?/D:` 长路径前缀，MinGW 会将其错误解析为 POSIX 根路径。路径可能
+    // 含空格，全程走参数数组；CMake 会在读取 -S 时消解 `..`。
     let native_dir = PathBuf::from(manifest_dir).join("../../native");
-    // canonicalize 消除 ../ 与符号链接差异；路径可能含空格，全程走参数数组。
-    let native_dir = native_dir
-        .canonicalize()
-        .map_err(|error| format!("native 目录不可达：{error}"))?;
+    if !native_dir.is_dir() {
+        return Err(format!("native 目录不可达：{}", native_dir.display()));
+    }
     let binary_dir = PathBuf::from(out_dir).join("native-build");
 
     let cmake = std::env::var_os("CMAKE")
@@ -96,7 +104,13 @@ fn orchestrate() -> Result<PathBuf, String> {
     run_step("configure", &mut configure)?;
 
     let mut build = Command::new(&cmake);
-    build.arg("--build").arg(&binary_dir);
+    // 单配置生成器会忽略 --config，多配置生成器（如 Windows Visual Studio）
+    // 则必须显式选择与 Cargo profile 对应的配置。
+    build
+        .arg("--build")
+        .arg(&binary_dir)
+        .arg("--config")
+        .arg(build_type);
     run_step("build", &mut build)?;
 
     let exe_name = if cfg!(windows) {
@@ -104,14 +118,32 @@ fn orchestrate() -> Result<PathBuf, String> {
     } else {
         "panta-native"
     };
-    let product = binary_dir.join("app").join(exe_name);
-    if !product.exists() {
-        return Err(format!(
-            "CMake 构建成功但未找到产物 {}；检查 native/app 的 OUTPUT_NAME 是否与 build.rs 定位约定一致",
-            product.display()
-        ));
-    }
-    Ok(product)
+    locate_product(&binary_dir, build_type, exe_name)
+}
+
+fn locate_product(
+    binary_dir: &std::path::Path,
+    build_type: &str,
+    exe_name: &str,
+) -> Result<PathBuf, String> {
+    let base = binary_dir.join("app");
+    // Ninja 等单配置生成器把产物直接放在 app/；Visual Studio 等多配置生成器
+    // 通常放在 app/<Config>/。同时检查两种布局，避免生成器选择泄漏到 launcher。
+    let candidates = [base.join(exe_name), base.join(build_type).join(exe_name)];
+    candidates
+        .iter()
+        .find(|path| path.is_file())
+        .cloned()
+        .ok_or_else(|| {
+            let expected = candidates
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(" 或 ");
+            format!(
+                "CMake 构建成功但未找到产物（尝试：{expected}）；检查 native/app 的 OUTPUT_NAME 与生成器配置"
+            )
+        })
 }
 
 fn run_step(name: &str, command: &mut Command) -> Result<(), String> {

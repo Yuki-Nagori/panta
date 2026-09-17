@@ -47,10 +47,10 @@
 
 ## CI（018）
 
-- GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-latest`。
+- GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。Windows 使用 Visual Studio 17 2022 与 Qt MSVC2022 预编译包；Ubuntu 在 configure 前安装 `libgl1-mesa-dev`，仅补齐 Qt Gui 的 OpenGL 开发文件，不替代项目托管的 Qt 供给。
 - 每个平台执行与本地一致的最小检查：按 rust-toolchain.toml 安装固定工具链（minimal + rustfmt + clippy）→ `cargo build --locked` → `cargo test --locked` → `cargo fmt --all -- --check` → `cargo clippy --locked --all-targets`。
-- runner 只需镜像自带的平台编译器与 rustup，无额外系统包——与 README 环境要求一致。
-- 边界：当前 CI 只验证 Rust 骨架层。native 托管构建接入 CI 随 004 之后扩展；测试聚合与质量门禁归 011，依赖缓存归 012。
+- runner 需要镜像自带的平台编译器与 rustup；Ubuntu 额外安装上面列出的 OpenGL 开发包，以满足预编译 Qt 的 CMake 探测。
+- 边界：当前 CI 通过 Cargo 同步验证 Rust 与已有 native/Qt 构建；VTK、OCCT、Netgen 的 SDK 供给与集成仍由 031 及后续任务扩展，测试聚合与质量门禁归 011，依赖缓存归 012。
 
 ## 干净重建步骤
 
