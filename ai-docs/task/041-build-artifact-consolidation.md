@@ -1,6 +1,6 @@
 # 041 — 构建产物归一与第三方缓存共享
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成）、[020](020-toolchain-provisioning.md)（已完成）
 - 优先级：P1
@@ -71,6 +71,7 @@
 | 2026-09-17 | 干净 PATH 冒烟（020 场景回归）：`PATH=<cargo 符号链接>:/usr/bin:/bin:/usr/sbin:/sbin cargo build` | 通过：托管工具（panta-tools）+ 共享树 + 共享缓存全链 9.27s；随后常规 PATH 幂等 0.08s |
 | 2026-09-17 | 磁盘清理：`rm -rf native/build`；删除当前活跃之外的全部 launcher 哈希目录 | `target` 15G → 4.4G（剩余：Rust 缓存 + 单份 Qt 1.4G + 工具 363M + 共享树 54M）；`native/` 源码树无产物 |
 | 2026-09-17 | `cargo clippy --locked --workspace --all-targets -- -D warnings`；`cargo fmt --all -- --check`；`git diff --check` | 通过 |
+| 2026-09-17 | 三平台 CI 复跑（push 97b7d32，run [35226508625](https://github.com/Yuki-Nagori/panta/actions/runs/35226508625)） | windows-2022 / macos-latest / ubuntu-latest 全绿（7m41s / 5m58s / 5m14s），共享树与缓存路径变更在 CI 干净环境同样成立 |
 
 ## 风险与回退
 
@@ -79,9 +80,9 @@
 ## 决策与工作记录
 
 - 2026-09-17：根据维护者反馈（两份产物、仓库整洁）创建任务。选择"presets 重定向 + Cargo/presets 共树"而非"删除 presets"：presets 保留 native-only 调试入口，且 039/041 的本机验证依赖它；共享依赖缓存是磁盘问题的根因修复，清目录只是止血。
-- 2026-09-17（实施）：build.rs 将 binary_dir 改为 `target_root/native/<profile>` 并注入 QT_PROVISION_DIR/FETCHCONTENT_BASE_DIR；presets binaryDir 重定向；新增根 `.clangd`（compile_commands 随共享树，编辑器经配置定位）。哈希更替不重下 Qt 的验证通过。三平台 CI 复跑待推送确认。
-- 待记录：实际方案、失败原因、范围调整与后续任务。
+- 2026-09-17（实施）：build.rs 将 binary_dir 改为 `target_root/native/<profile>` 并注入 QT_PROVISION_DIR/FETCHCONTENT_BASE_DIR；presets binaryDir 重定向；新增根 `.clangd`（compile_commands 随共享树，编辑器经配置定位）。哈希更替不重下 Qt 的验证通过。
+- 2026-09-17（收尾）：三平台 CI 复跑全绿（run 35226508625），验收关闭；presets fresh configure 需先 `cargo build` 注入 FFI 缓存值、切换 generator 需删 profile 目录、同 profile 并发构建不支持这三个边界保持记录在风险节。
 
 ## 完成摘要
 
-产物与缓存归一完成：native 构建树固定 `target/native/<profile>`（Cargo 与 presets 共用），Qt/googletest 缓存共享于 `target/panta-deps/`，compile_commands.json 只存在于构建树内并经根 `.clangd` 提供给编辑器。磁盘效果：`target` 15G → 4.4G，`native/build`（1.6G）删除，launcher 哈希更替不再重下 Qt。已知边界：presets 单独 fresh configure 缺 FFI 缓存值会被早校验明确拒绝（需先 `cargo build` 一次）；切换 generator 需删除对应 profile 目录；同 profile 并发构建不受支持（与之前一致）。
+产物与缓存归一完成并经三平台 CI 复跑验证（run 35226508625）：native 构建树固定 `target/native/<profile>`（Cargo 与 presets 共用），Qt/googletest 缓存共享于 `target/panta-deps/`，compile_commands.json 只存在于构建树内并经根 `.clangd` 提供给编辑器。磁盘效果：`target` 15G → 4.4G，`native/build`（1.6G）删除，launcher 哈希更替不再重下 Qt。已知边界：presets 单独 fresh configure 缺 FFI 缓存值会被早校验明确拒绝（需先 `cargo build` 一次）；切换 generator 需删除对应 profile 目录；同 profile 并发构建不受支持（与之前一致）。
