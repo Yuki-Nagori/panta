@@ -70,6 +70,7 @@
 | 2026-09-17 | `ctest --preset debug -R Build.SdkProvision`（macOS arm64，native 构建树 `target/native/debug`） | 通过：10 组场景全绿——038 布局成功供给（下载/SHA256 校验/解包/原子发布/marker/`find_package` CONFIG/imported target 自检）、归档缓存离线复用（删除源归档后新 consumer 成功）、marker 损坏按缓存归档重建、版本目录隔离（v1/v2 并存互不覆盖）、哈希不符拒收并清场、生产 manifest 缺资产诊断（vtk 报出固定版本 9.7.0 并指向 038）、OCCT 内嵌归档+包装目录布局（内层 SHA256 校验、外层残留不进 staging）、归档内配置歧义拒绝、未登记名诊断、SHA256 格式登记校验。测试自清理工作目录，连续两次运行均通过。 |
 | 2026-09-17 | `ctest --preset debug`（macOS arm64） | 16/16 全绿（15 项既有 + Build.SdkProvision），SDK 供给接入未影响既有构建与测试。 |
 | 2026-09-17 | `cargo build --locked`（macOS arm64） | 通过：build.rs 注入 `PANTA_SDK_PROVISION_DIR=target/panta-deps/sdk`，共享树重新 configure 引入 sdk-provision.cmake（manifest 登记 + 函数定义，不触发下载）；消费方任务未接入，生产构建零 SDK 下载。 |
+| 2026-09-17 | 三平台 CI（push 5130ca3，run [35230584355](https://github.com/Yuki-Nagori/panta/actions/runs/35230584355)） | windows-2022 / macos-latest / ubuntu-latest 全绿（5m26s）：sdk-provision.cmake 的解析与 manifest 登记在三平台 configure 均执行通过。注意 CI 当前不运行 CTest（011 聚合前），`Build.SdkProvision` 的 Windows/Linux 执行证据待 CI 扩展或平台实测补齐。 |
 
 ## 风险与回退
 
