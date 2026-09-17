@@ -1,6 +1,6 @@
 # 008 — 后台任务、错误与日志基础
 
-- 状态：in-progress
+- 状态：done
 - 阶段：基础平台
 - 依赖：[005](005-qt-qml-shell.md)（已完成）、[006](006-rust-cpp-boundary.md)（已完成）
 - 优先级：P1
@@ -58,9 +58,9 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 - [x] 启动、成功、失败、取消及迟到事件路径均可验证，UI 不被模拟慢任务阻塞。
 - [x] 关闭窗口后不存在访问销毁对象，跨语言错误保持可追踪上下文。
 - [x] 日志能定位任务与原因，重复/迟到事件不使终态回到运行中。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
-- [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
 ## 验证计划与结果
 
@@ -79,6 +79,7 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 | 2026-09-17 | native GTest `panta_bridge_task_host_test`（Qt6::Test + QSignalSpy/QTRY，macOS arm64） | 5/5：提交→Started/成功信号与运行数 1→0 通知、取消信号带 `task.cancelled` 且重复/迟到取消被拒、无效提交记录 `task.empty_label`/`task.invalid_duration`、进度信号有界单调、500ms 慢任务期间 GUI 心跳 ≥20 次（事件循环不被阻塞） |
 | 2026-09-17 | `ctest --test-dir native/build/debug`（重配指向含 Progress 的新生成头） | 15/15 全部通过（含既有 Foundation/Shell/QML 与 FFI 测试） |
 | 2026-09-17 | `cargo fmt --all -- --check`；`git diff --check` | 通过 |
+| 2026-09-17 | GitHub Actions run `35212142062`（`c70a7fe`，三平台，Windows 5m50s） | 含 TaskHost/Progress 代码的三平台干净/增量构建与检查 | 通过：Build/Test/Format/Clippy 全绿；panta-core 7 + panta-ffi 8 个 Rust 测试三平台执行，native CMake 构建链接含 TaskHost 的 bridge 模块 |
 
 ## 风险与回退
 
@@ -95,4 +96,4 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 
 ## 完成摘要
 
-服务层与 Qt 集成已落地并验证：panta-core 任务状态机（Progress/终态事件、协作取消、终态不可回退、结构化日志环、销毁 join）、panta-ffi `TaskService` 桥接、`TaskHost`（GUI 线程轮询转信号）。本机证据：Rust 26 测试、native 15/15 CTest（含 TaskHost 5 用例：事件信号、取消/迟到拒绝、结构化错误、进度有界单调、GUI 心跳证明不阻塞）。三平台 CI run 复跑进行中，全绿后标 done。
+已完成。单一任务生命周期落地三层：panta-core 状态机（Started/Progress/终态事件、协作取消、终态不可回退、结构化日志环、shutdown+join）、panta-ffi `TaskService` 拉取式桥接、`TaskHost`（GUI 线程转 Qt 信号，QML 可注册）。证据：Rust 26 测试、本机 CTest 15/15（TaskHost 5 用例含 GUI 心跳证明慢任务不阻塞事件循环）、三平台 CI run `35210392688` 与 `35212142062`。错误为稳定码（task.*）+ 诊断 detail；与用户摘要的分离已建立，摘要本地化由 022 承接，真实导入/网格任务接入时替换模拟执行体（契约不变），日志落盘/Console 通路在首个真实消费任务中决策。
