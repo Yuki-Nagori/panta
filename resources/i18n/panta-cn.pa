@@ -1,0 +1,21 @@
+version: 1
+kind: language
+language: zh-CN
+sourcelanguage: en
+
+[App]
+title:
+  src: Panta CAE
+  tr: Panta CAE
+
+revision-button:
+  src: Advance revision
+  tr: 推进修订
+
+revision-caption:
+  src: Revision %1
+  tr: 修订 %1
+
+error-title:
+  src: Error
+  tr: 错误

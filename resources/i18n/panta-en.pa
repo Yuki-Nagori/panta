@@ -1,0 +1,21 @@
+version: 1
+kind: language
+language: en
+sourcelanguage: en
+
+[App]
+title:
+  src: Panta CAE
+  tr: Panta CAE
+
+revision-button:
+  src: Advance revision
+  tr: Advance revision
+
+revision-caption:
+  src: Revision %1
+  tr: Revision %1
+
+error-title:
+  src: Error
+  tr: Error

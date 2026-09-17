@@ -77,3 +77,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 ## 完成摘要
 
 未完成，等待实现与跨平台验证。
+
+## 当前进展（2026-09-17）
+
+核心 parser、TS 生成入口和 formatter 消费契约已实现；实际 language 源文件已加入 resources/i18n/panta-en.pa 与 resources/i18n/panta-cn.pa。测试夹具仍只用于 parser 回归，构建入口接入和 QM 生成待本任务后续步骤。
