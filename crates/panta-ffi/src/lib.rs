@@ -2,6 +2,9 @@
 
 const MAX_REPEAT: u32 = 8;
 
+// unsafe 只由 CXX 桥接宏生成（胶水 extern/函数/块）；边界安全前提由 cxx
+// 运行时的类型检查与 ffi.hpp 签名一致性承担，本 crate 对外只暴露安全签名。
+#[allow(unsafe_code)]
 #[cxx::bridge(namespace = "panta::ffi")]
 pub mod bridge {
     /// 只跨边界传递 UTF-8 文本和有界整数，不暴露 Qt/CAE 类型布局。

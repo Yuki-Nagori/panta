@@ -35,6 +35,7 @@ const RERUN_PATHS: &[&str] = &[
     "../panta-ffi",
     "../panta-ffi/include",
     "../panta-ffi/src",
+    "../../native/ffi",
     "../../qml",
     "../../qml/Themes",
     "../../qml/Panels",
@@ -88,7 +89,7 @@ fn orchestrate() -> Result<PathBuf, String> {
     if !native_dir.is_dir() {
         return Err(format!("native 目录不可达：{}", native_dir.display()));
     }
-    let binary_dir = PathBuf::from(out_dir).join("native-build");
+    let binary_dir = PathBuf::from(&out_dir).join("native-build");
 
     let cmake = std::env::var_os("CMAKE")
         .map(PathBuf::from)

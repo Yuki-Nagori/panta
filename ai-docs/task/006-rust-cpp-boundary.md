@@ -54,13 +54,12 @@
 
 ## 验收标准
 
-- [ ] 跨语言成功/失败路径返回结构化结果；非 ASCII 文本与空输入行为定义明确。
+- [x] 跨语言成功/失败路径返回结构化结果；非 ASCII 文本与空输入行为定义明确。
 - [ ] 重复创建/释放、无效输入和错误转换有可运行验证；不存在未经处理的跨边界异常展开。
 - [ ] 干净构建与增量构建保持正确，没有第二套 Cargo 递归编译链。
 - [ ] CXX 两侧生成版本一致；双向调用及 CMake 最终链接通过，Result/异常与 panic-abort 行为被明确区分。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
-
-- [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
 ## 验证计划与结果
 
@@ -71,6 +70,11 @@
 | 2026-09-17 | CXX 双向最小路径：Rust `process` 调 C++ `cpp_prefix`；native GTest 调 Rust `process` | 待实现后验证 DTO、非 ASCII、空输入和错误转换 |
 | 2026-09-17 | `cargo fmt --all -- --check`；`cargo metadata --locked --no-deps`；`git diff --check` | 通过；workspace 成员、CXX 1.0.202 依赖和锁文件结构可解析。 |
 | 2026-09-17 | `CARGO_TARGET_DIR=/private/tmp/panta-ffi-dedicated cargo test -p panta-ffi --locked` | 未取得编译结果：本机新编译 Rust build script/可执行文件停留在 macOS `_dyld_start`，与项目源码无关；已终止本轮孤儿进程。需在 CI 或可正常启动新 Rust 二进制的环境补跑。 |
+| 2026-09-17 | `cargo check -p panta-ffi --all-targets`；`cargo fmt --all -- --check` | 通过：桥接模块加 `#[allow(unsafe_code)]` 后，workspace `-D unsafe-code` 不再拦截 CXX 生成胶水（原 4 个错误清零）；格式检查通过。 |
+| 2026-09-17 | `cargo clippy -p panta-ffi --all-targets` | 通过：仅测试代码 3 处 `expect_used` 警告（workspace 设为 warn，策略归任务 011）。 |
+| 2026-09-17 | `cargo test -p panta-ffi --locked`（默认 target 目录） | 通过：3 个测试全部成功，含 Rust→C++ 调用与非 ASCII 往返；上一轮 dyld 卡挂未复现，补齐此前欠的运行证据。 |
+| 2026-09-17 | 手动以等效 cargo 环境变量驱动 launcher build.rs 完成 CMake 全量构建（Qt staging 与 googletest 复用本地缓存，零下载；DEP 注入规则另由最小复现验证）。首跑暴露 build.rs E0382、DEP 不注入、boundary_test 缺 main 三处阻塞 | 修复后构建通过：84 个 ninja 目标全绿，panta_ffi_boundary_test 链接成功，产出 panta-native。 |
+| 2026-09-17 | `ctest -R Ffi`（上条构建树，macOS 26 arm64 / c++ 20 / Qt 6.11.2 staging） | 通过：`Ffi.RustCppBoundary` 1/1，覆盖 C++ 调 Rust 非 ASCII 往返（"界"×2 → "ffi:界界"）与 Rust 结构化错误转 `rust::Error` 异常。 |
 
 ## 风险与回退
 
@@ -81,8 +85,12 @@ CXX 生成器版本不一致、glue 重复编译或双向符号未链接会破�
 - 2026-09-16：仅完成任务编排，未实施；根据用户提出的 CXX 方案及官方文档，将 CXX 列为首选验证路线。
 - 2026-09-17：开始实施；冻结 `cxx`/`cxx-build` 使用同一 `1.0.x` release，`FfiRequest`/`FfiResponse` 只含受支持的 UTF-8 字符串和整数；Rust 错误通过 CXX `Result` 转为 C++ 异常，调用方必须捕获，空输入和超大 repeat 明确拒绝。
 - 2026-09-17：CMake 最终链接通过 launcher build dependency 传递 `panta-ffi` 静态库与生成头；CMake 不回调 Cargo，桥接 glue 只由 Rust build script 编译一次。
+- 2026-09-17：修复 workspace `unsafe_code = "deny"` 拦截 CXX 生成胶水的问题。Cargo 禁止成员在 `lints.workspace = true` 下覆盖同名 lint（报 "cannot override workspace.lints"），故不改成员 Cargo.toml，而是在桥接模块上加模块级 `#[allow(unsafe_code)]` 并随代码注明安全前提；workspace 注释同步指向该放开点，其余 crate 维持 deny。后续方向是收窄而非移除：allow 只覆盖宏生成胶水，接口层保持纯安全签名（DTO + `Result`，两侧调用方不写 unsafe）；新增手写 unsafe 另设专用模块并逐块写 `// SAFETY:`。`unsafe extern` 声明与胶水内部 unsafe 属 FFI 固有成本，不作为清理目标。
+- 2026-09-17：修复 fd0d228 引入的 launcher build.rs 借用错误（`out_dir` 移动后又被 `ffi_artifacts` 借用，E0382）。该提交落地时本地 `cargo test` 因 dyld 问题未完成、commit 未推送故 CI 未覆盖，问题在本次补跑验证时暴露。
+- 2026-09-17：修复 `DEP_PANTA_FFI_INCLUDE` 不注入的问题。本机 cargo 1.95.0/1.98.1（Homebrew 与 rustup 双渠道）最小复现均证实：links 包的 metadata 只沿普通 `[dependencies]` 边注入下游构建脚本，仅列在 `[build-dependencies]` 时不注入；将 panta-ffi 移入 launcher 的 `[dependencies]`。判别过程与证据记录于验证表；该行为与既有 cargo 文档表述不一致，后续升级工具链时需复查。
+- 2026-09-17：boundary_test 初次真实链接即失败：测试无自定义 `main` 却只链 `GTest::gtest`（fd0d228 从未本地链接验证过该目标）；按 foundation 先例改链 `GTest::gtest_main`。同轮发现 launcher build.rs 重建追踪缺 `native/ffi` 目录，一并补入。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要
 
-未完成。最小双向路径实现后仍需三平台干净/增量构建、ABI 和错误失败证据，全部验收完成后再标 done。
+未完成。最小双向路径已在本机验证（Rust 侧 3 测试 + native GTest `Ffi.RustCppBoundary` + CMake 最终链接）；剩余：panic-abort 区分的可运行证据、三平台干净/增量构建（CI 覆盖）、以及重复创建/释放验收项——当前 DTO-only 范围尚无 opaque 句柄，待该场景引入时补验证。全部验收完成后再标 done。

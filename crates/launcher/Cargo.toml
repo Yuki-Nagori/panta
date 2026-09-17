@@ -10,5 +10,7 @@ publish = false
 [lints]
 workspace = true
 
-[build-dependencies]
+# DEP_PANTA_FFI_INCLUDE 只沿普通依赖边注入构建脚本（cargo 1.95/1.98 实测，
+# 纯 [build-dependencies] 不注入），因此 panta-ffi 必须留在本表。
+[dependencies]
 panta-ffi = { path = "../panta-ffi" }

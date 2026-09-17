@@ -7,7 +7,7 @@ target_include_directories(panta_ffi_boundary_test PRIVATE
 )
 target_link_libraries(panta_ffi_boundary_test PRIVATE
   "${PANTA_FFI_STATIC_LIB}"
-  GTest::gtest
+  GTest::gtest_main
 )
 if(UNIX)
   find_package(Threads REQUIRED)

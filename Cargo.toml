@@ -26,7 +26,9 @@ quick-xml = { version = "0.38", features = ["serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 
 [workspace.lints.rust]
-# FFI 边界模块（任务 006）引入 unsafe 时在此放开并注明安全前提。
+# 默认拒绝 unsafe；唯一例外是 FFI 边界（任务 006）的 CXX 生成胶水，以桥接模块
+# 级 allow 放开（位置与安全前提见 crates/panta-ffi/src/lib.rs）。该 allow 只收窄
+# 不外扩：新增手写 unsafe 需专用模块并逐块写 // SAFETY:，规范见 standards/rust.md。
 unsafe_code = "deny"
 
 [workspace.lints.clippy]
