@@ -46,8 +46,10 @@ tests/
 cargo test       # workspace Rust + 根 tests/integration/native.rs
 cargo format     # Rust、C++/CXX、QML 格式
 cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、IWYU、Cppcheck
+cargo audit      # cargo-deny 依赖、许可证和 RustSec 审计
+cargo coverage   # cargo-llvm-cov Rust 覆盖率门禁
 ```
 
-`cargo lint <tool>` 用于单项定位。CI 对构建、测试、格式、每个 lint 工具和依赖审计分别建检查；CI 命令追加 `--locked`，确保 `Cargo.lock` 与 manifests 漂移时立即失败。`cargo quality` 只作为本地全量聚合入口，不作为 CI 的唯一检查名。
+`cargo lint <tool>` 用于单项定位。CI 对构建、测试、格式、每个 lint 工具、依赖审计和覆盖率分别建检查；CI 命令追加 `--locked`，确保 `Cargo.lock` 与 manifests 漂移时立即失败。`cargo quality` 只作为本地全量聚合入口，不作为 CI 的唯一检查名。
 
 测试迁移必须同时更新 CMake source path、Cargo manifest、根 aliases、README、task 和索引，并用 `rg` 清理旧目录引用；禁止保留同一测试的双份实现。

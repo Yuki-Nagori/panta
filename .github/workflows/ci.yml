@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   dependency-audit:
-    name: cargo deny (ubuntu)
+    name: cargo audit (ubuntu)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -28,15 +28,9 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal
 
-      # 固定版本见 ai-docs/modules/quality-tooling.md（任务 032）；升级必须
-      # 同 commit 更新此处的 --version 与规范。
-      - name: Install pinned dependency audit tool
-        shell: bash
-        run: cargo install cargo-deny --locked --version 0.20.2
-
       - name: Dependency and license audit
         shell: bash
-        run: cargo deny check
+        run: cargo audit
 
   lint:
     name: cargo lint (${{ matrix.tool }}, ubuntu)
@@ -54,21 +48,16 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
-      - name: Install Cargo machete
-        if: matrix.tool == 'machete'
-        shell: bash
-        run: cargo install cargo-machete --locked --version 0.9.2
-
       - name: Prepare uv for cargo lint cmake
         if: matrix.tool == 'cmake'
         uses: astral-sh/setup-uv@v6
 
       - name: Install external native analyzers
-        if: matrix.tool == 'clang-tidy' || matrix.tool == 'iwyu' || matrix.tool == 'cppcheck'
+        if: matrix.tool == 'iwyu' || matrix.tool == 'cppcheck'
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y clang-tidy cppcheck iwyu
+          sudo apt-get install --no-install-recommends -y cppcheck iwyu
 
       - name: Run selected lint
         shell: bash
@@ -106,16 +95,12 @@ jobs:
           # llvm-tools-preview 提供 llvm-profdata/llvm-cov（覆盖率合并所需）。
           rustup toolchain install "$channel" --profile minimal --component llvm-tools-preview
 
-      - name: Install pinned coverage tool
-        shell: bash
-        run: cargo install cargo-llvm-cov --locked --version 0.9.1
-
       # 全局阶段下限，不等于逐模块/逐提交防下降；具体边界见
       # ai-docs/modules/quality-tooling.md。launcher 暂不纳入 Rust 插桩链。
       # 使用与固定 rustc 配套的 llvm-tools-preview；branch 数据尚未采集。
       - name: Coverage gate
         shell: bash
-        run: cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92
+        run: cargo coverage
 
   native-coverage:
     name: native C++ and QML coverage (ubuntu)
@@ -166,14 +151,14 @@ jobs:
         include:
           - os: macos-latest
             cmake_generator: Ninja
-            cache_compiler: apple-clang-17
+            cache_compiler: llvm-22.1.7
           - os: ubuntu-latest
             cmake_generator: Ninja
-            cache_compiler: gcc-rhel9
+            cache_compiler: llvm-22.1.7
           - os: windows-2022
             cmake_generator: Visual Studio 17 2022
             cmake_generator_platform: x64
-            cache_compiler: msvc2022
+            cache_compiler: llvm-22.1.7
     runs-on: ${{ matrix.os }}
     env:
       CMAKE_GENERATOR: ${{ matrix.cmake_generator }}

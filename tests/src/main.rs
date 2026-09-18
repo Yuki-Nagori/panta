@@ -1,8 +1,12 @@
 use std::error::Error;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
+const CARGO_DENY_VERSION: &str = "0.20.2";
+const CARGO_MACHETE_VERSION: &str = "0.9.2";
+const CARGO_LLVM_COV_VERSION: &str = "0.9.1";
 
 fn main() -> ExitCode {
     let mut arguments = std::env::args().skip(1);
@@ -10,13 +14,17 @@ fn main() -> ExitCode {
         Some("quality") => quality(),
         Some("test") => test_all(),
         Some("format") => format_all(),
+        Some("audit") => audit(),
+        Some("coverage") => coverage(),
         Some("toolchain") => verify_toolchain(),
         Some("lint") => lint(arguments.next().as_deref()),
         Some(command) => Err(format!(
-            "未知命令 '{command}'；可用：quality、lint、test、format、toolchain"
+            "未知命令 '{command}'；可用：quality、audit、lint、test、format、coverage、toolchain"
         )
         .into()),
-        None => Err("缺少命令；可用：quality、lint、test、format、toolchain".into()),
+        None => {
+            Err("缺少命令；可用：quality、audit、lint、test、format、coverage、toolchain".into())
+        }
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -30,8 +38,33 @@ fn main() -> ExitCode {
 fn quality() -> Result<(), Box<dyn Error>> {
     format_all()?;
     lint(None)?;
-    cargo("deny", ["check"])?;
+    audit()?;
     test_all()
+}
+
+fn audit() -> Result<(), Box<dyn Error>> {
+    cargo("deny", ["check"])
+}
+
+fn coverage() -> Result<(), Box<dyn Error>> {
+    let tool = ensure_cargo_tool("cargo-llvm-cov", CARGO_LLVM_COV_VERSION)?;
+    let target_dir = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let mut command = Command::new(tool);
+    command
+        .env("CARGO_TARGET_DIR", target_dir)
+        .args([
+            "--locked",
+            "--workspace",
+            "--exclude",
+            "panta-launcher",
+            "--summary-only",
+            "--fail-under-functions",
+            "89",
+            "--fail-under-lines",
+            "92",
+        ])
+        .current_dir(ROOT);
+    run("cargo llvm-cov", command)
 }
 
 fn lint(tool: Option<&str>) -> Result<(), Box<dyn Error>> {
@@ -86,9 +119,11 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
     let cmake = Path::new(env!("PANTA_TEST_CMAKE"));
     let clang_format = Path::new(env!("PANTA_TEST_CLANG_FORMAT"));
+    let llvm_root = Path::new(env!("PANTA_TEST_LLVM_ROOT"));
+    let llvm_version = env!("PANTA_TEST_LLVM_VERSION");
     let managed_root = target_root.join("panta-tools");
     let managed_cmake = managed_root.join("cmake");
-    let managed_clang_format = managed_root.join("clang-format");
+    let managed_llvm = managed_root.join("llvm");
     let ninja = managed_root.join("ninja").join(executable_name("ninja"));
     let qt_bin = target_root.join("panta-deps/qt/staging/bin");
     let googletest = target_root.join("panta-deps/fetchcontent/googletest-src/CMakeLists.txt");
@@ -97,6 +132,26 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     require_file("托管 CMake", cmake)?;
     require_file("托管 Ninja", &ninja)?;
     require_file("托管 clang-format", clang_format)?;
+    require_file(
+        "托管 clang",
+        &llvm_root.join("bin").join(executable_name("clang")),
+    )?;
+    require_file(
+        "托管 clang++",
+        &llvm_root.join("bin").join(executable_name("clang++")),
+    )?;
+    if cfg!(windows) {
+        require_file(
+            "托管 clang-cl",
+            &llvm_root.join("bin").join(executable_name("clang-cl")),
+        )?;
+    }
+    let version_binary = if cfg!(windows) {
+        llvm_root.join("bin").join(executable_name("clang-cl"))
+    } else {
+        llvm_root.join("bin").join(executable_name("clang++"))
+    };
+    require_tool_version(&version_binary, llvm_version)?;
     require_file("Qt qmlformat", &qt_bin.join(executable_name("qmlformat")))?;
     require_file("Qt qmllint", &qt_bin.join(executable_name("qmllint")))?;
     require_file("GoogleTest FetchContent", &googletest)?;
@@ -109,22 +164,47 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
         )
         .into());
     }
-    if !clang_format.starts_with(&managed_clang_format) {
+    if !llvm_root.starts_with(&managed_llvm) || !clang_format.starts_with(&managed_llvm) {
         return Err(format!(
-            "clang-format 未使用 Cargo 托管资产：{}（期望位于 {}）",
+            "LLVM 工具未使用 Cargo 托管资产：root={} clang-format={}（期望位于 {}）",
+            llvm_root.display(),
             clang_format.display(),
-            managed_clang_format.display()
+            managed_llvm.display()
         )
         .into());
     }
     println!(
-        "Cargo 工具链已就绪：CMake={} Ninja={} Qt={} GoogleTest={} compile_commands={}",
+        "Cargo 工具链已就绪：LLVM={} CMake={} Ninja={} Qt={} GoogleTest={} compile_commands={}",
+        llvm_root.display(),
         cmake.display(),
         ninja.display(),
         qt_bin.display(),
         googletest.display(),
         compile_database.display()
     );
+    Ok(())
+}
+
+fn require_tool_version(path: &Path, expected: &str) -> Result<(), Box<dyn Error>> {
+    let output = Command::new(path)
+        .arg("--version")
+        .output()
+        .map_err(|error| format!("运行 {} 失败：{error}", path.display()))?;
+    if !output.status.success() {
+        return Err(format!("{} --version 失败：{}", path.display(), output.status).into());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stdout.contains(expected) && !stderr.contains(expected) {
+        return Err(format!(
+            "{} 版本不匹配：期望 LLVM {}，实际 {}{}",
+            path.display(),
+            expected,
+            stdout.trim(),
+            stderr.trim()
+        )
+        .into());
+    }
     Ok(())
 }
 
@@ -164,8 +244,19 @@ fn cargo(
     args: impl IntoIterator<Item = &'static str>,
 ) -> Result<(), Box<dyn Error>> {
     let target_dir = Path::new(env!("PANTA_TEST_TARGET_DIR"));
-    let mut command = Command::new("cargo");
-    command.arg(subcommand);
+    let mut command = if matches!(subcommand, "deny" | "machete") {
+        let (name, version) = if subcommand == "deny" {
+            ("cargo-deny", CARGO_DENY_VERSION)
+        } else {
+            ("cargo-machete", CARGO_MACHETE_VERSION)
+        };
+        Command::new(ensure_cargo_tool(name, version)?)
+    } else {
+        Command::new("cargo")
+    };
+    if !matches!(subcommand, "deny" | "machete") {
+        command.arg(subcommand);
+    }
     let mut inserted_target_dir = false;
     for arg in args {
         if arg == "--target-dir" {
@@ -182,6 +273,34 @@ fn cargo(
     }
     command.current_dir(ROOT);
     run(&format!("cargo {subcommand}"), command)
+}
+
+fn ensure_cargo_tool(name: &str, version: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let target_root = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let root = target_root.join("panta-tools/cargo");
+    let binary = root.join("bin").join(executable_name(name));
+    let marker = root.join(format!(".{name}-{version}.installed"));
+    if binary.is_file()
+        && fs::read_to_string(&marker)
+            .map(|recorded| recorded.trim() == version)
+            .unwrap_or(false)
+    {
+        return Ok(binary);
+    }
+    let mut command = Command::new("cargo");
+    command
+        .args(["install", "--root"])
+        .arg(&root)
+        .args([name, "--locked", "--version", version, "--force"])
+        .env("CARGO_TARGET_DIR", root.join("build"))
+        .current_dir(ROOT);
+    run(&format!("安装 {name} {version}"), command)?;
+    if binary.is_file() {
+        fs::write(&marker, format!("{version}\n"))?;
+        Ok(binary)
+    } else {
+        Err(format!("cargo install 成功但未生成项目工具：{}", binary.display()).into())
+    }
 }
 
 fn build_launcher() -> Result<(), Box<dyn Error>> {
@@ -344,6 +463,14 @@ fn required_tool(variable: &str, names: &[&str]) -> Result<PathBuf, Box<dyn Erro
         }
         return Err(format!("{variable} 指向的工具不存在：{}", path.display()).into());
     }
+    if variable == "CLANG_TIDY" {
+        let llvm_candidate = Path::new(env!("PANTA_TEST_LLVM_ROOT"))
+            .join("bin")
+            .join(executable_name("clang-tidy"));
+        if llvm_candidate.is_file() {
+            return Ok(llvm_candidate);
+        }
+    }
     let path_var = std::env::var_os("PATH").ok_or("PATH 未设置")?;
     for directory in std::env::split_paths(&path_var) {
         for name in names {
@@ -417,6 +544,11 @@ fn run_cmake_format() -> Result<(), Box<dyn Error>> {
     for file in cmake_files(root)? {
         let mut command = Command::new(&uv);
         command
+            .env("UV_CACHE_DIR", root.join("target/panta-tools/uv/cache"))
+            .env(
+                "UV_PROJECT_ENVIRONMENT",
+                root.join("target/panta-tools/uv/venv"),
+            )
             .args(["run", "--locked", "--project"])
             .arg(root)
             .args(["cmake-format", "--check"])
@@ -432,6 +564,11 @@ fn run_cmake_lint() -> Result<(), Box<dyn Error>> {
     for file in cmake_files(root)? {
         let mut command = Command::new(&uv);
         command
+            .env("UV_CACHE_DIR", root.join("target/panta-tools/uv/cache"))
+            .env(
+                "UV_PROJECT_ENVIRONMENT",
+                root.join("target/panta-tools/uv/venv"),
+            )
             .args(["run", "--locked", "--project"])
             .arg(root)
             .args(["cmake-lint"])

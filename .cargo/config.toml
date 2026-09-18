@@ -3,3 +3,5 @@
 quality = "run --locked --package panta-tests -- quality"
 lint = "run --locked --package panta-tests -- lint"
 format = "run --locked --package panta-tests -- format"
+audit = "run --locked --package panta-tests -- audit"
+coverage = "run --locked --package panta-tests -- coverage"

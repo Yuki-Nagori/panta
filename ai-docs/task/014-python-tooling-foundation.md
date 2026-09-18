@@ -47,7 +47,7 @@
 
 ## 验收标准
 
-- [x] 新环境按记录重建依赖并运行 `uv run --locked cmake-format --version` 与 `uv run --locked cmake-lint --version`，Python 最低版本声明与实测版本一致。
+- [x] 新环境按记录重建依赖并运行 `UV_CACHE_DIR=target/panta-tools/uv/cache UV_PROJECT_ENVIRONMENT=target/panta-tools/uv/venv uv run --locked cmake-format --version` 与 `UV_CACHE_DIR=target/panta-tools/uv/cache UV_PROJECT_ENVIRONMENT=target/panta-tools/uv/venv uv run --locked cmake-lint --version`，Python 最低版本声明与实测版本一致。
 - [x] 格式工具不启动 GUI 或修改工程；格式失败返回非零并保留文件路径上下文。
 - [x] README 明确此任务只提供质量工具环境，不宣称 Python CAE API/headless 已实现。
 - [x] 已同步 Python 规范、质量模块、当前可用命令和 task-index 状态。
@@ -60,7 +60,7 @@
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-09-18 | `UV_CACHE_DIR=/private/tmp/panta-uv-cache uv lock`；`uv run --locked cmake-format --version`；Python 3.14.0 | 依赖锁定成功，cmakelang 0.6.13 可执行；开发环境使用 uv 临时缓存以避免写入用户缓存目录 |
+| 2026-09-18 | `UV_CACHE_DIR=target/panta-tools/uv/cache UV_PROJECT_ENVIRONMENT=target/panta-tools/uv/venv uv lock`；`UV_CACHE_DIR=target/panta-tools/uv/cache UV_PROJECT_ENVIRONMENT=target/panta-tools/uv/venv uv run --locked cmake-format --version`；Python 3.14.0 | 依赖锁定成功，cmakelang 0.6.13 可执行；开发环境使用 uv 临时缓存以避免写入用户缓存目录 |
 | 2026-09-18 | 根 `cargo format` 的 CMake 文件枚举与 `actionlint .github/workflows/ci.yml` | 已接入 `native/`、`qml/`、`tools/` 下 CMakeLists/`.cmake`；CI format job 安装 uv 并调用根入口 |
 
 ## 风险与回退

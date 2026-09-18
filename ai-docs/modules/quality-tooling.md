@@ -10,24 +10,23 @@
 
 | 工具 | 固定版本 | 安装/来源 | 当前用途 |
 |---|---|---|---|
-| cargo-deny | 0.20.2 | `cargo install cargo-deny --locked --version 0.20.2` | RustSec、许可证、重复/通配依赖；配置 `deny.toml` |
-| cargo-machete | 0.9.2 | `cargo install cargo-machete --locked --version 0.9.2` | 未使用 Rust 依赖；launcher/panta-ffi 的 build.rs `DEP_*` 消费在 metadata 登记豁免 |
-| cargo-llvm-cov | 0.9.1 | `cargo install cargo-llvm-cov --locked --version 0.9.1`，rustup `llvm-tools-preview` | Rust 函数及行覆盖率阶段门禁 |
+| cargo-deny | 0.20.2 | `cargo audit`（根 Cargo alias 自动安装到 `target/panta-tools/cargo`） | RustSec、许可证、重复/通配依赖；配置 `deny.toml` |
+| cargo-machete | 0.9.2 | `cargo lint machete`（根 runner 自动安装到 `target/panta-tools/cargo`） | 未使用 Rust 依赖；launcher/panta-ffi 的 build.rs `DEP_*` 消费在 metadata 登记豁免 |
+| cargo-llvm-cov | 0.9.1 | `cargo coverage`（根 runner 自动安装到 `target/panta-tools/cargo`），rustup `llvm-tools-preview` | Rust 函数及行覆盖率阶段门禁 |
 | qmlformat / qmllint | 6.11.2 | Qt 托管预编译供给 | CTest `Qml.FormatCheck`（stdout diff）与 `all_qmllint` |
-| clang-format | 20.1.0 | `muttleyxd/clang-tools-static-binaries` release `master-796e77c`；资产 URL/SHA256 固定于 `crates/launcher/src/provision.rs` | 根 `cargo format` 检查 native、`tests/cpp`、`tests/qml` 与 panta-ffi 自有 C++；缓存按版本/摘要隔离并校验复用文件 |
-| clang-tidy | CI/本机固定 LLVM 工具链 | `CLANG_TIDY` 环境变量或 PATH；使用 native compile database | C++ 静态检查；根 `cargo lint` 逐文件执行，工具缺失直接失败 |
+| LLVM clang/clang++/clang-cl/clang-format/clang-tidy | 22.1.7 | LLVM 官方三平台固定资产；URL/SHA256 固定于 `crates/launcher/src/provision.rs`，由 Cargo 缓存到 `target/panta-tools/llvm` | CMake 与 Cargo CXX 使用同一 LLVM；macOS/Linux 选择 clang++，Windows 选择 clang-cl；clang-format、clang-tidy 和 C++ 质量入口复用同一版本 |
 | include-what-you-use | CI/本机固定 LLVM 工具链 | `IWYU_TOOL` 环境变量或 PATH 中的 `iwyu_tool.py`；使用 native compile database | 未使用/缺失 `#include` 检查；根 `cargo lint` 执行，不自动改写源码 |
 | Cppcheck | CI/本机固定版本 | `CPPCHECK` 环境变量或 PATH | C++ 未使用函数（`unusedFunction`）、错误路径和可疑构造；以 `--error-exitcode=1` 阻断 |
-| cmake-format / cmake-lint | 0.6.13 | 根 `pyproject.toml` + `uv.lock`；通过 `uv run --locked` 调用 | CMakeLists/`.cmake` 格式与静态规则门禁；分别纳入 `cargo format` 与 `cargo lint cmake` |
+| cmake-format / cmake-lint | 0.6.13 | 根 `pyproject.toml` + `uv.lock`；通过 `UV_CACHE_DIR=target/panta-tools/uv/cache UV_PROJECT_ENVIRONMENT=target/panta-tools/uv/venv uv run --locked` 调用 | CMakeLists/`.cmake` 格式与静态规则门禁；分别纳入 `cargo format` 与 `cargo lint cmake` |
 
-clang-format 使用第三方构建，摘要固定保证所取资产一致，不证明构建来源可信。升级时记录源码版本、构建流程与成功 run 的可定位链接，更新各平台摘要并验证实际执行版本与格式结果。同源码版本的独立构建比对可补充来源验证；不同版本对当前文件输出一致只证明这些文件的格式结果一致。
+LLVM 工具使用官方 22.1.7 三平台发布资产，下载归档按 SHA256 校验并按版本/摘要隔离缓存。升级时同步更新 Cargo 供给、CMake 编译器检查、CI cache key、task 042 和实际版本验证；不混用系统 LLVM 工具。
 
 ## 当前执行入口
 
-- 根 `tests/` package 提供三个 Cargo alias：`cargo format`（Rust、C++/CXX、CMake、QML 格式）、`cargo lint`（Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU、Cppcheck）和 `cargo quality`（全部质量入口）。`cargo lint <tool>` 可只运行一个工具，方便 CI 和本地定位；`cmake` 这一项由 uv 按 `uv.lock` 自动准备 `cmake-lint`。`cargo format` 直接调用格式工具，QML 只做 Qt 工具供给和文件检查，不触发 launcher/native 完整构建；完整链接和行为验证由 `cargo build`/`cargo test` 负责，`cargo run --locked --package panta-tests -- toolchain` 负责确认 build 后的 Cargo 托管工具链与共享产物路径。`tests/src/` 只调度已有测试，`tests/integration/` 只负责跨语言聚合，不复制 crate 私有测试或 CTest 用例。
-- `cargo test` 保留 Cargo 原生 workspace 语义，同时由根 `tests/` package 的显式集成测试聚合 qmllint、完整 CTest/GTest/QtTest 和 QML 行为测试。C++/QML 测试源分别归档在 `tests/cpp/`、`tests/qml/`；构建树、Debug/Release 配置和托管 CMake/clang-format 由根 runner 的 build.rs 注入；CTest 使用 `-C` 与 `--no-tests=error`。
-- CI 将 `cargo deny`、`cargo format`、`cargo test` 以及每个 `cargo lint <tool>` 分成独立检查；coverage 拆成 Rust 门禁和 native C++ 插桩报告，QML 场景随 native 测试执行。CI 命令显式使用 `--locked`，本地入口保持简洁。
-- Clang-Tidy、IWYU、Cppcheck 和 uv 的路径可由环境变量覆盖；没有工具时根 lint/format 明确失败。CMake 格式和 lint 共用 `pyproject.toml` 与 `uv.lock`，由 Cargo runner 调用 `uv run --locked`，不能绕过锁文件或静默跳过。Cppclean 不纳入门禁，IWYU 负责 include 建议，Cppcheck 负责错误路径与未使用函数等实现级检查。版本/来源、编译数据库路径和排除规则必须与 task 043 同步。
+- 除 Rust crate 外的质量工具统一安装到 `target/panta-tools/`：Cargo 扩展工具由根 runner 按固定版本安装到 `target/panta-tools/cargo`，uv 使用 `target/panta-tools/uv/cache` 和 `target/panta-tools/uv/venv`。根 `tests/` package 提供 Cargo alias：`cargo format`（Rust、C++/CXX、CMake、QML 格式）、`cargo lint`（Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU、Cppcheck）、`cargo audit`（cargo-deny）、`cargo coverage`（cargo-llvm-cov）和 `cargo quality`（全部质量入口）。`cargo lint <tool>` 可只运行一个工具，方便 CI 和本地定位；`cmake` 这一项由 uv 按 `uv.lock` 自动准备 `cmake-lint`。`cargo format` 直接调用格式工具，QML 只做 Qt 工具供给和文件检查，不触发 launcher/native 完整构建；完整链接和行为验证由 `cargo build`/`cargo test` 负责，`cargo run --locked --package panta-tests -- toolchain` 负责确认 build 后的 Cargo 托管工具链与共享产物路径。`tests/src/` 只调度已有测试，`tests/integration/` 只负责跨语言聚合，不复制 crate 私有测试或 CTest 用例。
+- `cargo test` 保留 Cargo 原生 workspace 语义，同时由根 `tests/` package 的显式集成测试聚合 qmllint、完整 CTest/GTest/QtTest 和 QML 行为测试。C++/QML 测试源分别归档在 `tests/cpp/`、`tests/qml/`；构建树、Debug/Release 配置和托管 CMake/LLVM 工具链由根 runner 的 build.rs 注入；CTest 使用 `-C` 与 `--no-tests=error`。
+- CI 将 `cargo audit`、`cargo format`、`cargo test` 以及每个 `cargo lint <tool>` 分成独立检查；coverage 拆成 Rust 门禁和 native C++ 插桩报告，QML 场景随 native 测试执行。CI 命令显式使用 `--locked`，本地入口保持简洁。
+- IWYU、Cppcheck 和 uv 的路径可由环境变量覆盖；Clang-Tidy 默认来自 Cargo 托管 LLVM，也可通过 CLANG_TIDY 显式覆盖；没有工具时根 lint/format 明确失败。CMake 格式和 lint 共用 `pyproject.toml` 与 `uv.lock`，由 Cargo runner 调用 `uv run --locked`，不能绕过锁文件或静默跳过。Cppclean 不纳入门禁，IWYU 负责 include 建议，Cppcheck 负责错误路径与未使用函数等实现级检查。版本/来源、编译数据库路径和排除规则必须与 task 043 同步。
 
 真实窗口、DPR、多显示屏、GPU、线程及 ABI 检查单独留证。无头组件测试不能代替所有平台的真实图形生命周期验证。
 
@@ -36,7 +35,7 @@ clang-format 使用第三方构建，摘要固定保证所取资产一致，不�
 Rust 门禁与 CI 一致的命令（仓库根目录）：
 
 ```sh
-cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92
+cargo coverage
 ```
 
 **当前下限为全局函数 89%、行 92%，两者都阻断。** 这是补齐历史缺口期间的阶段门禁，不是 100% 完成证明，也不是与父提交逐项比较的防下降机制。例如函数覆盖从 89.69% 降到 89.10% 仍可能通过；一个模块的增长也可能抵消另一模块的退步。新增/修改逻辑的行为覆盖仍需评审，032 后续补按模块统计与基线比较，不得把全局通过当作模块无缺口。
