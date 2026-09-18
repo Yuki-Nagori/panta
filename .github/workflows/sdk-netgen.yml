@@ -1,0 +1,93 @@
+# Netgen 预编译 SDK 生产管线（任务 038；workflow_dispatch 手动触发）。
+#
+# 受信 CI 语义：按 tools/sdk/netgen.cmake 冻结的构建描述生产三平台制品。
+# Netgen 链接 OCCT：本 workflow 先按 occt.cmake 构建同工具链的 OCCT 作为
+# 链接依赖（不发布）；sdk-occt-8.0.1 Release 落地后，可切换为经
+# sdk-provision 消费已发布 OCCT 制品（记录于任务 038）。自检通过后上传
+# 构建产物；`publish` 输入为 true 时发布到 GitHub Release
+# （tag sdk-netgen-6.2.2604，说明取自 tools/sdk/releases/netgen-6.2.2604.md）。
+
+name: SDK artifacts (Netgen)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 发布到 GitHub Release（tag sdk-netgen-6.2.2604）
+        type: boolean
+        default: false
+
+concurrency:
+  group: sdk-netgen
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  netgen:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            cmake_generator: Ninja
+            sdk_triple: macos-arm64
+          - os: ubuntu-latest
+            cmake_generator: Ninja
+            sdk_triple: linux-x86_64
+          - os: windows-2022
+            cmake_generator: Visual Studio 17 2022
+            cmake_generator_platform: x64
+            sdk_triple: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    env:
+      CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
+      CMAKE_GENERATOR_PLATFORM: ${{ matrix.cmake_generator_platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Produce Netgen SDK (builds OCCT link dependency first)
+        shell: bash
+        run: |
+          cmake -S tools/sdk -B sdk-build/superbuild
+          cmake --build sdk-build/superbuild --target netgen_sdk
+
+      - name: Selfcheck artifact
+        shell: bash
+        run: |
+          cmake -S tools/sdk/selfcheck -B sdk-build/selfcheck-netgen \
+            -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/netgen/6.2.2604/${{ matrix.sdk_triple }}" \
+            -DPSDK_PACKAGE=netgen \
+            -DPSDK_REQUIRED_TARGETS="ngcore nglib" \
+            -DCMAKE_PREFIX_PATH="$PWD/sdk-build/superbuild/out/occt/8.0.1/${{ matrix.sdk_triple }}"
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          cmake -DPKG_ROOT="$PWD/sdk-build/superbuild/out/netgen/6.2.2604/${{ matrix.sdk_triple }}" \
+            -DPKG_NAME=netgen -DPKG_VERSION=6.2.2604 \
+            -DPKG_TRIPLE="${{ matrix.sdk_triple }}" \
+            -DPKG_DIST="$PWD/sdk-build/dist" \
+            -P tools/sdk/package.cmake
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: netgen-6.2.2604-${{ matrix.sdk_triple }}
+          path: sdk-build/dist/*
+          if-no-files-found: error
+
+      - name: Publish release assets
+        if: inputs.publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view sdk-netgen-6.2.2604 --repo "$GITHUB_REPOSITORY" \
+            || gh release create sdk-netgen-6.2.2604 --repo "$GITHUB_REPOSITORY" \
+                 --title "Netgen v6.2.2604 prebuilt SDKs" \
+                 --notes-file tools/sdk/releases/netgen-6.2.2604.md
+          gh release upload sdk-netgen-6.2.2604 sdk-build/dist/* --clobber \
+            --repo "$GITHUB_REPOSITORY"

@@ -1,0 +1,91 @@
+# OCCT 预编译 SDK 生产管线（任务 038；workflow_dispatch 手动触发）。
+#
+# 受信 CI 语义：按 tools/sdk/occt.cmake 冻结的构建描述生产三平台制品，
+# 自检通过后上传构建产物；`publish` 输入为 true 时发布到 GitHub Release
+# （tag sdk-occt-8.0.1），发布说明取自 tools/sdk/releases/occt-8.0.1.md
+# （源码 pin、LGPL-2.1+例外、SHA256/provenance）。开发者与普通 CI 经 031
+# 的 sdk-provision 消费发布归档，不编译 OCCT 源码。
+
+name: SDK artifacts (OCCT)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 发布到 GitHub Release（tag sdk-occt-8.0.1）
+        type: boolean
+        default: false
+
+concurrency:
+  group: sdk-occt
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  occt:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            cmake_generator: Ninja
+            sdk_triple: macos-arm64
+          - os: ubuntu-latest
+            cmake_generator: Ninja
+            sdk_triple: linux-x86_64
+          - os: windows-2022
+            cmake_generator: Visual Studio 17 2022
+            cmake_generator_platform: x64
+            sdk_triple: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    env:
+      CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
+      CMAKE_GENERATOR_PLATFORM: ${{ matrix.cmake_generator_platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Produce OCCT SDK
+        shell: bash
+        run: |
+          cmake -S tools/sdk -B sdk-build/superbuild
+          cmake --build sdk-build/superbuild --target occt_sdk
+
+      - name: Selfcheck artifact
+        shell: bash
+        run: |
+          cmake -S tools/sdk/selfcheck -B sdk-build/selfcheck-occt \
+            -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/occt/8.0.1/${{ matrix.sdk_triple }}" \
+            -DPSDK_PACKAGE=OpenCASCADE \
+            -DPSDK_REQUIRED_TARGETS="TKernel TKDESTEP"
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          cmake -DPKG_ROOT="$PWD/sdk-build/superbuild/out/occt/8.0.1/${{ matrix.sdk_triple }}" \
+            -DPKG_NAME=occt -DPKG_VERSION=8.0.1 \
+            -DPKG_TRIPLE="${{ matrix.sdk_triple }}" \
+            -DPKG_DIST="$PWD/sdk-build/dist" \
+            -P tools/sdk/package.cmake
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: occt-8.0.1-${{ matrix.sdk_triple }}
+          path: sdk-build/dist/*
+          if-no-files-found: error
+
+      - name: Publish release assets
+        if: inputs.publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view sdk-occt-8.0.1 --repo "$GITHUB_REPOSITORY" \
+            || gh release create sdk-occt-8.0.1 --repo "$GITHUB_REPOSITORY" \
+                 --title "OCCT 8.0.1 prebuilt SDKs" \
+                 --notes-file tools/sdk/releases/occt-8.0.1.md
+          gh release upload sdk-occt-8.0.1 sdk-build/dist/* --clobber \
+            --repo "$GITHUB_REPOSITORY"
