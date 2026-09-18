@@ -18,7 +18,8 @@ set(PANTA_QT_SDK_VERSION 6.11.2)
 set(PANTA_VTK_INSTALL_DIR "${PANTA_SDK_OUT_ROOT}/vtk/${PANTA_VTK_VERSION}/${PANTA_SDK_TRIPLE}")
 
 include(ExternalProject)
-ExternalProject_Add(vtk_sdk
+ExternalProject_Add(
+  vtk_sdk
   GIT_REPOSITORY https://gitlab.kitware.com/vtk/vtk.git
   GIT_TAG ${PANTA_VTK_COMMIT}
   GIT_SHALLOW TRUE
@@ -27,29 +28,26 @@ ExternalProject_Add(vtk_sdk
   # Studio 17 2022 + x64，Ninja 子构建在无 vcvars 的 runner 上找不到 cl）。
   # 多配置生成器的构建/安装显式选 Release，单配置忽略 --config。
   BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
-  CMAKE_ARGS
-    -DCMAKE_BUILD_TYPE=Release
-    -DBUILD_SHARED_LIBS=ON
-    -DBUILD_TESTING=OFF
-    -DCMAKE_INSTALL_PREFIX=${PANTA_VTK_INSTALL_DIR}
-    -DCMAKE_PREFIX_PATH=${QT_STAGING}
-    -DVTK_QT_VERSION=6
-    -DVTK_GROUP_ENABLE_Qt=YES
-    -DVTK_MODULE_ENABLE_VTK_GUISupportQtQuick=YES
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+             -DBUILD_SHARED_LIBS=ON
+             -DBUILD_TESTING=OFF
+             -DCMAKE_INSTALL_PREFIX=${PANTA_VTK_INSTALL_DIR}
+             -DCMAKE_PREFIX_PATH=${QT_STAGING}
+             -DVTK_QT_VERSION=6
+             -DVTK_GROUP_ENABLE_Qt=YES
+             -DVTK_MODULE_ENABLE_VTK_GUISupportQtQuick=YES
   # 安装后补齐统一布局的非构建产物：许可证与 SDK 元数据。
   INSTALL_COMMAND ${CMAKE_COMMAND} --install . --config Release
-  COMMAND ${CMAKE_COMMAND} -E make_directory
-          ${PANTA_VTK_INSTALL_DIR}/share/licenses/VTK
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          <SOURCE_DIR>/Copyright.txt
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${PANTA_VTK_INSTALL_DIR}/share/licenses/VTK
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/Copyright.txt
           ${PANTA_VTK_INSTALL_DIR}/share/licenses/VTK/Copyright.txt
   USES_TERMINAL_DOWNLOAD TRUE
-  USES_TERMINAL_BUILD TRUE
-)
+  USES_TERMINAL_BUILD TRUE)
 
 # panta-sdk.json：031 供给自检与 012 缓存键的机器可读依据。
-file(WRITE "${CMAKE_BINARY_DIR}/vtk-panta-sdk.json.in"
-[=[
+file(
+  WRITE "${CMAKE_BINARY_DIR}/vtk-panta-sdk.json.in"
+  [=[
 {
   "name": "vtk",
   "version": "@PANTA_VTK_VERSION@",
@@ -69,10 +67,9 @@ file(WRITE "${CMAKE_BINARY_DIR}/vtk-panta-sdk.json.in"
 }
 ]=])
 configure_file("${CMAKE_BINARY_DIR}/vtk-panta-sdk.json.in"
-  "${CMAKE_BINARY_DIR}/vtk-panta-sdk-configure.json" @ONLY)
-ExternalProject_Add_Step(vtk_sdk metadata
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          ${CMAKE_BINARY_DIR}/vtk-panta-sdk-configure.json
+               "${CMAKE_BINARY_DIR}/vtk-panta-sdk-configure.json" @ONLY)
+ExternalProject_Add_Step(
+  vtk_sdk metadata
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/vtk-panta-sdk-configure.json
           ${PANTA_VTK_INSTALL_DIR}/panta-sdk.json
-  DEPENDEES install
-)
+  DEPENDEES install)

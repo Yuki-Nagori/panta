@@ -13,39 +13,36 @@ set(PANTA_OCCT_COMMIT b8f597c677811d1f9f4d8a97f5ae2825c0353a42)
 set(PANTA_OCCT_INSTALL_DIR "${PANTA_SDK_OUT_ROOT}/occt/${PANTA_OCCT_VERSION}/${PANTA_SDK_TRIPLE}")
 
 include(ExternalProject)
-ExternalProject_Add(occt_sdk
+ExternalProject_Add(
+  occt_sdk
   GIT_REPOSITORY https://github.com/Open-Cascade-SAS/OCCT.git
   GIT_TAG ${PANTA_OCCT_COMMIT}
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
-  CMAKE_ARGS
-    -DCMAKE_BUILD_TYPE=Release
-    -DBUILD_LIBRARY_TYPE=Shared
-    -DBUILD_MODULE_Draw=OFF
-    -DBUILD_MODULE_Visualization=OFF
-    -DBUILD_MODULE_DETools=OFF
-    # Linux/Windows 上 OCCT 默认启用 Freetype/Xlib 并因缺系统头文件而
-    # configure 失败；渲染归 VTK 后两者均无用，显式关闭保持制品零系统
-    # 第三方依赖（Netgen 上游 SuperBuild 构建 OCCT 时同样传 OFF）。
-    -DUSE_FREETYPE=OFF
-    -DUSE_XLIB=OFF
-    -DCMAKE_INSTALL_PREFIX=${PANTA_OCCT_INSTALL_DIR}
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+             -DBUILD_LIBRARY_TYPE=Shared
+             -DBUILD_MODULE_Draw=OFF
+             -DBUILD_MODULE_Visualization=OFF
+             -DBUILD_MODULE_DETools=OFF
+             # Linux/Windows 上 OCCT 默认启用 Freetype/Xlib 并因缺系统头文件而
+             # configure 失败；渲染归 VTK 后两者均无用，显式关闭保持制品零系统
+             # 第三方依赖（Netgen 上游 SuperBuild 构建 OCCT 时同样传 OFF）。
+             -DUSE_FREETYPE=OFF
+             -DUSE_XLIB=OFF
+             -DCMAKE_INSTALL_PREFIX=${PANTA_OCCT_INSTALL_DIR}
   INSTALL_COMMAND ${CMAKE_COMMAND} --install . --config Release
-  COMMAND ${CMAKE_COMMAND} -E make_directory
-          ${PANTA_OCCT_INSTALL_DIR}/share/licenses/OCCT
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          <SOURCE_DIR>/LICENSE_LGPL_21.txt
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${PANTA_OCCT_INSTALL_DIR}/share/licenses/OCCT
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE_LGPL_21.txt
           ${PANTA_OCCT_INSTALL_DIR}/share/licenses/OCCT/LICENSE_LGPL_21.txt
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          <SOURCE_DIR>/OCCT_LGPL_EXCEPTION.txt
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/OCCT_LGPL_EXCEPTION.txt
           ${PANTA_OCCT_INSTALL_DIR}/share/licenses/OCCT/OCCT_LGPL_EXCEPTION.txt
   USES_TERMINAL_DOWNLOAD TRUE
-  USES_TERMINAL_BUILD TRUE
-)
+  USES_TERMINAL_BUILD TRUE)
 
-file(WRITE "${CMAKE_BINARY_DIR}/occt-panta-sdk.json.in"
-[=[
+file(
+  WRITE "${CMAKE_BINARY_DIR}/occt-panta-sdk.json.in"
+  [=[
 {
   "name": "occt",
   "version": "@PANTA_OCCT_VERSION@",
@@ -65,10 +62,9 @@ file(WRITE "${CMAKE_BINARY_DIR}/occt-panta-sdk.json.in"
 }
 ]=])
 configure_file("${CMAKE_BINARY_DIR}/occt-panta-sdk.json.in"
-  "${CMAKE_BINARY_DIR}/occt-panta-sdk-configure.json" @ONLY)
-ExternalProject_Add_Step(occt_sdk metadata
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          ${CMAKE_BINARY_DIR}/occt-panta-sdk-configure.json
+               "${CMAKE_BINARY_DIR}/occt-panta-sdk-configure.json" @ONLY)
+ExternalProject_Add_Step(
+  occt_sdk metadata
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/occt-panta-sdk-configure.json
           ${PANTA_OCCT_INSTALL_DIR}/panta-sdk.json
-  DEPENDEES install
-)
+  DEPENDEES install)

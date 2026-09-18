@@ -22,7 +22,9 @@ project(panta_sdk_production NONE)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../native/cmake/sdk-provision.cmake)
 panta_sdk_triple(PANTA_SDK_TRIPLE)
 
-set(PANTA_SDK_OUT_ROOT "${CMAKE_BINARY_DIR}/out" CACHE PATH "SDK 安装树根")
+set(PANTA_SDK_OUT_ROOT
+    "${CMAKE_BINARY_DIR}/out"
+    CACHE PATH "SDK 安装树根")
 message(STATUS "panta SDK 生产：triple=${PANTA_SDK_TRIPLE} out=${PANTA_SDK_OUT_ROOT}")
 
 # 生产顺序：occt → netgen（依赖自产 OCCT，同 triple 同 ABI）；vtk 独立。

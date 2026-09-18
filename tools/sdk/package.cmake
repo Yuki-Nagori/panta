@@ -23,8 +23,7 @@ execute_process(
   # "." 打包含 ./include 等条目；解包后即平铺安装树。
   COMMAND "${CMAKE_COMMAND}" -E tar czf "${_archive}" .
   WORKING_DIRECTORY "${PKG_ROOT}"
-  RESULT_VARIABLE _result
-)
+  RESULT_VARIABLE _result)
 if(NOT _result EQUAL 0)
   message(FATAL_ERROR "打包失败（退出码 ${_result}）：${_archive}")
 endif()
