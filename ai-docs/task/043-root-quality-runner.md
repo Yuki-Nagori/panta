@@ -112,3 +112,7 @@ macOS arm64 托管模式（未启用 `PANTA_USE_SYSTEM_TOOLS`）下，`cargo qua
 Cppcheck 2.17.1 使用 Qt/GoogleTest 库模型及 `tests/cppcheck-qt.cfg`，真实宏展开仍由 LLVM 检查。删除试验性的 framework 软链接与平台宏提取实现，不屏蔽语法/预处理失败；开启 exhaustive 检查避免默认分支分析截断。仅对生成代码、测试注册符号及固定 CXX 头误报配置精确例外，范围见质量模块。实际完整项目加临时反例：未调用函数 exit 1，跨文件补调用后 exit 0。include-cleaner 对多余 include 的反例也返回非零，移除后通过。
 
 任务保持 in-progress：Windows/Linux 当前 CI、独立 target-dir 的完整跨语言运行及 runner 本身的覆盖率仍待补齐。本机系统目录写入测试需要允许 Qt 测试目录访问；沙箱拒绝该访问的失败不等同于业务回归，实际验证使用正常开发环境。
+
+## 2026-09-19 include 列表格式约定
+
+按维护者要求清理自有 C++/CXX 的 include 列表分组空行和注释，保留接口契约及条件编译；`.clang-format` 设置 `IncludeBlocks: Merge`，通过现有 `cargo format` / CI 持续检查连续排列。include-cleaner 的 QtTest 例外留在 `.clang-tidy` 说明，不写回头文件列表。使用托管 clang-format 重新检查，pre-commit 的聚合 format 和 Clippy 通过。

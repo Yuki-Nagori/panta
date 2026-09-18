@@ -1,6 +1,7 @@
 ---
 Language: Cpp
 BasedOnStyle: LLVM
+IncludeBlocks: Merge
 Standard: c++20
 IndentWidth: 4
 ColumnLimit: 100
