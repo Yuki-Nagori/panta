@@ -76,6 +76,7 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 | 2026-09-18 | `cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only`（0.9.1，LLVM_PROFDATA/LLVM_COV 指向 Apple CLT） | Rust line 基线 74.21%（path 87.15 / task 92.16 / dsl-core 66.94 / dslc 0.00 / ffi 83.96）；Branches 无数据（stable rustc 限制，已记录）。llvm-cov 驱动的 native 重编在 launcher build.rs 失败 → 印证 launcher 排除理由（启动胶水） |
 | 2026-09-18 | `ci.yml` 新增 `quality`（deny+machete，ubuntu 单平台）与 `coverage`（llvm-cov 报告，非门禁）job；YAML 解析通过 | 待推送后 CI 实证 |
 | 2026-09-18 | `cargo test --locked --workspace --exclude panta-launcher`（8 组 ok）、`cargo build --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings` | 全部通过 |
+| 2026-09-18 | dslc CLI 覆盖缺口补齐（0%→88.01% line；测试 0→14 项）：main.rs 单测（check/validate/emit-ts/format 全命令、kind 拒绝、usage、缺参、缺文件、非法 UTF-8、原子写回成功/创建失败/目录 rename 失败、无扩展名路径）+ tests/cli.rs 集成测试（CARGO_BIN_EXE 真二进制，main() 行随子进程 profdata 并入覆盖，退出码 0/2 契约） | 两项模式决策实证：①负向断言用 `matches!(result, Err(ref e) if …)`——新版 clippy 的 `unwrap_used` 涵盖 `unwrap_err`，且 match+panic 分支是结构性永不可达的未覆盖行；②测试统一 `?` 传播（`Result<(), Box/E>`）——`unwrap_or_else(|e| panic!())` 错误闭包同样是不执行的未覆盖行。llvm-cov 工具口径矛盾已记录：summary 报 dslc 88.01%（宏展开区域计 0 的行）而 lcov/show 行数据无零计数行，门禁启用前须先固定权威口径 |
 
 ## 风险与回退
 
@@ -84,7 +85,8 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 ## 决策与工作记录
 
 - 2026-09-16：新增跨语言质量任务；用户要求各语言配置 format/test/lint/依赖与死代码工具，并以 100% 覆盖率作为门禁目标。
-- 2026-09-18（增量一，Rust 质量完备 + QML 格式门禁 + CI 接线；维护者指示 032 优先于 007）：工具版本固定入 `modules/quality-tooling.md`（cargo-deny 0.20.2 / cargo-machete 0.9.2 / cargo-llvm-cov 0.9.1 / qmlformat 6.11.2）。发现并修复三类真实问题：quick-xml 0.38.4 有 RustSec 告警（升 0.41，DSL 测试全过、TS 生成语义不变）；syn 2/3 双版本为 pest↔cxx 锁定组合的传递依赖（deny skip 登记）；内部 path 依赖无版本号触发 wildcard 拒绝（workspace 表补 version、成员统一 `.workspace = true`）。launcher 的 panta-ffi 依赖被 machete 误报（仅经 build.rs 的 DEP_* 环境变量消费），按官方机制登记豁免。QML 格式门禁落地为 CTest `Qml.FormatCheck`（qmlformat stdout diff，两分支受控失败均验证）。Rust 覆盖率基线：line 74.21%（path 87.15/task 92.16/dsl-core 66.94/dslc 0/ffi 83.96），launcher（启动胶水）按 032 允许条款登记排除；stable rustc 无分支覆盖数据，门禁先以 line 执行（工具限制已记录）；**100% 门禁在缺口清零前不启用**（dslc CLI 与 dsl-core 错误路径为下一增量补测目标）。CI 新增 `quality`（deny+machete，单平台）与 `coverage`（报告非门禁）两个 job。011 的 CTest/QML 聚合与其余静态分析（clang-tidy、clang-format 供给）留在增量二。
+- 2026-09-18（增量一，Rust 质量完备 + QML 格式门禁 + CI 接线；维护者指示 032 优先于 007）：工具版本固定入 `modules/quality-tooling.md`（cargo-deny 0.20.2 / cargo-machete 0.9.2 / cargo-llvm-cov 0.9.1 / qmlformat 6.11.2）。发现并修复三类真实问题：quick-xml 0.38.4 有 RustSec 告警（升 0.41，DSL 测试全过、TS 生成语义不变）；syn 2/3 双版本为 pest↔cxx 锁定组合的传递依赖（deny skip 登记）；内部 path 依赖无版本号触发 wildcard 拒绝（workspace 表补 version、成员统一 `.workspace = true`）。launcher 的 panta-ffi 依赖被 machete 误报（仅经 build.rs 的 DEP_* 环境变量消费），按官方机制登记豁免。QML 格式门禁落地为 CTest `Qml.FormatCheck`（qmlformat stdout diff，两分支受控失败均验证）。Rust 覆盖率基线：line 74.21%（path 87.15/task 92.16/dsl-core 66.94/dslc 0/ffi 83.96），launcher（启动胶水）按 032 允许条款登记排除；stable rustc 无分支覆盖数据，门禁先以 line 执行（工具限制已记录）；**100% 门禁在缺口清零前不启用**。CI 新增 `quality`（deny+machete，单平台）与 `coverage`（报告非门禁）两个 job。
+- 2026-09-18（增量二，覆盖率缺口清零与门禁启用）：按 llvm-cov 未覆盖行清单逐 crate 补测试（基线 631 行缺口：dsl-core 406/ffi 60/path 50/task 29/dslc 86）；全部清零后启用 line 覆盖率门禁（CI coverage job 转阻断）。分支覆盖继续受 stable rustc 工具限制记录在案。门禁范围：workspace 除 launcher（启动胶水，已登记）。
 
 ## 完成摘要
 
