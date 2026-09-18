@@ -93,6 +93,7 @@ ai-docs/
 | 034 | [Rust Panta Artifact 解析与 TS/QM 编译入口](task/034-rust-panta-artifact-parser.md) | 应用平台扩展 | 001 | in-progress |
 | 035 | [`.pa` 格式化器与格式校验器选型](task/035-pa-formatter-and-validator.md) | 应用平台扩展 | 034 | in-progress |
 | 037 | [软件内增量更新基础](task/037-incremental-update-foundation.md) | 交付基础 | 005, 008, 013, 023 | planned |
+| 042 | [三平台自有 C++ 统一 LLVM/Clang 工具链](task/042-windows-clang-cl-toolchain.md) | 验证基础 | 018, 032, 038 | planned |
 
 ## 仓库与文档维护
 
