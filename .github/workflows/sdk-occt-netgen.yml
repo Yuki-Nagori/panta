@@ -65,9 +65,11 @@ jobs:
             -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/occt/8.0.1/${{ matrix.sdk_triple }}" \
             -DPSDK_PACKAGE=OpenCASCADE \
             -DPSDK_REQUIRED_TARGETS="TKernel TKDESTEP"
+          # NetgenConfig.cmake 为大写 N：包名须用 `Netgen`，否则在大小写
+          # 敏感文件系统（Linux ext4）上 find_package(netgen) 找不到。
           cmake -S tools/sdk/selfcheck -B sdk-build/selfcheck-netgen \
             -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/netgen/6.2.2604/${{ matrix.sdk_triple }}" \
-            -DPSDK_PACKAGE=netgen \
+            -DPSDK_PACKAGE=Netgen \
             -DPSDK_REQUIRED_TARGETS="ngcore nglib" \
             -DCMAKE_PREFIX_PATH="$PWD/sdk-build/superbuild/out/occt/8.0.1/${{ matrix.sdk_triple }}"
 
