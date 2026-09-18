@@ -5,7 +5,7 @@
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成）、[020](020-toolchain-provisioning.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-17 / 2026-09-17
+- 创建 / 更新：2026-09-17 / 2026-09-18
 
 ## 目标与背景
 
@@ -72,6 +72,7 @@
 | 2026-09-17 | 磁盘清理：`rm -rf native/build`；删除当前活跃之外的全部 launcher 哈希目录 | `target` 15G → 4.4G（剩余：Rust 缓存 + 单份 Qt 1.4G + 工具 363M + 共享树 54M）；`native/` 源码树无产物 |
 | 2026-09-17 | `cargo clippy --locked --workspace --all-targets -- -D warnings`；`cargo fmt --all -- --check`；`git diff --check` | 通过 |
 | 2026-09-17 | 三平台 CI 复跑（push 97b7d32，run [35226508625](https://github.com/Yuki-Nagori/panta/actions/runs/35226508625)） | windows-2022 / macos-latest / ubuntu-latest 全绿（7m41s / 5m58s / 5m14s），共享树与缓存路径变更在 CI 干净环境同样成立 |
+| 2026-09-18 | Cargo 驱动完整工具链复核：`cargo build --locked --workspace`、`cargo run --locked --package panta-tests -- toolchain` | 通过；构建使用 `target/panta-tools` 下托管 CMake/Ninja/clang-format，Qt、GoogleTest、compile_commands 均在 `target/` 共享目录中，未采用 PATH 系统 CMake/Ninja |
 
 ## 风险与回退
 
@@ -85,6 +86,6 @@
 
 ## 完成摘要
 
-产物与缓存归一完成并经三平台 CI 复跑验证（run 35226508625）：native 构建树固定 `target/native/<profile>`（Cargo 与 presets 共用），Qt/googletest 缓存共享于 `target/panta-deps/`，compile_commands.json 只存在于构建树内并经根 `.clangd` 提供给编辑器。磁盘效果：`target` 15G → 4.4G，`native/build`（1.6G）删除，launcher 哈希更替不再重下 Qt。已知边界：presets 单独 fresh configure 缺 FFI 缓存值会被早校验明确拒绝（需先 `cargo build` 一次）；切换 generator 需删除对应 profile 目录；同 profile 并发构建不受支持（与之前一致）。
+产物与缓存归一完成并经三平台 CI 复跑验证（run 35226508625）：native 构建树固定 `target/native/<profile>`（Cargo 与 presets 共用），Qt/googletest 缓存共享于 `target/panta-deps/`，compile_commands.json 只存在于构建树内并经根 `.clangd` 提供给编辑器。磁盘效果：`target` 15G → 4.4G，`native/build`（1.6G）删除，launcher 哈希更替不再重下 Qt。当前受支持平台默认强制使用 Cargo 托管的 CMake/Ninja/clang-format，CI 在 build 后运行 `panta-tests toolchain` 校验完整工具链路径；`PANTA_USE_SYSTEM_TOOLS=1` 仅作为不支持固定资产平台的显式旁路。已知边界：presets 单独 fresh configure 缺 FFI 缓存值会被早校验明确拒绝（需先 `cargo build` 一次）；切换 generator 需删除对应 profile 目录；同 profile 并发构建不受支持（与之前一致）。
 
 2026-09-18 复查发现 CMake 默认缓存会把 `CMAKE_EXPORT_COMPILE_COMMANDS` 留为空，导致 VS Code 即使指向正确构建树也找不到数据库；`native/cmake/build-policy.cmake` 现以 `CACHE BOOL ... FORCE` 确保导出开启。`cargo build` 已验证 `target/native/debug/compile_commands.json` 生成，`.vscode/settings.json` 与 `.clangd` 统一指向该路径，并保留 CMake Tools 的源码树副本。

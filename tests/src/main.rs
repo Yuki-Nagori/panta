@@ -10,11 +10,13 @@ fn main() -> ExitCode {
         Some("quality") => quality(),
         Some("test") => test_all(),
         Some("format") => format_all(),
+        Some("toolchain") => verify_toolchain(),
         Some("lint") => lint(arguments.next().as_deref()),
-        Some(command) => {
-            Err(format!("未知命令 '{command}'；可用：quality、lint、test、format").into())
-        }
-        None => Err("缺少命令；可用：quality、lint、test、format".into()),
+        Some(command) => Err(format!(
+            "未知命令 '{command}'；可用：quality、lint、test、format、toolchain"
+        )
+        .into()),
+        None => Err("缺少命令；可用：quality、lint、test、format、toolchain".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -77,6 +79,69 @@ fn format_all() -> Result<(), Box<dyn Error>> {
     check_cpp_format()?;
     run_cmake_format()?;
     run_qml_format_check()
+}
+
+fn verify_toolchain() -> Result<(), Box<dyn Error>> {
+    let target_root = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
+    let cmake = Path::new(env!("PANTA_TEST_CMAKE"));
+    let clang_format = Path::new(env!("PANTA_TEST_CLANG_FORMAT"));
+    let managed_root = target_root.join("panta-tools");
+    let managed_cmake = managed_root.join("cmake");
+    let managed_clang_format = managed_root.join("clang-format");
+    let ninja = managed_root.join("ninja").join(executable_name("ninja"));
+    let qt_bin = target_root.join("panta-deps/qt/staging/bin");
+    let googletest = target_root.join("panta-deps/fetchcontent/googletest-src/CMakeLists.txt");
+    let compile_database = native_dir.join("compile_commands.json");
+
+    require_file("托管 CMake", cmake)?;
+    require_file("托管 Ninja", &ninja)?;
+    require_file("托管 clang-format", clang_format)?;
+    require_file("Qt qmlformat", &qt_bin.join(executable_name("qmlformat")))?;
+    require_file("Qt qmllint", &qt_bin.join(executable_name("qmllint")))?;
+    require_file("GoogleTest FetchContent", &googletest)?;
+    require_file("native compile_commands.json", &compile_database)?;
+    if !cmake.starts_with(&managed_cmake) {
+        return Err(format!(
+            "CMake 未使用 Cargo 托管资产：{}（期望位于 {}）",
+            cmake.display(),
+            managed_cmake.display()
+        )
+        .into());
+    }
+    if !clang_format.starts_with(&managed_clang_format) {
+        return Err(format!(
+            "clang-format 未使用 Cargo 托管资产：{}（期望位于 {}）",
+            clang_format.display(),
+            managed_clang_format.display()
+        )
+        .into());
+    }
+    println!(
+        "Cargo 工具链已就绪：CMake={} Ninja={} Qt={} GoogleTest={} compile_commands={}",
+        cmake.display(),
+        ninja.display(),
+        qt_bin.display(),
+        googletest.display(),
+        compile_database.display()
+    );
+    Ok(())
+}
+
+fn executable_name(name: &str) -> String {
+    if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_owned()
+    }
+}
+
+fn require_file(label: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+    if path.is_file() {
+        Ok(())
+    } else {
+        Err(format!("{label} 不存在：{}", path.display()).into())
+    }
 }
 
 fn test_all() -> Result<(), Box<dyn Error>> {

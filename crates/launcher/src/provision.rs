@@ -1,8 +1,10 @@
 //! 托管引导（任务 020）：CMake/Ninja 预编译二进制的定位、下载、校验与缓存。
 //!
 //! 原则（standards/dependency-acquisition.md）：
-//! - 定位优先：`CMAKE` 环境变量旁路 → PATH 系统工具 → 工作区 `target/`
-//!   托管缓存 → 按固定清单下载；绝不静默源码编译。
+//! - 默认只使用工作区 `target/` 托管缓存 → 按固定清单下载；绝不静默
+//!   采用 PATH 中的系统工具或源码编译。
+//! - 不支持固定资产的平台可显式设置 `PANTA_USE_SYSTEM_TOOLS=1`，再用
+//!   `CMAKE` 或 PATH 提供宿主工具；CI 和受支持平台不走该旁路。
 //! - 只消费带 SHA256 的官方 release 资产；哈希不符立即删除归档并报错，
 //!   不进入构建图；禁止覆盖已校验的不同版本资产（marker 不符先清场）。
 //! - 缓存位于根 `target/panta-tools/`，与 profile 无关；marker 与二进制
@@ -154,31 +156,44 @@ pub fn resolve_clang_format(target_root: &Path) -> Result<PathBuf, String> {
     Ok(binary)
 }
 
-/// 解析 CMake：`CMAKE` 环境变量旁路 → PATH → 托管缓存/下载，返回可执行文件路径。
+/// 解析 CMake：默认使用托管缓存/下载；只有显式开启系统工具旁路，或
+/// 当前平台没有固定资产时，才读取 `CMAKE`/PATH。
 pub fn resolve_cmake(target_root: &Path) -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os("CMAKE") {
-        let path = PathBuf::from(path);
-        if path.is_file() {
+    if use_system_tools() || cmake_asset().is_none() {
+        if let Some(path) = std::env::var_os("CMAKE") {
+            let path = PathBuf::from(path);
+            if path.is_file() {
+                return Ok(path);
+            }
+            return Err(format!(
+                "CMAKE 环境变量指向的可执行文件不存在：{}",
+                path.display()
+            ));
+        }
+        if let Some(path) = find_on_path("cmake") {
             return Ok(path);
         }
-        return Err(format!(
-            "CMAKE 环境变量指向的可执行文件不存在：{}",
-            path.display()
-        ));
-    }
-    if let Some(path) = find_on_path("cmake") {
-        return Ok(path);
     }
     ensure_tool(Tool::Cmake, target_root, None)
 }
 
-/// 解析 Ninja：PATH → 托管缓存/下载。Ninja zip 需要 libarchive 解包，
-/// 复用上一步解析到的 cmake（系统或托管）。
+/// 解析 Ninja：默认使用托管缓存/下载。Ninja zip 需要 libarchive 解包，
+/// 复用上一步解析到的 cmake（系统或托管）。只有显式开启系统工具旁路，
+/// 或当前平台没有固定资产时，才读取 PATH。
 pub fn resolve_ninja(target_root: &Path, cmake: &Path) -> Result<PathBuf, String> {
-    if let Some(path) = find_on_path("ninja") {
+    if (use_system_tools() || ninja_asset().is_none())
+        && let Some(path) = find_on_path("ninja")
+    {
         return Ok(path);
     }
     ensure_tool(Tool::Ninja, target_root, Some(cmake))
+}
+
+fn use_system_tools() -> bool {
+    matches!(
+        std::env::var("PANTA_USE_SYSTEM_TOOLS").as_deref(),
+        Ok("1" | "true" | "yes")
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -274,8 +289,8 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
     let Some(asset) = tool.asset() else {
         return Err(format!(
             "本平台（{}/{}/托管清单）没有固定的 {name} 预编译资产；\
-             请用 CMAKE 环境变量指定本机 cmake 并保证 {name} 在 PATH，\
-             或在 ai-docs/standards/dependency-acquisition.md 登记资产后另立供给任务",
+             请登记固定资产，或显式设置 PANTA_USE_SYSTEM_TOOLS=1 后用 CMAKE/PATH 提供本机工具；\
+             供给资产登记见 ai-docs/standards/dependency-acquisition.md",
             std::env::consts::OS,
             std::env::consts::ARCH
         ));
@@ -373,7 +388,7 @@ fn download(
         )),
         Err(error) => Err(format!(
             "无法执行 curl：{error}。{name} {version} 需经 {} 下载；\
-             平台应自带 curl，也可用 CMAKE 环境变量旁路本机工具",
+             平台应自带 curl，受支持平台不使用本机 CMake/Ninja 旁路",
             asset.url
         )),
     }

@@ -38,7 +38,7 @@
 
 `crates/launcher/build.rs`（或新调度模块）、依赖获取文档、README 环境要求。
 
-本轮实际边界：新增 `crates/launcher/src/provision.rs`（build.rs 经 `#[path]` 复用，单元测试挂 launcher 测试构建）；build.rs 接入"定位 → 下载 → SHA256 校验 → 解包 → 注入路径"，托管 Ninja 时向 CMake 传 `CMAKE_MAKE_PROGRAM`；`sha2` 进入 workspace/build/dev 依赖。缓存位于根 `target/panta-tools/`（archives + 解包目录 + marker）。README 环境要求已是最终形态（写明工具由构建引导拉取），本任务使其成真，未改动；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖。
+本轮实际边界：新增 `crates/launcher/src/provision.rs`（build.rs 经 `#[path]` 复用，单元测试挂 launcher 测试构建）；build.rs 接入"托管缓存 → 下载 → SHA256 校验 → 解包 → 注入路径"，托管 Ninja 时向 CMake 传 `CMAKE_MAKE_PROGRAM`；受支持平台不读取 PATH 中的系统 CMake/Ninja；`sha2` 进入 workspace/build/dev 依赖。缓存位于根 `target/panta-tools/`（archives + 解包目录 + marker）。README 环境要求已是最终形态（写明工具由构建引导拉取），本任务使其成真，未改动；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖。
 
 ## 清理与兼容例外
 
@@ -66,15 +66,15 @@
 
 ## 风险与回退
 
-下载源不可达或校验失败会阻塞首次构建；保留"CMAKE 环境变量指定本机 cmake"的旁路并写明诊断。回退仅撤销本任务变更，恢复"要求本机预装"的 004 状态。
+下载源不可达或校验失败会阻塞首次构建；不支持固定资产的平台保留显式 `PANTA_USE_SYSTEM_TOOLS=1` + `CMAKE`/PATH 旁路并写明诊断。回退仅撤销本任务变更，恢复"要求本机预装"的 004 状态。
 
 ## 决策与工作记录
 
 - 2026-09-16：自任务 004 的托管原则拆分立task；004 交付调度与诊断，本任务交付二进制供给。
 - 2026-09-17：依赖 004 已完成且范围/验收明确，状态调整为 ready。根据预编译优先规则，CMake/Ninja 只消费带 SHA256 的官方或可信预编译资产；缺少资产时另立项目制品任务，不回退本地源码构建。
-- 2026-09-17（方案）：定位顺序为 `CMAKE` 环境变量 → PATH → `target/panta-tools/` 托管缓存 → 固定资产下载；marker 记录资产 SHA256，与解包二进制同时有效即可离线复用，marker 不符（版本升级）先清场不覆盖。下载用平台自带 curl，CMake 包用平台自带 tar 解压（macOS/Windows bsdtar 兼容 zip），Ninja zip 用 `cmake -E tar`（libarchive）；解包后显式 chmod 可执行位。托管 Ninja 向 CMake 传 `CMAKE_MAKE_PROGRAM`，不依赖 PATH。SHA256 于首次下载实测并回填固定清单；Linux aarch64 无官方 CMake 资产，走 `CMAKE` 旁路并给出诊断。
-- 2026-09-17（实施）：落地上表。已知限制：下载进度在成功 run 中被 cargo 隐藏（失败时完整输出）；CI runner 自带 cmake/ninja，走 PATH 定位路径，托管下载路径由本机 E2E 覆盖，三平台 CI 验证编译与 PATH 路径无回归。
+- 2026-09-17（方案）：受支持平台的定位顺序为 `target/panta-tools/` 托管缓存 → 固定资产下载；不支持固定资产的平台才在显式 `PANTA_USE_SYSTEM_TOOLS=1` 后读取 `CMAKE`/PATH；marker 记录资产 SHA256，与解包二进制同时有效即可离线复用，marker 不符（版本升级）先清场不覆盖。下载用平台自带 curl，CMake 包用平台自带 tar 解压（macOS/Windows bsdtar 兼容 zip），Ninja zip 用 `cmake -E tar`（libarchive）；解包后显式 chmod 可执行位。托管 Ninja 向 CMake 传 `CMAKE_MAKE_PROGRAM`，不依赖 PATH。SHA256 于首次下载实测并回填固定清单；Linux aarch64 无官方 CMake 资产，走 `CMAKE` 旁路并给出诊断。
+- 2026-09-17（实施）：落地上表。已知限制：下载进度在成功 run 中被 cargo 隐藏（失败时完整输出）；旧 CI runner 自带 cmake/ninja，历史 run 曾验证 PATH 定位；当前 CI 已改为 Cargo 托管优先，并在 `cargo build` 后由 `panta-tests toolchain` 校验实际路径。
 
 ## 完成摘要
 
-已完成。开发者环境要求收敛为 git + rustup + 平台编译器：PATH 无 CMake/Ninja 时构建引导按固定资产（SHA256 实测回填固定清单）自动下载校验到根 `target/panta-tools/`，干净 PATH 全链构建、损坏归档拒绝、两档离线复用均在本机 E2E 验证；三平台 CI run `35223745676` 确认供给模块编译与 PATH 定位路径无回归。已知边界：下载进度走 curl 的 stderr 实时可见（stdout 诊断在成功 run 中被 cargo 隐藏）；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖；Windows 非 unix 分支的 cfg 错误由 CI 抓出并已修复（`9063cae`）。
+已完成。开发者环境要求收敛为 git + rustup + 平台编译器：受支持平台的构建引导默认从固定资产下载并校验 CMake/Ninja 到根 `target/panta-tools/`，Cargo build 后的完整工具链检查确认托管路径；干净 PATH 全链构建、损坏归档拒绝、两档离线复用均在本机 E2E 验证。已知边界：下载进度走 curl 的 stderr 实时可见（stdout 诊断在成功 run 中被 cargo 隐藏）；Linux aarch64 无官方 CMake 资产，需显式 `PANTA_USE_SYSTEM_TOOLS=1` 后用 `CMAKE`/PATH 旁路；Windows 非 unix 分支的 cfg 错误由 CI 抓出并已修复（`9063cae`）。

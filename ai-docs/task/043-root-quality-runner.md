@@ -38,7 +38,7 @@
 2. 将 launcher 的 native 聚合测试移入根 runner，删除旧入口；C++/QML 测试源统一迁移到 `tests/cpp/`、`tests/qml/`，保留 crate 私有 Rust tests 和 native CTest 注册。
 3. 增加 Cargo aliases：`quality` 聚合格式、lint、依赖检查和测试；`lint` 聚合 Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU 和 Cppcheck；根 `tests/integration/native.rs` 通过显式 manifest 注册接入标准 `cargo test`；`format` 聚合 Rust、C++/CXX、CMake 和 QML 格式检查，CMake 工具由 uv 锁定，QML 格式只准备 Qt 工具不构建 launcher。
 4. CI 将每个 lint 作为独立可定位 step 调用 `cargo lint <tool>`，不以 `cargo quality` 代替；覆盖率仍使用独立 `cargo llvm-cov` job。
-5. 更新 README、质量工具链模块、011/032 任务记录，记录真实命令和受控失败验证。
+5. 在 `cargo build --locked --workspace` 后调用 `cargo run --locked --package panta-tests -- toolchain`，核对 Cargo 托管的 CMake/Ninja/clang-format、Qt、GoogleTest 和 compile_commands；更新 README、质量工具链模块、011/032 任务记录，记录真实命令和受控失败验证。
 
 ## 预计改动
 
@@ -56,6 +56,7 @@
 - [x] `cargo format` 检查 Rust、C++、CMake、QML；官方 `cargo fmt` 保持 Rust-only 语义，Python 工具通过 uv 锁定。
 - [x] CI 分别调用 `cargo lint clippy|machete|cmake|qmllint|clang-tidy|iwyu|cppcheck`，失败项可以单独定位；coverage job 的专用命令保持明确，不递归调用质量入口。
 - [x] 根入口支持 Debug/Release、自定义 target-dir 和 Windows `ctest.exe`；不重复执行旧 launcher 聚合。
+- [x] CI 的 `cargo build --locked --workspace` 后显式验证完整 Cargo 工具链安装和共享构建产物路径。
 - [x] 文档、task、索引、Cargo aliases、测试目录规范和 CI 一致，旧入口引用清理完成。
 
 ## 验证计划与结果
@@ -68,6 +69,7 @@
 | 2026-09-18 | `uv run --locked cmake-format --check ...`、`uv run --locked cmake-lint ...`（native/qml/tools 共 21 个 CMake 文件） | 通过；格式与 lint 均由根 Cargo runner 调用同一份 `pyproject.toml`/`uv.lock` 配置 |
 | 2026-09-18 | 仓库根 `cargo test --locked` | 通过；Rust workspace、CTest/GTest、qmllint、QML 行为和 `Qml.FormatCheck` 均执行，CTest 28/28 通过 |
 | 2026-09-18 | `cargo lint clippy`、`cargo lint cmake`、`cargo format`、`actionlint .github/workflows/ci.yml` | 通过；工具缺失和失败均由根入口传播，CI 每个 lint 工具独立成检查 |
+| 2026-09-18 | `cargo build --locked --workspace`、`cargo run --locked --package panta-tests -- toolchain` | 通过；CMake/Ninja/clang-format 使用 `target/panta-tools`，Qt/GoogleTest 使用 `target/panta-deps`，native compile database 已生成 |
 
 ## 风险与回退
 
@@ -79,4 +81,4 @@ Cargo runner 可能与 build.rs 使用不同 target-dir 或 profile；通过 Car
 
 ## 完成摘要
 
-根 `tests/` 已成为唯一跨语言测试与质量调度入口；native 测试源按 C++/QML 分类，Rust 私有单元测试仍遵循 Cargo 惯例保留在实现文件或 crate `tests/`。覆盖率报告继续由专用 CI job 独立执行。
+根 `tests/` 已成为唯一跨语言测试与质量调度入口；native 测试源按 C++/QML 分类，Rust 私有单元测试仍遵循 Cargo 惯例保留在实现文件或 crate `tests/`。CI 的跨平台 build job 先通过 Cargo 完整构建和工具链路径验证，再执行标准测试；覆盖率报告继续由专用 CI job 独立执行。

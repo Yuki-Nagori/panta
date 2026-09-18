@@ -25,7 +25,8 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 
 | 命令 | 当前行为 |
 |---|---|
-| `cargo build` | 统一构建入口：Cargo 先生成 `panta-ffi` staticlib，再经 build.rs 调度 CMake/Ninja 构建 Rust workspace/native（Qt 预编译包等首次自动下载到 `target/`） |
+| `cargo build` | 统一构建入口：Cargo 先生成 `panta-ffi` staticlib，再经 build.rs 调度托管 CMake/Ninja 构建 Rust workspace/native（Qt、GoogleTest 等首次自动下载到 `target/`） |
+| `cargo run --locked --package panta-tests -- toolchain` | 校验最近一次 Cargo build 使用了托管 CMake/Ninja/clang-format、Qt、GoogleTest，并生成 native `compile_commands.json`；CI 在跨平台 build 后执行 |
 | `cargo build --no-default-features` | 诊断构建：通过 Cargo feature 裁剪 `Panta.Bridge` 静态模块，构建不依赖 ViewModel 的最小 Shell；默认构建启用该模块 |
 | `cargo lint` | 根 `tests/` 入口统一执行 Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU 和 Cppcheck；工具缺失或任一检查失败即非零。可用 `cargo lint <tool>` 单独运行 |
 | `cargo test` | Cargo workspace 测试入口，并由根 `tests/` package 集成测试聚合 qmllint、完整 CTest/GTest/QtTest/QML 行为套件 |

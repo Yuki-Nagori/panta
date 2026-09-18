@@ -56,9 +56,10 @@ const RERUN_PATHS: &[&str] = &[
     // 扩展点：resources/ 与更多 QML 子目录落地时在此追加（任务 005 起）。
 ];
 
-/// 影响配置结果的环境变量，变更即重建。CMAKE 可指定 cmake 可执行文件路径。
+/// 影响配置结果的环境变量，变更即重建。系统工具旁路必须显式开启。
 const RERUN_ENVS: &[&str] = &[
     "CMAKE",
+    "PANTA_USE_SYSTEM_TOOLS",
     "CXX",
     "CMAKE_GENERATOR",
     "CMAKE_GENERATOR_PLATFORM",

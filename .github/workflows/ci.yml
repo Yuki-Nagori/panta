@@ -204,5 +204,9 @@ jobs:
       - name: Build workspace and native targets
         run: cargo build --locked --workspace
 
+      - name: Verify Cargo-provisioned toolchain
+        shell: bash
+        run: cargo run --locked --package panta-tests -- toolchain
+
       - name: Test
         run: cargo test --locked

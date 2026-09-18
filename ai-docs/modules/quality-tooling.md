@@ -24,7 +24,7 @@ clang-format 使用第三方构建，摘要固定保证所取资产一致，不�
 
 ## 当前执行入口
 
-- 根 `tests/` package 提供三个 Cargo alias：`cargo format`（Rust、C++/CXX、CMake、QML 格式）、`cargo lint`（Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU、Cppcheck）和 `cargo quality`（全部质量入口）。`cargo lint <tool>` 可只运行一个工具，方便 CI 和本地定位；`cmake` 这一项由 uv 按 `uv.lock` 自动准备 `cmake-lint`。`cargo format` 直接调用格式工具，QML 只做 Qt 工具供给和文件检查，不触发 launcher/native 完整构建；完整链接与行为验证由 `cargo build`/`cargo test` 负责。`tests/src/` 只调度已有测试，`tests/integration/` 只负责跨语言聚合，不复制 crate 私有测试或 CTest 用例。
+- 根 `tests/` package 提供三个 Cargo alias：`cargo format`（Rust、C++/CXX、CMake、QML 格式）、`cargo lint`（Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU、Cppcheck）和 `cargo quality`（全部质量入口）。`cargo lint <tool>` 可只运行一个工具，方便 CI 和本地定位；`cmake` 这一项由 uv 按 `uv.lock` 自动准备 `cmake-lint`。`cargo format` 直接调用格式工具，QML 只做 Qt 工具供给和文件检查，不触发 launcher/native 完整构建；完整链接和行为验证由 `cargo build`/`cargo test` 负责，`cargo run --locked --package panta-tests -- toolchain` 负责确认 build 后的 Cargo 托管工具链与共享产物路径。`tests/src/` 只调度已有测试，`tests/integration/` 只负责跨语言聚合，不复制 crate 私有测试或 CTest 用例。
 - `cargo test` 保留 Cargo 原生 workspace 语义，同时由根 `tests/` package 的显式集成测试聚合 qmllint、完整 CTest/GTest/QtTest 和 QML 行为测试。C++/QML 测试源分别归档在 `tests/cpp/`、`tests/qml/`；构建树、Debug/Release 配置和托管 CMake/clang-format 由根 runner 的 build.rs 注入；CTest 使用 `-C` 与 `--no-tests=error`。
 - CI 将 `cargo deny`、`cargo format`、`cargo test` 以及每个 `cargo lint <tool>` 分成独立检查；coverage 拆成 Rust 门禁和 native C++ 插桩报告，QML 场景随 native 测试执行。CI 命令显式使用 `--locked`，本地入口保持简洁。
 - Clang-Tidy、IWYU、Cppcheck 和 uv 的路径可由环境变量覆盖；没有工具时根 lint/format 明确失败。CMake 格式和 lint 共用 `pyproject.toml` 与 `uv.lock`，由 Cargo runner 调用 `uv run --locked`，不能绕过锁文件或静默跳过。Cppclean 不纳入门禁，IWYU 负责 include 建议，Cppcheck 负责错误路径与未使用函数等实现级检查。版本/来源、编译数据库路径和排除规则必须与 task 043 同步。
