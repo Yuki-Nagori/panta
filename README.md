@@ -27,7 +27,7 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 |---|---|
 | `cargo build --locked` | 统一构建入口：Cargo 先生成 `panta-ffi` staticlib，再经 build.rs 调度 CMake/Ninja 构建 Rust workspace/native（Qt 预编译包等首次自动下载到 `target/`） |
 | `cargo build --locked --no-default-features` | 诊断构建：通过 Cargo feature 裁剪 `Panta.Bridge` 静态模块，构建不依赖 ViewModel 的最小 Shell；默认构建启用该模块 |
-| `cargo test --locked` | 运行 workspace 的 parser、CLI、launcher 单元测试（native 测试经 ctest 运行，见任务 019） |
+| `cargo test --locked` | 运行 workspace 的 parser、CLI、launcher 单元测试，并聚合执行 native 全部测试与 qmllint及自有 C++ 格式检查（C++ GTest、QtTest、ABI/SDK/i18n 门禁，见任务 011） |
 | `cargo fmt --all -- --check` | Rust 格式检查（C++/QML 格式与 lint 见任务 003/005） |
 | `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典 |
 | `cargo run -p panta-dslc -- format --check resources/i18n/panta-cn.pa` | 检查 `.pa` 是否为规范格式；写回使用 `format <file>` |

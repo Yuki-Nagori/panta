@@ -26,7 +26,7 @@ class TaskHost : public QObject {
     /// 最近一次 submitTask 失败的结构化错误码；成功提交不清除。
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
 
-public:
+  public:
     explicit TaskHost(QObject* parent = nullptr);
     ~TaskHost() override;
 
@@ -38,7 +38,7 @@ public:
     /// 请求取消；终态或未知任务返回 false。
     Q_INVOKABLE bool cancelTask(quint64 taskId);
 
-signals:
+  signals:
     void runningTasksChanged();
     void lastErrorChanged();
     void taskStarted(quint64 taskId);
@@ -51,7 +51,7 @@ signals:
     /// code 区分 task.cancelled（用户取消）与 task.shutdown（宿主关闭）。
     void taskCancelled(quint64 taskId, const QString& code);
 
-private:
+  private:
     void poll();
 
     rust::Box<panta::ffi::TaskService> m_service;
@@ -60,4 +60,4 @@ private:
     QString m_lastError;
 };
 
-}  // namespace panta::bridge
+} // namespace panta::bridge

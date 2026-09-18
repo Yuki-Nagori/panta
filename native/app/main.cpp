@@ -31,7 +31,7 @@ void print_version() {
     std::printf("panta-native %d.%d.%d\n", version.major, version.minor, version.patch);
 }
 
-}  // namespace
+} // namespace
 
 int main(int argc, char* argv[]) {
     for (int index = 1; index < argc; ++index) {
@@ -45,9 +45,10 @@ int main(int argc, char* argv[]) {
         }
         // 其余 Qt 标准参数交给 QGuiApplication；明确的未知参数在此拒绝，
         // 避免吞掉拼写错误。
-        std::fprintf(stderr,
-                     "panta-native: 未知参数 '%.*s'（用法：panta-native [--version] [-- <Qt 参数>]）\n",
-                     static_cast<int>(argument.size()), argument.data());
+        std::fprintf(
+            stderr,
+            "panta-native: 未知参数 '%.*s'（用法：panta-native [--version] [-- <Qt 参数>]）\n",
+            static_cast<int>(argument.size()), argument.data());
         return kExitUsage;
     }
 

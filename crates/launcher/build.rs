@@ -122,6 +122,18 @@ fn orchestrate() -> Result<PathBuf, String> {
     emit_translation_sources(&i18n_dir, &ts_dir)?;
     // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
     let cmake = provision::resolve_cmake(&target_root)?;
+    // 供集成测试（native_suite）定位同目录的 ctest：任务 011/032 聚合入口。
+    println!("cargo:rustc-env=PANTA_CMAKE={}", cmake.display());
+    println!(
+        "cargo:rustc-env=PANTA_NATIVE_BUILD_DIR={}",
+        binary_dir.display()
+    );
+    println!("cargo:rustc-env=PANTA_NATIVE_BUILD_TYPE={build_type}");
+    let clang_format = provision::resolve_clang_format(&target_root)?;
+    println!(
+        "cargo:rustc-env=PANTA_CLANG_FORMAT={}",
+        clang_format.display()
+    );
     let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
     let ninja = if generator.to_ascii_lowercase().contains("ninja") {
         Some(provision::resolve_ninja(&target_root, &cmake)?)

@@ -21,7 +21,7 @@ class ShellViewModel : public QObject {
     /// 最近一次面向用户的错误摘要；空串表示无错误。
     Q_PROPERTY(QString error READ error WRITE setError NOTIFY errorChanged)
 
-public:
+  public:
     explicit ShellViewModel(QObject* parent = nullptr);
 
     [[nodiscard]] auto caption() const -> const QString&;
@@ -35,15 +35,15 @@ public:
     /// 命令：推进修订计数并同步刷新说明文字。
     Q_INVOKABLE void tick();
 
-signals:
+  signals:
     void captionChanged();
     void countChanged();
     void errorChanged();
 
-private:
+  private:
     QString m_caption;
     int m_count = 0;
     QString m_error;
 };
 
-}  // namespace panta::bridge
+} // namespace panta::bridge

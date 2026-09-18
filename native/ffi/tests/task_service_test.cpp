@@ -13,15 +13,15 @@
 // 销毁 join；UI 线程集成由后续 ViewModel 接入验证。
 namespace {
 
-using panta::ffi::TaskEvent;
-using panta::ffi::TaskEventKind;
-using panta::ffi::TaskService;
 using panta::ffi::task_service_cancel;
 using panta::ffi::task_service_drain;
 using panta::ffi::task_service_new;
 using panta::ffi::task_service_recent_logs;
 using panta::ffi::task_service_running;
 using panta::ffi::task_service_submit;
+using panta::ffi::TaskEvent;
+using panta::ffi::TaskEventKind;
+using panta::ffi::TaskService;
 
 using Clock = std::chrono::steady_clock;
 
@@ -132,8 +132,7 @@ TEST(FfiTaskService, CancelRunningTaskAndRejectLateCancel) {
 TEST(FfiTaskService, InvalidSubmitYieldsStructuredError) {
     auto service = task_service_new();
     EXPECT_THROW(static_cast<void>(task_service_submit(*service, "", 1, false)), rust::Error);
-    EXPECT_THROW(static_cast<void>(task_service_submit(*service, "x", 60'001, false)),
-                 rust::Error);
+    EXPECT_THROW(static_cast<void>(task_service_submit(*service, "x", 60'001, false)), rust::Error);
     EXPECT_EQ(task_service_running(*service), 0U);
 }
 
@@ -150,4 +149,4 @@ TEST(FfiTaskService, DestructionJoinsRunningWorkers) {
     EXPECT_LT(elapsed.count(), 30'000);
 }
 
-}  // namespace
+} // namespace

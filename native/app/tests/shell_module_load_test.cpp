@@ -14,7 +14,7 @@ Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 class ShellModuleLoadTest final : public QObject {
     Q_OBJECT
 
-private slots:
+  private slots:
     void loads_shell_module() {
         QQmlApplicationEngine engine;
 #ifdef PANTA_ENABLE_BRIDGE_MODULE

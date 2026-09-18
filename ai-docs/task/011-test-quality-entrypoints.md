@@ -55,21 +55,24 @@
 
 ## 验收标准
 
-- [ ] cargo test --locked 实际执行约定 Rust/native 套件；受控失败能导致顶层命令失败。
+- [x] cargo test --locked 实际执行约定 Rust/native 套件；受控失败能导致顶层命令失败。
 - [x] 当前 Rust workspace 的 Clippy warning 直接失败；既有 warning 已清理，CI 与本地命令保持一致。
 - [ ] 报告含测试数量和跳过原因；零个意外缺失的 native 测试不能视作通过。
-- [ ] QML 检查与真实图形冒烟有明确执行方式，格式/静态检查针对实际源码。
+- [x] QML 检查（qmllint 全量目标 + Qml.FormatCheck CTest）与行为测试经 native_suite 聚合进 cargo test；真实窗口/图形冒烟仍为独立验证记录。
 - [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
 - [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
 ## 验证计划与结果
 
-上方命令和场景均为待执行计划。只在对应入口存在后执行，记录 cwd、平台/版本、完整命令、结果和必要日志路径；手工图形操作记录步骤与观察。失败、跳过及未覆盖范围分别注明。
+上方命令和场景按下表区分已验证与待执行。只在对应入口存在后执行，记录 cwd、平台/版本、完整命令、结果和必要日志路径；手工图形操作记录步骤与观察。失败、跳过及未覆盖范围分别注明。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-09-17 | `cargo clippy --locked --workspace --all-targets -- -D warnings`（完整 workspace，复用已缓存 Qt staging）；`cargo fmt --all -- --check`；`cargo test --locked --workspace --exclude panta-launcher` | Rust warning 直接失败且测试/格式通过 | 完整 workspace Clippy 通过且无 warning；Rust 测试 15/15；fmt 通过 |
+| 2026-09-17 | `cargo clippy --locked --workspace --all-targets -- -D warnings`（完整 workspace，复用已缓存 Qt staging）；`cargo fmt --all -- --check`；`cargo test --locked --workspace --exclude panta-launcher` | 完整 workspace Clippy 通过且无 warning；Rust 测试 15/15；fmt 通过 |
+| 2026-09-18 | 仓库根，macOS arm64 / rustc 1.98.1；`cargo test --locked --workspace` | 101 项 Rust/聚合测试通过，含 CTest 28/28、qmllint 与 C++ 格式；Qt 路径测试需沙箱外测试配置目录写权限 |
+| 2026-09-18 | `cargo test --locked --release --target-dir target/review-target -p panta-launcher --test native_suite` | 2/2 聚合、28/28 CTest 通过；验证 profile 与自定义目录，复用已缓存第三方依赖 |
+| 2026-09-18 | 临时 CTest 夹具，编译并执行实际 native_suite；空套件、失败用例、成功用例 | 前两者聚合 exit 101，成功 exit 0；Windows 后缀/多配置参数静态核对，Windows/Linux 本轮 CI 待跑 |
 
 ## 风险与回退
 
@@ -77,9 +80,11 @@
 
 ## 决策与工作记录
 
+- 2026-09-18（本轮评审）：复核暂存聚合入口：修复 Windows ctest.exe、多配置 -C、profile/target-dir 定位与零测试误报；补受控失败证据后提交。
+
 - 2026-09-16：仅完成任务编排，未实施。
 - 2026-09-17：根据质量要求先收敛 Rust workspace 门禁；workspace lints 将 Clippy warning 提升为 deny，CI 额外传入 `-D warnings`，并清理 FFI build script/测试中的 `expect` warning。
-- 待记录：CTest/QML 聚合、跨语言静态分析和覆盖率方案，依赖任务完成后继续实施。
+- 2026-09-18：CTest/QML 聚合落地（与 032 协同）：launcher 集成测试 `native_suite` 聚合 `all_qmllint` 与全部 CTest,`cargo test --locked` 一条命令覆盖 Rust + native + QML;ctest 定位经 build.rs 导出的 `PANTA_CMAKE` 同目录。评审后构建树与配置由 build.rs 注入，修复 Windows .exe、CTest -C、release/自定义 target-dir 以及空套件误报；qmllint/CTest 顺序执行。clang-format 已接入，C++ 覆盖率与逐项测试遗漏检测仍待后续增量。
 
 ## 完成摘要
 

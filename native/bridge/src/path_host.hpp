@@ -28,7 +28,7 @@ struct StandardRoot {
 };
 
 class PathHost {
-public:
+  public:
     /// 创建并注入标准目录（user-config→AppConfigLocation、
     /// app-data→AppDataLocation、cache→CacheLocation、
     /// session→TempLocation）。注入时确保目录存在（缺失即创建，首次
@@ -39,8 +39,8 @@ public:
 
     /// 以显式根列表创建（create 的可测入口）；每个根按 create 同一语义
     /// 校验：绝对路径、缺失创建、写探针、UTF-8 往返。
-    [[nodiscard]] static std::unique_ptr<PathHost> createWithStandardRoots(
-        const std::vector<StandardRoot>& roots, QString* error);
+    [[nodiscard]] static std::unique_ptr<PathHost>
+    createWithStandardRoots(const std::vector<StandardRoot>& roots, QString* error);
 
     /// 注入显式工程根（打开工程时调用）；必须为绝对路径。
     [[nodiscard]] bool setProjectRoot(const QString& root, QString* error);
@@ -62,14 +62,14 @@ public:
     /// 这是当前 FFI 契约的非 Unicode 边界，禁止有损转换。
     [[nodiscard]] static bool toBoundaryUtf8(const QString& text, std::string* out, QString* error);
 
-private:
+  private:
     PathHost() = default;
 
     /// 统一的调用入口：捕获 rust::Error 并把错误码文本写回 error。
-    [[nodiscard]] QString callResolve(
-        const QString& reference,
-        const std::function<QString(const panta::ffi::PathRef&)>& resolver,
-        QString* error) const;
+    [[nodiscard]] QString
+    callResolve(const QString& reference,
+                const std::function<QString(const panta::ffi::PathRef&)>& resolver,
+                QString* error) const;
 
     rust::Box<panta::ffi::PathService> m_service = panta::ffi::path_service_new();
 };

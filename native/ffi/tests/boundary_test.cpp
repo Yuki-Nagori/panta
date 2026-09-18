@@ -21,9 +21,7 @@ TEST(FfiBoundary, RustErrorBecomesCppException) {
     EXPECT_THROW(static_cast<void>(panta::ffi::process(request)), rust::Error);
 }
 
-TEST(FfiBoundary, RustPanicAbortsInsteadOfThrowing) {
-    EXPECT_DEATH(panta::ffi::panic_probe(), "");
-}
+TEST(FfiBoundary, RustPanicAbortsInsteadOfThrowing) { EXPECT_DEATH(panta::ffi::panic_probe(), ""); }
 
 TEST(FfiBoundary, OpaqueSessionCreateUseAndRelease) {
     // 前置为 0：若此前用例泄漏句柄，在此显式失败而非掩盖。

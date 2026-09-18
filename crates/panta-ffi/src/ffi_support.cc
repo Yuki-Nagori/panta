@@ -2,8 +2,6 @@
 
 namespace panta::ffi {
 
-rust::String cpp_prefix() {
-    return rust::String("ffi:");
-}
+rust::String cpp_prefix() { return rust::String("ffi:"); }
 
-}  // namespace panta::ffi
+} // namespace panta::ffi

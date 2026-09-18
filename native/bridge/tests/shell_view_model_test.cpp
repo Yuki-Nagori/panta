@@ -1,10 +1,10 @@
 // ShellViewModel 的属性通知与命令验证（gtest.md + qt.md）。
 // QSignalSpy 属 QtTest；自定义 main 提供 QCoreApplication。
 
-#include <gtest/gtest.h>
 #include <QCoreApplication>
 #include <QSignalSpy>
 #include <QtTest/qsignalspy.h>
+#include <gtest/gtest.h>
 
 #include "shell_view_model.hpp"
 
@@ -12,7 +12,7 @@ namespace {
 
 constexpr int kInitialCount = 0;
 
-}  // namespace
+} // namespace
 
 TEST(ShellViewModel, TickAdvancesCountAndUpdatesCaption) {
     panta::bridge::ShellViewModel viewModel;

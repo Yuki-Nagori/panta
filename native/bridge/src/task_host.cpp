@@ -10,10 +10,9 @@ using panta::ffi::task_service_drain;
 using panta::ffi::task_service_new;
 using panta::ffi::task_service_running;
 using panta::ffi::task_service_submit;
-}  // namespace
+} // namespace
 
-TaskHost::TaskHost(QObject* parent)
-    : QObject(parent), m_service(task_service_new()) {
+TaskHost::TaskHost(QObject* parent) : QObject(parent), m_service(task_service_new()) {
     m_pollTimer.setInterval(kPollIntervalMs);
     connect(&m_pollTimer, &QTimer::timeout, this, &TaskHost::poll);
     m_pollTimer.start();
@@ -21,13 +20,9 @@ TaskHost::TaskHost(QObject* parent)
 
 TaskHost::~TaskHost() = default;
 
-quint32 TaskHost::runningTasks() const {
-    return m_runningTasks;
-}
+quint32 TaskHost::runningTasks() const { return m_runningTasks; }
 
-const QString& TaskHost::lastError() const {
-    return m_lastError;
-}
+const QString& TaskHost::lastError() const { return m_lastError; }
 
 qint64 TaskHost::submitTask(const QString& label, qint64 durationMs, bool fail) {
     try {
@@ -44,9 +39,7 @@ qint64 TaskHost::submitTask(const QString& label, qint64 durationMs, bool fail) 
     }
 }
 
-bool TaskHost::cancelTask(quint64 taskId) {
-    return task_service_cancel(*m_service, taskId);
-}
+bool TaskHost::cancelTask(quint64 taskId) { return task_service_cancel(*m_service, taskId); }
 
 void TaskHost::poll() {
     for (const auto& event : task_service_drain(*m_service)) {
@@ -61,8 +54,7 @@ void TaskHost::poll() {
             emit taskSucceeded(event.task_id);
             break;
         case panta::ffi::TaskEventKind::Failed:
-            emit taskFailed(event.task_id,
-                            QString::fromUtf8(event.code.data(), event.code.size()),
+            emit taskFailed(event.task_id, QString::fromUtf8(event.code.data(), event.code.size()),
                             QString::fromUtf8(event.detail.data(), event.detail.size()));
             break;
         case panta::ffi::TaskEventKind::Cancelled:
@@ -78,4 +70,4 @@ void TaskHost::poll() {
     }
 }
 
-}  // namespace panta::bridge
+} // namespace panta::bridge

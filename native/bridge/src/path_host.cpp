@@ -8,8 +8,7 @@
 
 namespace panta::bridge {
 
-std::unique_ptr<PathHost> PathHost::create(QString* error)
-{
+std::unique_ptr<PathHost> PathHost::create(QString* error) {
     struct Location {
         QStandardPaths::StandardLocation location;
         panta::ffi::PathRootKind kind;
@@ -24,16 +23,14 @@ std::unique_ptr<PathHost> PathHost::create(QString* error)
     std::vector<StandardRoot> roots;
     roots.reserve(std::size(locations));
     for (const auto& entry : locations) {
-        roots.push_back(StandardRoot{
-            entry.kind, QStandardPaths::writableLocation(entry.location),
-            QLatin1String(entry.label)});
+        roots.push_back(StandardRoot{entry.kind, QStandardPaths::writableLocation(entry.location),
+                                     QLatin1String(entry.label)});
     }
     return createWithStandardRoots(roots, error);
 }
 
-std::unique_ptr<PathHost> PathHost::createWithStandardRoots(
-    const std::vector<StandardRoot>& roots, QString* error)
-{
+std::unique_ptr<PathHost> PathHost::createWithStandardRoots(const std::vector<StandardRoot>& roots,
+                                                            QString* error) {
     std::unique_ptr<PathHost> host(new PathHost());
     for (const auto& root : roots) {
         if (root.directory.isEmpty() || !QDir::isAbsolutePath(root.directory)) {
@@ -78,8 +75,7 @@ std::unique_ptr<PathHost> PathHost::createWithStandardRoots(
     return host;
 }
 
-bool PathHost::setProjectRoot(const QString& root, QString* error)
-{
+bool PathHost::setProjectRoot(const QString& root, QString* error) {
     std::string utf8;
     QString conversionError;
     if (!toBoundaryUtf8(root, &utf8, &conversionError)) {
@@ -99,11 +95,9 @@ bool PathHost::setProjectRoot(const QString& root, QString* error)
     return true;
 }
 
-QString PathHost::callResolve(
-    const QString& reference,
-    const std::function<QString(const panta::ffi::PathRef&)>& resolver,
-    QString* error) const
-{
+QString PathHost::callResolve(const QString& reference,
+                              const std::function<QString(const panta::ffi::PathRef&)>& resolver,
+                              QString* error) const {
     std::string utf8;
     QString conversionError;
     if (!toBoundaryUtf8(reference, &utf8, &conversionError)) {
@@ -123,8 +117,7 @@ QString PathHost::callResolve(
     }
 }
 
-QString PathHost::resolve(const QString& reference, QString* error) const
-{
+QString PathHost::resolve(const QString& reference, QString* error) const {
     return callResolve(
         reference,
         [this](const panta::ffi::PathRef& parsed) {
@@ -133,19 +126,16 @@ QString PathHost::resolve(const QString& reference, QString* error) const
         error);
 }
 
-QString PathHost::resolveExisting(const QString& reference, QString* error) const
-{
+QString PathHost::resolveExisting(const QString& reference, QString* error) const {
     return callResolve(
         reference,
         [this](const panta::ffi::PathRef& parsed) {
-            return QString::fromUtf8(
-                panta::ffi::path_service_resolve_existing(*m_service, parsed));
+            return QString::fromUtf8(panta::ffi::path_service_resolve_existing(*m_service, parsed));
         },
         error);
 }
 
-QString PathHost::resolveWriteTarget(const QString& reference, QString* error) const
-{
+QString PathHost::resolveWriteTarget(const QString& reference, QString* error) const {
     return callResolve(
         reference,
         [this](const panta::ffi::PathRef& parsed) {
@@ -155,8 +145,7 @@ QString PathHost::resolveWriteTarget(const QString& reference, QString* error) c
         error);
 }
 
-QString PathHost::fileUrlToPath(const QUrl& url, QString* error)
-{
+QString PathHost::fileUrlToPath(const QUrl& url, QString* error) {
     if (!url.isValid() || url.scheme().compare(QStringLiteral("file"), Qt::CaseInsensitive) != 0) {
         if (error != nullptr) {
             *error = QStringLiteral("path.not_file_url: %1").arg(url.toString());
@@ -174,8 +163,7 @@ QString PathHost::fileUrlToPath(const QUrl& url, QString* error)
     return path;
 }
 
-bool PathHost::toBoundaryUtf8(const QString& text, std::string* out, QString* error)
-{
+bool PathHost::toBoundaryUtf8(const QString& text, std::string* out, QString* error) {
     const QByteArray utf8 = text.toUtf8();
     // 有损转换（未配对代理项等）在往返比较中暴露：当前契约只支持可往返
     // Unicode 路径，拒绝而不是替换字符后访问其它文件。

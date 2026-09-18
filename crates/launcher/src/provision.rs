@@ -50,6 +50,30 @@ fn cmake_asset() -> Option<ToolAsset> {
     }
 }
 
+/// clang-format 独立二进制(任务 032):LLVM 官方不发布独立资产,采用
+/// muttleyxd/clang-tools-static-binaries 对 LLVM 20.1.0 源码的静态构建
+/// (公开构建脚本，下载资产 SHA256 固定；仅用于格式检查)。
+fn clang_format_asset() -> Option<ToolAsset> {
+    if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
+        Some(ToolAsset {
+            url: "https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_macos-arm-arm64",
+            sha256: "fe6b8450a8cf83de3f517e3b9a9b1bb925613e5fb59145d6d24ccca5fe17d442",
+        })
+    } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
+        Some(ToolAsset {
+            url: "https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_linux-amd64",
+            sha256: "e900c1e520b6c9b9c99e43c0f45ccd12927838741cfc60c077a33dec69bb60cc",
+        })
+    } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
+        Some(ToolAsset {
+            url: "https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_windows-amd64.exe",
+            sha256: "44011742f30b2ebfd9013aa2b07d802b1b474186fb7904a2f773296f27ff15f9",
+        })
+    } else {
+        None
+    }
+}
+
 fn ninja_asset() -> Option<ToolAsset> {
     if cfg!(target_os = "macos") {
         Some(ToolAsset {
@@ -69,6 +93,65 @@ fn ninja_asset() -> Option<ToolAsset> {
     } else {
         None
     }
+}
+
+/// 解析 clang-format（任务 032）：缓存于 `panta-tools/clang-format/`，
+/// 资产即单文件二进制（无解包步骤），SHA256 校验后置可执行位。
+pub fn resolve_clang_format(target_root: &Path) -> Result<PathBuf, String> {
+    let Some(asset) = clang_format_asset() else {
+        return Err(format!(
+            "本平台（{}/{}）没有固定的 clang-format 资产；请登记后另立供给任务",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ));
+    };
+    // 版本和摘要进入缓存键，升级不能复用旧二进制。
+    let dir = target_root
+        .join("panta-tools")
+        .join("clang-format")
+        .join("20.1.0")
+        .join(asset.sha256);
+    let binary_name = if cfg!(windows) {
+        "clang-format.exe"
+    } else {
+        "clang-format"
+    };
+    let binary = dir.join(binary_name);
+
+    if binary.is_file() {
+        let actual = sha256_file(&binary)?;
+        if actual != asset.sha256 {
+            return Err(format!(
+                "clang-format 缓存校验失败：{}；请删除该文件后重试",
+                binary.display()
+            ));
+        }
+        return Ok(binary);
+    }
+
+    fs::create_dir_all(&dir).map_err(|error| format!("创建 {} 失败：{error}", dir.display()))?;
+    let staging = dir.join("clang-format-20.download");
+    if staging.exists() {
+        let actual = sha256_file(&staging)?;
+        if actual != asset.sha256 {
+            let _ = fs::remove_file(&staging);
+        }
+    }
+    if !staging.exists() {
+        download(&asset, &staging, "clang-format", "20.1.0")?;
+    }
+    let actual = sha256_file(&staging)?;
+    if actual != asset.sha256 {
+        let _ = fs::remove_file(&staging);
+        return Err(format!(
+            "clang-format SHA256 不符：预期 {}，实际 {}；已删除，重试将重新下载",
+            asset.sha256, actual
+        ));
+    }
+    set_executable(&staging)?;
+    fs::rename(&staging, &binary)
+        .map_err(|error| format!("落位 {} 失败：{error}", binary.display()))?;
+    Ok(binary)
 }
 
 /// 解析 CMake：`CMAKE` 环境变量旁路 → PATH → 托管缓存/下载，返回可执行文件路径。

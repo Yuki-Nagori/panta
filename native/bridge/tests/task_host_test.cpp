@@ -2,12 +2,12 @@
 // GUI 线程在慢任务期间保持响应。QSignalSpy 属 QtTest；自定义 main 提供
 // QCoreApplication。
 
-#include <gtest/gtest.h>
 #include <QCoreApplication>
 #include <QEventLoop>
 #include <QSignalSpy>
 #include <QTimer>
 #include <QtTest>
+#include <gtest/gtest.h>
 
 #include "task_host.hpp"
 
@@ -108,7 +108,7 @@ TEST(TaskHost, GuiThreadStaysResponsiveDuringSlowTask) {
     Q_UNUSED(id);
 }
 
-}  // namespace
+} // namespace
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);

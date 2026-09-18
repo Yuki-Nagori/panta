@@ -17,13 +17,9 @@ using panta::bridge::PathHost;
 
 /// QStandardPaths 测试模式让标准目录落在隔离的 .qttest 路径；必须先于
 /// 进程内第一次目录查询开启，每个用例开头调用（幂等）。
-void enableStandardPathsTestMode()
-{
-    QStandardPaths::setTestModeEnabled(true);
-}
+void enableStandardPathsTestMode() { QStandardPaths::setTestModeEnabled(true); }
 
-[[nodiscard]] QString resolveOrDie(const PathHost& host, const QString& reference)
-{
+[[nodiscard]] QString resolveOrDie(const PathHost& host, const QString& reference) {
     QString error;
     const QString resolved = host.resolve(reference, &error);
     if (!error.isEmpty()) {
@@ -34,8 +30,7 @@ void enableStandardPathsTestMode()
 
 } // namespace
 
-TEST(PathHostTest, StandardDirectoriesAreInjectedOnCreate)
-{
+TEST(PathHostTest, StandardDirectoriesAreInjectedOnCreate) {
     enableStandardPathsTestMode();
     QString error;
     auto host = PathHost::create(&error);
@@ -50,8 +45,7 @@ TEST(PathHostTest, StandardDirectoriesAreInjectedOnCreate)
     EXPECT_TRUE(error.isEmpty()) << error.toStdString();
 }
 
-TEST(PathHostTest, ProjectResolutionIsCwdIndependentAndRelocatable)
-{
+TEST(PathHostTest, ProjectResolutionIsCwdIndependentAndRelocatable) {
     enableStandardPathsTestMode();
     QTemporaryDir projectRoot;
     ASSERT_TRUE(projectRoot.isValid());
@@ -80,8 +74,7 @@ TEST(PathHostTest, ProjectResolutionIsCwdIndependentAndRelocatable)
     EXPECT_TRUE(after.startsWith(QDir(relocated.path()).absolutePath()));
 }
 
-TEST(PathHostTest, WriteTargetCreatesThenExistingResolves)
-{
+TEST(PathHostTest, WriteTargetCreatesThenExistingResolves) {
     enableStandardPathsTestMode();
     QTemporaryDir projectRoot;
     ASSERT_TRUE(projectRoot.isValid());
@@ -91,8 +84,8 @@ TEST(PathHostTest, WriteTargetCreatesThenExistingResolves)
     ASSERT_TRUE(host->setProjectRoot(QDir(projectRoot.path()).absolutePath(), &error))
         << error.toStdString();
 
-    const QString target = host->resolveWriteTarget(
-        QStringLiteral("project:/pockets/新 口袋/pocket.pa"), &error);
+    const QString target =
+        host->resolveWriteTarget(QStringLiteral("project:/pockets/新 口袋/pocket.pa"), &error);
     ASSERT_TRUE(error.isEmpty()) << error.toStdString();
 
     const QDir parent = QFileInfo(target).dir();
@@ -112,8 +105,7 @@ TEST(PathHostTest, WriteTargetCreatesThenExistingResolves)
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.not_found"))) << error.toStdString();
 }
 
-TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes)
-{
+TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes) {
     enableStandardPathsTestMode();
     QTemporaryDir projectRoot;
     ASSERT_TRUE(projectRoot.isValid());
@@ -147,8 +139,7 @@ TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes)
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.root_missing"))) << error.toStdString();
 }
 
-TEST(PathHostTest, FileUrlsDecodeExactlyOnce)
-{
+TEST(PathHostTest, FileUrlsDecodeExactlyOnce) {
     enableStandardPathsTestMode();
     QString error;
     const QString path = QStringLiteral("/tmp/panta 空格%20名字.pa");
@@ -159,14 +150,13 @@ TEST(PathHostTest, FileUrlsDecodeExactlyOnce)
     EXPECT_EQ(decoded, path);
 
     error.clear();
-    const QString rejected = PathHost::fileUrlToPath(
-        QUrl(QStringLiteral("qrc:///icons/x.svg")), &error);
+    const QString rejected =
+        PathHost::fileUrlToPath(QUrl(QStringLiteral("qrc:///icons/x.svg")), &error);
     EXPECT_TRUE(rejected.isEmpty());
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.not_file_url"))) << error.toStdString();
 }
 
-TEST(PathHostTest, NonRoundTrippableTextIsRejected)
-{
+TEST(PathHostTest, NonRoundTrippableTextIsRejected) {
     enableStandardPathsTestMode();
     // 未配对代理项无法往返 UTF-8：按当前契约拒绝，不做有损转换。
     const QString surrogate(QChar(0xD800));
@@ -178,21 +168,20 @@ TEST(PathHostTest, NonRoundTrippableTextIsRejected)
     error.clear();
     auto host = PathHost::create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
-    const QString resolved = host->resolve(
-        QStringLiteral("project:/") + surrogate + QStringLiteral(".pa"), &error);
+    const QString resolved =
+        host->resolve(QStringLiteral("project:/") + surrogate + QStringLiteral(".pa"), &error);
     EXPECT_TRUE(resolved.isEmpty());
     EXPECT_EQ(error, QStringLiteral("path.non_unicode"));
 }
 
-TEST(PathHostTest, StandardRootInjectionCreatesMissingDirectories)
-{
+TEST(PathHostTest, StandardRootInjectionCreatesMissingDirectories) {
     QTemporaryDir scratch;
     ASSERT_TRUE(scratch.isValid());
     const QString nested = scratch.path() + QStringLiteral("/laid/out/cache");
     QString error;
     auto host = panta::bridge::PathHost::createWithStandardRoots(
-        {panta::bridge::StandardRoot{
-            panta::ffi::PathRootKind::Cache, QDir(nested).absolutePath(), QStringLiteral("cache")}},
+        {panta::bridge::StandardRoot{panta::ffi::PathRootKind::Cache, QDir(nested).absolutePath(),
+                                     QStringLiteral("cache")}},
         &error);
     ASSERT_NE(host, nullptr) << error.toStdString();
     EXPECT_TRUE(QDir(nested).exists());
@@ -201,12 +190,11 @@ TEST(PathHostTest, StandardRootInjectionCreatesMissingDirectories)
     EXPECT_TRUE(entries.isEmpty()) << entries.join(QStringLiteral(",")).toStdString();
 }
 
-TEST(PathHostTest, StandardRootInjectionRejectsEmptyAndRelativeEntries)
-{
+TEST(PathHostTest, StandardRootInjectionRejectsEmptyAndRelativeEntries) {
     QString error;
     auto host = panta::bridge::PathHost::createWithStandardRoots(
-        {panta::bridge::StandardRoot{
-            panta::ffi::PathRootKind::Cache, QString(), QStringLiteral("cache")}},
+        {panta::bridge::StandardRoot{panta::ffi::PathRootKind::Cache, QString(),
+                                     QStringLiteral("cache")}},
         &error);
     EXPECT_EQ(host, nullptr);
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.standard_dir_unavailable")))
@@ -214,9 +202,8 @@ TEST(PathHostTest, StandardRootInjectionRejectsEmptyAndRelativeEntries)
 
     error.clear();
     host = panta::bridge::PathHost::createWithStandardRoots(
-        {panta::bridge::StandardRoot{
-            panta::ffi::PathRootKind::AppData, QStringLiteral("relative/dir"),
-            QStringLiteral("app-data")}},
+        {panta::bridge::StandardRoot{panta::ffi::PathRootKind::AppData,
+                                     QStringLiteral("relative/dir"), QStringLiteral("app-data")}},
         &error);
     EXPECT_EQ(host, nullptr);
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.standard_dir_unavailable")))
@@ -224,36 +211,34 @@ TEST(PathHostTest, StandardRootInjectionRejectsEmptyAndRelativeEntries)
 }
 
 #ifdef Q_OS_UNIX
-TEST(PathHostTest, StandardRootInjectionRejectsUnwritableDirectory)
-{
+TEST(PathHostTest, StandardRootInjectionRejectsUnwritableDirectory) {
     QTemporaryDir scratch;
     ASSERT_TRUE(scratch.isValid());
     const QString locked = scratch.path() + QStringLiteral("/locked");
     ASSERT_TRUE(QDir().mkpath(locked));
     // 只读目录(含执行位,可进入不可写):写探针必须失败并给出明确错误。
     QFile permissions(locked);
-    ASSERT_TRUE(permissions.setPermissions(
-        QFileDevice::ReadOwner | QFileDevice::ExeOwner | QFileDevice::ReadGroup
-        | QFileDevice::ExeGroup | QFileDevice::ReadOther | QFileDevice::ExeOther));
+    ASSERT_TRUE(permissions.setPermissions(QFileDevice::ReadOwner | QFileDevice::ExeOwner |
+                                           QFileDevice::ReadGroup | QFileDevice::ExeGroup |
+                                           QFileDevice::ReadOther | QFileDevice::ExeOther));
 
     QString error;
     auto host = panta::bridge::PathHost::createWithStandardRoots(
-        {panta::bridge::StandardRoot{
-            panta::ffi::PathRootKind::Cache, QDir(locked).absolutePath(), QStringLiteral("cache")}},
+        {panta::bridge::StandardRoot{panta::ffi::PathRootKind::Cache, QDir(locked).absolutePath(),
+                                     QStringLiteral("cache")}},
         &error);
     EXPECT_EQ(host, nullptr);
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.standard_dir_unwritable")))
         << error.toStdString();
 
     // 恢复权限以便 QTemporaryDir 清理。
-    (void)permissions.setPermissions(
-        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    (void)permissions.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                     QFileDevice::ExeOwner);
 }
 #endif
 
 #ifdef Q_OS_UNIX
-TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected)
-{
+TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected) {
     enableStandardPathsTestMode();
     QTemporaryDir projectRoot;
     QTemporaryDir outside;
@@ -279,8 +264,7 @@ TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected)
 }
 #endif
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

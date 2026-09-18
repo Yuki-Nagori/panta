@@ -1,3 +1,7 @@
+# 质量与构建门禁（任务 011/018/032）：
+# - quality：依赖审计（RustSec/许可证/重复与通配）与未使用依赖检查，单平台；
+# - coverage：Rust 函数 89% / 行 92% 阶段下限；100% 目标尚未达成。
+# - rust：三平台完整构建、测试、格式与 clippy 门禁。
 name: CI
 
 on:
@@ -39,7 +43,7 @@ jobs:
         run: cargo machete
 
   coverage:
-    name: rust coverage report
+    name: rust coverage gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -55,12 +59,12 @@ jobs:
         shell: bash
         run: cargo install cargo-llvm-cov --locked --version 0.9.1
 
-      # 覆盖率报告（任务 032）：launcher（启动胶水）按登记理由排除，C++
-      # 覆盖率另行测量。当前为基线报告；100% line 门禁在缺口清零后启用
-      # （032 记录：panta-dslc 0%、panta-dsl-core 66.94% 为主要缺口）。
-      - name: Coverage report
+      # 全局阶段下限，不等于逐模块/逐提交防下降；具体边界见
+      # ai-docs/modules/quality-tooling.md。launcher 暂不纳入 Rust 插桩链。
+      # 使用与固定 rustc 配套的 llvm-tools-preview；branch 数据尚未采集。
+      - name: Coverage gate
         shell: bash
-        run: cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only
+        run: cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92
 
   rust:
     name: rust (${{ matrix.os }})

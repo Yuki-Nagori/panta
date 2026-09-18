@@ -6,4 +6,4 @@ namespace panta::ffi {
 
 rust::String cpp_prefix();
 
-}  // namespace panta::ffi
+} // namespace panta::ffi
