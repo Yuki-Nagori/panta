@@ -71,6 +71,8 @@
 | 2026-09-17 | `ctest --preset debug`（macOS arm64） | 16/16 全绿（15 项既有 + Build.SdkProvision），SDK 供给接入未影响既有构建与测试。 |
 | 2026-09-17 | `cargo build --locked`（macOS arm64） | 通过：build.rs 注入 `PANTA_SDK_PROVISION_DIR=target/panta-deps/sdk`，共享树重新 configure 引入 sdk-provision.cmake（manifest 登记 + 函数定义，不触发下载）；消费方任务未接入，生产构建零 SDK 下载。 |
 | 2026-09-17 | 三平台 CI（push 5130ca3，run [35230584355](https://github.com/Yuki-Nagori/panta/actions/runs/35230584355)） | windows-2022 / macos-latest / ubuntu-latest 全绿（5m26s）：sdk-provision.cmake 的解析与 manifest 登记在三平台 configure 均执行通过。注意 CI 当前不运行 CTest（011 聚合前），`Build.SdkProvision` 的 Windows/Linux 执行证据待 CI 扩展或平台实测补齐。 |
+| 2026-09-18 | 038 Release `sdk-vtk-9.7.0` 落地（workflow run [35242622228](https://github.com/Yuki-Nagori/panta/actions/runs/35242622228)，三平台 success，1h58m）；`panta_sdk_declare_asset` 按发布资产 URL/SHA256 登记 vtk macos-arm64 / linux-x86_64 / windows-x86_64 | SHA256 取自各 `.sha256` 资产；REQUIRED_TARGETS `VTK::GUISupportQtQuick VTK::RenderingQt`；Linux glibc 基线（ubuntu-24.04 gcc13 生产）标注待 007 回写 |
+| 2026-09-18 | 生产 consumer 烟测（macOS arm64）：`cmake -S native/cmake/tests/sdk/consumer -DCONSUMER_KIND=production -DSDK_NAME=vtk -DPANTA_SDK_PROVISION_DIR=target/panta-deps/sdk -DCMAKE_PREFIX_PATH=<Qt staging>` | 通过：从 GitHub Release 下载 58MB 归档、SHA256 校验、解包发布、`find_package(VTK CONFIG)` 与 required-target 自检全部成功（staging 293MB）。consumer 工程改为 `LANGUAGES CXX`（VTK config 的 add_library(IMPORTED)/FindThreads 需要编译语言，NONE 会失败）；fixture 负例"生产缺资产"由 vtk 改 occt（vtk 已有资产，避免测试触网）。二跑零下载（离线复用）；`ctest --preset debug` 27/27 |
 
 ## 风险与回退
 
@@ -85,4 +87,4 @@
 
 ## 完成摘要
 
-未完成（保持 in-progress）。已落地：官方资产首轮盘点（OCCT Windows 唯一候选，VTK/Netgen 无官方 C++ SDK）、SDK 供给模块 `native/cmake/sdk-provision.cmake`（manifest、下载/校验/缓存/原子 staging、CONFIG 注入、失败诊断）及其 fixture 驱动验证（ctest `Build.SdkProvision`，macOS arm64 实测 10 场景全绿）。仍等待：全平台 SDK 资产登记（038 制品生产）、真实 SDK 三平台 configure/package 冒烟、007/009/010 以 imported targets 接入的集成证据。
+未完成（保持 in-progress）。**VTK 已全链路就绪**：038 受信 CI 三平台制品发布（Release `sdk-vtk-9.7.0`）、manifest 三平台登记（URL/SHA256/ABI/targets）、macOS 生产 consumer 烟测 + 离线复用通过——007 的供给前置满足，可启动。OCCT 仅 Windows 候选（ABI 集成未验证）；Netgen 全平台无资产。剩余：OCCT/Netgen 制品生产（038）、真实 SDK 三平台 configure/package 冒烟（随 007/009/010 集成完成）、Linux glibc 有效基线回写（007 运行验证）。

@@ -68,6 +68,8 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-17 | 自检 `cmake -S tools/sdk/selfcheck -B … -DPSDK_ROOT=<安装树> -DPSDK_PACKAGE=VTK -DPSDK_REQUIRED_TARGETS="VTK::GUISupportQtQuick VTK::RenderingQt" -DCMAKE_PREFIX_PATH=<Qt staging>` | 通过。两轮教训记档：`cmake -P` 脚本模式无法执行 `add_library(IMPORTED)`，VTK config 加载半途而断且脚本仍退出 0（假阳性）——自检必须是真实 configure 工程；VTK config 会调用 FindThreads 等编译探测，工程需启用 CXX。必需 target 以 `VTK::` 命名空间断言 |
 | 2026-09-17 | 打包 `cmake -DPKG_ROOT=<安装树> … -P tools/sdk/package.cmake` | `vtk-9.7.0-macos-arm64.tar.gz`（平铺布局，56MB），SHA256 `0cc143dc6545d96f25d537b4ee31f76f4d6e3cc7dfb147bc205c7fdd1e1b6a0f`，与 `.sha256` 文件一致 |
 | 2026-09-17 | 增量二本地回归：vtk.cmake 去除子工程硬编码 Ninja（继承外层生成器）后 `cmake -S tools/sdk …` 重配 + `cmake --build`；`python3 -c "yaml.safe_load(...)"` 校验 `sdk-vtk.yml` 与 `ci.yml` | 重配/幂等构建通过（已产出的 stamp 不重编）；两个 workflow YAML 解析通过。dispatch 级验证（三平台真实生产/发布）待推送后执行 |
+| 2026-09-18 | 用户 dispatch 实测：workflow run [35242622228](https://github.com/Yuki-Nagori/panta/actions/runs/35242622228)（三平台，1h58m） | 三平台 success；Release [sdk-vtk-9.7.0](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-vtk-9.7.0) 落地：三平台 tar.gz（56-76MB）+ `.sha256` 共 6 资产，发布说明来自合规模板 |
+| 2026-09-18 | 闭环验证（031 侧）：manifest 按发布资产登记后，macOS 生产 consumer 从 Release 真实下载消费，`find_package(VTK CONFIG)` + required-target 自检通过，离线二跑零下载；ctest 27/27 | 通过。VTK 从生产到消费全链路闭环；剩余：OCCT/Netgen 构建描述与制品、SBOM/provenance 自动化、007/009/010 的真实链接/运行冒烟 |
 
 ## 风险与回退
 

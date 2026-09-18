@@ -219,11 +219,12 @@ if(_mismatched_archives)
   message(FATAL_ERROR "哈希不符：不符归档应已删除：${_mismatched_archives}")
 endif()
 
-# ── 6. 生产 manifest 缺资产：vtk 三平台无条目，诊断指向 038 ──
+# ── 6. 生产 manifest 缺资产：occt 已登记版本但本平台无条目，诊断指向 038 ──
+# （vtk 已由 038 供全平台资产，缺资产负例改用 occt，避免测试触网下载。）
 _configure_consumer("${TEST_BINARY_DIR}/case6-consumer" ${_common}
   "-DRESULT_FILE=${TEST_BINARY_DIR}/case6.result" "-DCONSUMER_KIND=production"
-  "-DSDK_NAME=vtk")
-_expect_failure("生产缺资产" "038" "9.7.0")
+  "-DSDK_NAME=occt")
+_expect_failure("生产缺资产" "038" "8.0.1")
 
 # ── 7. OCCT 形态：内层归档校验 + 包装目录前缀 + 外层残留不进 staging ──
 set(_root7 "${TEST_BINARY_DIR}/case7-deps")

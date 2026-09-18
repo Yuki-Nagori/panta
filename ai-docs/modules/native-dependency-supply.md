@@ -35,7 +35,7 @@ VTK、OpenCASCADE 和 Netgen 是 CAE 主链路的 native 依赖，开发者和�
 ## 当前盘点结论（2026-09-17）
 
 - OCCT `V8.0.1` 有官方 Windows 预编译归档并含 `OpenCASCADEConfig.cmake`；已按外层/内层归档 SHA256 登记进 sdk-provision.cmake 的 manifest（内嵌归档形态）。目前只将它作为 Windows 候选，尚未证明 Qt/编译器 ABI 集成（009/038 验证）。
-- VTK `v9.7.0` 官方渠道确认源码归档、Python wheels 和 SDK 提示，本轮没有确认包含 `GUISupportQtQuick` 的三平台 C++ SDK；由 038 生产制品。038 增量一（2026-09-17）已在 macOS arm64 按 `tools/sdk/` 冻结构建描述真实产出制品并自检/打包通过（含 `VTK::GUISupportQtQuick`），发布存储与 CI 生产管线为后续增量；登记前 `panta_require_sdk(vtk)` 在任何平台都按缺资产失败。
+- VTK `v9.7.0` 官方渠道只有源码归档与 Python wheels（wheel SDK 不含 `GUISupportQtQuick`，不可用）；038 已按 `tools/sdk/` 冻结构建描述在受信 CI 生产三平台制品并发布（Release `sdk-vtk-9.7.0`，2026-09-17，含 `VTK::GUISupportQtQuick`），031 manifest 已按 Release URL/SHA256 登记，macOS 生产 consumer 烟测与离线复用通过；007 的 VTK 供给前置已满足。
 - Netgen 更新 tag `v6.2.2607` 没有对应 release 预编译资产；当前清单的 `v6.2.2604` 保持不变，等待与 OCCT ABI 一起生产或取得 SDK。
 
 供给实现的验证证据见 [任务 031](../task/031-prebuilt-native-dependencies.md)：ctest `Build.SdkProvision` 用 fixture SDK（file:// 下载、project NONE）驱动成功、哈希不符、缺资产、离线缓存、marker 重建、版本隔离、内嵌归档/包装目录、配置歧义等路径，三平台可同路径执行。在全平台 manifest 和 configure/package 冒烟证据完成前，031 保持进行中，007/009/010 不启动第三方源码构建。

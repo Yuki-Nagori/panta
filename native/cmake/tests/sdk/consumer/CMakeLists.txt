@@ -1,9 +1,11 @@
 # Build.SdkProvision 的 consumer 工程（任务 031）：以真实 configure 驱动
 # sdk-provision.cmake。fixture 模式用 -D 传入资产参数登记 fixture 条目；
 # production 模式直接请求生产 manifest 里的名字，验证缺资产诊断。
-# 全部为 project(NONE)，不编译；结果经 RESULT_FILE 回传给驱动脚本。
+# 启用 CXX：生产 SDK（VTK 等）的 config 会执行 add_library(IMPORTED) 与
+# FindThreads 等编译探测，NONE 语言会在那一步失败。结果经 RESULT_FILE
+# 回传给驱动脚本。
 cmake_minimum_required(VERSION 3.22)
-project(panta_sdk_consumer NONE)
+project(panta_sdk_consumer LANGUAGES CXX)
 
 if(NOT DEFINED PANTA_SDK_MODULE)
   message(FATAL_ERROR "consumer 需要 -DPANTA_SDK_MODULE 指向 sdk-provision.cmake")
