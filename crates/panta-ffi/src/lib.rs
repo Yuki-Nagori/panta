@@ -304,8 +304,7 @@ fn path_service_set_root(
 }
 
 fn path_ref_parse(reference: String) -> Result<bridge::PathRef, String> {
-    let parsed =
-        panta_core::path::ResourceRef::parse(&reference).map_err(|error| error.to_string())?;
+    let parsed = panta_core::path::ResourceRef::parse(&reference)?;
     Ok(bridge::PathRef {
         kind: bridge_kind(parsed.category),
         relative: parsed.relative,
@@ -394,9 +393,11 @@ fn bridge_kind(category: panta_core::path::RootCategory) -> bridge::PathRootKind
 #[cfg(test)]
 mod tests {
     use super::{
-        FfiRequest, FfiResponse, MAX_LABEL_BYTES, bridge, panic_probe, process, session_close,
-        session_create, session_label, session_live_count, task_service_drain, task_service_new,
-        task_service_recent_logs, task_service_running, task_service_submit,
+        FfiRequest, FfiResponse, MAX_LABEL_BYTES, bridge, panic_probe, path_ref_parse,
+        path_service_new, path_service_resolve, path_service_resolve_existing,
+        path_service_resolve_write_target, path_service_set_root, process, session_close,
+        session_create, session_label, session_live_count, task_service_cancel, task_service_drain,
+        task_service_new, task_service_recent_logs, task_service_running, task_service_submit,
     };
     use std::sync::{Mutex, MutexGuard};
 
@@ -407,12 +408,11 @@ mod tests {
     }
 
     #[test]
-    fn round_trip_calls_cpp_and_preserves_unicode() {
+    fn round_trip_calls_cpp_and_preserves_unicode() -> Result<(), Box<dyn std::error::Error>> {
         let response = process(&FfiRequest {
             text: "界".to_owned(),
             repeat: 2,
-        })
-        .unwrap_or_else(|error| panic!("valid request failed: {error}"));
+        })?; // valid request failed: {error}
         assert_eq!(
             response,
             FfiResponse {
@@ -420,6 +420,7 @@ mod tests {
                 repeat: 2,
             }
         );
+        Ok(())
     }
 
     #[test]
@@ -455,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn sessions_create_use_and_release_balance() {
+    fn sessions_create_use_and_release_balance() -> Result<(), Box<dyn std::error::Error>> {
         let _guard = session_lock();
         assert_eq!(session_live_count(), 0);
 
@@ -475,6 +476,7 @@ mod tests {
         assert_eq!(session_close(beta), 1);
         assert_eq!(session_close(alpha), 0);
         assert_eq!(session_live_count(), 0);
+        Ok(())
     }
 
     #[test]
@@ -505,11 +507,9 @@ mod tests {
     }
 
     #[test]
-    fn path_service_round_trips_references_and_rejects_escapes() {
-        let parsed = match crate::path_ref_parse("project:/资产 齿轮/a.step".to_owned()) {
-            Ok(parsed) => parsed,
-            Err(error) => panic!("合法引用被拒绝: {error}"),
-        };
+    fn path_service_round_trips_references_and_rejects_escapes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let parsed = crate::path_ref_parse("project:/资产 齿轮/a.step".to_owned())?;
         assert!(matches!(parsed.kind, bridge::PathRootKind::Project));
         assert_eq!(parsed.relative, "资产 齿轮/a.step");
         let logical = match crate::path_ref_to_logical(&parsed) {
@@ -526,7 +526,7 @@ mod tests {
             std::fs::canonicalize(std::env::temp_dir()).unwrap_or_else(|_| std::env::temp_dir());
         let root = base.join(format!("panta-ffi-path-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
+        std::fs::create_dir_all(&root)?; // mkdir 失败: {error}
         let mut service = crate::path_service_new();
         if let Err(error) = crate::path_service_set_root(
             &mut service,
@@ -575,10 +575,11 @@ mod tests {
             Err(error) => assert_eq!(error, "path.qrc_not_native"),
         }
         let _ = std::fs::remove_dir_all(&root);
+        Ok(())
     }
 
     #[test]
-    fn task_service_drains_events_through_bridge() {
+    fn task_service_drains_events_through_bridge() -> Result<(), Box<dyn std::error::Error>> {
         let service = task_service_new();
         let id = match task_service_submit(&service, "桥接-θ".to_owned(), 20, false) {
             Ok(id) => id,
@@ -626,5 +627,96 @@ mod tests {
             Ok(_) => panic!("oversized duration accepted"),
             Err(error) => assert!(error.starts_with("task.invalid_duration:")),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn task_service_lifecycle_maps_cancel_failed_and_cancelled_events()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let service = task_service_new();
+        // 失败任务:Failed 事件经桥接枚举映射。
+        let failed_id = task_service_submit(&service, "失败任务".to_owned(), 10, true)?;
+        for _ in 0..400 {
+            if task_service_running(&service) == 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let events = task_service_drain(&service);
+        assert!(
+            events.iter().any(|event| {
+                event.task_id == failed_id
+                    && matches!(event.kind, bridge::TaskEventKind::Failed)
+                    && !event.code.is_empty()
+            }),
+            "失败任务必须携带 Failed 事件与错误码"
+        );
+        // 取消长任务:Cancelled 事件经桥接枚举映射;cancel 返回 true。
+        let long_id = task_service_submit(&service, "长任务".to_owned(), 5_000, false)?;
+        assert!(
+            task_service_cancel(&service, long_id),
+            "运行中任务必须可取消"
+        );
+        for _ in 0..400 {
+            if task_service_running(&service) == 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let events = task_service_drain(&service);
+        assert!(
+            events.iter().any(|event| {
+                event.task_id == long_id && matches!(event.kind, bridge::TaskEventKind::Cancelled)
+            }),
+            "取消必须产生 Cancelled 事件"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn path_service_covers_existing_write_target_and_all_kinds()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use std::path::Path;
+
+        let base = std::fs::canonicalize(std::env::temp_dir())?;
+        let root = base.join(format!("panta-ffi-path-kinds-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root)?;
+        let mut service = path_service_new();
+
+        // 全类别注入(UserConfig/AppData/Cache/Session 各指临时子目录):
+        // core_category 与 set_root 的全部分支被真实执行。
+        for (kind, name) in [
+            (bridge::PathRootKind::UserConfig, "user-config"),
+            (bridge::PathRootKind::AppData, "app-data"),
+            (bridge::PathRootKind::Cache, "cache"),
+            (bridge::PathRootKind::Session, "session"),
+        ] {
+            let directory = root.join(name);
+            std::fs::create_dir_all(&directory)?;
+            path_service_set_root(&mut service, kind, directory.display().to_string())?;
+        }
+
+        // 每个类别都可纯逻辑解析,且 scheme 往返经 bridge_kind 全分支。
+        for scheme in ["user-config", "app-data", "cache", "session"] {
+            let parsed = path_ref_parse(format!("{scheme}:/配置/x.pa"))?;
+            let resolved = path_service_resolve(&service, &parsed)?;
+            assert!(resolved.contains(scheme), "{scheme} -> {resolved}");
+        }
+
+        // 写目标(未创建)与读解析(现存)在 cache 类别走通全链。
+        let reference = bridge::PathRef {
+            kind: bridge::PathRootKind::Cache,
+            relative: "out/新 口袋/pocket.pa".to_owned(),
+        };
+        let target = path_service_resolve_write_target(&service, &reference)?;
+        let parent = Path::new(&target)
+            .parent()
+            .ok_or_else(|| format!("目标缺少父目录: {target}"))?;
+        std::fs::create_dir_all(parent)?;
+        std::fs::write(&target, b"pa")?;
+        path_service_resolve_existing(&service, &reference)?;
+        let _ = std::fs::remove_dir_all(&root);
+        Ok(())
     }
 }

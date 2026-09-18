@@ -188,6 +188,8 @@ impl From<PathError> for String {
     }
 }
 
+impl std::error::Error for PathError {}
+
 /// Windows 保留设备名（不含扩展名比较）；跨平台统一拒绝，保证工程资产
 /// 在平台间搬迁时不会落到目标平台非法文件名上。
 const RESERVED_NAMES: [&str; 22] = [
@@ -357,21 +359,19 @@ mod tests {
     }
 
     impl FixtureRoot {
-        fn new(label: &str) -> Self {
+        fn new(label: &str) -> std::io::Result<Self> {
             let base = std::fs::canonicalize(std::env::temp_dir())
                 .unwrap_or_else(|_| std::env::temp_dir());
             let root = base.join(format!("panta-path-{}-{label}", std::process::id()));
             let _ = fs::remove_dir_all(&root);
-            fs::create_dir_all(&root).unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
-            Self { root }
+            fs::create_dir_all(&root)?;
+            Ok(Self { root })
         }
 
-        fn service(&self) -> PathService {
+        fn service(&self) -> Result<PathService, PathError> {
             let mut service = PathService::new();
-            service
-                .set_root(RootCategory::Project, &self.root)
-                .unwrap_or_else(|error| panic!("注入工程根失败: {error}"));
-            service
+            service.set_root(RootCategory::Project, &self.root)?;
+            Ok(service)
         }
     }
 
@@ -389,22 +389,21 @@ mod tests {
     }
 
     #[test]
-    fn logical_reference_round_trips() {
-        let parsed = ResourceRef::parse("project:/assets/齿轮 box/a.step")
-            .unwrap_or_else(|error| panic!("合法引用被拒绝: {error}"));
+    fn logical_reference_round_trips() -> Result<(), Box<dyn std::error::Error>> {
+        let parsed = ResourceRef::parse("project:/assets/齿轮 box/a.step")?;
         assert_eq!(parsed.category, RootCategory::Project);
         assert_eq!(parsed.relative, "assets/齿轮 box/a.step");
         assert_eq!(parsed.to_logical(), "project:/assets/齿轮 box/a.step");
 
         for scheme in ["user-config", "app-data", "cache", "session", "qrc"] {
-            let parsed = ResourceRef::parse(&format!("{scheme}:/x"))
-                .unwrap_or_else(|error| panic!("{scheme} 被拒绝: {error}"));
+            let parsed = ResourceRef::parse(&format!("{scheme}:/x"))?;
             assert_eq!(parsed.category.scheme(), scheme);
         }
+        Ok(())
     }
 
     #[test]
-    fn logical_reference_rejects_structural_errors() {
+    fn logical_reference_rejects_structural_errors() -> Result<(), Box<dyn std::error::Error>> {
         for (input, expected) in [
             ("", PathError::MissingScheme),
             ("assets/x", PathError::MissingScheme),
@@ -423,28 +422,30 @@ mod tests {
                 "input={input:?} 应被拒绝"
             );
         }
+        Ok(())
     }
 
     #[test]
-    fn resolve_joins_without_filesystem_and_stays_absolute() {
-        let fixture = FixtureRoot::new("join");
-        let service = fixture.service();
-        let resolved = service
-            .resolve(&reference("assets/./b/../齿轮/a.step"))
-            .unwrap_or_else(|error| panic!("合法引用被拒绝: {error}"));
+    fn resolve_joins_without_filesystem_and_stays_absolute()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = FixtureRoot::new("join")?;
+        let service = fixture.service()?;
+        let resolved = service.resolve(&reference("assets/./b/../齿轮/a.step"))?;
         assert!(resolved.is_absolute());
         assert_eq!(
             resolved,
             fixture.root.join("assets").join("齿轮").join("a.step")
         );
+        Ok(())
     }
 
     #[test]
-    fn relative_rules_reject_invalid_fragments() {
-        let fixture = FixtureRoot::new("rules");
-        let service = fixture.service();
+    fn relative_rules_reject_invalid_fragments() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = FixtureRoot::new("rules")?;
+        let service = fixture.service()?;
         for (fragment, code) in [
             ("", "path.empty_reference"),
+            (".", "path.empty_reference"),
             ("/abs", "path.absolute_rejected"),
             ("C:/win", "path.absolute_rejected"),
             ("..", "path.parent_escape"),
@@ -463,10 +464,11 @@ mod tests {
                 "fragment={fragment:?} 应被拒绝"
             );
         }
+        Ok(())
     }
 
     #[test]
-    fn roots_must_be_absolute_and_injected() {
+    fn roots_must_be_absolute_and_injected() -> Result<(), Box<dyn std::error::Error>> {
         let mut service = PathService::new();
         assert!(matches!(
             service.set_root(RootCategory::Project, Path::new("relative/root")),
@@ -482,12 +484,13 @@ mod tests {
             service.resolve(&reference("a")),
             Err(PathError::RootMissing(RootCategory::Project))
         ));
+        Ok(())
     }
 
     #[test]
-    fn qrc_never_resolves_to_native_path() {
-        let fixture = FixtureRoot::new("qrc");
-        let service = fixture.service();
+    fn qrc_never_resolves_to_native_path() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = FixtureRoot::new("qrc")?;
+        let service = fixture.service()?;
         let qrc_ref = ResourceRef {
             category: RootCategory::Qrc,
             relative: "icons/open.svg".to_owned(),
@@ -496,38 +499,35 @@ mod tests {
             service.resolve(&qrc_ref),
             Err(PathError::QrcNotNative)
         ));
+        Ok(())
     }
 
     #[test]
-    fn resolve_preserves_component_case_without_folding() {
-        let fixture = FixtureRoot::new("case");
-        let service = fixture.service();
-        let upper = service
-            .resolve(&reference("Assets/GearBox.PA"))
-            .unwrap_or_else(|error| panic!("大写引用被拒绝: {error}"));
-        let lower = service
-            .resolve(&reference("assets/gearbox.pa"))
-            .unwrap_or_else(|error| panic!("小写引用被拒绝: {error}"));
+    fn resolve_preserves_component_case_without_folding() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let fixture = FixtureRoot::new("case")?;
+        let service = fixture.service()?;
+        let upper = service.resolve(&reference("Assets/GearBox.PA"))?;
+        let lower = service.resolve(&reference("assets/gearbox.pa"))?;
         // 服务层不做任何大小写折叠：两种写法保持各自的字节形态。磁盘的
         // 大小写敏感性由平台文件系统决定（macOS/Windows 默认不敏感），
         // 引用语义层的区分交给调用方。
         assert_ne!(upper, lower);
         assert!(upper.ends_with("Assets/GearBox.PA"));
         assert!(lower.ends_with("assets/gearbox.pa"));
+        Ok(())
     }
 
     #[test]
-    fn resolve_existing_requires_present_contained_target() {
-        let fixture = FixtureRoot::new("existing");
+    fn resolve_existing_requires_present_contained_target() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let fixture = FixtureRoot::new("existing")?;
         let assets = fixture.root.join("assets");
-        fs::create_dir_all(&assets).unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
-        fs::write(assets.join("模型 v1.step"), b"step")
-            .unwrap_or_else(|error| panic!("写入失败: {error}"));
+        fs::create_dir_all(&assets)?;
+        fs::write(assets.join("模型 v1.step"), b"step")?;
 
-        let service = fixture.service();
-        let existing = service
-            .resolve_existing(&reference("assets/模型 v1.step"))
-            .unwrap_or_else(|error| panic!("现存目标被拒绝: {error}"));
+        let service = fixture.service()?;
+        let existing = service.resolve_existing(&reference("assets/模型 v1.step"))?;
         assert!(existing.is_absolute());
         assert!(existing.ends_with("模型 v1.step"));
 
@@ -535,17 +535,16 @@ mod tests {
             service.resolve_existing(&reference("assets/missing.step")),
             Err(ref error) if error.code() == "path.not_found"
         ));
+        Ok(())
     }
 
     #[test]
-    fn write_target_allows_missing_file_but_checks_ancestor() {
-        let fixture = FixtureRoot::new("write");
-        fs::create_dir_all(fixture.root.join("out"))
-            .unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
-        let service = fixture.service();
-        let target = service
-            .resolve_write_target(&reference("out/新 工程口袋/未创建.pa"))
-            .unwrap_or_else(|error| panic!("未创建目标被拒绝: {error}"));
+    fn write_target_allows_missing_file_but_checks_ancestor()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = FixtureRoot::new("write")?;
+        fs::create_dir_all(fixture.root.join("out"))?;
+        let service = fixture.service()?;
+        let target = service.resolve_write_target(&reference("out/新 工程口袋/未创建.pa"))?;
         assert_eq!(
             target,
             fixture
@@ -554,47 +553,43 @@ mod tests {
                 .join("新 工程口袋")
                 .join("未创建.pa")
         );
+        Ok(())
     }
 
     #[test]
-    fn missing_root_directory_is_an_error() {
+    fn missing_root_directory_is_an_error() -> Result<(), Box<dyn std::error::Error>> {
         let base =
             std::fs::canonicalize(std::env::temp_dir()).unwrap_or_else(|_| std::env::temp_dir());
         let absent = base.join(format!("panta-path-absent-{}", std::process::id()));
         let _ = fs::remove_dir_all(&absent);
         let mut service = PathService::new();
-        service
-            .set_root(RootCategory::Project, &absent)
-            .unwrap_or_else(|error| panic!("注入缺失根失败: {error}"));
+        service.set_root(RootCategory::Project, &absent)?;
         assert!(matches!(
             service.resolve_existing(&reference("a")),
             Err(PathError::RootMissing(RootCategory::Project))
         ));
         let _ = fs::remove_dir_all(&absent);
+        Ok(())
     }
 
     #[cfg(unix)]
     #[test]
-    fn symlink_escape_outside_root_is_rejected() {
+    fn symlink_escape_outside_root_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
         use std::os::unix::fs::symlink;
 
-        let fixture = FixtureRoot::new("symlink");
-        let outside = fixture.root.parent().map(|parent| {
-            let outside = parent.join(format!("panta-path-outside-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&outside);
-            fs::create_dir_all(&outside).unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
-            outside
-        });
-        let Some(outside) = outside else {
-            panic!("无法构造根外目录");
-        };
-        fs::write(outside.join("secret.pa"), b"x")
-            .unwrap_or_else(|error| panic!("写入失败: {error}"));
+        let fixture = FixtureRoot::new("symlink")?;
+        // 根目录的兄弟目录：with_file_name 直接构造，无 Option 分支。
+        let outside = fixture
+            .root
+            .with_file_name(format!("panta-path-outside-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&outside)?;
+        fs::write(outside.join("secret.pa"), b"x")?;
 
         let link = fixture.root.join("leak");
-        symlink(&outside, &link).unwrap_or_else(|error| panic!("符号链接创建失败: {error}"));
+        symlink(&outside, &link)?;
 
-        let service = fixture.service();
+        let service = fixture.service()?;
         assert!(matches!(
             service.resolve_existing(&reference("leak/secret.pa")),
             Err(ref error) if error.code() == "path.not_contained"
@@ -605,10 +600,11 @@ mod tests {
             Err(ref error) if error.code() == "path.not_contained"
         ));
         let _ = fs::remove_dir_all(&outside);
+        Ok(())
     }
 
     #[test]
-    fn error_code_and_detail_cover_every_variant() {
+    fn error_code_and_detail_cover_every_variant() -> Result<(), Box<dyn std::error::Error>> {
         // 全变体遍历：code()/detail() 的每个 match 臂都真实执行（032 门禁）。
         let cases: Vec<(PathError, &str, &str)> = vec![
             (PathError::EmptyReference, "path.empty_reference", ""),
@@ -667,14 +663,16 @@ mod tests {
                 assert_eq!(rendered, format!("{code}: {detail}"), "{error:?}");
             }
         }
+        Ok(())
     }
 
     #[test]
-    fn empty_and_repeated_separators_are_tolerated_consistently() -> Result<(), String> {
+    fn empty_and_repeated_separators_are_tolerated_consistently()
+    -> Result<(), Box<dyn std::error::Error>> {
         // 手工 `/` 切分语义：尾随与连续分隔符容忍（与 Path::components 的
         // 尾斜杠语义一致）；首分隔符仍按绝对路径拒绝。
-        let fixture = FixtureRoot::new("separators");
-        let service = fixture.service();
+        let fixture = FixtureRoot::new("separators")?;
+        let service = fixture.service()?;
         let trailing = service.resolve(&reference("assets/"))?;
         assert_eq!(trailing, fixture.root.join("assets"));
         let inner = service.resolve(&reference("assets//齿轮"))?;
@@ -683,8 +681,9 @@ mod tests {
     }
 
     #[test]
-    fn path_error_converts_to_string_directly() {
+    fn path_error_converts_to_string_directly() -> Result<(), Box<dyn std::error::Error>> {
         let rendered: String = PathError::NotFound("/x".into()).into();
         assert_eq!(rendered, "path.not_found: /x");
+        Ok(())
     }
 }

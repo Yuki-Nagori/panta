@@ -8,44 +8,35 @@ fn dslc() -> Command {
 }
 
 #[test]
-fn no_arguments_prints_usage_and_exits_two() {
-    let output = dslc()
-        .output()
-        .unwrap_or_else(|error| panic!("启动失败: {error}"));
+fn no_arguments_prints_usage_and_exits_two() -> Result<(), Box<dyn std::error::Error>> {
+    let output = dslc().output()?;
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("usage: panta-dslc"), "{stderr}");
+    Ok(())
 }
 
 #[test]
-fn check_succeeds_and_fails_with_exit_code_two() {
+fn check_succeeds_and_fails_with_exit_code_two() -> Result<(), Box<dyn std::error::Error>> {
     let dir = std::env::temp_dir().join(format!("panta-dslc-e2e-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("mkdir 失败: {error}"));
+    std::fs::create_dir_all(&dir)?;
     let ok = dir.join("ok.pa");
-    std::fs::write(&ok, "version: 1\nkind: language\nlanguage: en\nsourcelanguage: en\n\n[App]\ntitle:\n  src: Hi\n  tr: Hi\n")
-        .unwrap_or_else(|error| panic!("写入失败: {error}"));
+    std::fs::write(
+        &ok,
+        "version: 1\nkind: language\nlanguage: en\nsourcelanguage: en\n\n[App]\ntitle:\n  src: Hi\n  tr: Hi\n",
+    )?;
 
-    let output = dslc()
-        .args([
-            "check",
-            ok.to_str().unwrap_or_else(|| panic!("非 UTF-8 路径")),
-        ])
-        .output()
-        .unwrap_or_else(|error| panic!("启动失败: {error}"));
+    let ok_str = ok.to_str().ok_or("非 UTF-8 路径")?;
+    let output = dslc().args(["check", ok_str]).output()?;
     assert_eq!(output.status.code(), Some(0), "{output:?}");
 
     let bad = dir.join("bad.pa");
-    std::fs::write(&bad, "version: 1\nkind: language\nlanguage: en\n")
-        .unwrap_or_else(|error| panic!("写入失败: {error}"));
-    let output = dslc()
-        .args([
-            "check",
-            bad.to_str().unwrap_or_else(|| panic!("非 UTF-8 路径")),
-        ])
-        .output()
-        .unwrap_or_else(|error| panic!("启动失败: {error}"));
+    std::fs::write(&bad, "version: 1\nkind: language\nlanguage: en\n")?;
+    let bad_str = bad.to_str().ok_or("非 UTF-8 路径")?;
+    let output = dslc().args(["check", bad_str]).output()?;
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("pa."));
 
     let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }

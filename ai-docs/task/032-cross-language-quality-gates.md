@@ -5,7 +5,7 @@
 - 依赖：[011](011-test-quality-entrypoints.md)、[018](018-cross-platform-ci.md)、[019](019-gtest-native-testing.md)
 - 优先级：P0
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-18
 
 ## 目标与背景
 
@@ -87,6 +87,9 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 过度追求数字会导致无意义测试或大范围排除；按模块和分支指标审查，工具无法测量时补可观察行为测试。平台 coverage 工具差异由等价报告校验，暂不能统一时保持门禁缺口可见，不降低到“尽力而为”。回退只撤销本任务配置，保留已有测试和质量证据。
 
 ## 决策与工作记录
+
+- 2026-09-18（Rust 测试批次，本轮评审）：新增 DSL 24 项公共 API 行为测试、FFI 取消/失败事件和路径类别/读写链验证；测试错误使用 Error + ? 传播。修复关闭线程测试吞掉 submit 失败，恢复 CLI 完整 usage 断言，删除仅为实例覆盖重复调用库的 CLI 测试与冗余 dev-dependency。无业务契约变化、无兼容例外；覆盖率规则与 native 聚合在后续独立批次收敛。
+- 本批验证：仓库根、macOS arm64、rustc 1.98.1，`cargo test --locked --workspace --exclude panta-launcher` 90 项通过；`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 通过。cargo-llvm-cov 0.9.1 配套工具报告函数 89.69%、行 94.23%；未宣称已达到 100%。
 
 - 2026-09-16：新增跨语言质量任务；用户要求各语言配置 format/test/lint/依赖与死代码工具，并以 100% 覆盖率作为门禁目标。
 - 2026-09-18（增量一，Rust 质量完备 + QML 格式门禁 + CI 接线；维护者指示 032 优先于 007）：工具版本固定入 `modules/quality-tooling.md`（cargo-deny 0.20.2 / cargo-machete 0.9.2 / cargo-llvm-cov 0.9.1 / qmlformat 6.11.2）。发现并修复三类真实问题：quick-xml 0.38.4 有 RustSec 告警（升 0.41，DSL 测试全过、TS 生成语义不变）；syn 2/3 双版本为 pest↔cxx 锁定组合的传递依赖（deny skip 登记）；内部 path 依赖无版本号触发 wildcard 拒绝（workspace 表补 version、成员统一 `.workspace = true`）。launcher 的 panta-ffi 依赖被 machete 误报（仅经 build.rs 的 DEP_* 环境变量消费），按官方机制登记豁免。QML 格式门禁落地为 CTest `Qml.FormatCheck`（qmlformat stdout diff，两分支受控失败均验证）。Rust 覆盖率基线：line 74.21%（path 87.15/task 92.16/dsl-core 66.94/dslc 0/ffi 83.96），launcher（启动胶水）按 032 允许条款登记排除；stable rustc 无分支覆盖数据，门禁先以 line 执行（工具限制已记录）；**100% 门禁在缺口清零前不启用**。CI 新增 `quality`（deny+machete，单平台）与 `coverage`（报告非门禁）两个 job。

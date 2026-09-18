@@ -16,32 +16,31 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(arguments: Vec<String>) -> Result<(), String> {
+fn run(arguments: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     let Some(command) = arguments.first().map(String::as_str) else {
-        return Err(usage());
+        return Err(usage().into());
     };
     match command {
         "check" | "validate" => {
             let input = required_path(&arguments, 1)?;
             let source = read_source(input)?;
-            parse(&source)
-                .map(|_| ())
-                .map_err(|error| error.to_string())
+            parse(&source).map(|_| ())?;
+            Ok(())
         }
         "emit-ts" => {
             let input = required_path(&arguments, 1)?;
             let output = required_path(&arguments, 2)?;
             let source = read_source(input)?;
-            let document = parse(&source).map_err(|error| error.to_string())?;
+            let document = parse(&source)?;
             if document.kind != Kind::Language {
-                return Err("emit-ts requires kind: language".to_owned());
+                return Err("emit-ts requires kind: language".into());
             }
             let locale = arguments
                 .get(3)
                 .map(String::as_str)
                 .or(document.language.as_deref())
                 .unwrap_or("en");
-            let ts = emit_ts(&document, locale).map_err(|error| error.to_string())?;
+            let ts = emit_ts(&document, locale)?;
             write_atomically(output, ts.as_bytes())
         }
         "format" => {
@@ -49,12 +48,12 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
             let input_index = usize::from(check) + 1;
             let input = required_path(&arguments, input_index)?;
             let source = read_source(input)?;
-            let formatted = format_source(&source).map_err(|error| error.to_string())?;
+            let formatted = format_source(&source)?;
             if check {
                 if formatted == source {
                     Ok(())
                 } else {
-                    Err(format!("{} requires formatting", input.display()))
+                    Err(format!("{} requires formatting", input.display()).into())
                 }
             } else if formatted == source {
                 Ok(())
@@ -62,7 +61,7 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
                 write_atomically(input, formatted.as_bytes())
             }
         }
-        _ => Err(usage()),
+        _ => Err(usage().into()),
     }
 }
 
@@ -81,7 +80,7 @@ fn read_source(path: &Path) -> Result<String, String> {
     })
 }
 
-fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), String> {
+fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let temporary = path.with_extension(format!(
         "{}.tmp",
         path.extension()
@@ -93,7 +92,8 @@ fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), String> {
     let write = fs::File::create(&temporary)
         .and_then(|mut file| file.write_all(contents).and_then(|_| file.sync_all()));
     write.map_err(|error| format!("write {}: {error}", temporary.display()))?;
-    fs::rename(&temporary, path).map_err(|error| format!("replace {}: {error}", path.display()))
+    fs::rename(&temporary, path).map_err(|error| format!("replace {}: {error}", path.display()))?;
+    Ok(())
 }
 
 fn usage() -> String {
@@ -149,18 +149,19 @@ mod tests {
     fn missing_or_unknown_command_reports_usage() {
         for arguments in [vec![], vec!["nonsense".to_owned()]] {
             assert!(
-                matches!(run(arguments), Err(ref error) if *error == usage()),
+                matches!(
+                    run(arguments),
+                    Err(ref error) if error.to_string() == usage()
+                ),
                 "无效应命令必须报 usage"
             );
         }
     }
 
     #[test]
-    fn check_and_validate_accept_canonical_dictionary() -> Result<(), String> {
-        let dir = TempDir::new("check").map_err(|e| e.to_string())?;
-        let input = dir
-            .write("ok.pa", LANGUAGE_CANONICAL)
-            .map_err(|e| e.to_string())?;
+    fn check_and_validate_accept_canonical_dictionary() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("check")?;
+        let input = dir.write("ok.pa", LANGUAGE_CANONICAL)?;
         for command in ["check", "validate"] {
             run(vec![command.to_owned(), input.display().to_string()])?;
         }
@@ -168,15 +169,13 @@ mod tests {
     }
 
     #[test]
-    fn check_reports_parse_diagnostics() -> Result<(), String> {
-        let dir = TempDir::new("check-bad").map_err(|e| e.to_string())?;
-        let input = dir
-            .write("bad.pa", "version: 1\nkind: language\nlanguage: en\n")
-            .map_err(|e| e.to_string())?;
+    fn check_reports_parse_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("check-bad")?;
+        let input = dir.write("bad.pa", "version: 1\nkind: language\nlanguage: en\n")?;
         assert!(
             matches!(
                 run(vec!["check".to_owned(), input.display().to_string()]),
-                Err(ref error) if error.contains("pa.")
+                Err(ref error) if error.to_string().contains("pa.")
             ),
             "坏字典必须带诊断失败"
         );
@@ -184,19 +183,19 @@ mod tests {
     }
 
     #[test]
-    fn emit_ts_writes_requested_locale_and_cleans_temporary() -> Result<(), String> {
-        let dir = TempDir::new("emit").map_err(|e| e.to_string())?;
-        let input = dir
-            .write("cn.pa", LANGUAGE_CANONICAL)
-            .map_err(|e| e.to_string())?;
+    fn emit_ts_writes_requested_locale_and_cleans_temporary()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("emit")?;
+        let input = dir.write("cn.pa", LANGUAGE_CANONICAL)?;
         let output = dir.path.join("out.ts");
-        run(vec![
+        let arguments = vec![
             "emit-ts".to_owned(),
             input.display().to_string(),
             output.display().to_string(),
             "zh_CN".to_owned(),
-        ])?;
-        let ts = dir.read("out.ts").map_err(|e| e.to_string())?;
+        ];
+        run(arguments)?;
+        let ts = dir.read("out.ts")?;
         assert!(ts.contains("zh_CN"), "locale 应写入 TS");
         assert!(
             !dir.path.join("out.ts.tmp").exists(),
@@ -206,25 +205,25 @@ mod tests {
     }
 
     #[test]
-    fn emit_ts_falls_back_to_document_locale() -> Result<(), String> {
-        let dir = TempDir::new("emit-doc-locale").map_err(|e| e.to_string())?;
-        let input = dir
-            .write("en.pa", LANGUAGE_CANONICAL)
-            .map_err(|e| e.to_string())?;
+    fn emit_ts_falls_back_to_document_locale() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("emit-doc-locale")?;
+        let input = dir.write("en.pa", LANGUAGE_CANONICAL)?;
         let output = dir.path.join("out.ts");
-        run(vec![
+        let arguments = vec![
             "emit-ts".to_owned(),
             input.display().to_string(),
             output.display().to_string(),
-        ])?;
+        ];
+        run(arguments)?;
         assert!(output.exists());
         Ok(())
     }
 
     #[test]
-    fn emit_ts_rejects_non_language_kind_and_missing_output() -> Result<(), String> {
-        let dir = TempDir::new("emit-bad").map_err(|e| e.to_string())?;
-        let input = dir.write("vars.pa", VARIABLES).map_err(|e| e.to_string())?;
+    fn emit_ts_rejects_non_language_kind_and_missing_output()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("emit-bad")?;
+        let input = dir.write("vars.pa", VARIABLES)?;
         assert!(
             matches!(
                 run(vec![
@@ -232,14 +231,14 @@ mod tests {
                     input.display().to_string(),
                     dir.path.join("out.ts").display().to_string(),
                 ]),
-                Err(ref error) if error == "emit-ts requires kind: language"
+                Err(ref error) if error.to_string() == "emit-ts requires kind: language"
             ),
             "variables 字典不得生成 TS"
         );
         assert!(
             matches!(
                 run(vec!["emit-ts".to_owned(), input.display().to_string()]),
-                Err(ref error) if *error == usage()
+                Err(ref error) if error.to_string() == usage()
             ),
             "缺输出参数必须报 usage"
         );
@@ -247,43 +246,30 @@ mod tests {
     }
 
     #[test]
-    fn format_writes_only_when_needed() -> Result<(), String> {
-        let dir = TempDir::new("format").map_err(|e| e.to_string())?;
-        let dirty = dir
-            .write("dirty.pa", LANGUAGE_NEEDS_FORMAT)
-            .map_err(|e| e.to_string())?;
+    fn format_writes_only_when_needed() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("format")?;
+        let dirty = dir.write("dirty.pa", LANGUAGE_NEEDS_FORMAT)?;
         run(vec!["format".to_owned(), dirty.display().to_string()])?;
-        assert_eq!(
-            dir.read("dirty.pa").map_err(|e| e.to_string())?,
-            LANGUAGE_CANONICAL
-        );
+        assert_eq!(dir.read("dirty.pa")?, LANGUAGE_CANONICAL);
 
-        let clean = dir
-            .write("clean.pa", LANGUAGE_CANONICAL)
-            .map_err(|e| e.to_string())?;
+        let clean = dir.write("clean.pa", LANGUAGE_CANONICAL)?;
         run(vec!["format".to_owned(), clean.display().to_string()])?;
-        assert_eq!(
-            dir.read("clean.pa").map_err(|e| e.to_string())?,
-            LANGUAGE_CANONICAL
-        );
+        assert_eq!(dir.read("clean.pa")?, LANGUAGE_CANONICAL);
         Ok(())
     }
 
     #[test]
-    fn format_check_distinguishes_clean_and_dirty() -> Result<(), String> {
-        let dir = TempDir::new("format-check").map_err(|e| e.to_string())?;
-        let clean = dir
-            .write("clean.pa", LANGUAGE_CANONICAL)
-            .map_err(|e| e.to_string())?;
-        run(vec![
+    fn format_check_distinguishes_clean_and_dirty() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("format-check")?;
+        let clean = dir.write("clean.pa", LANGUAGE_CANONICAL)?;
+        let arguments = vec![
             "format".to_owned(),
             "--check".to_owned(),
             clean.display().to_string(),
-        ])?;
+        ];
+        run(arguments)?;
 
-        let dirty = dir
-            .write("dirty.pa", LANGUAGE_NEEDS_FORMAT)
-            .map_err(|e| e.to_string())?;
+        let dirty = dir.write("dirty.pa", LANGUAGE_NEEDS_FORMAT)?;
         assert!(
             matches!(
                 run(vec![
@@ -291,7 +277,7 @@ mod tests {
                     "--check".to_owned(),
                     dirty.display().to_string(),
                 ]),
-                Err(ref error) if error.contains("requires formatting")
+                Err(ref error) if error.to_string().contains("requires formatting")
             ),
             "--check 对脏文件必须非零"
         );
@@ -299,25 +285,25 @@ mod tests {
     }
 
     #[test]
-    fn read_source_reports_missing_and_invalid_utf8() -> Result<(), String> {
-        let dir = TempDir::new("read").map_err(|e| e.to_string())?;
+    fn read_source_reports_missing_and_invalid_utf8() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("read")?;
         assert!(
             matches!(
                 run(vec![
                     "check".to_owned(),
                     dir.path.join("absent.pa").display().to_string(),
                 ]),
-                Err(ref error) if error.starts_with("read ")
+                Err(ref error) if error.to_string().starts_with("read ")
             ),
             "缺失文件必须报 read 诊断"
         );
 
         let invalid = dir.path.join("invalid.pa");
-        fs::write(&invalid, [0xffu8, 0xfe]).map_err(|e| e.to_string())?;
+        fs::write(&invalid, [0xffu8, 0xfe])?;
         assert!(
             matches!(
                 run(vec!["check".to_owned(), invalid.display().to_string()]),
-                Err(ref error) if error.starts_with("pa.invalid_utf8 at byte 0")
+                Err(ref error) if error.to_string().starts_with("pa.invalid_utf8 at byte 0")
             ),
             "非法 UTF-8 必须带字节位置"
         );
@@ -336,37 +322,39 @@ mod tests {
     }
 
     #[test]
-    fn write_atomically_replaces_content_and_covers_extensionless_target() -> Result<(), String> {
-        let dir = TempDir::new("write").map_err(|e| e.to_string())?;
-        let target = dir.write("a.ts", "old").map_err(|e| e.to_string())?;
+    fn write_atomically_replaces_content_and_covers_extensionless_target()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("write")?;
+        let target = dir.write("a.ts", "old")?;
         write_atomically(&target, b"new")?;
-        assert_eq!(dir.read("a.ts").map_err(|e| e.to_string())?, "new");
+        assert_eq!(dir.read("a.ts")?, "new");
         assert!(!dir.path.join("a.ts.tmp").exists());
 
         let extensionless = dir.path.join("plain");
         write_atomically(&extensionless, b"x")?;
-        assert_eq!(dir.read("plain").map_err(|e| e.to_string())?, "x");
+        assert_eq!(dir.read("plain")?, "x");
         Ok(())
     }
 
     #[test]
-    fn write_atomically_reports_create_and_replace_failures() -> Result<(), String> {
-        let dir = TempDir::new("write-fail").map_err(|e| e.to_string())?;
+    fn write_atomically_reports_create_and_replace_failures()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("write-fail")?;
         assert!(
             matches!(
                 write_atomically(&dir.path.join("absent-dir").join("a.ts"), b"x"),
-                Err(ref error) if error.starts_with("write ")
+                Err(ref error) if error.to_string().starts_with("write ")
             ),
             "不存在目录必须报 write 诊断"
         );
 
         // 目标是目录时 rename 失败：覆盖 replace 错误面。
         let as_directory = dir.path.join("as-dir.ts");
-        fs::create_dir_all(&as_directory).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&as_directory)?;
         assert!(
             matches!(
                 write_atomically(&as_directory, b"x"),
-                Err(ref error) if error.starts_with("replace ")
+                Err(ref error) if error.to_string().starts_with("replace ")
             ),
             "目录目标必须报 replace 诊断"
         );

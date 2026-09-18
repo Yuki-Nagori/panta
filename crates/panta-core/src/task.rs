@@ -81,6 +81,8 @@ pub enum SubmitError {
     SpawnFailed(String),
 }
 
+impl std::error::Error for SubmitError {}
+
 impl std::fmt::Display for SubmitError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -402,7 +404,7 @@ fn publish_progress(inner: &Arc<Inner>, task_id: u64, percent: u32) {
 mod tests {
     use super::{
         LOG_RING_CAPACITY, LogRecord, MAX_TASK_DURATION, SubmitError, TaskEvent, TaskEventKind,
-        TaskManager, publish_progress, rollback_spawn, transition,
+        TaskManager, cancel_requested, publish_progress, rollback_spawn, transition,
     };
     use std::time::{Duration, Instant};
 
@@ -418,16 +420,19 @@ mod tests {
         condition()
     }
 
-    fn submit(manager: &TaskManager, label: &str, millis: u64, fail: bool) -> u64 {
-        manager
-            .submit(label, Duration::from_millis(millis), fail)
-            .unwrap_or_else(|error| panic!("submit '{label}' failed: {error}"))
+    fn submit(
+        manager: &TaskManager,
+        label: &str,
+        millis: u64,
+        fail: bool,
+    ) -> Result<u64, Box<dyn std::error::Error>> {
+        Ok(manager.submit(label, Duration::from_millis(millis), fail)?)
     }
 
     #[test]
-    fn submit_succeeds_and_emits_ordered_events() {
+    fn submit_succeeds_and_emits_ordered_events() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
-        let id = submit(&manager, "succeed-α", 30, false);
+        let id = submit(&manager, "succeed-α", 30, false)?;
 
         assert!(wait_for(
             || manager.running_tasks() == 0,
@@ -459,12 +464,13 @@ mod tests {
             logs.iter()
                 .any(|record| record.task_id == id && record.message.contains("succeeded"))
         );
+        Ok(())
     }
 
     #[test]
-    fn progress_events_are_bounded_and_monotonic() {
+    fn progress_events_are_bounded_and_monotonic() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
-        let id = submit(&manager, "progress-θ", 200, false);
+        let id = submit(&manager, "progress-θ", 200, false)?;
 
         assert!(wait_for(
             || manager.running_tasks() == 0,
@@ -486,12 +492,13 @@ mod tests {
             assert!(pair[0] < pair[1], "progress not increasing: {percents:?}");
         }
         assert!(*percents.last().unwrap_or(&0) <= 100);
+        Ok(())
     }
 
     #[test]
-    fn simulated_failure_is_a_structured_error() {
+    fn simulated_failure_is_a_structured_error() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
-        let id = submit(&manager, "fail-β", 20, true);
+        let id = submit(&manager, "fail-β", 20, true)?;
 
         assert!(wait_for(
             || manager.running_tasks() == 0,
@@ -504,15 +511,19 @@ mod tests {
                 failed = Some(event);
             }
         }
-        let failed = failed.unwrap_or_else(|| panic!("failed event missing: {events:?}"));
+        let Some(failed) = failed else {
+            panic!("failed event missing")
+        };
         assert_eq!(failed.code, "task.simulated_failure");
         assert!(failed.detail.contains("fail-β"));
+        Ok(())
     }
 
     #[test]
-    fn cancel_running_task_and_reject_duplicate_request() {
+    fn cancel_running_task_and_reject_duplicate_request() -> Result<(), Box<dyn std::error::Error>>
+    {
         let manager = TaskManager::new();
-        let id = submit(&manager, "cancel-γ", 30_000, false);
+        let id = submit(&manager, "cancel-γ", 30_000, false)?;
 
         assert!(manager.cancel(id));
         // 取消请求只接受一次；重复请求不产生第二个事件。
@@ -529,7 +540,9 @@ mod tests {
                 cancelled = Some(event);
             }
         }
-        let cancelled = cancelled.unwrap_or_else(|| panic!("cancelled event missing: {events:?}"));
+        let Some(cancelled) = cancelled else {
+            panic!("cancelled event missing")
+        };
         assert_eq!(cancelled.code, "task.cancelled");
         assert!(
             !events.iter().any(|event| matches!(
@@ -537,12 +550,13 @@ mod tests {
                 TaskEventKind::Succeeded | TaskEventKind::Failed
             ))
         );
+        Ok(())
     }
 
     #[test]
-    fn late_cancel_is_rejected_and_terminal_holds() {
+    fn late_cancel_is_rejected_and_terminal_holds() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
-        let id = submit(&manager, "late-δ", 20, false);
+        let id = submit(&manager, "late-δ", 20, false)?;
 
         assert!(wait_for(
             || manager.running_tasks() == 0,
@@ -556,6 +570,7 @@ mod tests {
                 .any(|event| event.kind == TaskEventKind::Cancelled)
         );
         assert_eq!(manager.drain_events(), Vec::<TaskEvent>::new());
+        Ok(())
     }
 
     #[test]
@@ -579,18 +594,19 @@ mod tests {
     }
 
     #[test]
-    fn drop_joins_running_workers() {
+    fn drop_joins_running_workers() -> Result<(), Box<dyn std::error::Error>> {
         let started = Instant::now();
         {
             let manager = TaskManager::new();
-            submit(&manager, "shutdown-ζ", 30_000, false);
-            submit(&manager, "shutdown-η", 30_000, false);
+            submit(&manager, "shutdown-ζ", 30_000, false)?;
+            submit(&manager, "shutdown-η", 30_000, false)?;
         }
         let elapsed = started.elapsed();
         assert!(
             elapsed < Duration::from_secs(30),
             "drop 阻塞 {elapsed:?}：工作线程未被 join"
         );
+        Ok(())
     }
 
     #[test]
@@ -628,11 +644,9 @@ mod tests {
     }
 
     #[test]
-    fn default_manager_is_usable() -> Result<(), String> {
+    fn default_manager_is_usable() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::default();
-        let id = manager
-            .submit("默认构造", std::time::Duration::from_millis(1), false)
-            .map_err(|error| error.to_string())?;
+        let id = manager.submit("默认构造", std::time::Duration::from_millis(1), false)?;
         wait_until_running_zero(&manager);
         assert!(
             manager
@@ -645,13 +659,11 @@ mod tests {
     }
 
     #[test]
-    fn log_ring_capacity_evicts_oldest() -> Result<(), String> {
+    fn log_ring_capacity_evicts_oldest() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
         // 提交超过环容量的任务数：每条提交至少写一条日志，最旧者被淘汰。
         for _ in 0..(LOG_RING_CAPACITY + 16) {
-            manager
-                .submit("环容量", std::time::Duration::from_millis(1), false)
-                .map_err(|error| error.to_string())?;
+            manager.submit("环容量", std::time::Duration::from_millis(1), false)?;
         }
         wait_until_running_zero(&manager);
         let logs = manager.recent_logs();
@@ -660,24 +672,21 @@ mod tests {
     }
 
     #[test]
-    fn cancel_rejects_unknown_and_terminal_tasks() -> Result<(), String> {
+    fn cancel_rejects_unknown_and_terminal_tasks() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
         assert!(!manager.cancel(9_999), "未知任务不可取消");
-        let id = manager
-            .submit("终态", std::time::Duration::from_millis(1), false)
-            .map_err(|error| error.to_string())?;
+        let id = manager.submit("终态", std::time::Duration::from_millis(1), false)?;
         wait_until_running_zero(&manager);
         assert!(!manager.cancel(id), "终态任务不可取消");
         Ok(())
     }
 
     #[test]
-    fn late_events_for_missing_or_terminal_tasks_are_rejected() -> Result<(), String> {
+    fn late_events_for_missing_or_terminal_tasks_are_rejected()
+    -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
         let inner = manager.inner.clone();
-        let id = manager
-            .submit("晚到", std::time::Duration::from_millis(1), false)
-            .map_err(|error| error.to_string())?;
+        let id = manager.submit("晚到", std::time::Duration::from_millis(1), false)?;
         wait_until_running_zero(&manager);
         manager.drain_events();
 
@@ -693,11 +702,9 @@ mod tests {
     }
 
     #[test]
-    fn spawn_rollback_removes_record_and_logs() -> Result<(), String> {
+    fn spawn_rollback_removes_record_and_logs() -> Result<(), Box<dyn std::error::Error>> {
         let manager = TaskManager::new();
-        let id = manager
-            .submit("回滚", std::time::Duration::from_millis(50), false)
-            .map_err(|error| error.to_string())?;
+        let id = manager.submit("回滚", std::time::Duration::from_millis(50), false)?;
         let error = std::io::Error::other("boom");
         let submit_error = rollback_spawn(&manager.inner, id, &error);
         assert!(matches!(
@@ -712,6 +719,20 @@ mod tests {
                 .any(|record| record.task_id == id && record.message.contains("spawn failed")),
             "回滚必须写结构化日志"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_requested_is_false_for_missing_and_terminal_tasks()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let manager = TaskManager::new();
+        let inner = manager.inner.clone();
+        // 未知任务：记录缺失。
+        assert!(!cancel_requested(&inner, 9_999));
+        let id = manager.submit("终态查询", std::time::Duration::from_millis(1), false)?;
+        wait_until_running_zero(&manager);
+        // 终态任务：守卫条件不满足。
+        assert!(!cancel_requested(&inner, id));
         Ok(())
     }
 
