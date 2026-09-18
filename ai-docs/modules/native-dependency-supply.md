@@ -32,11 +32,11 @@ VTK、OpenCASCADE 和 Netgen 是 CAE 主链路的 native 依赖，开发者和�
 
 供给失败的诊断至少包含依赖名、期望版本、平台 triple、编译器/运行库 ABI、staging 路径、缺失 target 或模块、manifest 来源和修复动作。不能静默改用系统库、另一个版本或源码构建。
 
-## 当前盘点结论（2026-09-17）
+## 当前盘点结论（2026-09-18）
 
-- OCCT `V8.0.1` 有官方 Windows 预编译归档并含 `OpenCASCADEConfig.cmake`；已按外层/内层归档 SHA256 登记进 sdk-provision.cmake 的 manifest（内嵌归档形态）。目前只将它作为 Windows 候选，尚未证明 Qt/编译器 ABI 集成（009/038 验证）。
-- VTK `v9.7.0` 官方渠道只有源码归档与 Python wheels（wheel SDK 不含 `GUISupportQtQuick`，不可用）；038 已按 `tools/sdk/` 冻结构建描述在受信 CI 生产三平台制品并发布（Release `sdk-vtk-9.7.0`，2026-09-17，含 `VTK::GUISupportQtQuick`），031 manifest 已按 Release URL/SHA256 登记，macOS 生产 consumer 烟测与离线复用通过；007 的 VTK 供给前置已满足。
-- Netgen 更新 tag `v6.2.2607` 没有对应 release 预编译资产；当前清单的 `v6.2.2604` 保持不变，等待与 OCCT ABI 一起生产或取得 SDK。
+- 三个依赖的供给已全链路就绪：VTK 9.7.0（Release `sdk-vtk-9.7.0`）与 OCCT 8.0.1 + Netgen v6.2.2604（合并 Release `sdk-occt-netgen-8.0.1-6.2.2604`，成对发布——Netgen 链接其构建时的 OCCT，硬 ABI 锁定）均由 038 受信 CI 三平台生产并登记进 031 manifest；macOS 生产 consumer 烟测（occt/netgen/vtk 三依赖从 Release 真实下载消费）与离线复用全部通过。OCCT 弃用官方 Windows SDK（仅 Windows 有归档，跨平台工具链不一致，维护者决策 2026-09-18 三平台统一自托管）。
+- 实证约束（009/010/007 消费时注意）：OCCT targets 无命名空间（`TKernel`/`TKDESTEP`）；Netgen 包配置为 `NetgenConfig.cmake`，`find_package` 必须用 `Netgen`（Linux ext4 大小写敏感）；Netgen 运行期加载依赖同平台 OCCT 资产（staging 相邻，消费侧处理 rpath/加载路径）；VTK 目标为 `VTK::` 命名空间且已含 `GUISupportQtQuick`。
+- 剩余项属集成任务自身：007（视口运行时）、009（STEP 集成）、010（网格集成）的真实链接/运行冒烟，以及 Linux glibc 有效基线的运行验证回写。
 
 供给实现的验证证据见 [任务 031](../task/031-prebuilt-native-dependencies.md)：ctest `Build.SdkProvision` 用 fixture SDK（file:// 下载、project NONE）驱动成功、哈希不符、缺资产、离线缓存、marker 重建、版本隔离、内嵌归档/包装目录、配置歧义等路径，三平台可同路径执行。在全平台 manifest 和 configure/package 冒烟证据完成前，031 保持进行中，007/009/010 不启动第三方源码构建。
 

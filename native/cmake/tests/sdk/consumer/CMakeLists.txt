@@ -18,6 +18,14 @@ if(CONSUMER_KIND STREQUAL "production")
   return()
 endif()
 
+# missing-asset：只登记版本、不登记任何平台资产，验证"已登记名但本平台
+# 无资产"的 038 指向诊断——不依赖生产 manifest 的实际登记状态，不触网。
+if(CONSUMER_KIND STREQUAL "missing-asset")
+  panta_sdk_declare_version("${SDK_NAME}" "${SDK_VERSION}")
+  panta_require_sdk("${SDK_NAME}" _staging)
+  return()
+endif()
+
 # fixture 资产参数来自 -D；SDK_NAME/SDK_VERSION/ASSET_URL/ASSET_SHA/PACKAGE
 # 必填，INNER_ARCHIVE/INNER_SHA256/CHECK_TARGET 可空。值不含空格（驱动脚本
 # 以无引号 ${ARGN} 传参）。

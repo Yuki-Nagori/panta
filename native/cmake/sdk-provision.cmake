@@ -389,21 +389,65 @@ panta_sdk_declare_asset(vtk windows-x86_64
   LICENSE share/licenses/VTK/Copyright.txt (BSD-3))
 
 panta_sdk_declare_version(occt 8.0.1)
-# OCCT V8.0.1 官方 Windows 归档（2026-09-17 下载实测，task 031）：外层 zip
-# 内嵌真正的 SDK zip（vc14/x64，动态 CRT，MSVC2022 v143 兼容）；含
-# cmake/OpenCASCADEConfig.cmake、头文件、DLL/库与 LGPL-2.1 许可证。
-# 与本项目编译器/Qt 的集成尚未验证（009/038）；macOS/Linux 无官方 SDK。
-panta_sdk_declare_asset(occt windows-x86_64
-  URL https://github.com/Open-Cascade-SAS/OCCT/releases/download/V8.0.1/opencascade-release-no-pch.zip
-  SHA256 307f694f1d4a280c7f58ee2ddb69a7f7e2b78d82749339efd40ce8b8b116d76c
-  INNER_ARCHIVE opencascade-8.0.1-vc14-64.zip
-  INNER_SHA256 24d947bf045e8da43f559592d28eee4df389dd8034754d70f3ab341346a22ca8
+# OCCT 8.0.1 制品（038 受信 CI 生产，Release sdk-occt-netgen-8.0.1-6.2.2604，
+# 2026-09-18 登记；与 Netgen 成对发布，见 tools/sdk/releases/occt-netgen-
+# 8.0.1-6.2.2604.md）。维护者决策：三平台统一自托管，官方 Windows SDK 不再
+# 消费（仅 Windows 有归档、跨平台工具链不一致）。源码 tag V8.0.1 → commit
+# b8f597c677811d1f9f4d8a97f5ae2825c0353a42（unmodified）；Release/Shared，
+# Draw/Visualization/DETools 与 USE_FREETYPE/USE_XLIB 关闭（渲染归 VTK）。
+panta_sdk_declare_asset(occt macos-arm64
+  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
+  SHA256 db6d4a878cc3f1c4ccf693e2d1408c35b10fa844b9793a02c38379bcbc157161
   PACKAGE OpenCASCADE
-  REQUIRED_TARGETS TKernel
-  ABI vc14-x64-动态CRT
-  MODULES 官方全模块
-  LICENSE LGPL-2.1-with-exception)
+  REQUIRED_TARGETS TKernel TKDESTEP
+  ABI macos-15-apple-clang-arm64-Release-shared
+  MODULES ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools 关闭）
+  LICENSE share/licenses/OCCT (LGPL-2.1 + OCCT exception))
+panta_sdk_declare_asset(occt linux-x86_64
+  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
+  SHA256 04a33d7a5aa1c122da8fb0ec775fffb5f8872a90db717b800e7561d52a7cf563
+  PACKAGE OpenCASCADE
+  REQUIRED_TARGETS TKernel TKDESTEP
+  ABI ubuntu-24.04-gcc13-x86_64-Release-shared
+  MODULES ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools 关闭）
+  LICENSE share/licenses/OCCT (LGPL-2.1 + OCCT exception))
+panta_sdk_declare_asset(occt windows-x86_64
+  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
+  SHA256 d0162ff98100741f63d6f4103e8c98d6b7e4c7fa32c6ff4ba9ad570c66634751
+  PACKAGE OpenCASCADE
+  REQUIRED_TARGETS TKernel TKDESTEP
+  ABI windows-msvc2022-v143-x64-Release-shared-MD
+  MODULES ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools 关闭）
+  LICENSE share/licenses/OCCT (LGPL-2.1 + OCCT exception))
 
 panta_sdk_declare_version(netgen 6.2.2604)
-# Netgen v6.2.2604：上游无 release 预编译资产（task 031 盘点）；由 038
-# 与 OCCT ABI 一起生产制品后在此登记。
+# Netgen v6.2.2604 制品（038 同管线生产，与 OCCT 成对发布——USE_OCC 链接
+# 其构建时的 OCCT，硬 ABI 锁定，升级必须成对；2026-09-18 登记）。源码 tag
+# v6.2.2604 → commit 3ee489c7d58fdbc2a6708cca3cbaefaae506dc17（unmodified）；
+# GUI/Python/MPI 关闭。包配置文件名为 NetgenConfig.cmake（大写 N）：
+# find_package 须用 `Netgen`。运行期依赖同平台 OCCT 资产（消费侧处理加载
+# 路径，009/010）。
+panta_sdk_declare_asset(netgen macos-arm64
+  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
+  SHA256 51d067f057143044fb8feb8501f47973832c92a359281833ff7be996018f384e
+  PACKAGE Netgen
+  REQUIRED_TARGETS ngcore nglib
+  ABI macos-15-apple-clang-arm64-Release-shared（链接本 Release 的 occt macos-arm64）
+  MODULES 网格生成内核（ngcore/nglib；GUI/Python/MPI 关闭）
+  LICENSE share/licenses/Netgen/LICENSE (LGPL-2.1))
+panta_sdk_declare_asset(netgen linux-x86_64
+  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
+  SHA256 9be1ac3a2d8f16bc86c2c52d51c7aab821aaeee9848e2c3b85d55bea6eb4079a
+  PACKAGE Netgen
+  REQUIRED_TARGETS ngcore nglib
+  ABI ubuntu-24.04-gcc13-x86_64-Release-shared（链接本 Release 的 occt linux-x86_64）
+  MODULES 网格生成内核（ngcore/nglib；GUI/Python/MPI 关闭）
+  LICENSE share/licenses/Netgen/LICENSE (LGPL-2.1))
+panta_sdk_declare_asset(netgen windows-x86_64
+  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
+  SHA256 3e8c5204fc1977c4ce4ff53e66cb32c4a2092e408b45ad7b5da173922ce9fd1d
+  PACKAGE Netgen
+  REQUIRED_TARGETS ngcore nglib
+  ABI windows-msvc2022-v143-x64-Release-shared-MD（链接本 Release 的 occt windows-x86_64）
+  MODULES 网格生成内核（ngcore/nglib；GUI/Python/MPI 关闭）
+  LICENSE share/licenses/Netgen/LICENSE (LGPL-2.1))

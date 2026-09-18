@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039–041 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口与构建产物归一/第三方缓存共享均落地并验证），031 已落地 SDK 供给模块：VTK 9.7.0 三平台制品已发布并登记（macOS 生产消费烟测通过），OCCT/Netgen 合并管线（038，`sdk-occt-netgen.yml` 一个 Release 成对发布）经 macOS 实证、待 dispatch 发布后登记（维护者决策：OCCT 弃用官方 Windows SDK、三平台统一自托管；Netgen↔OCCT 硬 ABI 锁定合并发布），009 因 OCCT 制品未发布保持阻塞（解除条件为 sdk-occt-netgen-8.0.1-6.2.2604 Release + manifest 登记），**007 的 VTK 供给前置已满足、可启动**，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039–041 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口与构建产物归一/第三方缓存共享均落地并验证），031 的供给侧已全部就绪：VTK/OCCT/Netgen 三依赖 × 三平台 manifest 全部登记并经 macOS 生产消费烟测（OCCT 弃用官方 Windows SDK 统一自托管；Netgen↔OCCT 成对发布），其剩余项即 007/009/010 的集成证据，可并行推进——**007 与 009 供给前置均满足、状态转 ready**，010 待 009，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -51,9 +51,9 @@ ai-docs/
 | 004 | [Cargo 调度 CMake 与运行入口](task/004-cargo-native-orchestration.md) | M0 | 001, 003 | done |
 | 005 | [Qt/QML 主窗口与 C++ ViewModel](task/005-qt-qml-shell.md) | M0 | 004 | done |
 | 006 | [Rust/C++ FFI 最小契约](task/006-rust-cpp-boundary.md) | 基础平台 | 004 | done |
-| 007 | [VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031 | planned |
+| 007 | [VTK 原生 Qt Quick 视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031 | ready |
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | done |
-| 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | blocked |
+| 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | ready |
 | 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | planned |
 | 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | in-progress |
 | 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | planned |

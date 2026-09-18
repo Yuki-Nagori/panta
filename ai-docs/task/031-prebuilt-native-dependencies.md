@@ -73,6 +73,8 @@
 | 2026-09-17 | 三平台 CI（push 5130ca3，run [35230584355](https://github.com/Yuki-Nagori/panta/actions/runs/35230584355)） | windows-2022 / macos-latest / ubuntu-latest 全绿（5m26s）：sdk-provision.cmake 的解析与 manifest 登记在三平台 configure 均执行通过。注意 CI 当前不运行 CTest（011 聚合前），`Build.SdkProvision` 的 Windows/Linux 执行证据待 CI 扩展或平台实测补齐。 |
 | 2026-09-18 | 038 Release `sdk-vtk-9.7.0` 落地（workflow run [35242622228](https://github.com/Yuki-Nagori/panta/actions/runs/35242622228)，三平台 success，1h58m）；`panta_sdk_declare_asset` 按发布资产 URL/SHA256 登记 vtk macos-arm64 / linux-x86_64 / windows-x86_64 | SHA256 取自各 `.sha256` 资产；REQUIRED_TARGETS `VTK::GUISupportQtQuick VTK::RenderingQt`；Linux glibc 基线（ubuntu-24.04 gcc13 生产）标注待 007 回写 |
 | 2026-09-18 | 生产 consumer 烟测（macOS arm64）：`cmake -S native/cmake/tests/sdk/consumer -DCONSUMER_KIND=production -DSDK_NAME=vtk -DPANTA_SDK_PROVISION_DIR=target/panta-deps/sdk -DCMAKE_PREFIX_PATH=<Qt staging>` | 通过：从 GitHub Release 下载 58MB 归档、SHA256 校验、解包发布、`find_package(VTK CONFIG)` 与 required-target 自检全部成功（staging 293MB）。consumer 工程改为 `LANGUAGES CXX`（VTK config 的 add_library(IMPORTED)/FindThreads 需要编译语言，NONE 会失败）；fixture 负例"生产缺资产"由 vtk 改 occt（vtk 已有资产，避免测试触网）。二跑零下载（离线复用）；`ctest --preset debug` 27/27 |
+| 2026-09-18 | Release `sdk-occt-netgen-8.0.1-6.2.2604` 落地（run [35307708622](https://github.com/Yuki-Nagori/panta/actions/runs/35307708622) 三平台 success，38m）；manifest 按 6 个资产 URL/SHA256 登记 occt/netgen 三平台，**OCCT 官方 Windows 条目被自托管制品替换**（维护者决策：仅 Windows 有归档、跨平台工具链不一致） | SHA256 取自各 `.sha256` 资产；occt `PACKAGE=OpenCASCADE`（targets `TKernel TKDESTEP`）、netgen `PACKAGE=Netgen`（`ngcore nglib`——包配置为大写 `NetgenConfig.cmake`，Linux ext4 大小写敏感约束实证于 run 35304961896） |
+| 2026-09-18 | 生产 consumer 烟测（macOS arm64）：occt 与 netgen 各自从 Release 真实下载消费（netgen 未借助额外 CMAKE_PREFIX_PATH，验证供给自足性） | 双双通过：SHA256 校验、解包、`find_package` 与 required-target 自检成功（occt 111MB、netgen 9.5MB staging）；fixture 套件"缺资产"负例改为 consumer 的 missing-asset 模式（不再依赖生产 manifest 状态、不触网）；`ctest --preset debug -R Build.SdkProvision` 通过。**至此 VTK/OCCT/Netgen 三依赖 9 条 manifest 全部登记并经真实消费验证——依赖引入完毕**，007/009/010 供给前置全部满足 |
 
 ## 风险与回退
 
@@ -87,4 +89,4 @@
 
 ## 完成摘要
 
-未完成（保持 in-progress）。**VTK 已全链路就绪**：038 受信 CI 三平台制品发布（Release `sdk-vtk-9.7.0`）、manifest 三平台登记（URL/SHA256/ABI/targets）、macOS 生产 consumer 烟测 + 离线复用通过——007 的供给前置满足，可启动。OCCT 仅 Windows 候选（ABI 集成未验证）；Netgen 全平台无资产。剩余：OCCT/Netgen 制品生产（038）、真实 SDK 三平台 configure/package 冒烟（随 007/009/010 集成完成）、Linux glibc 有效基线回写（007 运行验证）。
+未完成（保持 in-progress）。**供给侧已全部就绪**：VTK/OCCT/Netgen 三依赖 × 三平台 = 9 条 manifest 全部登记（Release `sdk-vtk-9.7.0` 与 `sdk-occt-netgen-8.0.1-6.2.2604`）并经 macOS 生产 consumer 真实下载消费验证 + 离线复用；OCCT 弃用官方 Windows SDK、三平台统一自托管（维护者决策）；Netgen↔OCCT 成对发布的 ABI 锁定与 `Netgen` 包名大小写约束已实证并记录。剩余项即集成任务自身的证据：007/009/010 的真实链接/运行冒烟（这同时构成 031 的三平台 configure/package smoke 记录）、Linux glibc 有效基线回写、SBOM/provenance 自动化（038）。

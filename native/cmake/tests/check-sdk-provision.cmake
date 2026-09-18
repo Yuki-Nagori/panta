@@ -219,12 +219,13 @@ if(_mismatched_archives)
   message(FATAL_ERROR "哈希不符：不符归档应已删除：${_mismatched_archives}")
 endif()
 
-# ── 6. 生产 manifest 缺资产：occt 已登记版本但本平台无条目，诊断指向 038 ──
-# （vtk 已由 038 供全平台资产，缺资产负例改用 occt，避免测试触网下载。）
+# ── 6. 已登记名但本平台无资产：诊断报出固定版本并指向 038 ──
+# （生产 manifest 现已全依赖登记，负例走 fixture 的 missing-asset 模式，
+# 不依赖 manifest 状态、不触网下载。）
 _configure_consumer("${TEST_BINARY_DIR}/case6-consumer" ${_common}
-  "-DRESULT_FILE=${TEST_BINARY_DIR}/case6.result" "-DCONSUMER_KIND=production"
-  "-DSDK_NAME=occt")
-_expect_failure("生产缺资产" "038" "8.0.1")
+  "-DRESULT_FILE=${TEST_BINARY_DIR}/case6.result" "-DCONSUMER_KIND=missing-asset"
+  "-DSDK_NAME=fixture" "-DSDK_VERSION=1.2.3")
+_expect_failure("生产缺资产" "038" "1.2.3")
 
 # ── 7. OCCT 形态：内层归档校验 + 包装目录前缀 + 外层残留不进 staging ──
 set(_root7 "${TEST_BINARY_DIR}/case7-deps")
