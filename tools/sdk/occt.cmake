@@ -25,6 +25,11 @@ ExternalProject_Add(occt_sdk
     -DBUILD_MODULE_Draw=OFF
     -DBUILD_MODULE_Visualization=OFF
     -DBUILD_MODULE_DETools=OFF
+    # Linux/Windows 上 OCCT 默认启用 Freetype/Xlib 并因缺系统头文件而
+    # configure 失败；渲染归 VTK 后两者均无用，显式关闭保持制品零系统
+    # 第三方依赖（Netgen 上游 SuperBuild 构建 OCCT 时同样传 OFF）。
+    -DUSE_FREETYPE=OFF
+    -DUSE_XLIB=OFF
     -DCMAKE_INSTALL_PREFIX=${PANTA_OCCT_INSTALL_DIR}
   INSTALL_COMMAND ${CMAKE_COMMAND} --install . --config Release
   COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -53,6 +58,7 @@ file(WRITE "${CMAKE_BINARY_DIR}/occt-panta-sdk.json.in"
   "build_type": "Release",
   "shared": true,
   "modules_off": ["Draw", "Visualization", "DETools"],
+  "options_off": ["USE_FREETYPE", "USE_XLIB"],
   "modules_highlights": ["ModelingData", "ModelingAlgorithms", "DataExchange", "ApplicationFramework"],
   "cmake_package": "OpenCASCADEConfig.cmake",
   "license": "share/licenses/OCCT/ (LGPL-2.1 + OCCT exception)"
