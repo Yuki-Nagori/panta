@@ -1,12 +1,9 @@
 #!/bin/sh
-# 提交前质量门禁：聚合检查、格式与 Rust lint 必须通过，否则拒绝提交。
-# 聚合检查与 CI 的 rust job 使用同一条 cargo check 命令。
+# 提交前轻量质量门禁：格式与 Rust lint 必须通过，否则拒绝提交。
+# 完整 workspace check、build、test 由 CI 负责，避免提交时重复构建 native 目标。
 # 启用方式（每台机器一次性，git 不随仓库携带 hooks 配置）：
 #   git config core.hooksPath .githooks
 set -e
-
-echo "[pre-commit] cargo check --locked --workspace --all-targets"
-cargo check --locked --workspace --all-targets
 
 echo "[pre-commit] cargo format"
 cargo format
