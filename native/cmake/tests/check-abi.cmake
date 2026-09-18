@@ -8,14 +8,13 @@ foreach(_case IN ITEMS valid runtime iterator)
     set(_iterator ON)
   endif()
   execute_process(
-    COMMAND "${CMAKE_COMMAND}"
-      -S "${CMAKE_CURRENT_LIST_DIR}/abi" -B "${TEST_BINARY_DIR}/${_case}"
-      "-DCMAKE_CXX_COMPILER=${TEST_CXX_COMPILER}"
-      "-DINJECT_BAD_RUNTIME=${_runtime}"
+    COMMAND
+      "${CMAKE_COMMAND}" -S "${CMAKE_CURRENT_LIST_DIR}/abi" -B "${TEST_BINARY_DIR}/${_case}"
+      "-DCMAKE_CXX_COMPILER=${TEST_CXX_COMPILER}" "-DINJECT_BAD_RUNTIME=${_runtime}"
       "-DINJECT_BAD_ITERATOR=${_iterator}"
     RESULT_VARIABLE _result
-    OUTPUT_VARIABLE _output ERROR_VARIABLE _error
-  )
+    OUTPUT_VARIABLE _output
+    ERROR_VARIABLE _error)
   if(_case STREQUAL "valid")
     if(NOT _result EQUAL 0)
       message(FATAL_ERROR "ABI inheritance failed: ${_output}\n${_error}")

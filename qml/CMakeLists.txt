@@ -8,13 +8,8 @@ set_source_files_properties(Themes/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TR
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
 
 set(PANTA_SHELL_QML_FILES
-  App.qml
-  Themes/Theme.qml
-  Components/Atoms/ThemedLabel.qml
-  Components/Atoms/ThemedButton.qml
-  Components/Atoms/PanelSurface.qml
-  Panels/PlaceholderPanel.qml
-)
+    App.qml Themes/Theme.qml Components/Atoms/ThemedLabel.qml Components/Atoms/ThemedButton.qml
+    Components/Atoms/PanelSurface.qml Panels/PlaceholderPanel.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge)
@@ -31,50 +26,45 @@ if(UNIX AND NOT APPLE)
   set(PANTA_QML_MODULE_OPTIONS __QT_INTERNAL_NO_GENERATE_QMLLS_BUILD_INI)
 endif()
 
-qt_add_qml_module(panta_shell
-  URI Panta.Shell
-  VERSION 1.0
-  RESOURCE_PREFIX /qt/qml
+qt_add_qml_module(
+  panta_shell
+  URI
+  Panta.Shell
+  VERSION
+  1.0
+  RESOURCE_PREFIX
+  /qt/qml
   NO_PLUGIN
   ${PANTA_SHELL_QML_DEPENDENCIES}
   ${PANTA_QML_MODULE_OPTIONS}
-  QML_FILES ${PANTA_SHELL_QML_FILES}
-)
+  QML_FILES
+  ${PANTA_SHELL_QML_FILES})
 
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
 panta_native_defaults(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
 
 if(BUILD_TESTING)
-  add_executable(panta_qml_theme_component_test Tests/theme_component_test.cpp)
+  add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)
   panta_native_defaults(panta_qml_theme_component_test)
-  target_link_libraries(panta_qml_theme_component_test PRIVATE
-    panta_shell
-    Qt6::Gui
-    Qt6::Qml
-    Qt6::Test
-  )
-  add_test(
-    NAME Qml.ThemeComponentParameters
-    COMMAND panta_qml_theme_component_test
-  )
-  set_tests_properties(Qml.ThemeComponentParameters PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-  )
+  target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
+                                                               Qt6::Test)
+  add_test(NAME Qml.ThemeComponentParameters COMMAND panta_qml_theme_component_test)
+  set_tests_properties(Qml.ThemeComponentParameters PROPERTIES ENVIRONMENT
+                                                               "QT_QPA_PLATFORM=offscreen")
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。
-  find_program(PANTA_QMLFORMAT_EXECUTABLE
+  find_program(
+    PANTA_QMLFORMAT_EXECUTABLE
     NAMES qmlformat
     PATHS "${QT_STAGING}/bin"
-    NO_DEFAULT_PATH
-    REQUIRED
-  )
-  add_test(NAME Qml.FormatCheck
-    COMMAND "${CMAKE_COMMAND}"
-      "-DQMLFMT=${PANTA_QMLFORMAT_EXECUTABLE}"
-      "-DQML_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
-      -P "${CMAKE_CURRENT_SOURCE_DIR}/../native/cmake/tests/check-qml-format.cmake"
-  )
+    NO_DEFAULT_PATH REQUIRED)
+  add_test(
+    NAME Qml.FormatCheck
+    COMMAND
+      "${CMAKE_COMMAND}" "-DQMLFMT=${PANTA_QMLFORMAT_EXECUTABLE}"
+      "-DQML_DIR=${CMAKE_CURRENT_SOURCE_DIR}" -P
+      "${CMAKE_CURRENT_SOURCE_DIR}/../native/cmake/tests/check-qml-format.cmake")
 endif()
 
 # 资源扩展点：未来图标/内置资源在此追加 qt_add_resources（资源入口，任务 005 决策）。

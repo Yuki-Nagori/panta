@@ -3,14 +3,9 @@
 function(panta_add_ffi_test name source)
   add_executable(${name} ${source})
   panta_native_defaults(${name})
-  target_include_directories(${name} PRIVATE
-    "${PANTA_FFI_INCLUDE_DIR}"
-    "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include"
-  )
-  target_link_libraries(${name} PRIVATE
-    "${PANTA_FFI_STATIC_LIB}"
-    GTest::gtest_main
-  )
+  target_include_directories(${name} PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
+                                             "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
+  target_link_libraries(${name} PRIVATE "${PANTA_FFI_STATIC_LIB}" GTest::gtest_main)
   if(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(${name} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -21,15 +16,9 @@ function(panta_add_ffi_test name source)
   endif()
 endfunction()
 
-panta_add_ffi_test(panta_ffi_boundary_test tests/boundary_test.cpp)
-panta_add_ffi_test(panta_ffi_task_service_test tests/task_service_test.cpp)
+panta_add_ffi_test(panta_ffi_boundary_test ../../tests/cpp/ffi/boundary_test.cpp)
+panta_add_ffi_test(panta_ffi_task_service_test ../../tests/cpp/ffi/task_service_test.cpp)
 
-add_test(
-  NAME Ffi.RustCppBoundary
-  COMMAND panta_ffi_boundary_test
-)
+add_test(NAME Ffi.RustCppBoundary COMMAND panta_ffi_boundary_test)
 
-add_test(
-  NAME Ffi.TaskServiceLifecycle
-  COMMAND panta_ffi_task_service_test
-)
+add_test(NAME Ffi.TaskServiceLifecycle COMMAND panta_ffi_task_service_test)

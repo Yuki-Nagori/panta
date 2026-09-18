@@ -7,7 +7,10 @@
 if(NOT DEFINED QMLFMT OR NOT DEFINED QML_DIR)
   message(FATAL_ERROR "check-qml-format 需要 -DQMLFMT 与 -DQML_DIR")
 endif()
-execute_process(COMMAND "${QMLFMT}" --version OUTPUT_VARIABLE _version ERROR_VARIABLE _version)
+execute_process(
+  COMMAND "${QMLFMT}" --version
+  OUTPUT_VARIABLE _version
+  ERROR_VARIABLE _version)
 message(STATUS "qml 格式门禁：${_version}")
 
 file(GLOB_RECURSE _qml_files "${QML_DIR}/*.qml")
@@ -21,8 +24,7 @@ foreach(_file IN LISTS _qml_files)
     COMMAND "${QMLFMT}" "${_file}"
     OUTPUT_VARIABLE _formatted
     ERROR_VARIABLE _err
-    RESULT_VARIABLE _rc
-  )
+    RESULT_VARIABLE _rc)
   if(NOT _rc EQUAL 0)
     message(FATAL_ERROR "qmlformat 运行失败（退出码 ${_rc}）：${_file}\n${_err}")
   endif()
@@ -34,7 +36,6 @@ endforeach()
 
 if(_needs_format)
   string(REPLACE ";" "\n  " _listed "${_needs_format}")
-  message(FATAL_ERROR "以下 QML 文件需要格式化（qmlformat 后不一致）：\n  ${_listed}\n"
-    "修复：对列出文件运行 qmlformat")
+  message(FATAL_ERROR "以下 QML 文件需要格式化（qmlformat 后不一致）：\n  ${_listed}\n" "修复：对列出文件运行 qmlformat")
 endif()
 message(STATUS "qml 格式门禁：${_qml_files} 全部合规")

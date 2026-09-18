@@ -33,7 +33,7 @@ function(panta_sdk_triple out_var)
     endif()
   else()
     message(FATAL_ERROR "panta_sdk_triple：未知架构 ${CMAKE_SYSTEM_PROCESSOR}"
-      "（${CMAKE_SYSTEM_NAME}）；请在 native/cmake/sdk-provision.cmake 扩展 triple 映射")
+                        "（${CMAKE_SYSTEM_NAME}）；请在 native/cmake/sdk-provision.cmake 扩展 triple 映射")
   endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(_os macos)
@@ -43,9 +43,11 @@ function(panta_sdk_triple out_var)
     set(_os windows)
   else()
     message(FATAL_ERROR "panta_sdk_triple：不支持的平台 ${CMAKE_SYSTEM_NAME}；"
-      "记录到 dependency-acquisition.md 后再扩展供给")
+                        "记录到 dependency-acquisition.md 后再扩展供给")
   endif()
-  set(${out_var} "${_os}-${_arch}" PARENT_SCOPE)
+  set(${out_var}
+      "${_os}-${_arch}"
+      PARENT_SCOPE)
 endfunction()
 
 # 登记 SDK 的固定版本（升级 = 改本节并同一 commit 完成集成验证）。
@@ -65,35 +67,45 @@ endfunction()
 # Windows 外层 zip 套内层 zip）。COMPONENTS/REQUIRED_TARGETS 是 find_package
 # 与供给自检的约束：缺组件或 imported target 立即失败。
 function(panta_sdk_declare_asset name triple)
-  cmake_parse_arguments(PARSE_ARGV 2 PASSED ""
-    "URL;SHA256;PACKAGE;ABI;MODULES;LICENSE;INNER_ARCHIVE;INNER_SHA256"
+  cmake_parse_arguments(
+    PARSE_ARGV 2 PASSED "" "URL;SHA256;PACKAGE;ABI;MODULES;LICENSE;INNER_ARCHIVE;INNER_SHA256"
     "COMPONENTS;REQUIRED_TARGETS")
-  if(NOT PASSED_URL OR NOT PASSED_SHA256 OR NOT PASSED_PACKAGE)
-    message(FATAL_ERROR "panta_sdk_declare_asset(${name} ${triple})："
-      "URL、SHA256、PACKAGE 均为必填")
+  if(NOT PASSED_URL
+     OR NOT PASSED_SHA256
+     OR NOT PASSED_PACKAGE)
+    message(FATAL_ERROR "panta_sdk_declare_asset(${name} ${triple})：" "URL、SHA256、PACKAGE 均为必填")
   endif()
   # file:// 仅限 fixture 测试消费同一代码路径；生产资产必须是 https。
   if(NOT PASSED_URL MATCHES "^(https|file)://")
     message(FATAL_ERROR "panta_sdk_declare_asset(${name} ${triple})："
-      "URL 必须以 https://（生产）或 file://（测试）开头：${PASSED_URL}")
+                        "URL 必须以 https://（生产）或 file://（测试）开头：${PASSED_URL}")
   endif()
   string(TOLOWER "${PASSED_SHA256}" PASSED_SHA256)
   string(LENGTH "${PASSED_SHA256}" _sha_length)
   if(NOT _sha_length EQUAL 64 OR NOT PASSED_SHA256 MATCHES "^[0-9a-f]+$")
     message(FATAL_ERROR "panta_sdk_declare_asset(${name} ${triple})："
-      "SHA256 必须是 64 位小写十六进制：${PASSED_SHA256}")
+                        "SHA256 必须是 64 位小写十六进制：${PASSED_SHA256}")
   endif()
   if(PASSED_INNER_ARCHIVE STREQUAL "" AND PASSED_INNER_SHA256 STREQUAL "")
     # 无内层归档，允许。
   elseif(PASSED_INNER_ARCHIVE STREQUAL "" OR PASSED_INNER_SHA256 STREQUAL "")
     message(FATAL_ERROR "panta_sdk_declare_asset(${name} ${triple})："
-      "INNER_ARCHIVE 与 INNER_SHA256 必须成对提供")
+                        "INNER_ARCHIVE 与 INNER_SHA256 必须成对提供")
   endif()
 
   # 条目存为 key=value 列表（global property）；值内不得出现 list 分隔符，
   # 多值关键字以空格连接，消费侧 separate_arguments 还原。
   set(_entry)
-  foreach(_key URL SHA256 PACKAGE ABI MODULES LICENSE INNER_ARCHIVE INNER_SHA256)
+  foreach(
+    _key
+    URL
+    SHA256
+    PACKAGE
+    ABI
+    MODULES
+    LICENSE
+    INNER_ARCHIVE
+    INNER_SHA256)
     set(_value "${PASSED_${_key}}")
     if(NOT _value STREQUAL "")
       list(APPEND _entry "${_key}=${_value}")
@@ -127,7 +139,7 @@ function(panta_require_sdk name staging_var)
   get_property(_names GLOBAL PROPERTY panta_sdk_names)
   if(NOT name IN_LIST _names)
     message(FATAL_ERROR "panta_require_sdk(${name})：未登记的 SDK 名；"
-      "已登记：${_names}。检查拼写或在 native/cmake/sdk-provision.cmake 登记。")
+                        "已登记：${_names}。检查拼写或在 native/cmake/sdk-provision.cmake 登记。")
   endif()
   get_property(_version GLOBAL PROPERTY "panta_sdk_version_${name}")
   panta_sdk_triple(_triple)
@@ -137,18 +149,19 @@ function(panta_require_sdk name staging_var)
     if(NOT _triples)
       set(_triples "（无任何平台）")
     endif()
-    message(FATAL_ERROR
-      "panta_require_sdk(${name})：manifest 没有本平台的预编译 SDK 资产，\n"
-      "  固定版本：${_version}\n"
-      "  平台 triple：${_triple}（${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}）\n"
-      "  已登记资产的 triple：${_triples}\n"
-      "  修复：按 ai-docs/task/038-native-sdk-artifact-production.md 生产可校验制品，\n"
-      "  并在 native/cmake/sdk-provision.cmake 登记 URL/SHA256；不退回系统库、\n"
-      "  Python wheel 或本地源码构建（standards/dependency-acquisition.md）。")
+    message(
+      FATAL_ERROR
+        "panta_require_sdk(${name})：manifest 没有本平台的预编译 SDK 资产，\n"
+        "  固定版本：${_version}\n"
+        "  平台 triple：${_triple}（${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}）\n"
+        "  已登记资产的 triple：${_triples}\n"
+        "  修复：按 ai-docs/task/038-native-sdk-artifact-production.md 生产可校验制品，\n"
+        "  并在 native/cmake/sdk-provision.cmake 登记 URL/SHA256；不退回系统库、\n"
+        "  Python wheel 或本地源码构建（standards/dependency-acquisition.md）。")
   endif()
   if(_version STREQUAL "")
     message(FATAL_ERROR "panta_require_sdk(${name})：缺少 panta_sdk_declare_version"
-      " 登记，staging 目录无法按版本隔离")
+                        " 登记，staging 目录无法按版本隔离")
   endif()
 
   # 条目局部变量先置空：if() 对未定义变量不做空串展开（保留字面量），
@@ -167,7 +180,7 @@ function(panta_require_sdk name staging_var)
     string(REGEX REPLACE "^([^=]+)=(.*)$" "\\1" _k "${_pair}")
     string(REGEX REPLACE "^([^=]+)=(.*)$" "\\2" _v "${_pair}")
     string(TOLOWER "${_k}" _k)
-    set("_${_k}" "${_v}")
+    set(_${_k} "${_v}")
   endforeach()
 
   set(_root "${PANTA_SDK_PROVISION_DIR}/${name}")
@@ -187,11 +200,12 @@ function(panta_require_sdk name staging_var)
         set(_marker_prefix "${CMAKE_MATCH_1}")
       endif()
     endforeach()
-    if(NOT (DEFINED _marker_sha AND _marker_sha STREQUAL "${_sha256}"
-          AND NOT _marker_prefix STREQUAL "<unset>"))
+    if(NOT
+       (DEFINED _marker_sha
+        AND _marker_sha STREQUAL "${_sha256}"
+        AND NOT _marker_prefix STREQUAL "<unset>"))
       file(REMOVE_RECURSE "${_staging}")
-      message(STATUS "panta SDK ${name} ${_version}(${_triple}) staging 标记"
-        " 缺失或不符，按缓存归档重建")
+      message(STATUS "panta SDK ${name} ${_version}(${_triple}) staging 标记" " 缺失或不符，按缓存归档重建")
       set(_marker_prefix "<unset>")
     endif()
   endif()
@@ -208,7 +222,8 @@ function(panta_require_sdk name staging_var)
     endif()
     if(NOT EXISTS "${_archive}")
       message(STATUS "下载 ${name} ${_version}(${_triple}) SDK：${_url}")
-      file(DOWNLOAD "${_url}" "${_archive}"
+      file(
+        DOWNLOAD "${_url}" "${_archive}"
         INACTIVITY_TIMEOUT 120
         TIMEOUT 1800
         EXPECTED_HASH SHA256=${_sha256}
@@ -217,11 +232,10 @@ function(panta_require_sdk name staging_var)
       if(NOT _download_code EQUAL 0)
         file(REMOVE "${_archive}")
         list(GET _download_status 1 _download_message)
-        message(FATAL_ERROR
-          "下载 ${name} ${_version}(${_triple}) SDK 失败：${_download_message}\n"
-          "  URL：${_url}\n"
-          "  归档已删除；网络可用时重试，或按 manifest 手动放置归档到\n"
-          "  ${_archive}（SHA256=${_sha256}）")
+        message(
+          FATAL_ERROR
+            "下载 ${name} ${_version}(${_triple}) SDK 失败：${_download_message}\n" "  URL：${_url}\n"
+            "  归档已删除；网络可用时重试，或按 manifest 手动放置归档到\n" "  ${_archive}（SHA256=${_sha256}）")
       endif()
     endif()
 
@@ -241,14 +255,13 @@ function(panta_require_sdk name staging_var)
       if(NOT EXISTS "${_inner}")
         file(REMOVE_RECURSE "${_outer_tmp}" "${_sdk_tmp}")
         message(FATAL_ERROR "${name} ${_version}(${_triple}) 外层归档缺少内层归档"
-          " ${_inner_archive}：上游布局可能变化，请核对 manifest 并重新实测")
+                            " ${_inner_archive}：上游布局可能变化，请核对 manifest 并重新实测")
       endif()
       file(SHA256 "${_inner}" _inner_actual)
       if(NOT _inner_actual STREQUAL "${_inner_sha256}")
         file(REMOVE_RECURSE "${_outer_tmp}" "${_sdk_tmp}")
         message(FATAL_ERROR "${name} ${_version}(${_triple}) 内层归档 SHA256 不符："
-          "预期 ${_inner_sha256}，实际 ${_inner_actual}；外层归档内容与 manifest"
-          " 不一致，已清场")
+                            "预期 ${_inner_sha256}，实际 ${_inner_actual}；外层归档内容与 manifest" " 不一致，已清场")
       endif()
       file(MAKE_DIRECTORY "${_sdk_tmp}")
       _panta_extract_archive("${_inner}" "${_sdk_tmp}" "${name} ${_version}(${_triple}) 内层")
@@ -263,22 +276,24 @@ function(panta_require_sdk name staging_var)
     foreach(_candidate IN LISTS _config_hits)
       get_filename_component(_base "${_candidate}" NAME)
       string(TOLOWER "${_base}" _base_lower)
-      if(_base_lower STREQUAL "${_package_lower}config.cmake"
-          OR _base_lower STREQUAL "${_package_lower}-config.cmake")
+      if(_base_lower STREQUAL "${_package_lower}config.cmake" OR _base_lower STREQUAL
+                                                                 "${_package_lower}-config.cmake")
         if(NOT _hit STREQUAL "")
           file(REMOVE_RECURSE "${_outer_tmp}" "${_sdk_tmp}")
-          message(FATAL_ERROR "${name} ${_version}(${_triple}) 归档内多处命中"
-            " ${_package} 配置文件（${_hit} 与 ${_candidate}）：布局歧义，"
-            "请核对 manifest 与制品内容")
+          message(
+            FATAL_ERROR "${name} ${_version}(${_triple}) 归档内多处命中"
+                        " ${_package} 配置文件（${_hit} 与 ${_candidate}）：布局歧义，" "请核对 manifest 与制品内容")
         endif()
         set(_hit "${_candidate}")
       endif()
     endforeach()
     if(_hit STREQUAL "")
       file(REMOVE_RECURSE "${_outer_tmp}" "${_sdk_tmp}")
-      message(FATAL_ERROR "${name} ${_version}(${_triple}) 解包完成但未找到"
-        " ${_package}Config.cmake / ${_package}-config.cmake：归档布局与 manifest"
-        " 不符，已清场；请核对制品（038）并更新登记")
+      message(
+        FATAL_ERROR
+          "${name} ${_version}(${_triple}) 解包完成但未找到"
+          " ${_package}Config.cmake / ${_package}-config.cmake：归档布局与 manifest"
+          " 不符，已清场；请核对制品（038）并更新登记")
     endif()
 
     # 从命中文件向上推导 find_package 前缀：剥掉尾部的 cmake|lib|<Package>*
@@ -290,8 +305,9 @@ function(panta_require_sdk name staging_var)
     while(NOT _dir STREQUAL "")
       string(REGEX REPLACE ".*/" "" _leaf "${_dir}")
       string(TOLOWER "${_leaf}" _leaf_lower)
-      if(_leaf_lower STREQUAL "cmake" OR _leaf_lower STREQUAL "lib"
-          OR _leaf_lower MATCHES "^${_package_lower}")
+      if(_leaf_lower STREQUAL "cmake"
+         OR _leaf_lower STREQUAL "lib"
+         OR _leaf_lower MATCHES "^${_package_lower}")
         if(_dir MATCHES "/")
           string(REGEX REPLACE "/[^/]*$" "" _dir "${_dir}")
         else()
@@ -323,20 +339,30 @@ function(panta_require_sdk name staging_var)
     list(PREPEND _components_list COMPONENTS)
     set(_find_args "${_components_list}")
   endif()
-  find_package(${_package} CONFIG REQUIRED ${_find_args}
-    PATHS "${_prefix}" NO_DEFAULT_PATH)
+  find_package(
+    ${_package}
+    CONFIG
+    REQUIRED
+    ${_find_args}
+    PATHS
+    "${_prefix}"
+    NO_DEFAULT_PATH)
 
   separate_arguments(_required_target_list UNIX_COMMAND "${_required_targets}")
   foreach(_target IN LISTS _required_target_list)
     if(NOT TARGET "${_target}")
-      message(FATAL_ERROR "${name} ${_version}(${_triple}) SDK 已供给但缺少"
-        " imported target ${_target}：制品模块与 manifest REQUIRED_TARGETS 不符；"
-        "检查 ${_staging} 的包内容或更新 manifest/制品（038）")
+      message(
+        FATAL_ERROR
+          "${name} ${_version}(${_triple}) SDK 已供给但缺少"
+          " imported target ${_target}：制品模块与 manifest REQUIRED_TARGETS 不符；"
+          "检查 ${_staging} 的包内容或更新 manifest/制品（038）")
     endif()
   endforeach()
 
   message(STATUS "panta SDK ${name} ${_version}(${_triple}) 供给就绪：${_staging}")
-  set(${staging_var} "${_staging}" PARENT_SCOPE)
+  set(${staging_var}
+      "${_staging}"
+      PARENT_SCOPE)
 endfunction()
 
 # `cmake -E tar xf`（libarchive）解包：zip/tgz 等 三平台零额外工具。
@@ -344,12 +370,10 @@ function(_panta_extract_archive archive destination label)
   execute_process(
     COMMAND "${CMAKE_COMMAND}" -E tar xf "${archive}"
     WORKING_DIRECTORY "${destination}"
-    RESULT_VARIABLE _result
-  )
+    RESULT_VARIABLE _result)
   if(NOT _result EQUAL 0)
     file(REMOVE_RECURSE "${destination}")
-    message(FATAL_ERROR "解包 ${label} 归档失败（退出码 ${_result}）：${archive}；"
-      "归档可能损坏，删除缓存归档后重试将重新下载")
+    message(FATAL_ERROR "解包 ${label} 归档失败（退出码 ${_result}）：${archive}；" "归档可能损坏，删除缓存归档后重试将重新下载")
   endif()
 endfunction()
 
@@ -363,30 +387,66 @@ panta_sdk_declare_version(vtk 9.7.0)
 # Release/共享库/Qt6/GUISupportQtQuick，Qt 为锁定预编译 6.11.2。
 # Linux 注意：ubuntu-24.04 gcc13 生产，有效 glibc 基线高于 Qt 的 RHEL9
 # （≥2.34）；实际下限由 007 运行验证后回写。
-panta_sdk_declare_asset(vtk macos-arm64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-macos-arm64.tar.gz
-  SHA256 eb3c2f298c1640d347b42cfbd0715fb05b95eb403e0cff2cbb1d2139f6feca58
-  PACKAGE VTK
-  REQUIRED_TARGETS VTK::GUISupportQtQuick VTK::RenderingQt
-  ABI macos-15-apple-clang-arm64-Release-shared
-  MODULES GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt 及默认模块集
-  LICENSE share/licenses/VTK/Copyright.txt (BSD-3))
-panta_sdk_declare_asset(vtk linux-x86_64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-linux-x86_64.tar.gz
-  SHA256 d2b54fb37eb82bc27c3ce1840556a4c92129b6c0fb9d07ac4f0407ac66e2f80c
-  PACKAGE VTK
-  REQUIRED_TARGETS VTK::GUISupportQtQuick VTK::RenderingQt
-  ABI ubuntu-24.04-gcc13-x86_64-Release-shared
-  MODULES GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt 及默认模块集
-  LICENSE share/licenses/VTK/Copyright.txt (BSD-3))
-panta_sdk_declare_asset(vtk windows-x86_64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-windows-x86_64.tar.gz
-  SHA256 023931171a60b1a74bb97766d26713dabab73d4ff0ed4b6f706aba67cf60a710
-  PACKAGE VTK
-  REQUIRED_TARGETS VTK::GUISupportQtQuick VTK::RenderingQt
-  ABI windows-msvc2022-v143-x64-Release-shared-MD
-  MODULES GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt 及默认模块集
-  LICENSE share/licenses/VTK/Copyright.txt (BSD-3))
+panta_sdk_declare_asset(
+  vtk
+  macos-arm64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-macos-arm64.tar.gz
+  SHA256
+  eb3c2f298c1640d347b42cfbd0715fb05b95eb403e0cff2cbb1d2139f6feca58
+  PACKAGE
+  VTK
+  REQUIRED_TARGETS
+  VTK::GUISupportQtQuick
+  VTK::RenderingQt
+  ABI
+  macos-15-apple-clang-arm64-Release-shared
+  MODULES
+  GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt
+  及默认模块集
+  LICENSE
+  share/licenses/VTK/Copyright.txt
+  (BSD-3))
+panta_sdk_declare_asset(
+  vtk
+  linux-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-linux-x86_64.tar.gz
+  SHA256
+  d2b54fb37eb82bc27c3ce1840556a4c92129b6c0fb9d07ac4f0407ac66e2f80c
+  PACKAGE
+  VTK
+  REQUIRED_TARGETS
+  VTK::GUISupportQtQuick
+  VTK::RenderingQt
+  ABI
+  ubuntu-24.04-gcc13-x86_64-Release-shared
+  MODULES
+  GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt
+  及默认模块集
+  LICENSE
+  share/licenses/VTK/Copyright.txt
+  (BSD-3))
+panta_sdk_declare_asset(
+  vtk
+  windows-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-windows-x86_64.tar.gz
+  SHA256
+  023931171a60b1a74bb97766d26713dabab73d4ff0ed4b6f706aba67cf60a710
+  PACKAGE
+  VTK
+  REQUIRED_TARGETS
+  VTK::GUISupportQtQuick
+  VTK::RenderingQt
+  ABI
+  windows-msvc2022-v143-x64-Release-shared-MD
+  MODULES
+  GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt
+  及默认模块集
+  LICENSE
+  share/licenses/VTK/Copyright.txt
+  (BSD-3))
 
 panta_sdk_declare_version(occt 8.0.1)
 # OCCT 8.0.1 制品（038 受信 CI 生产，Release sdk-occt-netgen-8.0.1-6.2.2604，
@@ -395,30 +455,66 @@ panta_sdk_declare_version(occt 8.0.1)
 # 消费（仅 Windows 有归档、跨平台工具链不一致）。源码 tag V8.0.1 → commit
 # b8f597c677811d1f9f4d8a97f5ae2825c0353a42（unmodified）；Release/Shared，
 # Draw/Visualization/DETools 与 USE_FREETYPE/USE_XLIB 关闭（渲染归 VTK）。
-panta_sdk_declare_asset(occt macos-arm64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
-  SHA256 db6d4a878cc3f1c4ccf693e2d1408c35b10fa844b9793a02c38379bcbc157161
-  PACKAGE OpenCASCADE
-  REQUIRED_TARGETS TKernel TKDESTEP
-  ABI macos-15-apple-clang-arm64-Release-shared
-  MODULES ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools 关闭）
-  LICENSE share/licenses/OCCT (LGPL-2.1 + OCCT exception))
-panta_sdk_declare_asset(occt linux-x86_64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
-  SHA256 04a33d7a5aa1c122da8fb0ec775fffb5f8872a90db717b800e7561d52a7cf563
-  PACKAGE OpenCASCADE
-  REQUIRED_TARGETS TKernel TKDESTEP
-  ABI ubuntu-24.04-gcc13-x86_64-Release-shared
-  MODULES ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools 关闭）
-  LICENSE share/licenses/OCCT (LGPL-2.1 + OCCT exception))
-panta_sdk_declare_asset(occt windows-x86_64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
-  SHA256 d0162ff98100741f63d6f4103e8c98d6b7e4c7fa32c6ff4ba9ad570c66634751
-  PACKAGE OpenCASCADE
-  REQUIRED_TARGETS TKernel TKDESTEP
-  ABI windows-msvc2022-v143-x64-Release-shared-MD
-  MODULES ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools 关闭）
-  LICENSE share/licenses/OCCT (LGPL-2.1 + OCCT exception))
+panta_sdk_declare_asset(
+  occt
+  macos-arm64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
+  SHA256
+  db6d4a878cc3f1c4ccf693e2d1408c35b10fa844b9793a02c38379bcbc157161
+  PACKAGE
+  OpenCASCADE
+  REQUIRED_TARGETS
+  TKernel
+  TKDESTEP
+  ABI
+  macos-15-apple-clang-arm64-Release-shared
+  MODULES
+  ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools
+  关闭）
+  LICENSE
+  share/licenses/OCCT
+  (LGPL-2.1 + OCCT exception))
+panta_sdk_declare_asset(
+  occt
+  linux-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
+  SHA256
+  04a33d7a5aa1c122da8fb0ec775fffb5f8872a90db717b800e7561d52a7cf563
+  PACKAGE
+  OpenCASCADE
+  REQUIRED_TARGETS
+  TKernel
+  TKDESTEP
+  ABI
+  ubuntu-24.04-gcc13-x86_64-Release-shared
+  MODULES
+  ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools
+  关闭）
+  LICENSE
+  share/licenses/OCCT
+  (LGPL-2.1 + OCCT exception))
+panta_sdk_declare_asset(
+  occt
+  windows-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
+  SHA256
+  d0162ff98100741f63d6f4103e8c98d6b7e4c7fa32c6ff4ba9ad570c66634751
+  PACKAGE
+  OpenCASCADE
+  REQUIRED_TARGETS
+  TKernel
+  TKDESTEP
+  ABI
+  windows-msvc2022-v143-x64-Release-shared-MD
+  MODULES
+  ModelingData/ModelingAlgorithms/DataExchange/ApplicationFramework（Draw/Visualization/DETools
+  关闭）
+  LICENSE
+  share/licenses/OCCT
+  (LGPL-2.1 + OCCT exception))
 
 panta_sdk_declare_version(netgen 6.2.2604)
 # Netgen v6.2.2604 制品（038 同管线生产，与 OCCT 成对发布——USE_OCC 链接
@@ -427,27 +523,75 @@ panta_sdk_declare_version(netgen 6.2.2604)
 # GUI/Python/MPI 关闭。包配置文件名为 NetgenConfig.cmake（大写 N）：
 # find_package 须用 `Netgen`。运行期依赖同平台 OCCT 资产（消费侧处理加载
 # 路径，009/010）。
-panta_sdk_declare_asset(netgen macos-arm64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
-  SHA256 51d067f057143044fb8feb8501f47973832c92a359281833ff7be996018f384e
-  PACKAGE Netgen
-  REQUIRED_TARGETS ngcore nglib
-  ABI macos-15-apple-clang-arm64-Release-shared（链接本 Release 的 occt macos-arm64）
-  MODULES 网格生成内核（ngcore/nglib；GUI/Python/MPI 关闭）
-  LICENSE share/licenses/Netgen/LICENSE (LGPL-2.1))
-panta_sdk_declare_asset(netgen linux-x86_64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
-  SHA256 9be1ac3a2d8f16bc86c2c52d51c7aab821aaeee9848e2c3b85d55bea6eb4079a
-  PACKAGE Netgen
-  REQUIRED_TARGETS ngcore nglib
-  ABI ubuntu-24.04-gcc13-x86_64-Release-shared（链接本 Release 的 occt linux-x86_64）
-  MODULES 网格生成内核（ngcore/nglib；GUI/Python/MPI 关闭）
-  LICENSE share/licenses/Netgen/LICENSE (LGPL-2.1))
-panta_sdk_declare_asset(netgen windows-x86_64
-  URL https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
-  SHA256 3e8c5204fc1977c4ce4ff53e66cb32c4a2092e408b45ad7b5da173922ce9fd1d
-  PACKAGE Netgen
-  REQUIRED_TARGETS ngcore nglib
-  ABI windows-msvc2022-v143-x64-Release-shared-MD（链接本 Release 的 occt windows-x86_64）
-  MODULES 网格生成内核（ngcore/nglib；GUI/Python/MPI 关闭）
-  LICENSE share/licenses/Netgen/LICENSE (LGPL-2.1))
+panta_sdk_declare_asset(
+  netgen
+  macos-arm64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
+  SHA256
+  51d067f057143044fb8feb8501f47973832c92a359281833ff7be996018f384e
+  PACKAGE
+  Netgen
+  REQUIRED_TARGETS
+  ngcore
+  nglib
+  ABI
+  macos-15-apple-clang-arm64-Release-shared（链接本
+  Release
+  的
+  occt
+  macos-arm64）
+  MODULES
+  网格生成内核（ngcore/nglib；GUI/Python/MPI
+  关闭）
+  LICENSE
+  share/licenses/Netgen/LICENSE
+  (LGPL-2.1))
+panta_sdk_declare_asset(
+  netgen
+  linux-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
+  SHA256
+  9be1ac3a2d8f16bc86c2c52d51c7aab821aaeee9848e2c3b85d55bea6eb4079a
+  PACKAGE
+  Netgen
+  REQUIRED_TARGETS
+  ngcore
+  nglib
+  ABI
+  ubuntu-24.04-gcc13-x86_64-Release-shared（链接本
+  Release
+  的
+  occt
+  linux-x86_64）
+  MODULES
+  网格生成内核（ngcore/nglib；GUI/Python/MPI
+  关闭）
+  LICENSE
+  share/licenses/Netgen/LICENSE
+  (LGPL-2.1))
+panta_sdk_declare_asset(
+  netgen
+  windows-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
+  SHA256
+  3e8c5204fc1977c4ce4ff53e66cb32c4a2092e408b45ad7b5da173922ce9fd1d
+  PACKAGE
+  Netgen
+  REQUIRED_TARGETS
+  ngcore
+  nglib
+  ABI
+  windows-msvc2022-v143-x64-Release-shared-MD（链接本
+  Release
+  的
+  occt
+  windows-x86_64）
+  MODULES
+  网格生成内核（ngcore/nglib；GUI/Python/MPI
+  关闭）
+  LICENSE
+  share/licenses/Netgen/LICENSE
+  (LGPL-2.1))

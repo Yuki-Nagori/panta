@@ -35,12 +35,18 @@ set(_inner_args)
 if(INNER_ARCHIVE)
   list(APPEND _inner_args INNER_ARCHIVE "${INNER_ARCHIVE}" INNER_SHA256 "${INNER_SHA256}")
 endif()
-panta_sdk_declare_asset("${SDK_NAME}" "${_host_triple}"
-  URL "${ASSET_URL}"
-  SHA256 "${ASSET_SHA}"
-  PACKAGE "${PACKAGE}"
+panta_sdk_declare_asset(
+  "${SDK_NAME}"
+  "${_host_triple}"
+  URL
+  "${ASSET_URL}"
+  SHA256
+  "${ASSET_SHA}"
+  PACKAGE
+  "${PACKAGE}"
   ${_inner_args}
-  REQUIRED_TARGETS "${CHECK_TARGET}")
+  REQUIRED_TARGETS
+  "${CHECK_TARGET}")
 panta_require_sdk("${SDK_NAME}" _staging)
 
 set(_target_found 0)
@@ -48,4 +54,4 @@ if(TARGET "${CHECK_TARGET}")
   set(_target_found 1)
 endif()
 file(WRITE "${RESULT_FILE}"
-  "staging=${_staging}\nhost_triple=${_host_triple}\ntarget_found=${_target_found}\n")
+     "staging=${_staging}\nhost_triple=${_host_triple}\ntarget_found=${_target_found}\n")

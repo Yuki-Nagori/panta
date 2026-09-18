@@ -6,6 +6,7 @@ members = [
     "crates/panta-dsl-core",
     "crates/panta-dslc",
     "crates/panta-ffi",
+    "tests",
 ]
 
 [workspace.package]

@@ -22,17 +22,18 @@ QObject* create_component(QQmlEngine& engine, const QString& path, QObject& owne
     return object;
 }
 
-}  // namespace
+} // namespace
 
 class ThemeComponentTest final : public QObject {
     Q_OBJECT
 
-private slots:
+  private slots:
     void defaults_use_theme() {
         QQmlEngine engine;
         QObject owner;
         QObject* label = create_component(
-            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedLabel.qml"), owner);
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedLabel.qml"),
+            owner);
         QVERIFY(label != nullptr);
         QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#e8e8e8")));
         QCOMPARE(label->property("textSize").toInt(), 14);
@@ -42,7 +43,8 @@ private slots:
         QQmlEngine engine;
         QObject owner;
         QObject* button = create_component(
-            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedButton.qml"), owner);
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedButton.qml"),
+            owner);
         QVERIFY(button != nullptr);
         button->setProperty("controlHeight", 48);
         button->setProperty("contentPadding", 20);

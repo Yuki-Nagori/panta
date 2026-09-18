@@ -1,21 +1,16 @@
 # 桌面入口（任务 005）：链接 QML 模块与 ViewModel 模块。
-add_executable(panta_native_app
-  main.cpp
-)
-set_target_properties(panta_native_app PROPERTIES
-  OUTPUT_NAME panta-native
-  EXPORT_NAME native-app
-)
+add_executable(panta_native_app main.cpp)
+set_target_properties(panta_native_app PROPERTIES OUTPUT_NAME panta-native EXPORT_NAME native-app)
 panta_native_defaults(panta_native_app)
-target_link_libraries(panta_native_app PRIVATE
-  panta::foundation
-  panta::shell
-  panta::i18n
-  Qt6::Gui
-  Qt6::Qml
-  Qt6::Quick
-  Qt6::QuickControls2
-)
+target_link_libraries(
+  panta_native_app
+  PRIVATE panta::foundation
+          panta::shell
+          panta::i18n
+          Qt6::Gui
+          Qt6::Qml
+          Qt6::Quick
+          Qt6::QuickControls2)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   target_link_libraries(panta_native_app PRIVATE panta_bridgeplugin)
   target_compile_definitions(panta_native_app PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
@@ -27,27 +22,19 @@ endif()
 # 扫描的源文件；调用扫描器只会产生空结果，并要求工具额外加载平台 ICU。
 
 if(BUILD_TESTING)
-  add_executable(panta_qml_shell_module_test tests/shell_module_load_test.cpp)
+  add_executable(panta_qml_shell_module_test ../../tests/cpp/app/shell_module_load_test.cpp)
   panta_native_defaults(panta_qml_shell_module_test)
-  target_link_libraries(panta_qml_shell_module_test PRIVATE
-    panta::shell
-    Qt6::Gui
-    Qt6::Qml
-    Qt6::Test
-  )
+  target_link_libraries(panta_qml_shell_module_test PRIVATE panta::shell Qt6::Gui Qt6::Qml
+                                                            Qt6::Test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
     target_link_libraries(panta_qml_shell_module_test PRIVATE panta_bridgeplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
-  add_test(
-    NAME Qml.ShellModuleLoads
-    COMMAND panta_qml_shell_module_test
-  )
-  set_tests_properties(Qml.ShellModuleLoads PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-  )
+  add_test(NAME Qml.ShellModuleLoads COMMAND panta_qml_shell_module_test)
+  set_tests_properties(Qml.ShellModuleLoads PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
-install(TARGETS panta_native_app EXPORT pantaNativeTargets
-  RUNTIME DESTINATION bin
-)
+install(
+  TARGETS panta_native_app
+  EXPORT pantaNativeTargets
+  RUNTIME DESTINATION bin)

@@ -4,13 +4,27 @@ include_guard(GLOBAL)
 
 get_property(_panta_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT _panta_multi_config AND NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING "构建类型" FORCE)
+  set(CMAKE_BUILD_TYPE
+      Debug
+      CACHE STRING "构建类型" FORCE)
 endif()
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "安装前缀" FORCE)
+  set(CMAKE_INSTALL_PREFIX
+      "${CMAKE_BINARY_DIR}/install"
+      CACHE PATH "安装前缀" FORCE)
 endif()
-if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if(NOT CMAKE_EXPORT_COMPILE_COMMANDS)
+  set(CMAKE_EXPORT_COMPILE_COMMANDS
+      ON
+      CACHE BOOL "导出 compile_commands.json" FORCE)
+endif()
+
+if(PANTA_ENABLE_COVERAGE)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "PANTA_ENABLE_COVERAGE 需要 Clang C++ 编译器")
+  endif()
+  add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+  add_link_options(-fprofile-instr-generate)
 endif()
 
 if(MSVC)
@@ -27,10 +41,9 @@ endif()
 function(panta_native_defaults target)
   target_compile_features(${target} PUBLIC cxx_std_20)
   set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
-  target_compile_options(${target} PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
-  )
+  target_compile_options(
+    ${target} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
+                      $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 endfunction()
 
 # 递归核对真实构建图（包括 Qt 生成的 object libraries），提前阻断上游或
@@ -39,23 +52,38 @@ function(panta_verify_msvc_abi directory)
   if(NOT MSVC)
     return()
   endif()
-  get_property(_targets DIRECTORY "${directory}" PROPERTY BUILDSYSTEM_TARGETS)
-  get_property(_directory_defines DIRECTORY "${directory}" PROPERTY COMPILE_DEFINITIONS)
+  get_property(
+    _targets
+    DIRECTORY "${directory}"
+    PROPERTY BUILDSYSTEM_TARGETS)
+  get_property(
+    _directory_defines
+    DIRECTORY "${directory}"
+    PROPERTY COMPILE_DEFINITIONS)
   foreach(_target IN LISTS _targets)
     get_target_property(_type ${_target} TYPE)
     if(_type MATCHES "^(EXECUTABLE|STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY|OBJECT_LIBRARY)$")
       get_target_property(_runtime ${_target} MSVC_RUNTIME_LIBRARY)
-      get_property(_defines TARGET ${_target} PROPERTY COMPILE_DEFINITIONS)
+      get_property(
+        _defines
+        TARGET ${_target}
+        PROPERTY COMPILE_DEFINITIONS)
       list(APPEND _defines ${_directory_defines})
-      if(NOT _runtime STREQUAL "MultiThreadedDLL" OR
-         NOT "_ITERATOR_DEBUG_LEVEL=0" IN_LIST _defines OR
-         "_ITERATOR_DEBUG_LEVEL=1" IN_LIST _defines OR
-         "_ITERATOR_DEBUG_LEVEL=2" IN_LIST _defines)
-        message(FATAL_ERROR "${_target}: inconsistent MSVC ABI (${_runtime}; ${_defines}); expected /MD and _ITERATOR_DEBUG_LEVEL=0")
+      if(NOT _runtime STREQUAL "MultiThreadedDLL"
+         OR NOT "_ITERATOR_DEBUG_LEVEL=0" IN_LIST _defines
+         OR "_ITERATOR_DEBUG_LEVEL=1" IN_LIST _defines
+         OR "_ITERATOR_DEBUG_LEVEL=2" IN_LIST _defines)
+        message(
+          FATAL_ERROR
+            "${_target}: inconsistent MSVC ABI (${_runtime}; ${_defines}); expected /MD and _ITERATOR_DEBUG_LEVEL=0"
+        )
       endif()
     endif()
   endforeach()
-  get_property(_directories DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
+  get_property(
+    _directories
+    DIRECTORY "${directory}"
+    PROPERTY SUBDIRECTORIES)
   foreach(_directory IN LISTS _directories)
     panta_verify_msvc_abi("${_directory}")
   endforeach()

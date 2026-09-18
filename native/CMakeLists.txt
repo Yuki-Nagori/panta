@@ -2,14 +2,14 @@
 # 任务 004 的 launcher 诊断将依赖这一致性。3.22 是本树用到的 presets
 # schema 3（build/test presets）所需的最低版本，不随在线文档的最新版浮动。
 cmake_minimum_required(VERSION 3.22)
-project(panta_native VERSION 0.1.0 LANGUAGES CXX)
+project(
+  panta_native
+  VERSION 0.1.0
+  LANGUAGES CXX)
 
-option(PANTA_ENABLE_FFI_TEST
-  "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF
-)
-option(PANTA_ENABLE_BRIDGE_MODULE
-  "Build and register the Panta.Bridge QML module" ON
-)
+option(PANTA_ENABLE_FFI_TEST "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF)
+option(PANTA_ENABLE_BRIDGE_MODULE "Build and register the Panta.Bridge QML module" ON)
+option(PANTA_ENABLE_COVERAGE "Instrument native C++ targets for LLVM coverage" OFF)
 
 include(cmake/build-policy.cmake)
 
@@ -22,9 +22,13 @@ if(PANTA_ENABLE_FFI_TEST)
   if(NOT BUILD_TESTING)
     message(FATAL_ERROR "PANTA_ENABLE_FFI_TEST requires BUILD_TESTING=ON")
   endif()
-  if(NOT EXISTS "${PANTA_FFI_INCLUDE_DIR}/panta_ffi.h" OR
-     NOT EXISTS "${PANTA_FFI_STATIC_LIB}" OR IS_DIRECTORY "${PANTA_FFI_STATIC_LIB}")
-    message(FATAL_ERROR "PANTA_ENABLE_FFI_TEST requires existing PANTA_FFI_INCLUDE_DIR/panta_ffi.h and PANTA_FFI_STATIC_LIB; build via Cargo")
+  if(NOT EXISTS "${PANTA_FFI_INCLUDE_DIR}/panta_ffi.h"
+     OR NOT EXISTS "${PANTA_FFI_STATIC_LIB}"
+     OR IS_DIRECTORY "${PANTA_FFI_STATIC_LIB}")
+    message(
+      FATAL_ERROR
+        "PANTA_ENABLE_FFI_TEST requires existing PANTA_FFI_INCLUDE_DIR/panta_ffi.h and PANTA_FFI_STATIC_LIB; build via Cargo"
+    )
   endif()
 endif()
 
@@ -35,9 +39,8 @@ set(_panta_qt_components Core Gui Qml Quick QuickControls2)
 if(BUILD_TESTING)
   list(APPEND _panta_qt_components Test)
 endif()
-find_package(Qt6 6.11 REQUIRED COMPONENTS ${_panta_qt_components}
-  PATHS "${QT_STAGING}" NO_DEFAULT_PATH
-)
+find_package(Qt6 6.11 REQUIRED COMPONENTS ${_panta_qt_components} PATHS "${QT_STAGING}"
+                                          NO_DEFAULT_PATH)
 # AUTOMOC（QML_ELEMENT 元类型生成必需）与 Qt CMake 策略在此统一；
 # QTP0004(NEW)：子目录（Themes/、Panels/）的 qmldir 自动生成。
 qt_standard_project_setup()
@@ -51,34 +54,40 @@ qt_policy(SET QTP0005 NEW)
 include(cmake/sdk-provision.cmake)
 
 if(BUILD_TESTING)
-  add_test(NAME Build.MsvcAbiPolicy
-    COMMAND "${CMAKE_COMMAND}"
-      "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/abi-policy-test"
-      "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-abi.cmake"
-  )
+  add_test(
+    NAME Build.MsvcAbiPolicy
+    COMMAND
+      "${CMAKE_COMMAND}" "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/abi-policy-test"
+      "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}" -P
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-abi.cmake")
   # SDK 供给逻辑（031）用 fixture 归档驱动：不联网（file://）、不编译
   # （consumer 为 project NONE），三平台 CI 与本地同路径。
-  add_test(NAME Build.SdkProvision
-    COMMAND "${CMAKE_COMMAND}"
-      "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-provision-test"
+  add_test(
+    NAME Build.SdkProvision
+    COMMAND
+      "${CMAKE_COMMAND}" "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-provision-test"
       "-DPANTA_SDK_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk-provision.cmake"
-      "-DCONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/sdk/consumer"
-      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-sdk-provision.cmake"
-  )
+      "-DCONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/sdk/consumer" -P
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-sdk-provision.cmake")
   # GoogleTest 固定点见 ai-docs/standards/dependency-acquisition.md：
   # GIT_TAG 用完整 commit SHA（v1.18.0 → 063de7e9578f82b369302001269680b4b1553359）。
   # configure 阶段联网拉取到构建树，与 Cargo 托管原则一致（gtest.md）。
   include(FetchContent)
-  FetchContent_Declare(googletest
+  FetchContent_Declare(
+    googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG 063de7e9578f82b369302001269680b4b1553359
-  )
+    GIT_TAG 063de7e9578f82b369302001269680b4b1553359)
   # Windows 下与自有 target 的 CRT 运行库保持一致，避免混链。
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  set(gtest_force_shared_crt
+      ON
+      CACHE BOOL "" FORCE)
   # 只消费 gtest；gmock 待模块边界场景出现时按对应 task 打开。
-  set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-  set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+  set(BUILD_GMOCK
+      OFF
+      CACHE BOOL "" FORCE)
+  set(INSTALL_GTEST
+      OFF
+      CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
 endif()
 
@@ -100,25 +109,19 @@ set(PANTA_NATIVE_INSTALL_CONFIG_DIR lib/cmake/panta-native)
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
-  cmake/panta-native-config.cmake.in
-  "${CMAKE_BINARY_DIR}/cmake/panta-native-config.cmake"
-  INSTALL_DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}"
-)
-write_basic_package_version_file(
-  "${CMAKE_BINARY_DIR}/cmake/panta-native-config-version.cmake"
-  COMPATIBILITY SameMajorVersion
-)
+  cmake/panta-native-config.cmake.in "${CMAKE_BINARY_DIR}/cmake/panta-native-config.cmake"
+  INSTALL_DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}")
+write_basic_package_version_file("${CMAKE_BINARY_DIR}/cmake/panta-native-config-version.cmake"
+                                 COMPATIBILITY SameMajorVersion)
 
-install(EXPORT pantaNativeTargets
+install(
+  EXPORT pantaNativeTargets
   FILE panta-native-targets.cmake
   NAMESPACE panta::
-  DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}"
-)
-install(FILES
-  "${CMAKE_BINARY_DIR}/cmake/panta-native-config.cmake"
-  "${CMAKE_BINARY_DIR}/cmake/panta-native-config-version.cmake"
-  DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}"
-)
+  DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}")
+install(FILES "${CMAKE_BINARY_DIR}/cmake/panta-native-config.cmake"
+              "${CMAKE_BINARY_DIR}/cmake/panta-native-config-version.cmake"
+        DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}")
 
 # 等 Qt 的延迟目标创建完成后审计，包括 plugin_init/resource object targets。
 cmake_language(DEFER CALL panta_verify_msvc_abi "${CMAKE_CURRENT_SOURCE_DIR}")

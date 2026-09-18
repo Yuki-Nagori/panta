@@ -33,10 +33,10 @@ const RERUN_PATHS: &[&str] = &[
     "../../native/i18n",
     "../../native/bridge",
     "../../native/bridge/src",
-    "../../native/bridge/tests",
+    "../../tests/cpp/bridge",
     "../../native/foundation",
     "../../native/foundation/src",
-    "../../native/foundation/tests",
+    "../../tests/cpp/foundation",
     "../../native/foundation/include/panta/foundation",
     "../panta-ffi",
     "../panta-ffi/include",
@@ -46,6 +46,9 @@ const RERUN_PATHS: &[&str] = &[
     "../panta-core",
     "../panta-core/src",
     "../../native/ffi",
+    "../../tests/cpp/ffi",
+    "../../tests/cpp/app",
+    "../../tests/qml",
     "../../qml",
     "../../qml/Themes",
     "../../qml/Panels",
@@ -60,6 +63,7 @@ const RERUN_ENVS: &[&str] = &[
     "CMAKE_GENERATOR",
     "CMAKE_GENERATOR_PLATFORM",
     "CMAKE_PREFIX_PATH",
+    "PANTA_NATIVE_COVERAGE",
 ];
 
 fn main() -> ExitCode {
@@ -122,7 +126,7 @@ fn orchestrate() -> Result<PathBuf, String> {
     emit_translation_sources(&i18n_dir, &ts_dir)?;
     // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
     let cmake = provision::resolve_cmake(&target_root)?;
-    // 供集成测试（native_suite）定位同目录的 ctest：任务 011/032 聚合入口。
+    // 供根 tests/integration/native.rs 定位同目录的 ctest：任务 011/032/043 聚合入口。
     println!("cargo:rustc-env=PANTA_CMAKE={}", cmake.display());
     println!(
         "cargo:rustc-env=PANTA_NATIVE_BUILD_DIR={}",
@@ -183,6 +187,9 @@ fn orchestrate() -> Result<PathBuf, String> {
             deps_root.join("sdk").display()
         ))
         .arg(format!("-DPANTA_I18N_TS_DIR={}", ts_dir.display()));
+    if std::env::var_os("PANTA_NATIVE_COVERAGE").is_some() {
+        configure.arg("-DPANTA_ENABLE_COVERAGE=ON");
+    }
     if let Some(ninja) = &ninja {
         // 托管供给的 Ninja 不依赖 PATH；系统 Ninja 传显式路径同样无害。
         configure.arg(format!("-DCMAKE_MAKE_PROGRAM={}", ninja.display()));

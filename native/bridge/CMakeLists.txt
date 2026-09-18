@@ -11,10 +11,14 @@ endif()
 add_library(panta_bridge STATIC)
 add_library(panta::bridge ALIAS panta_bridge)
 
-qt_add_qml_module(panta_bridge
-  URI Panta.Bridge
-  VERSION 1.0
-  OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Panta/Bridge"
+qt_add_qml_module(
+  panta_bridge
+  URI
+  Panta.Bridge
+  VERSION
+  1.0
+  OUTPUT_DIRECTORY
+  "${CMAKE_BINARY_DIR}/Panta/Bridge"
   ${PANTA_QML_MODULE_OPTIONS}
   SOURCES
   src/shell_view_model.hpp
@@ -22,18 +26,15 @@ qt_add_qml_module(panta_bridge
   src/task_host.hpp
   src/task_host.cpp
   src/path_host.hpp
-  src/path_host.cpp
-)
+  src/path_host.cpp)
 panta_native_defaults(panta_bridge)
 # 测试和 C++ 消费者按 <shell_view_model.hpp> 引用头文件。
 target_include_directories(panta_bridge PUBLIC src)
 # TaskHost 消费 Rust TaskService：生成头路径与其引用的手写支持头
 # （panta/ffi.hpp）公开给消费者，staticlib 及其系统库依赖随 target
 # 传播到最终链接者（与 native/ffi 测试同规则）。
-target_include_directories(panta_bridge PUBLIC
-  "${PANTA_FFI_INCLUDE_DIR}"
-  "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include"
-)
+target_include_directories(panta_bridge PUBLIC "${PANTA_FFI_INCLUDE_DIR}"
+                                               "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
 target_link_libraries(panta_bridge PUBLIC Qt6::Core "${PANTA_FFI_STATIC_LIB}")
 if(UNIX)
   find_package(Threads REQUIRED)
@@ -45,32 +46,22 @@ endif()
 
 if(BUILD_TESTING)
   include(GoogleTest)
-  add_executable(panta_bridge_shell_view_model_test tests/shell_view_model_test.cpp)
+  add_executable(panta_bridge_shell_view_model_test
+                 ../../tests/cpp/bridge/shell_view_model_test.cpp)
   panta_native_defaults(panta_bridge_shell_view_model_test)
-  target_link_libraries(panta_bridge_shell_view_model_test PRIVATE
-    panta::bridge
-    GTest::gtest
-    Qt6::Test
-  )
+  target_link_libraries(panta_bridge_shell_view_model_test PRIVATE panta::bridge GTest::gtest
+                                                                   Qt6::Test)
   gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE PRE_TEST)
 
-  add_executable(panta_bridge_task_host_test tests/task_host_test.cpp)
+  add_executable(panta_bridge_task_host_test ../../tests/cpp/bridge/task_host_test.cpp)
   panta_native_defaults(panta_bridge_task_host_test)
-  target_link_libraries(panta_bridge_task_host_test PRIVATE
-    panta::bridge
-    GTest::gtest
-    Qt6::Test
-  )
+  target_link_libraries(panta_bridge_task_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
   gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE PRE_TEST)
 
   # 路径宿主（023）覆盖标准目录注入、cwd 无关、拒绝矩阵、file URL 与
   # 非 Unicode 策略；symlink 用例仅在 Unix 编译（Windows junction 记录待测）。
-  add_executable(panta_bridge_path_host_test tests/path_host_test.cpp)
+  add_executable(panta_bridge_path_host_test ../../tests/cpp/bridge/path_host_test.cpp)
   panta_native_defaults(panta_bridge_path_host_test)
-  target_link_libraries(panta_bridge_path_host_test PRIVATE
-    panta::bridge
-    GTest::gtest
-    Qt6::Test
-  )
+  target_link_libraries(panta_bridge_path_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
   gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE PRE_TEST)
 endif()

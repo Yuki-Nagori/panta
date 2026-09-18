@@ -18,31 +18,37 @@ set(QT_STAGING "${QT_PROVISION_DIR}/staging")
 set(QT_EXTRACTED "${QT_PROVISION_DIR}/extracted")
 
 if(APPLE)
-  set(_qt_repo "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.clang_64")
+  set(_qt_repo
+      "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.clang_64"
+  )
   set(_qt_archives
-    "6.11.2-0-202608131016qtbase-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|9592f84f7e26d532c5c56824d1da7c9214a766cb0a17beb5af71022bcfbcd271"
-    "6.11.2-0-202608131016qtdeclarative-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|ceb8e3f3830531a52de5007ef3f50ffc5525021feb132ee322f59583eb2903cf"
-    "6.11.2-0-202608131016qttools-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|415b5008059d0066ac0d4806de98f6e8dacf7b5c80ca0305875160d2107d3719"
+      "6.11.2-0-202608131016qtbase-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|9592f84f7e26d532c5c56824d1da7c9214a766cb0a17beb5af71022bcfbcd271"
+      "6.11.2-0-202608131016qtdeclarative-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|ceb8e3f3830531a52de5007ef3f50ffc5525021feb132ee322f59583eb2903cf"
+      "6.11.2-0-202608131016qttools-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|415b5008059d0066ac0d4806de98f6e8dacf7b5c80ca0305875160d2107d3719"
   )
 elseif(WIN32)
-  set(_qt_repo "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6112/qt6_6112_msvc2022_64/qt.qt6.6112.win64_msvc2022_64")
+  set(_qt_repo
+      "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6112/qt6_6112_msvc2022_64/qt.qt6.6112.win64_msvc2022_64"
+  )
   set(_qt_archives
-    "6.11.2-0-202608131017qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|fd984b7264361b4dd3fd2a417702ca1258e4086268f2ee6a69b9a393d9c3f6bb"
-    "6.11.2-0-202608131017qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5591ca564c1a9299a45a15b6b1d324c86e0aaed7cf6c47b7e6fe464aecae2587"
-    "6.11.2-0-202608131017qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5f2b387a1f8055102b1388ff4ea743124ed6389d442f75c659728bb5c2a56946"
+      "6.11.2-0-202608131017qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|fd984b7264361b4dd3fd2a417702ca1258e4086268f2ee6a69b9a393d9c3f6bb"
+      "6.11.2-0-202608131017qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5591ca564c1a9299a45a15b6b1d324c86e0aaed7cf6c47b7e6fe464aecae2587"
+      "6.11.2-0-202608131017qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5f2b387a1f8055102b1388ff4ea743124ed6389d442f75c659728bb5c2a56946"
   )
 elseif(UNIX)
-  set(_qt_repo "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.linux_gcc_64")
+  set(_qt_repo
+      "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.linux_gcc_64"
+  )
   set(_qt_archives
-    "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
-    "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
-    "6.11.2-0-202608131018qttools-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|42d5f3dbfc25647d9d95ef8b64401dc7e3ef7c83a39a29b548dfa0985f71c0ca"
+      "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
+      "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
+      "6.11.2-0-202608131018qttools-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|42d5f3dbfc25647d9d95ef8b64401dc7e3ef7c83a39a29b548dfa0985f71c0ca"
   )
   # Qt Linux 工具使用与该发行版配套的 ICU 73。此归档由 Qt 官方仓库提供，
   # 文件直接放入 staging/lib，供 rcc、qtpaths、qmlimportscanner 等工具通过
   # $ORIGIN/../lib 解析；不使用系统 ICU，也不在本地编译 ICU。
   set(_qt_runtime_archives
-    "6.11.2-0-202608131018icu-linux-Rhel8.6-x86_64.7z|111bdae30a66fff6ef65620e95766170fa5a6f425c360ea33b79cb2ec7e2fd86"
+      "6.11.2-0-202608131018icu-linux-Rhel8.6-x86_64.7z|111bdae30a66fff6ef65620e95766170fa5a6f425c360ea33b79cb2ec7e2fd86"
   )
 else()
   message(FATAL_ERROR "Qt 预编译供给暂不支持平台：${CMAKE_SYSTEM_NAME}（记录到 dependency-acquisition.md 再扩展）")
@@ -58,8 +64,8 @@ foreach(entry IN LISTS _qt_archives)
   # 已按同一哈希解包且 staging 仍完整则跳过；指纹不符（升级归档或清空
   # staging）才重新下载/解包，老缓存只补新模块。
   if(EXISTS "${_extract_marker}"
-      AND EXISTS "${QT_STAGING}/bin"
-      AND EXISTS "${_archive_path}")
+     AND EXISTS "${QT_STAGING}/bin"
+     AND EXISTS "${_archive_path}")
     file(STRINGS "${_extract_marker}" _recorded_sha)
     if(_recorded_sha STREQUAL "${_archive_sha}")
       continue()
@@ -74,7 +80,8 @@ foreach(entry IN LISTS _qt_archives)
   endif()
   if(NOT EXISTS "${_archive_path}")
     message(STATUS "下载 Qt 预编译包：${_archive_name}")
-    file(DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
+    file(
+      DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
       INACTIVITY_TIMEOUT 120
       TIMEOUT 900
       EXPECTED_HASH SHA256=${_archive_sha})
@@ -84,16 +91,14 @@ foreach(entry IN LISTS _qt_archives)
     if(NOT _archive_actual STREQUAL _archive_sha)
       file(REMOVE "${_archive_path}")
       message(FATAL_ERROR "Qt 归档 SHA256 不符（下载结果）：${_archive_name}"
-        " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，"
-        "请核对 manifest 与上游资产")
+                          " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，" "请核对 manifest 与上游资产")
     endif()
   endif()
   message(STATUS "解包 Qt 预编译包：${_archive_name}")
   execute_process(
     COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive_path}"
     WORKING_DIRECTORY "${QT_STAGING}"
-    RESULT_VARIABLE _extract_result
-  )
+    RESULT_VARIABLE _extract_result)
   if(NOT _extract_result EQUAL 0)
     message(FATAL_ERROR "Qt 归档解包失败（${_extract_result}）：${_archive_name}")
   endif()
@@ -115,7 +120,8 @@ if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.
     endif()
     if(NOT EXISTS "${_archive_path}")
       message(STATUS "下载 Qt ICU 预编译包：${_archive_name}")
-      file(DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
+      file(
+        DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
         INACTIVITY_TIMEOUT 120
         TIMEOUT 900
         EXPECTED_HASH SHA256=${_archive_sha})
@@ -123,16 +129,14 @@ if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.
       if(NOT _archive_actual STREQUAL _archive_sha)
         file(REMOVE "${_archive_path}")
         message(FATAL_ERROR "Qt ICU 归档 SHA256 不符（下载结果）：${_archive_name}"
-          " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，"
-          "请核对 manifest 与上游资产")
+                            " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，" "请核对 manifest 与上游资产")
       endif()
     endif()
     message(STATUS "解包 Qt ICU 预编译包：${_archive_name}")
     execute_process(
       COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive_path}"
       WORKING_DIRECTORY "${QT_STAGING}/lib"
-      RESULT_VARIABLE _extract_result
-    )
+      RESULT_VARIABLE _extract_result)
     if(NOT _extract_result EQUAL 0)
       message(FATAL_ERROR "Qt ICU 归档解包失败（${_extract_result}）：${_archive_name}")
     endif()
