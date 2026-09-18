@@ -24,7 +24,7 @@
 
 ## 范围与非目标
 
-范围：调整 launcher 的 Cargo manifest 构建图；让 CI 和当前构建文档继续使用 `cargo build`；为 CI 增加任务 012 所需的基础缓存（Cargo registry/git 与 `target/`，覆盖 Qt staging/GTest）；保留 `panta-ffi` 与 workspace/native 的既有构建参数和环境变量。
+范围：调整 launcher 的 Cargo manifest 构建图；让 CI 和当前构建文档继续使用 `cargo build`；为 CI 增加任务 012 所需的基础缓存（Cargo registry/git 与带校验的 `target/panta-tools`、`target/panta-deps`，覆盖 Qt staging/GTest）；保留 `panta-ffi` 与 workspace/native 的既有构建参数和环境变量。
 
 非目标：不在 launcher build script 中递归调用 Cargo；不改变 CXX DTO、CMake target、Qt/Native 依赖供给、CTest 聚合或 Cargo 缓存策略；不把编排器扩展成通用任务运行器。
 
@@ -52,7 +52,7 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 - [x] `DEP_PANTA_FFI_INCLUDE` 仍注入 launcher build script；`CMAKE_GENERATOR`、`CMAKE_GENERATOR_PLATFORM`、`CMAKE_PREFIX_PATH`、`CARGO_TARGET_DIR` 等既有参数传递不变。
 - [x] staticlib 缺失或任一构建失败时，诊断原样输出且入口返回非零码；不引入 Cargo 递归调用。
 - [x] CI、README、架构文档和 task-index 使用 `cargo build` 同一入口；不再存在重复的 FFI 预构建步骤。
-- [x] CI 缓存键区分 OS、架构、编译器 ABI、CMake generator、锁文件和 native/Qt 构建配置；缓存删除后仍可完整构建。
+- [x] CI 依赖缓存键区分 OS、架构、LLVM 版本、锁文件和 native/Qt/Python 供给配置；可变 native/Cargo 构建树不跨运行恢复，缓存删除后仍可完整构建。
 - [x] `cargo fmt`、相关 Rust 测试/Clippy、workflow 静态检查和可用 native 测试通过；无死代码或未登记兼容分支。
 
 ## 验证计划与结果

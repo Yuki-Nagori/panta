@@ -81,3 +81,5 @@
 ## 质量工具供给（042/043）
 
 `panta-build` 是 launcher、FFI 与根质量 runner 共享的支持 crate。LLVM/CMake/Ninja/uv 固定资产按版本和 SHA256 隔离并加锁安装；Cargo 扩展按固定版本安装到 `target/panta-tools/<tool>/<version>`。uv 0.8.22 和 CPython 3.13.7 在仓库内托管；cmakelang 0.6.13、Cppcheck wheel 1.5.1（Cppcheck 2.17.1）由 `uv.lock` 锁定，禁止源码安装回退。Python 工具/解释器许可证沿各分发包保留；Cppcheck 为 GPL-3.0 工具，仅开发/CI 使用，不链接进应用。详细边界与入口见 [质量工具链](../modules/quality-tooling.md)。
+
+CI 缓存只保存 Cargo registry/git 和 `target/panta-tools`、`target/panta-deps` 这类可验证的依赖资产；`target/native` 与 Cargo 编译产物每次在当前 checkout 重新生成，避免旧 compile database、CMakeCache 或增量对象从 restore key 泄漏。缓存键包含平台、架构、LLVM 版本、Cargo/Python/原生供给清单；回退命中只能复用目录内带版本和摘要校验的资产。

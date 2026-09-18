@@ -29,7 +29,7 @@
 
 范围：build.rs 的 CMake 二进制目录与缓存变量注入、CMakePresets `binaryDir` 重定向、compile_commands 经 `.clangd` 指向构建树、磁盘清理、受影响文档同步。
 
-非目标：不改变 004/040 的构建图（Cargo → build.rs → CMake 单向）、不引入多 profile 并发构建支持、不改 FFI/CMake target 结构、不动 012 的 CI 缓存键。
+非目标：不改变 004/040 的构建图（Cargo → build.rs → CMake 单向）、不引入多 profile 并发构建支持、不改 FFI/CMake target 结构；CI 缓存策略由 012 负责，当前只缓存可验证依赖资产。
 
 ## 前置条件与待决策
 

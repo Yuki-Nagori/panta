@@ -1,17 +1,17 @@
 # 012 — CI 与依赖缓存
 
-- 状态：planned
+- 状态：in-progress
 - 阶段：验证基础
 - 依赖：[011](011-test-quality-entrypoints.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-19
 
 ## 目标与背景
 
 在实际代码托管环境建立可复现的基础设施验证，缓存只加速不隐藏依赖。
 
-本任务尚未完整实施；任务 040 已提前接入最小 Cargo/native 缓存基础，命中/失效和清空缓存验证仍由本任务完成。
+任务 040 的初版把整个 `target/` 放入缓存，可能恢复旧的 Cargo/CMake 构建树。本轮已收窄为 Cargo registry/git 与带版本校验的 `target/panta-tools`、`target/panta-deps`；native 构建树和 Cargo 编译产物不跨运行复用。远端命中/失效和清空缓存仍需当前 workflow 实跑补证。
 
 ## 必读
 
@@ -38,7 +38,7 @@
 ## 实施步骤
 
 1. 托管平台与 CI 格式已由 [018](018-cross-platform-ci.md) 确定为 GitHub Actions 三平台矩阵；本任务核实 runner 能力，确认 018 workflow 首次三平台绿灯并回填其证据，再扩展缓存与聚合接入。
-2. 运行锁定工具链与依赖重建流程，缓存键包含 OS/架构/编译器/依赖和构建配置。注意任务 005 起 `cargo build` 会拉取 Qt 预编译包（约 160MB/平台）——CI 缓存必须覆盖构建树内 `qt/staging`，否则三平台每次全量下载。
+2. 运行锁定工具链与依赖重建流程，缓存键包含 OS/架构/LLVM 版本、锁文件和供给清单。注意任务 005 起 `cargo build` 会拉取 Qt 预编译包——CI 缓存覆盖 `target/panta-deps/qt`，但不缓存可变 native 构建树。
 3. 接入 011 的检查入口，保留测试报告和失败诊断；有显示环境时执行图形冒烟。
 4. 验证清空缓存也可成功，明确未覆盖的平台、图形检查和下一步补齐方式。
 
@@ -65,7 +65,8 @@
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-09-17 | 任务 040 workflow 初始缓存接入 | 已覆盖 `~/.cargo/registry`、`~/.cargo/git`、`target/`；缓存键区分 runner OS/架构、编译器 ABI、CMake generator、Cargo.lock 与 native/Qt 配置；真实命中和清空缓存验证待本任务完成 |
+| 2026-09-17 | 任务 040 workflow 初始缓存接入 | 初版覆盖 `~/.cargo/registry`、`~/.cargo/git`、`target/`；后续复审确认整个 target 会恢复可变构建树，不能作为最终方案 |
+| 2026-09-19 | CI cache 方案收窄 | 只缓存 registry/git、`target/panta-tools` 和 `target/panta-deps`；key 按 OS/架构/LLVM 与 Cargo/Python/native 供给清单区分，restore key 只回退同平台同 LLVM 依赖资产 |
 | — | 完整缓存命中/删除验证 | 未完成 |
 
 ## 风险与回退

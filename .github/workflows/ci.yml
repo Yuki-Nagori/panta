@@ -129,16 +129,17 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
-      - name: Cache Cargo and native build
+      - name: Cache Cargo registries and managed dependencies
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: panta-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-ninja-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.github/workflows/ci.yml', 'native/CMakePresets.json', 'crates/panta-build/src/*.rs', 'native/**/*.cmake', 'native/**/CMakeLists.txt', 'qml/**/*.cmake', 'qml/CMakeLists.txt') }}
+            target/panta-tools
+            target/panta-deps
+          key: panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'pyproject.toml', 'uv.lock', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'tests/src/main.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
           restore-keys: |
-            panta-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-ninja-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
 
       - name: Check workspace and all aggregated targets
         run: cargo check --locked --workspace --all-targets
