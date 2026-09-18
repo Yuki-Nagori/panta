@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039–041 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口与构建产物归一/第三方缓存共享均落地并验证），031 已落地 SDK 供给模块：VTK 9.7.0 三平台制品已发布并登记（macOS 生产消费烟测通过），OCCT/Netgen 三平台生产管线（038，独立 workflow）经 macOS 实证、待 dispatch 发布后登记（维护者决策：OCCT 弃用官方 Windows SDK、三平台统一自托管），009 因 OCCT 制品未发布保持阻塞（解除条件为 sdk-occt-8.0.1 Release + manifest 登记），**007 的 VTK 供给前置已满足、可启动**，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、018–020、036、039–041 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja 托管供给、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口与构建产物归一/第三方缓存共享均落地并验证），031 已落地 SDK 供给模块：VTK 9.7.0 三平台制品已发布并登记（macOS 生产消费烟测通过），OCCT/Netgen 合并管线（038，`sdk-occt-netgen.yml` 一个 Release 成对发布）经 macOS 实证、待 dispatch 发布后登记（维护者决策：OCCT 弃用官方 Windows SDK、三平台统一自托管；Netgen↔OCCT 硬 ABI 锁定合并发布），009 因 OCCT 制品未发布保持阻塞（解除条件为 sdk-occt-netgen-8.0.1-6.2.2604 Release + manifest 登记），**007 的 VTK 供给前置已满足、可启动**，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 

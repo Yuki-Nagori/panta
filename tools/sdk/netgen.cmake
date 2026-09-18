@@ -70,7 +70,7 @@ file(WRITE "${CMAKE_BINARY_DIR}/netgen-panta-sdk.json.in"
   "build_type": "Release",
   "shared": true,
   "options": {"USE_OCC": true, "USE_GUI": false, "USE_PYTHON": false, "USE_MPI": false},
-  "dependencies": ["occt 8.0.1 (panta sdk-vtk-9.7.0/sdk-occt-8.0.1 pipeline, same triple)"],
+  "dependencies": ["occt 8.0.1 (same sdk-occt-netgen pipeline/release, same triple, paired upgrade)"],
   "cmake_package": "lib/cmake/netgen/NetgenConfig.cmake",
   "license": "share/licenses/Netgen/LICENSE (LGPL-2.1)"
 }

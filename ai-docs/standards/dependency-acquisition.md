@@ -41,7 +41,7 @@
 
 ## 依赖间版本关系（2026-09-16 核实）
 
-- **Netgen ↔ OCCT**：netgen v6.2.2604 的 OCCT 适配经 `find_package(OpenCASCADE)`，源码内版本守卫为 `NETGEN_OCC_VERSION_AT_LEAST` 风格（如 ≥7.4、≥7.8 走 TKDE 新目标名），对 8.0 为"大于等于"语义，未发现排除 8.x 的守卫或上游 issue；因此采用 OCCT 8.0.1。该组合**未经构建实测**：010 必须用真实几何到网格验证；若不兼容，回退固定 OCCT `V7_9_3`（commit `a016080bf673`）并在此记录原因。
+- **Netgen ↔ OCCT**：netgen v6.2.2604 的 OCCT 适配经 `find_package(OpenCASCADE)`，源码内版本守卫为 `NETGEN_OCC_VERSION_AT_LEAST` 风格（如 ≥7.4、≥7.8 走 TKDE 新目标名），对 8.0 为"大于等于"语义，未发现排除 8.x 的守卫或上游 issue；因此采用 OCCT 8.0.1。该组合**未经构建实测**：010 必须用真实几何到网格验证；若不兼容，回退固定 OCCT `V7_9_3`（commit `a016080bf673`）并在此记录原因。**制品层配对（2026-09-18 维护者决策）**：OCCT 不承诺跨版本 C++ ABI 稳定，Netgen 制品只与构建时所链接的 OCCT 兼容，混用会在加载/链接期失败或静默出错；因此两者由 038 同管线、同工具链生产并**合并为一个 Release 成对发布**（`sdk-occt-netgen-<occt>-<netgen>`），升级必须成对重建发布，不允许只换一侧。
 - **VTK ↔ Qt**：VTK 9.7.0 的预编译 SDK 必须明确包含 `GUISupportQtQuick`/`QQuickVTKItem`、Qt 6.11.2 兼容范围和目标 ABI；007 验证实际窗口与运行时加载。没有匹配 SDK 时，先由 031 评估项目制品，不在开发机直接编译 VTK。2026-09-17（038 增量一）已在 macOS arm64 构建级证实：9.7.0 × Qt 6.11.2 预编译包可产出 `GUISupportQtQuick` 并经 `find_package(VTK CONFIG)` 以 `VTK::GUISupportQtQuick` 消费；窗口运行时行为仍归 007。
 - **全体 ↔ CMake 4.4**：清单内项目声明的 CMake 下限均 ≥3.10，高于 CMake 4 移除的 <3.5 兼容线；首次 configure 由 003/004 实测。
 - Rust 侧无 native 版本耦合；CXX 的 MSRV（1.88）低于固定工具链 1.98.1，约束见 [Rust 规范](rust.md)。

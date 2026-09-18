@@ -2,9 +2,18 @@
 
 Panta 项目受信 CI 按[冻结的构建描述](../../tools/sdk/)生产的预编译 OCCT 与
 Netgen SDK，供 `sdk-provision`（任务 031）按 manifest 消费；开发者与普通
-CI 不编译两者源码。**两者在同一管线以同一工具链生产并发布**：Netgen
-`USE_OCC=ON` 链接本 Release 的 OCCT（同 triple、同编译器），升级必须成对
-进行（Netgen↔OCCT ABI 锁定，见依赖规范）。
+CI 不编译两者源码。
+
+## 为何合并发布
+
+Netgen 以 `USE_OCC=ON` 构建时在 C++ 层直接链接 OCCT（`ngcore`/`nglib` 的
+接口使用 OCCT 类型），而 OCCT 不承诺跨版本的 C++ ABI 稳定性——Netgen 制品
+只与**构建它时所链接的那个 OCCT** 兼容，混用新旧版本会在加载/链接期失败，
+甚至静默出错。因此两者在本管线以同一工具链生产，并作为**一个 Release 成对
+发布**：配对关系在制品层就是原子的，消费者不可能拿到错配组合；任何一侧
+升级都必须成对重建、成对发布（Release tag 同时编码两个版本）。配对与
+版本关系同时记录在依赖规范的"依赖间版本关系"与每个归档的
+`panta-sdk.json` 中。
 
 ## 源码与可复现性
 

@@ -11,7 +11,7 @@ VTK、OpenCASCADE 和 Netgen 是 CAE 主链路的 native 依赖，开发者和�
 ## 制品生命周期
 
 1. 031 维护依赖 manifest：版本、来源 URL、SHA256、目标 triple、ABI、Qt 兼容范围、CMake package 入口、模块和许可证。manifest 与供给实现已落地于 [native/cmake/sdk-provision.cmake](../../native/cmake/sdk-provision.cmake)（`panta_sdk_declare_version` / `panta_sdk_declare_asset` 登记，`panta_require_sdk` 供给并注入 `find_package(... CONFIG)`）。
-2. 038 在固定工具链容器或 runner 中生成缺失的平台 SDK，记录源码 tag/commit、构建选项、依赖清单和许可证；制品生成不进入开发者的 `cargo build` 或普通 CMake 图。
+2. 038 在固定工具链容器或 runner 中生成缺失的平台 SDK，记录源码 tag/commit、构建选项、依赖清单和许可证；制品生成不进入开发者的 `cargo build` 或普通 CMake 图。**ABI 互相锁定的依赖合并发布**：Netgen `USE_OCC=ON` 在 C++ 层链接构建时的 OCCT，而 OCCT 不承诺跨版本 C++ ABI 稳定——两者由同一管线、同一工具链生产并合并为一个 Release（`sdk-occt-netgen-<occt>-<netgen>`），升级成对进行，配对关系写入 Release 说明与 `panta-sdk.json`。
 3. 发布前运行 package 自检：头文件、动态库、CMake config/imported targets、所需模块、运行库和许可证均存在，架构与 ABI 元数据一致；生成校验和、SBOM 和 provenance 记录。
 4. 供给脚本按 manifest 下载到 `target/panta-deps/sdk/<name>/<version>/<triple>/`（Cargo 入口由 build.rs 注入该共享根；presets 直接 configure 时默认构建树内），归档缓存于 `<name>/archives/`，解包走临时目录并以原子 rename 发布；哈希不符删除归档，staging 标记（`.panta-sdk-provisioned`）损坏时按缓存归档重建。CMake 只接收对应 staging 根目录，并在缺包、哈希错误、配置文件缺失/歧义或 target 缺失时立即失败。
 5. 007、009、010 只使用 imported targets 完成集成验证；升级必须先更新制品 manifest，再验证三平台最小窗口、几何和网格冒烟。
