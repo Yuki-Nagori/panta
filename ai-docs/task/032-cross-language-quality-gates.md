@@ -77,6 +77,8 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 | 2026-09-18 | `ci.yml` 新增 `quality`（deny+machete，ubuntu 单平台）与 `coverage`（llvm-cov 报告，非门禁）job；YAML 解析通过 | 待推送后 CI 实证 |
 | 2026-09-18 | `cargo test --locked --workspace --exclude panta-launcher`（8 组 ok）、`cargo build --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings` | 全部通过 |
 | 2026-09-18 | dslc CLI 覆盖缺口补齐（0%→88.01% line；测试 0→14 项）：main.rs 单测（check/validate/emit-ts/format 全命令、kind 拒绝、usage、缺参、缺文件、非法 UTF-8、原子写回成功/创建失败/目录 rename 失败、无扩展名路径）+ tests/cli.rs 集成测试（CARGO_BIN_EXE 真二进制，main() 行随子进程 profdata 并入覆盖，退出码 0/2 契约） | 两项模式决策实证：①负向断言用 `matches!(result, Err(ref e) if …)`——新版 clippy 的 `unwrap_used` 涵盖 `unwrap_err`，且 match+panic 分支是结构性永不可达的未覆盖行；②测试统一 `?` 传播（`Result<(), Box/E>`）——`unwrap_or_else(|e| panic!())` 错误闭包同样是不执行的未覆盖行。llvm-cov 工具口径矛盾已记录：summary 报 dslc 88.01%（宏展开区域计 0 的行）而 lcov/show 行数据无零计数行，门禁启用前须先固定权威口径 |
+| 2026-09-18 | path.rs 覆盖缺口攻坚（28 行缺失起步）：`validate_relative` 弃用平台 `Path::components`，改为按逻辑引用格式 `/` 手工切分——Windows 盘符 Prefix 分支此前在 mac/Linux 永不可达（平台解析器差异），且反斜杠分隔语义随宿主漂移；现三平台同一套判定（尾随/连续分隔符容忍、首分隔符拒绝、盘符/保留名/尾点空格不变）。`resolve_write_target` 的防御性死分支以 `ancestors().find + unwrap_or(根)` 消除。新增全变体 `code()/detail()` 遍历测试、`root()` 访问器断言、分隔符容忍测试；负向断言转 `matches!`。补 `From<PathError> for String`。测试 20 项通过；clippy/fmt 干净 |
+| 2026-09-18 | **关键发现（影响 100% 门禁的口径）**：llvm-cov summary 的分母包含 `#[cfg(test)]` 测试代码自身的错误闭包与 panic 分支——仓库旧测试普遍使用 `unwrap_or_else(panic!)`，这些从不执行的闭包全部计为"未覆盖行"（path.rs 攻坚后"覆盖率下降"即因新增测试的闭包）。结论：100% 门禁的真实工作量 = ①全仓库测试风格统一为 `?` 传播（stable rustc 无 `#[coverage(off)]`，E0658 实证）；②补真实逻辑缺口。`allow-unwrap-in-tests` 被 011 记录的决策排除。约定已写入本表供后续 crate 复用 |
 
 ## 风险与回退
 

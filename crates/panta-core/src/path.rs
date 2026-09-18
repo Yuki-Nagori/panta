@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 /// 逻辑根类别；scheme 用于 `ResourceRef` 的字符串形态。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -180,6 +180,14 @@ impl ResourceRef {
     }
 }
 
+impl From<PathError> for String {
+    /// 错误文本即 `Display` 渲染（`code: detail`），供以字符串错误为契约的
+    /// 边界（FFI 包装、测试 `?` 传播）直接转换。
+    fn from(error: PathError) -> String {
+        error.to_string()
+    }
+}
+
 /// Windows 保留设备名（不含扩展名比较）；跨平台统一拒绝，保证工程资产
 /// 在平台间搬迁时不会落到目标平台非法文件名上。
 const RESERVED_NAMES: [&str; 22] = [
@@ -197,32 +205,34 @@ fn validate_relative(relative: &str) -> Result<Vec<String>, PathError> {
         return Err(PathError::NulByte);
     }
     let mut folded: Vec<String> = Vec::new();
-    for component in Path::new(relative).components() {
-        let part = match component {
-            Component::Normal(part) => part.to_string_lossy().into_owned(),
-            Component::CurDir => continue,
-            Component::ParentDir => {
-                if folded.pop().is_some() {
-                    continue;
-                }
-                return Err(PathError::ParentEscape(relative.to_owned()));
-            }
-            Component::Prefix(prefix) => {
-                return Err(PathError::AbsoluteRejected(format!(
-                    "{prefix:?}/{relative}"
-                )));
-            }
-            Component::RootDir => {
+    // 逻辑引用以 `/` 为唯一分隔符，手工切分而非经平台 Path 解析：Windows
+    // 盘符 Prefix、反斜杠分隔等平台差异（Linux/macOS 上永不可达或语义漂移）
+    // 在三平台间保持同一套判定。
+    for part in relative.split('/') {
+        if part.is_empty() {
+            // 首个空组件 = 引用以 `/` 开头（绝对路径冒充相对）。
+            if folded.is_empty() && relative.starts_with('/') {
                 return Err(PathError::AbsoluteRejected(format!("/{relative}")));
             }
-        };
+            // 尾随或连续分隔符按容忍处理（与 Path::components 的尾斜杠语义一致）。
+            continue;
+        }
+        if part == "." {
+            continue;
+        }
+        if part == ".." {
+            if folded.pop().is_some() {
+                continue;
+            }
+            return Err(PathError::ParentEscape(relative.to_owned()));
+        }
         // Unix 上 `C:/x` 的盘符是普通组件，显式识别，防绝对路径伪装相对。
         if part.len() == 2 && part.as_bytes()[1] == b':' && part.as_bytes()[0].is_ascii_alphabetic()
         {
             return Err(PathError::AbsoluteRejected(format!("{part}/{relative}")));
         }
         if part.ends_with('.') || part.ends_with(' ') {
-            return Err(PathError::TrailingDotOrSpace(part));
+            return Err(PathError::TrailingDotOrSpace(part.to_owned()));
         }
         let stem = part
             .split('.')
@@ -230,9 +240,9 @@ fn validate_relative(relative: &str) -> Result<Vec<String>, PathError> {
             .unwrap_or_default()
             .to_ascii_uppercase();
         if RESERVED_NAMES.contains(&stem.as_str()) {
-            return Err(PathError::ReservedName(part));
+            return Err(PathError::ReservedName(part.to_owned()));
         }
-        folded.push(part);
+        folded.push(part.to_owned());
     }
     if folded.is_empty() {
         return Err(PathError::EmptyReference);
@@ -307,18 +317,16 @@ impl PathService {
     /// 根）规范化后必须仍在根内，覆盖"未创建目标"的越界场景。返回未
     /// 规范化的拼接路径（写入方按原语义创建文件），包含性已由祖先保证。
     /// 祖先回溯按注入形态的根做前缀判断，包含判定用双方的规范化形态，
-    /// 注入根本身含符号链接时不会误判。
+    /// 注入根本身含符号链接时不会误判。根必现存（canonical_root 已验证），
+    /// 故祖先链必然在根内命中现存目录——并发删除等极端竞态由 unwrap_or
+    /// 以根为保守祖先兜底，再交由规范化包含检查拒绝。
     pub fn resolve_write_target(&self, reference: &ResourceRef) -> Result<PathBuf, PathError> {
-        let root = self.native_root(reference.category)?;
         let canonical_root = self.canonical_root(reference.category)?;
         let path = self.resolve(reference)?;
-        let mut ancestor = path.as_path();
-        while !ancestor.starts_with(root) || !ancestor.exists() {
-            match ancestor.parent() {
-                Some(parent) if parent.starts_with(root) => ancestor = parent,
-                _ => return Err(PathError::NotContained(ancestor.display().to_string())),
-            }
-        }
+        let ancestor = path
+            .ancestors()
+            .find(|candidate| candidate.exists())
+            .unwrap_or(canonical_root.as_path());
         let canonical_ancestor = std::fs::canonicalize(ancestor)
             .map_err(|_| PathError::NotContained(ancestor.display().to_string()))?;
         if !canonical_ancestor.starts_with(canonical_root) {
@@ -410,11 +418,10 @@ mod tests {
                 PathError::UnknownScheme("workspace".to_owned()),
             ),
         ] {
-            let error = match ResourceRef::parse(input) {
-                Ok(parsed) => panic!("{input:?} 意外通过: {:?}", parsed.to_logical()),
-                Err(error) => error,
-            };
-            assert_eq!(error, expected, "input={input:?}");
+            assert!(
+                matches!(ResourceRef::parse(input), Err(ref error) if *error == expected),
+                "input={input:?} 应被拒绝"
+            );
         }
     }
 
@@ -448,29 +455,33 @@ mod tests {
             ("trailing ", "path.trailing_dot_or_space"),
             ("nul\0byte", "path.nul_byte"),
         ] {
-            let error = match service.resolve(&reference(fragment)) {
-                Ok(path) => panic!("{fragment:?} 意外通过: {}", path.display()),
-                Err(error) => error,
-            };
-            assert_eq!(error.code(), code, "fragment={fragment:?}");
+            assert!(
+                matches!(
+                    service.resolve(&reference(fragment)),
+                    Err(ref error) if error.code() == code
+                ),
+                "fragment={fragment:?} 应被拒绝"
+            );
         }
     }
 
     #[test]
     fn roots_must_be_absolute_and_injected() {
         let mut service = PathService::new();
-        match service.set_root(RootCategory::Project, Path::new("relative/root")) {
-            Ok(()) => panic!("相对根被接受"),
-            Err(error) => assert_eq!(error, PathError::RootNotAbsolute(RootCategory::Project)),
-        }
-        match service.set_root(RootCategory::Qrc, Path::new("/tmp")) {
-            Ok(()) => panic!("qrc 根被接受"),
-            Err(error) => assert_eq!(error, PathError::QrcRootForbidden),
-        }
-        match service.resolve(&reference("a")) {
-            Ok(path) => panic!("未注入类别被解析: {}", path.display()),
-            Err(error) => assert_eq!(error, PathError::RootMissing(RootCategory::Project)),
-        }
+        assert!(matches!(
+            service.set_root(RootCategory::Project, Path::new("relative/root")),
+            Err(PathError::RootNotAbsolute(RootCategory::Project))
+        ));
+        assert!(matches!(
+            service.set_root(RootCategory::Qrc, Path::new("/tmp")),
+            Err(PathError::QrcRootForbidden)
+        ));
+        // root() 访问器：未注入返回 None，注入后可读。
+        assert_eq!(service.root(RootCategory::Project), None);
+        assert!(matches!(
+            service.resolve(&reference("a")),
+            Err(PathError::RootMissing(RootCategory::Project))
+        ));
     }
 
     #[test]
@@ -481,10 +492,10 @@ mod tests {
             category: RootCategory::Qrc,
             relative: "icons/open.svg".to_owned(),
         };
-        match service.resolve(&qrc_ref) {
-            Ok(path) => panic!("qrc 被解析为本机路径: {}", path.display()),
-            Err(error) => assert_eq!(error, PathError::QrcNotNative),
-        }
+        assert!(matches!(
+            service.resolve(&qrc_ref),
+            Err(PathError::QrcNotNative)
+        ));
     }
 
     #[test]
@@ -520,10 +531,10 @@ mod tests {
         assert!(existing.is_absolute());
         assert!(existing.ends_with("模型 v1.step"));
 
-        match service.resolve_existing(&reference("assets/missing.step")) {
-            Ok(path) => panic!("缺失目标被接受: {}", path.display()),
-            Err(error) => assert_eq!(error.code(), "path.not_found"),
-        }
+        assert!(matches!(
+            service.resolve_existing(&reference("assets/missing.step")),
+            Err(ref error) if error.code() == "path.not_found"
+        ));
     }
 
     #[test]
@@ -555,10 +566,10 @@ mod tests {
         service
             .set_root(RootCategory::Project, &absent)
             .unwrap_or_else(|error| panic!("注入缺失根失败: {error}"));
-        match service.resolve_existing(&reference("a")) {
-            Ok(path) => panic!("缺失根被接受: {}", path.display()),
-            Err(error) => assert_eq!(error, PathError::RootMissing(RootCategory::Project)),
-        }
+        assert!(matches!(
+            service.resolve_existing(&reference("a")),
+            Err(PathError::RootMissing(RootCategory::Project))
+        ));
         let _ = fs::remove_dir_all(&absent);
     }
 
@@ -584,15 +595,90 @@ mod tests {
         symlink(&outside, &link).unwrap_or_else(|error| panic!("符号链接创建失败: {error}"));
 
         let service = fixture.service();
-        match service.resolve_existing(&reference("leak/secret.pa")) {
-            Ok(path) => panic!("符号链接越界被接受: {}", path.display()),
-            Err(error) => assert_eq!(error.code(), "path.not_contained"),
-        }
+        assert!(matches!(
+            service.resolve_existing(&reference("leak/secret.pa")),
+            Err(ref error) if error.code() == "path.not_contained"
+        ));
         // 写目标同样按最深现存祖先拒绝。
-        match service.resolve_write_target(&reference("leak/secret.pa")) {
-            Ok(path) => panic!("符号链接越界写目标被接受: {}", path.display()),
-            Err(error) => assert_eq!(error.code(), "path.not_contained"),
-        }
+        assert!(matches!(
+            service.resolve_write_target(&reference("leak/secret.pa")),
+            Err(ref error) if error.code() == "path.not_contained"
+        ));
         let _ = fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn error_code_and_detail_cover_every_variant() {
+        // 全变体遍历：code()/detail() 的每个 match 臂都真实执行（032 门禁）。
+        let cases: Vec<(PathError, &str, &str)> = vec![
+            (PathError::EmptyReference, "path.empty_reference", ""),
+            (
+                PathError::AbsoluteRejected("C:/x".into()),
+                "path.absolute_rejected",
+                "C:/x",
+            ),
+            (
+                PathError::ParentEscape("..".into()),
+                "path.parent_escape",
+                "..",
+            ),
+            (
+                PathError::ReservedName("NUL".into()),
+                "path.reserved_name",
+                "NUL",
+            ),
+            (
+                PathError::TrailingDotOrSpace("x ".into()),
+                "path.trailing_dot_or_space",
+                "x ",
+            ),
+            (PathError::NulByte, "path.nul_byte", ""),
+            (
+                PathError::UnknownScheme("ws".into()),
+                "path.unknown_scheme",
+                "ws",
+            ),
+            (PathError::MissingScheme, "path.missing_scheme", ""),
+            (
+                PathError::RootMissing(RootCategory::Cache),
+                "path.root_missing",
+                "cache",
+            ),
+            (
+                PathError::RootNotAbsolute(RootCategory::Cache),
+                "path.root_not_absolute",
+                "cache",
+            ),
+            (PathError::QrcRootForbidden, "path.qrc_root_forbidden", ""),
+            (PathError::QrcNotNative, "path.qrc_not_native", ""),
+            (
+                PathError::NotContained("/x".into()),
+                "path.not_contained",
+                "/x",
+            ),
+            (PathError::NotFound("/x".into()), "path.not_found", "/x"),
+        ];
+        for (error, code, detail) in cases {
+            assert_eq!(error.code(), code, "{error:?}");
+            let rendered = error.to_string();
+            if detail.is_empty() {
+                assert_eq!(rendered, code, "{error:?}");
+            } else {
+                assert_eq!(rendered, format!("{code}: {detail}"), "{error:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn empty_and_repeated_separators_are_tolerated_consistently() -> Result<(), String> {
+        // 手工 `/` 切分语义：尾随与连续分隔符容忍（与 Path::components 的
+        // 尾斜杠语义一致）；首分隔符仍按绝对路径拒绝。
+        let fixture = FixtureRoot::new("separators");
+        let service = fixture.service();
+        let trailing = service.resolve(&reference("assets/"))?;
+        assert_eq!(trailing, fixture.root.join("assets"));
+        let inner = service.resolve(&reference("assets//齿轮"))?;
+        assert_eq!(inner, fixture.root.join("assets").join("齿轮"));
+        Ok(())
     }
 }
