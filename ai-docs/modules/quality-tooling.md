@@ -32,6 +32,16 @@
 
 Rust/C++/QML 的测试命令必须复用生产构建图。覆盖率排除只允许生成的 moc、rcc、qmlcache、第三方源码和纯声明性布局；每一项排除写入配置和报告，不能通过大目录排除规避业务分支。
 
+## 提交门禁（git hooks）
+
+`.githooks/pre-commit` 在每次 commit 前执行与 CI 相同的 `cargo fmt --all -- --check` 与 `cargo clippy --workspace --all-targets -- -D warnings`，任一失败即拒绝提交。git 不随仓库携带 hooks 配置，新机器需一次性启用：
+
+```sh
+git config core.hooksPath .githooks
+```
+
+维护者决策（2026-09-18）：提交门禁用原生 git hooks 而非 husky——husky 依赖 Node.js 与 package.json，与"未引入 Node/Python 时不创建其生态配置"的规则冲突；原生 hooks 零依赖、三平台（Windows 经 Git Bash）等效。
+
 ## 统一执行边界
 
 Cargo 仍是开发者的一键入口，CMake 拥有 native 构建图。任务 011 提供统一入口后，入口按顺序执行格式、静态检查、构建、测试、覆盖率和审计；任一工具缺失、测试发现为空、报告生成失败或覆盖率低于 100% 都返回非零。入口不能通过自身再次调用自身，也不在没有 Node/Python 工程时创建 package.json 或 pyproject.toml。

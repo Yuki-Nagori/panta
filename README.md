@@ -43,6 +43,12 @@ native 直接诊断构建（不经 Cargo）仍可用：在 `native/` 下执行 `
 2. 阅读任务引用的 [架构说明](ai-docs/architecture/README.md) 与 [技术规范](ai-docs/standards/README.md)。
 3. 按任务实施、验证并更新状态。具体依赖与可开始任务以[任务索引](ai-docs/task-index.md)为准。
 
+提交前质量门禁（fmt + clippy）经 git hooks 强制，新克隆后启用一次：
+
+```sh
+git config core.hooksPath .githooks
+```
+
 国际化、跨平台路径与运行时、变量 DSL、C++/QML 模块和热重载的规划见[重要模块说明](ai-docs/modules/README.md)。
 
 完整路由见 [AGENTS.md](AGENTS.md)。

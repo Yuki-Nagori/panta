@@ -1,0 +1,14 @@
+#!/bin/sh
+# 提交前质量门禁（任务 032）：Rust 格式与 lint 必须通过，否则拒绝提交。
+# 与 CI 同命令（ci.yml rust job），保证本地与门禁一致。
+# 启用方式（每台机器一次性，git 不随仓库携带 hooks 配置）：
+#   git config core.hooksPath .githooks
+set -e
+
+echo "[pre-commit] cargo fmt --all -- --check"
+cargo fmt --all -- --check
+
+echo "[pre-commit] cargo clippy --workspace --all-targets -- -D warnings"
+cargo clippy --workspace --all-targets -- -D warnings
+
+echo "[pre-commit] 通过"

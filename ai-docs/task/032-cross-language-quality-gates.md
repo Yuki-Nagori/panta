@@ -88,6 +88,7 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 
 - 2026-09-16：新增跨语言质量任务；用户要求各语言配置 format/test/lint/依赖与死代码工具，并以 100% 覆盖率作为门禁目标。
 - 2026-09-18（增量一，Rust 质量完备 + QML 格式门禁 + CI 接线；维护者指示 032 优先于 007）：工具版本固定入 `modules/quality-tooling.md`（cargo-deny 0.20.2 / cargo-machete 0.9.2 / cargo-llvm-cov 0.9.1 / qmlformat 6.11.2）。发现并修复三类真实问题：quick-xml 0.38.4 有 RustSec 告警（升 0.41，DSL 测试全过、TS 生成语义不变）；syn 2/3 双版本为 pest↔cxx 锁定组合的传递依赖（deny skip 登记）；内部 path 依赖无版本号触发 wildcard 拒绝（workspace 表补 version、成员统一 `.workspace = true`）。launcher 的 panta-ffi 依赖被 machete 误报（仅经 build.rs 的 DEP_* 环境变量消费），按官方机制登记豁免。QML 格式门禁落地为 CTest `Qml.FormatCheck`（qmlformat stdout diff，两分支受控失败均验证）。Rust 覆盖率基线：line 74.21%（path 87.15/task 92.16/dsl-core 66.94/dslc 0/ffi 83.96），launcher（启动胶水）按 032 允许条款登记排除；stable rustc 无分支覆盖数据，门禁先以 line 执行（工具限制已记录）；**100% 门禁在缺口清零前不启用**。CI 新增 `quality`（deny+machete，单平台）与 `coverage`（报告非门禁）两个 job。
+- 2026-09-18（增量二补充，提交门禁）：维护者要求 commit 强制 fmt+lint。husky 依赖 Node.js/package.json，与"未引入 Node 时不创建其生态配置"规则冲突，经说明后采用原生 git hooks：`.githooks/pre-commit` 执行与 CI 同命令的 fmt --check 与 clippy -D warnings，失败即拒绝提交；`git config core.hooksPath .githooks` 一次性启用（git 不携带 hooks 配置，README 与 quality-tooling 已记录）。本机已启用并验证。
 - 2026-09-18（增量二，覆盖率缺口清零与门禁启用）：按 llvm-cov 未覆盖行清单逐 crate 补测试（基线 631 行缺口：dsl-core 406/ffi 60/path 50/task 29/dslc 86）；全部清零后启用 line 覆盖率门禁（CI coverage job 转阻断）。分支覆盖继续受 stable rustc 工具限制记录在案。门禁范围：workspace 除 launcher（启动胶水，已登记）。
 
 ## 完成摘要
