@@ -1,8 +1,9 @@
-//! 托管引导（任务 020）：CMake/Ninja 预编译二进制的定位、下载、校验与缓存。
+//! 托管引导（任务 020/042）：LLVM、CMake/Ninja 预编译二进制的定位、下载、
+//! 校验与缓存。
 //!
 //! 原则（standards/dependency-acquisition.md）：
 //! - 默认只使用工作区 `target/` 托管缓存 → 按固定清单下载；绝不静默
-//!   采用 PATH 中的系统工具或源码编译。
+//!   采用 PATH 中的系统工具或源码编译。LLVM 同时服务 Cargo CXX 与 CMake。
 //! - 不支持固定资产的平台可显式设置 `PANTA_USE_SYSTEM_TOOLS=1`，再用
 //!   `CMAKE` 或 PATH 提供宿主工具；CI 和受支持平台不走该旁路。
 //! - 只消费带 SHA256 的官方 release 资产；哈希不符立即删除归档并报错，
@@ -28,6 +29,17 @@ struct ToolAsset {
 
 const CMAKE_VERSION: &str = "4.4.3";
 const NINJA_VERSION: &str = "1.13.2";
+pub const LLVM_VERSION: &str = "22.1.7";
+
+/// 两条 C++ 构建链必须消费同一份 LLVM 目录中的工具。
+#[derive(Clone, Debug)]
+pub struct LlvmCompilers {
+    pub root: PathBuf,
+    pub clang: PathBuf,
+    pub clangxx: PathBuf,
+    pub clang_cl: Option<PathBuf>,
+    pub clang_format: PathBuf,
+}
 
 fn cmake_asset() -> Option<ToolAsset> {
     // macOS 资产为 universal（arm64/x86_64）；Linux/Windows 官方仅 x86_64，
@@ -46,30 +58,6 @@ fn cmake_asset() -> Option<ToolAsset> {
         Some(ToolAsset {
             url: "https://github.com/Kitware/CMake/releases/download/v4.4.3/cmake-4.4.3-windows-x86_64.zip",
             sha256: "4d52ebab7193a698651639ed80d8d04fd903358843572cf44c7fd234cb7c26ab",
-        })
-    } else {
-        None
-    }
-}
-
-/// clang-format 独立二进制(任务 032):LLVM 官方不发布独立资产,采用
-/// muttleyxd/clang-tools-static-binaries 对 LLVM 20.1.0 源码的静态构建
-/// (公开构建脚本，下载资产 SHA256 固定；仅用于格式检查)。
-fn clang_format_asset() -> Option<ToolAsset> {
-    if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
-        Some(ToolAsset {
-            url: "https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_macos-arm-arm64",
-            sha256: "fe6b8450a8cf83de3f517e3b9a9b1bb925613e5fb59145d6d24ccca5fe17d442",
-        })
-    } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
-        Some(ToolAsset {
-            url: "https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_linux-amd64",
-            sha256: "e900c1e520b6c9b9c99e43c0f45ccd12927838741cfc60c077a33dec69bb60cc",
-        })
-    } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
-        Some(ToolAsset {
-            url: "https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_windows-amd64.exe",
-            sha256: "44011742f30b2ebfd9013aa2b07d802b1b474186fb7904a2f773296f27ff15f9",
         })
     } else {
         None
@@ -97,63 +85,102 @@ fn ninja_asset() -> Option<ToolAsset> {
     }
 }
 
-/// 解析 clang-format（任务 032）：缓存于 `panta-tools/clang-format/`，
-/// 资产即单文件二进制（无解包步骤），SHA256 校验后置可执行位。
-pub fn resolve_clang_format(target_root: &Path) -> Result<PathBuf, String> {
-    let Some(asset) = clang_format_asset() else {
-        return Err(format!(
-            "本平台（{}/{}）没有固定的 clang-format 资产；请登记后另立供给任务",
-            std::env::consts::OS,
-            std::env::consts::ARCH
-        ));
-    };
-    // 版本和摘要进入缓存键，升级不能复用旧二进制。
-    let dir = target_root
-        .join("panta-tools")
-        .join("clang-format")
-        .join("20.1.0")
-        .join(asset.sha256);
-    let binary_name = if cfg!(windows) {
-        "clang-format.exe"
+/// LLVM 官方发布资产。Windows 使用官方工具链归档：它包含 clang-cl、lld-link
+/// 与 clang-format，解包到 Cargo 的托管目录，不写入用户系统目录。
+fn llvm_asset() -> Option<ToolAsset> {
+    if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
+        Some(ToolAsset {
+            url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/LLVM-22.1.7-macOS-ARM64.tar.xz",
+            sha256: "4177245188b0a30a6539c96b361dea56f253485756bfd8927a6a59e7301e7806",
+        })
+    } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
+        Some(ToolAsset {
+            url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/LLVM-22.1.7-Linux-X64.tar.xz",
+            sha256: "edb0522b41e261819c06ea437d249f9b8acfa413d3805bc9920eec6fb76ff830",
+        })
+    } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
+        Some(ToolAsset {
+            url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/clang+llvm-22.1.7-x86_64-pc-windows-msvc.tar.xz",
+            sha256: "3b568b5be1443d1a04c63261fa3a7aed16e126a8ed2196a1032aa8ed602144bd",
+        })
     } else {
-        "clang-format"
-    };
-    let binary = dir.join(binary_name);
+        None
+    }
+}
 
-    if binary.is_file() {
-        let actual = sha256_file(&binary)?;
-        if actual != asset.sha256 {
-            return Err(format!(
-                "clang-format 缓存校验失败：{}；请删除该文件后重试",
-                binary.display()
-            ));
-        }
-        return Ok(binary);
+/// 解析 Cargo CXX 与 CMake 共用的固定 LLVM 工具链。
+pub fn resolve_llvm_compilers(target_root: &Path) -> Result<LlvmCompilers, String> {
+    if use_system_tools() || llvm_asset().is_none() {
+        return resolve_system_llvm();
     }
 
-    fs::create_dir_all(&dir).map_err(|error| format!("创建 {} 失败：{error}", dir.display()))?;
-    let staging = dir.join("clang-format-20.download");
-    if staging.exists() {
-        let actual = sha256_file(&staging)?;
-        if actual != asset.sha256 {
-            let _ = fs::remove_file(&staging);
+    let primary = ensure_tool(Tool::Llvm, target_root, None)?;
+    let bin_dir = primary
+        .parent()
+        .ok_or_else(|| format!("LLVM 编译器路径没有父目录：{}", primary.display()))?;
+    let root = bin_dir
+        .parent()
+        .ok_or_else(|| format!("LLVM bin 目录没有安装根：{}", bin_dir.display()))?
+        .to_path_buf();
+    let clang = find_binary(&root, "clang")
+        .ok_or_else(|| format!("LLVM {} 缺少 clang：{}", LLVM_VERSION, root.display()))?;
+    let clangxx = find_binary(&root, "clang++")
+        .ok_or_else(|| format!("LLVM {} 缺少 clang++：{}", LLVM_VERSION, root.display()))?;
+    let clang_format = find_binary(&root, "clang-format").ok_or_else(|| {
+        format!(
+            "LLVM {} 缺少 clang-format：{}",
+            LLVM_VERSION,
+            root.display()
+        )
+    })?;
+    let clang_cl = find_binary(&root, "clang-cl");
+    for path in [&clang, &clangxx, &clang_format] {
+        set_executable(path)?;
+    }
+    if let Some(path) = &clang_cl {
+        set_executable(path)?;
+    }
+    Ok(LlvmCompilers {
+        root,
+        clang,
+        clangxx,
+        clang_cl,
+        clang_format,
+    })
+}
+
+fn resolve_system_llvm() -> Result<LlvmCompilers, String> {
+    let cxx_name = if cfg!(windows) { "clang-cl" } else { "clang++" };
+    let c_name = if cfg!(windows) { "clang-cl" } else { "clang" };
+    let clangxx = env_or_path("CXX", cxx_name)?;
+    let clang = env_or_path("CC", c_name)?;
+    let clang_format = env_or_path("CLANG_FORMAT", "clang-format")?;
+    let root = clangxx
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let clang_cl = cfg!(windows).then_some(clangxx.clone());
+    Ok(LlvmCompilers {
+        root,
+        clang,
+        clangxx,
+        clang_cl,
+        clang_format,
+    })
+}
+
+fn env_or_path(variable: &str, name: &str) -> Result<PathBuf, String> {
+    if let Some(value) = std::env::var_os(variable) {
+        let path = PathBuf::from(value);
+        if path.is_file() {
+            return Ok(path);
         }
-    }
-    if !staging.exists() {
-        download(&asset, &staging, "clang-format", "20.1.0")?;
-    }
-    let actual = sha256_file(&staging)?;
-    if actual != asset.sha256 {
-        let _ = fs::remove_file(&staging);
         return Err(format!(
-            "clang-format SHA256 不符：预期 {}，实际 {}；已删除，重试将重新下载",
-            asset.sha256, actual
+            "{variable} 环境变量指向的编译器不存在：{}",
+            path.display()
         ));
     }
-    set_executable(&staging)?;
-    fs::rename(&staging, &binary)
-        .map_err(|error| format!("落位 {} 失败：{error}", binary.display()))?;
-    Ok(binary)
+    find_on_path(name).ok_or_else(|| format!("系统工具旁路需要 {variable} 或 PATH 中的 {name}"))
 }
 
 /// 解析 CMake：默认使用托管缓存/下载；只有显式开启系统工具旁路，或
@@ -189,7 +216,7 @@ pub fn resolve_ninja(target_root: &Path, cmake: &Path) -> Result<PathBuf, String
     ensure_tool(Tool::Ninja, target_root, Some(cmake))
 }
 
-fn use_system_tools() -> bool {
+pub fn use_system_tools() -> bool {
     matches!(
         std::env::var("PANTA_USE_SYSTEM_TOOLS").as_deref(),
         Ok("1" | "true" | "yes")
@@ -200,6 +227,7 @@ fn use_system_tools() -> bool {
 enum Tool {
     Cmake,
     Ninja,
+    Llvm,
 }
 
 impl Tool {
@@ -207,6 +235,7 @@ impl Tool {
         match self {
             Tool::Cmake => "cmake",
             Tool::Ninja => "ninja",
+            Tool::Llvm => "llvm",
         }
     }
 
@@ -214,6 +243,7 @@ impl Tool {
         match self {
             Tool::Cmake => CMAKE_VERSION,
             Tool::Ninja => NINJA_VERSION,
+            Tool::Llvm => LLVM_VERSION,
         }
     }
 
@@ -221,6 +251,7 @@ impl Tool {
         match self {
             Tool::Cmake => cmake_asset(),
             Tool::Ninja => ninja_asset(),
+            Tool::Llvm => llvm_asset(),
         }
     }
 
@@ -234,6 +265,10 @@ impl Tool {
                 candidate.is_file().then_some(candidate)
             }
             Tool::Cmake => find_cmake_binary(root, &exe, 0),
+            Tool::Llvm => {
+                let compiler = if cfg!(windows) { "clang-cl" } else { "clang++" };
+                find_binary(root, compiler)
+            }
         }
     }
 }
@@ -272,6 +307,30 @@ fn find_cmake_binary(dir: &Path, exe: &str, depth: usize) -> Option<PathBuf> {
     paths
         .iter()
         .find_map(|path| find_cmake_binary(path, exe, depth + 1))
+}
+
+/// 在 LLVM 解包目录中查找工具；官方压缩包在顶层带有版本目录，Windows
+/// 归档和 Unix 归档的布局因此统一按相对路径处理。
+fn find_binary(dir: &Path, name: &str) -> Option<PathBuf> {
+    let exe = exe_name(name);
+    let mut directories = vec![(dir.to_owned(), 0usize)];
+    while let Some((directory, depth)) = directories.pop() {
+        if depth > 6 {
+            continue;
+        }
+        let candidate = directory.join(&exe);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        let entries = fs::read_dir(&directory).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                directories.push((path, depth + 1));
+            }
+        }
+    }
+    None
 }
 
 fn find_on_path(name: &str) -> Option<PathBuf> {
@@ -403,7 +462,7 @@ fn extract(
     let result = match tool {
         // CMake 压缩包由平台自带 tar 解开（macOS/Windows 为 bsdtar，可直接
         // 读 zip；Linux 为 GNU tar，自动识别 gzip）。
-        Tool::Cmake => Command::new("tar")
+        Tool::Cmake | Tool::Llvm => Command::new("tar")
             .arg("-xf")
             .arg(archive)
             .arg("-C")
@@ -468,7 +527,9 @@ fn hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{cmake_asset, exe_name, find_cmake_binary, hex, ninja_asset, sha256_file};
+    use super::{
+        cmake_asset, exe_name, find_cmake_binary, hex, llvm_asset, ninja_asset, sha256_file,
+    };
     use std::fs;
     use std::path::PathBuf;
 
@@ -481,7 +542,7 @@ mod tests {
 
     #[test]
     fn host_platform_has_well_formed_assets() {
-        for asset in [cmake_asset(), ninja_asset()] {
+        for asset in [cmake_asset(), ninja_asset(), llvm_asset()] {
             let asset = match asset {
                 Some(asset) => asset,
                 None => panic!("宿主平台应有固定资产"),

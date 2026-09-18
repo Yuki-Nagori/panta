@@ -254,6 +254,7 @@ dependencies = [
  "cxx",
  "cxx-build",
  "panta-core",
+ "sha2",
 ]
 
 [[package]]

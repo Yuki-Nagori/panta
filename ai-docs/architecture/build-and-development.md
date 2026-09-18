@@ -16,7 +16,7 @@ Qt Quick 主窗口已可用（任务 005）：`native/app` 为 Qt 入口，`nati
 
 构建图与扩展点：Cargo → launcher 的 build.rs → CMake/Ninja → native targets，单向无环；CMake 侧不回调 Cargo。重建追踪显式列举 native 源/配置与 qml/ 目录；`resources/` 落地时追加（qt_add_resources 扩展点已在 qml/CMakeLists.txt 标注）。Rust 库供 C++ 消费的接入点在 CMake 侧，由任务 006 确定。
 
-仍不能完成 CAE 业务流程：几何导入、网格、渲染与持久化均为后续任务；桌面分发（013）未实施。工具二进制供给（020）已落地：PATH 无 CMake/Ninja 时由构建引导按固定资产下载校验到根 `target/panta-tools/`，`CMAKE` 环境变量与 PATH 上的本机工具优先（Linux aarch64 无官方 CMake 资产，需走该旁路）。VTK/OCCT/Netgen 的 SDK 供给模块（031 `native/cmake/sdk-provision.cmake`）已落地并经 ctest `Build.SdkProvision` 验证，缓存于 `target/panta-deps/sdk/`；当前仅 OCCT Windows 有固定资产，消费方任务接入前不触发下载。下面是构建契约与实施要求，不是已验证的安装教程。
+仍不能完成 CAE 业务流程：几何导入、网格、渲染与持久化均为后续任务；桌面分发（013）未实施。工具二进制供给（020/042）已落地：受支持平台由构建引导按固定资产下载校验 CMake、Ninja 与 LLVM 22.1.7 到根 `target/panta-tools/`，CMake、Cargo CXX、clang-format 和 clang-tidy 复用同一套 LLVM；只有显式设置 `PANTA_USE_SYSTEM_TOOLS=1` 才读取 `CMAKE`、`CC`、`CXX` 或 PATH 的本机工具。Linux aarch64 无官方固定资产时需走该旁路。VTK/OCCT/Netgen 的 SDK 供给模块（031 `native/cmake/sdk-provision.cmake`）已落地并经 ctest `Build.SdkProvision` 验证，缓存于 `target/panta-deps/sdk/`；当前仅 OCCT Windows 有固定资产，消费方任务接入前不触发下载。下面是构建契约与实施要求，不是已验证的安装教程。
 
 ## 构建职责
 

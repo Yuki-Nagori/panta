@@ -3,10 +3,35 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[allow(dead_code)]
+#[path = "../launcher/src/provision.rs"]
+mod provision;
+
 fn main() -> Result<(), io::Error> {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/ffi_support.cc");
     println!("cargo:rerun-if-changed=include/panta/ffi.hpp");
+    println!("cargo:rerun-if-changed=../launcher/src/provision.rs");
+    println!("cargo:rerun-if-env-changed=PANTA_USE_SYSTEM_TOOLS");
+    println!("cargo:rerun-if-env-changed=CC");
+    println!("cargo:rerun-if-env-changed=CXX");
+    println!("cargo:rerun-if-env-changed=CLANG_FORMAT");
+
+    let out_dir = PathBuf::from(
+        env::var_os("OUT_DIR")
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Cargo 必须设置 OUT_DIR"))?,
+    );
+    let target_root = out_dir.ancestors().nth(4).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "无法从 OUT_DIR 推导 target 根")
+    })?;
+    let llvm = provision::resolve_llvm_compilers(target_root).map_err(io::Error::other)?;
+    let compiler = match (
+        env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc"),
+        llvm.clang_cl.as_ref(),
+    ) {
+        (true, Some(path)) => path,
+        _ => &llvm.clangxx,
+    };
 
     let mut builder = cxx_build::bridge("src/lib.rs");
     let cxx_standard_flag = if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
@@ -15,15 +40,12 @@ fn main() -> Result<(), io::Error> {
         "-std=c++20"
     };
     builder
+        .compiler(compiler)
         .file("src/ffi_support.cc")
         .include("include")
         .flag_if_supported(cxx_standard_flag)
         .compile("panta_ffi_bridge");
 
-    let out_dir = PathBuf::from(
-        env::var_os("OUT_DIR")
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Cargo must set OUT_DIR"))?,
-    );
     let generated_header = find_generated_header(&out_dir).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,

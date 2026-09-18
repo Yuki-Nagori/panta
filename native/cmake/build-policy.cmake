@@ -19,6 +19,26 @@ if(NOT CMAKE_EXPORT_COMPILE_COMMANDS)
       CACHE BOOL "导出 compile_commands.json" FORCE)
 endif()
 
+if(NOT PANTA_USE_SYSTEM_TOOLS)
+  if(NOT PANTA_LLVM_VERSION STREQUAL "22.1.7")
+    message(FATAL_ERROR "Cargo 托管 LLVM 版本必须是 22.1.7，实际为 '${PANTA_LLVM_VERSION}'")
+  endif()
+  foreach(_panta_compiler IN ITEMS CMAKE_C_COMPILER CMAKE_CXX_COMPILER)
+    execute_process(
+      COMMAND "${${_panta_compiler}}" --version
+      RESULT_VARIABLE _panta_version_status
+      OUTPUT_VARIABLE _panta_version
+      ERROR_VARIABLE _panta_version_error
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT _panta_version_status EQUAL 0
+       OR NOT _panta_version MATCHES "clang version 22\\.1\\.7")
+      message(
+        FATAL_ERROR
+          "${_panta_compiler} 未使用 LLVM 22.1.7：${_panta_version} ${_panta_version_error}")
+    endif()
+  endforeach()
+endif()
+
 if(PANTA_ENABLE_COVERAGE)
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "PANTA_ENABLE_COVERAGE 需要 Clang C++ 编译器")

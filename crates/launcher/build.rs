@@ -60,7 +60,9 @@ const RERUN_PATHS: &[&str] = &[
 const RERUN_ENVS: &[&str] = &[
     "CMAKE",
     "PANTA_USE_SYSTEM_TOOLS",
+    "CC",
     "CXX",
+    "CLANG_FORMAT",
     "CMAKE_GENERATOR",
     "CMAKE_GENERATOR_PLATFORM",
     "CMAKE_PREFIX_PATH",
@@ -134,10 +136,16 @@ fn orchestrate() -> Result<PathBuf, String> {
         binary_dir.display()
     );
     println!("cargo:rustc-env=PANTA_NATIVE_BUILD_TYPE={build_type}");
-    let clang_format = provision::resolve_clang_format(&target_root)?;
+    let llvm = provision::resolve_llvm_compilers(&target_root)?;
+    let clang_format = llvm.clang_format.clone();
     println!(
         "cargo:rustc-env=PANTA_CLANG_FORMAT={}",
         clang_format.display()
+    );
+    println!("cargo:rustc-env=PANTA_LLVM_ROOT={}", llvm.root.display());
+    println!(
+        "cargo:rustc-env=PANTA_LLVM_VERSION={}",
+        provision::LLVM_VERSION
     );
     let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
     let ninja = if generator.to_ascii_lowercase().contains("ninja") {
@@ -187,7 +195,20 @@ fn orchestrate() -> Result<PathBuf, String> {
             "-DPANTA_SDK_PROVISION_DIR={}",
             deps_root.join("sdk").display()
         ))
-        .arg(format!("-DPANTA_I18N_TS_DIR={}", ts_dir.display()));
+        .arg(format!("-DPANTA_I18N_TS_DIR={}", ts_dir.display()))
+        .arg(format!("-DCMAKE_C_COMPILER={}", llvm.clang.display()));
+    let cxx_compiler = match (cfg!(windows), llvm.clang_cl.as_ref()) {
+        (true, Some(path)) => path,
+        _ => &llvm.clangxx,
+    };
+    configure.arg(format!("-DCMAKE_CXX_COMPILER={}", cxx_compiler.display()));
+    configure.arg(format!("-DPANTA_LLVM_VERSION={}", provision::LLVM_VERSION));
+    if provision::use_system_tools() {
+        configure.arg("-DPANTA_USE_SYSTEM_TOOLS=ON");
+    }
+    if cfg!(windows) && generator.to_ascii_lowercase().contains("visual studio") {
+        configure.arg("-T").arg("ClangCL");
+    }
     if std::env::var_os("PANTA_NATIVE_COVERAGE").is_some() {
         configure.arg("-DPANTA_ENABLE_COVERAGE=ON");
     }

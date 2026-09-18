@@ -1,5 +1,5 @@
 // launcher 的供给模块还包含生产构建脚本专用的 Ninja 定位逻辑。
-// 测试 package 复用其中的 CMake/clang-format 定位，因此这里明确允许
+// 测试 package 复用其中的 CMake/LLVM 工具链定位，因此这里明确允许
 // launcher 专用项目未被使用。
 #[allow(dead_code)]
 #[path = "../crates/launcher/src/provision.rs"]
@@ -34,7 +34,7 @@ fn run() -> Result<(), String> {
     };
 
     let cmake = provision::resolve_cmake(&target_root)?;
-    let clang_format = provision::resolve_clang_format(&target_root)?;
+    let llvm = provision::resolve_llvm_compilers(&target_root)?;
     let native_dir = target_root.join("native").join(&profile);
 
     println!(
@@ -49,7 +49,15 @@ fn run() -> Result<(), String> {
     println!("cargo:rustc-env=PANTA_TEST_CMAKE={}", cmake.display());
     println!(
         "cargo:rustc-env=PANTA_TEST_CLANG_FORMAT={}",
-        clang_format.display()
+        llvm.clang_format.display()
+    );
+    println!(
+        "cargo:rustc-env=PANTA_TEST_LLVM_ROOT={}",
+        llvm.root.display()
+    );
+    println!(
+        "cargo:rustc-env=PANTA_TEST_LLVM_VERSION={}",
+        provision::LLVM_VERSION
     );
     Ok(())
 }

@@ -38,7 +38,7 @@
 
 `crates/launcher/build.rs`（或新调度模块）、依赖获取文档、README 环境要求。
 
-本轮实际边界：新增 `crates/launcher/src/provision.rs`（build.rs 经 `#[path]` 复用，单元测试挂 launcher 测试构建）；build.rs 接入"托管缓存 → 下载 → SHA256 校验 → 解包 → 注入路径"，托管 Ninja 时向 CMake 传 `CMAKE_MAKE_PROGRAM`；受支持平台不读取 PATH 中的系统 CMake/Ninja；`sha2` 进入 workspace/build/dev 依赖。缓存位于根 `target/panta-tools/`（archives + 解包目录 + marker）。README 环境要求已是最终形态（写明工具由构建引导拉取），本任务使其成真，未改动；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖。
+本轮实际边界：新增 `crates/launcher/src/provision.rs`（build.rs 经 `#[path]` 复用，单元测试挂 launcher 测试构建）；build.rs 接入"托管缓存 → 下载 → SHA256 校验 → 解包 → 注入路径"，托管 Ninja 时向 CMake 传 `CMAKE_MAKE_PROGRAM`；受支持平台不读取 PATH 中的系统 CMake/Ninja；`sha2` 进入 workspace/build/dev 依赖。缓存位于根 `target/panta-tools/`（archives + 解包目录 + marker）。LLVM 22.1.7 的统一供给由任务 042 追加，CMake 与 Cargo CXX 共用同一目录。README 环境要求已是最终形态（写明工具由构建引导拉取），本任务使其成真，未改动；Linux aarch64 无官方 CMake 资产，`CMAKE` 旁路诊断覆盖。
 
 ## 清理与兼容例外
 
@@ -77,4 +77,4 @@
 
 ## 完成摘要
 
-已完成。开发者环境要求收敛为 git + rustup + 平台编译器：受支持平台的构建引导默认从固定资产下载并校验 CMake/Ninja 到根 `target/panta-tools/`，Cargo build 后的完整工具链检查确认托管路径；干净 PATH 全链构建、损坏归档拒绝、两档离线复用均在本机 E2E 验证。已知边界：下载进度走 curl 的 stderr 实时可见（stdout 诊断在成功 run 中被 cargo 隐藏）；Linux aarch64 无官方 CMake 资产，需显式 `PANTA_USE_SYSTEM_TOOLS=1` 后用 `CMAKE`/PATH 旁路；Windows 非 unix 分支的 cfg 错误由 CI 抓出并已修复（`9063cae`）。
+已完成。开发者环境要求收敛为 git + rustup + 平台编译器：受支持平台的构建引导默认从固定资产下载并校验 CMake/Ninja 到根 `target/panta-tools/`，Cargo build 后的完整工具链检查确认托管路径；LLVM 22.1.7 的统一编译器由任务 042 承接。干净 PATH 全链构建、损坏归档拒绝、两档离线复用均在本机 E2E 验证。已知边界：下载进度走 curl 的 stderr 实时可见（stdout 诊断在成功 run 中被 cargo 隐藏）；Linux aarch64 无官方 CMake 资产，需显式 `PANTA_USE_SYSTEM_TOOLS=1` 后用 `CMAKE`/PATH 旁路；Windows 非 unix 分支的 cfg 错误由 CI 抓出并已修复（`9063cae`）。
