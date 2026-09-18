@@ -681,4 +681,10 @@ mod tests {
         assert_eq!(inner, fixture.root.join("assets").join("齿轮"));
         Ok(())
     }
+
+    #[test]
+    fn path_error_converts_to_string_directly() {
+        let rendered: String = PathError::NotFound("/x".into()).into();
+        assert_eq!(rendered, "path.not_found: /x");
+    }
 }

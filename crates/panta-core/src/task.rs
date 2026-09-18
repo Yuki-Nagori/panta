@@ -213,12 +213,7 @@ impl TaskManager {
                 Ok(task_id)
             }
             // 工作线程未启动：回滚记录，任务从未进入生命周期。
-            Err(error) => {
-                let mut state = self.inner.lock_state();
-                state.tasks.remove(&task_id);
-                state.log(task_id, format!("spawn failed: {error}"));
-                Err(SubmitError::SpawnFailed(error.to_string()))
-            }
+            Err(error) => Err(rollback_spawn(&self.inner, task_id, &error)),
         }
     }
 
@@ -338,6 +333,16 @@ fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, 
     }
 }
 
+/// 工作线程未启动时的回滚：移除任务记录并写结构化日志。独立成函数，
+/// 使线程启动失败路径可不经真实 OS 故障即可测试（任务 032）。
+fn rollback_spawn(inner: &Arc<Inner>, task_id: u64, error: &std::io::Error) -> SubmitError {
+    let mut state = inner.lock_state();
+    state.tasks.remove(&task_id);
+    let message = format!("spawn failed: {error}");
+    state.log(task_id, message);
+    SubmitError::SpawnFailed(error.to_string())
+}
+
 fn cancel_requested(inner: &Arc<Inner>, task_id: u64) -> bool {
     let state = inner.lock_state();
     match state.tasks.get(&task_id) {
@@ -395,7 +400,10 @@ fn publish_progress(inner: &Arc<Inner>, task_id: u64, percent: u32) {
 
 #[cfg(test)]
 mod tests {
-    use super::{LogRecord, MAX_TASK_DURATION, SubmitError, TaskEvent, TaskEventKind, TaskManager};
+    use super::{
+        LOG_RING_CAPACITY, LogRecord, MAX_TASK_DURATION, SubmitError, TaskEvent, TaskEventKind,
+        TaskManager, publish_progress, rollback_spawn, transition,
+    };
     use std::time::{Duration, Instant};
 
     /// 轮询直到条件成立或超时；超时后返回最后一次条件值供断言。
@@ -583,5 +591,140 @@ mod tests {
             elapsed < Duration::from_secs(30),
             "drop 阻塞 {elapsed:?}：工作线程未被 join"
         );
+    }
+
+    #[test]
+    fn submit_error_display_covers_all_variants() {
+        assert_eq!(SubmitError::EmptyLabel.to_string(), "empty label");
+        assert_eq!(
+            SubmitError::TooLongDuration(MAX_TASK_DURATION.as_millis() as u64).to_string(),
+            format!(
+                "duration {} ms exceeds the limit",
+                MAX_TASK_DURATION.as_millis() as u64
+            )
+        );
+        assert_eq!(
+            SubmitError::SpawnFailed("boom".to_owned()).to_string(),
+            "spawn failed: boom"
+        );
+    }
+
+    #[test]
+    fn task_event_kind_labels_cover_all_variants() {
+        let labels: Vec<&'static str> = [
+            TaskEventKind::Started,
+            TaskEventKind::Progress,
+            TaskEventKind::Succeeded,
+            TaskEventKind::Failed,
+            TaskEventKind::Cancelled,
+        ]
+        .iter()
+        .map(|kind| kind.label())
+        .collect();
+        assert_eq!(
+            labels,
+            vec!["started", "progress", "succeeded", "failed", "cancelled"]
+        );
+    }
+
+    #[test]
+    fn default_manager_is_usable() -> Result<(), String> {
+        let manager = TaskManager::default();
+        let id = manager
+            .submit("默认构造", std::time::Duration::from_millis(1), false)
+            .map_err(|error| error.to_string())?;
+        wait_until_running_zero(&manager);
+        assert!(
+            manager
+                .drain_events()
+                .iter()
+                .any(|event| event.task_id == id),
+            "默认构造的管理器应有事件"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn log_ring_capacity_evicts_oldest() -> Result<(), String> {
+        let manager = TaskManager::new();
+        // 提交超过环容量的任务数：每条提交至少写一条日志，最旧者被淘汰。
+        for _ in 0..(LOG_RING_CAPACITY + 16) {
+            manager
+                .submit("环容量", std::time::Duration::from_millis(1), false)
+                .map_err(|error| error.to_string())?;
+        }
+        wait_until_running_zero(&manager);
+        let logs = manager.recent_logs();
+        assert_eq!(logs.len(), LOG_RING_CAPACITY, "日志环应淘汰最旧记录");
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_rejects_unknown_and_terminal_tasks() -> Result<(), String> {
+        let manager = TaskManager::new();
+        assert!(!manager.cancel(9_999), "未知任务不可取消");
+        let id = manager
+            .submit("终态", std::time::Duration::from_millis(1), false)
+            .map_err(|error| error.to_string())?;
+        wait_until_running_zero(&manager);
+        assert!(!manager.cancel(id), "终态任务不可取消");
+        Ok(())
+    }
+
+    #[test]
+    fn late_events_for_missing_or_terminal_tasks_are_rejected() -> Result<(), String> {
+        let manager = TaskManager::new();
+        let inner = manager.inner.clone();
+        let id = manager
+            .submit("晚到", std::time::Duration::from_millis(1), false)
+            .map_err(|error| error.to_string())?;
+        wait_until_running_zero(&manager);
+        manager.drain_events();
+
+        // 未知任务：记录缺失，直接返回。
+        publish_progress(&inner, 9_999, 50);
+        transition(&inner, 9_999, TaskEventKind::Failed, "x", 0, String::new());
+        // 终态任务：迟到位事件不得改写终态或追加事件。
+        publish_progress(&inner, id, 50);
+        transition(&inner, id, TaskEventKind::Succeeded, "", 100, String::new());
+
+        assert!(manager.drain_events().is_empty(), "迟到位事件不得产生事件");
+        Ok(())
+    }
+
+    #[test]
+    fn spawn_rollback_removes_record_and_logs() -> Result<(), String> {
+        let manager = TaskManager::new();
+        let id = manager
+            .submit("回滚", std::time::Duration::from_millis(50), false)
+            .map_err(|error| error.to_string())?;
+        let error = std::io::Error::other("boom");
+        let submit_error = rollback_spawn(&manager.inner, id, &error);
+        assert!(matches!(
+            submit_error,
+            SubmitError::SpawnFailed(ref detail) if detail.contains("boom")
+        ));
+        assert!(!manager.cancel(id), "回滚后的任务不可取消");
+        assert!(
+            manager
+                .recent_logs()
+                .iter()
+                .any(|record| record.task_id == id && record.message.contains("spawn failed")),
+            "回滚必须写结构化日志"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn wait_until_returns_condition_outcome() {
+        assert!(wait_for(|| true, std::time::Duration::from_millis(10)));
+        assert!(!wait_for(|| false, std::time::Duration::from_millis(20)));
+    }
+
+    fn wait_until_running_zero(manager: &TaskManager) {
+        assert!(wait_for(
+            || manager.running_tasks() == 0,
+            std::time::Duration::from_millis(2_000)
+        ));
     }
 }
