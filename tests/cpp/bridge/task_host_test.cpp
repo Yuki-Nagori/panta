@@ -2,14 +2,17 @@
 // GUI 线程在慢任务期间保持响应。QSignalSpy 属 QtTest；自定义 main 提供
 // QCoreApplication。
 
+#include "task_host.hpp"
 #include <QCoreApplication>
 #include <QEventLoop>
+#include <QObject>
 #include <QSignalSpy>
 #include <QTimer>
-#include <QtTest>
+#include <QtCore/qtpreprocessorsupport.h>
+#include <QtCore/qtypes.h>
+#include <QtTest/qtest.h>
+#include <QtTest/qtestcase.h>
 #include <gtest/gtest.h>
-
-#include "task_host.hpp"
 
 namespace {
 

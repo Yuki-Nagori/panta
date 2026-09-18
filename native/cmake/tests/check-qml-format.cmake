@@ -13,7 +13,8 @@ execute_process(
   ERROR_VARIABLE _version)
 message(STATUS "qml 格式门禁：${_version}")
 
-file(GLOB_RECURSE _qml_files "${QML_DIR}/*.qml")
+file(GLOB_RECURSE _qml_files "${QML_DIR}/*.qml"
+     "${CMAKE_CURRENT_LIST_DIR}/../../../tests/qml/*.qml")
 if(NOT _qml_files)
   message(FATAL_ERROR "${QML_DIR} 下没有 QML 文件：空套件不能视作通过")
 endif()

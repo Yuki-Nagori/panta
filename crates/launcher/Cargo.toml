@@ -31,9 +31,4 @@ panta-ffi.workspace = true
 [build-dependencies]
 panta-ffi.workspace = true
 panta-dsl-core.workspace = true
-# 托管引导（任务 020）：下载资产的 SHA256 校验。
-sha2.workspace = true
-
-# src/provision.rs 的单元测试在测试构建中运行（build.rs 经 #[path] 复用）。
-[dev-dependencies]
-sha2.workspace = true
+panta-build.workspace = true

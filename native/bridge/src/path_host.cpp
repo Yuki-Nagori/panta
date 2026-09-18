@@ -1,10 +1,19 @@
 #include "path_host.hpp"
-
+#include "panta_ffi.h"
+#include "rust/cxx.h"
+#include <QByteArray>
 #include <QDir>
+#include <QLatin1String>
 #include <QStandardPaths>
 #include <QTemporaryFile>
-
+#include <QUrl>
+#include <QtCore/qnamespace.h>
+#include <cstddef>
 #include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace panta::bridge {
 
@@ -153,7 +162,7 @@ QString PathHost::fileUrlToPath(const QUrl& url, QString* error) {
         return {};
     }
     // toLocalFile 恰好解码一次；qrc/其它 scheme 不经此入口成为本机路径。
-    const QString path = url.toLocalFile();
+    QString path = url.toLocalFile();
     if (path.isEmpty()) {
         if (error != nullptr) {
             *error = QStringLiteral("path.file_url_without_local_path: %1").arg(url.toString());
@@ -174,7 +183,7 @@ bool PathHost::toBoundaryUtf8(const QString& text, std::string* out, QString* er
         return false;
     }
     if (out != nullptr) {
-        *out = std::string(utf8.constData(), static_cast<size_t>(utf8.size()));
+        *out = std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
     }
     return true;
 }

@@ -3,7 +3,7 @@
 # - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位；
 # - format：Ubuntu 上通过 cargo format 检查 Rust、C++/CXX、CMake、QML；
 # - dependency-audit：Ubuntu 上执行 RustSec、许可证、重复与通配审计；
-# - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++/QML instrumentation 报告。
+# - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++ 插桩报告与 QML 行为测试。
 name: CI
 
 on:
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tool: [clippy, machete, cmake, qmllint, clang-tidy, iwyu, cppcheck]
+        tool: [clippy, machete, cmake, qmllint, clang-tidy, includes, cppcheck]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -48,17 +48,6 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
-      - name: Prepare uv for cargo lint cmake
-        if: matrix.tool == 'cmake'
-        uses: astral-sh/setup-uv@v6
-
-      - name: Install external native analyzers
-        if: matrix.tool == 'iwyu' || matrix.tool == 'cppcheck'
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y cppcheck iwyu
-
       - name: Run selected lint
         shell: bash
         run: cargo lint "${{ matrix.tool }}"
@@ -68,9 +57,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - name: Prepare uv for cargo format
-        uses: astral-sh/setup-uv@v6
 
       - name: Install pinned toolchain
         shell: bash
@@ -103,13 +89,8 @@ jobs:
         run: cargo coverage
 
   native-coverage:
-    name: native C++ and QML coverage (ubuntu)
+    name: native C++ coverage and QML tests (ubuntu)
     runs-on: ubuntu-latest
-    env:
-      CC: clang
-      CXX: clang++
-      PANTA_NATIVE_COVERAGE: "1"
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/target/native-coverage/%p.profraw
     steps:
       - uses: actions/checkout@v7
 
@@ -117,52 +98,28 @@ jobs:
         shell: bash
         run: |
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
-          rustup toolchain install "$channel" --profile minimal --component llvm-tools-preview
+          rustup toolchain install "$channel" --profile minimal
 
-      - name: Run native and QML tests with LLVM instrumentation
+      - name: Run native tests and report with managed LLVM
         shell: bash
-        run: |
-          mkdir -p target/native-coverage
-          cargo test --locked
+        run: cargo coverage native
 
-      - name: Report native coverage
-        shell: bash
-        run: |
-          profdata="$(rustup which llvm-profdata)"
-          cov="$(rustup which llvm-cov)"
-          mapfile -t profiles < <(find target/native-coverage -name '*.profraw' -type f -print)
-          test "${#profiles[@]}" -gt 0
-          "$profdata" merge -sparse "${profiles[@]}" -o target/native-coverage/native.profdata
-          mapfile -t binaries < <(find target/native/debug -type f -perm -111 -name '*_test' -print)
-          test "${#binaries[@]}" -gt 0
-          objects=("${binaries[0]}")
-          for binary in "${binaries[@]:1}"; do
-            objects+=("-object" "$binary")
-          done
-          "$cov" report -instr-profile=target/native-coverage/native.profdata "${objects[@]}" \
-            --ignore-filename-regex='(/target/|googletest|/usr/)' \
-            --show-region-summary=false
+      - name: Upload native coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-coverage
+          path: target/native-coverage/summary.txt
+          if-no-files-found: error
 
   check:
     name: cargo check, build and test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            cmake_generator: Ninja
-            cache_compiler: llvm-22.1.7
-          - os: ubuntu-latest
-            cmake_generator: Ninja
-            cache_compiler: llvm-22.1.7
-          - os: windows-2022
-            cmake_generator: Visual Studio 17 2022
-            cmake_generator_platform: x64
-            cache_compiler: llvm-22.1.7
+        os: [macos-latest, ubuntu-latest, windows-2022]
     runs-on: ${{ matrix.os }}
     env:
-      CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
-      CMAKE_GENERATOR_PLATFORM: ${{ matrix.cmake_generator_platform }}
+      CMAKE_GENERATOR: Ninja
     steps:
       - uses: actions/checkout@v7
 
@@ -179,9 +136,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: panta-${{ runner.os }}-${{ runner.arch }}-${{ matrix.cache_compiler }}-${{ matrix.cmake_generator }}-${{ matrix.cmake_generator_platform }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.github/workflows/ci.yml', 'native/CMakePresets.json', 'native/**/*.cmake', 'native/**/CMakeLists.txt', 'qml/**/*.cmake', 'qml/CMakeLists.txt') }}
+          key: panta-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-ninja-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.github/workflows/ci.yml', 'native/CMakePresets.json', 'crates/panta-build/src/*.rs', 'native/**/*.cmake', 'native/**/CMakeLists.txt', 'qml/**/*.cmake', 'qml/CMakeLists.txt') }}
           restore-keys: |
-            panta-${{ runner.os }}-${{ runner.arch }}-${{ matrix.cache_compiler }}-${{ matrix.cmake_generator }}-
+            panta-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-ninja-
 
       - name: Check workspace and all aggregated targets
         run: cargo check --locked --workspace --all-targets

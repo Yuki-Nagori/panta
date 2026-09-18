@@ -1,6 +1,7 @@
 #include "panta_ffi.h"
-
+#include "rust/cxx.h"
 #include <gtest/gtest.h>
+#include <utility>
 
 TEST(FfiBoundary, CppCallsRustAndRustCallsCpp) {
     panta::ffi::FfiRequest request;

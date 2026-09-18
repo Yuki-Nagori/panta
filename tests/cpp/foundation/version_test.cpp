@@ -1,6 +1,5 @@
-#include <panta/foundation/version.hpp>
-
 #include <gtest/gtest.h>
+#include <panta/foundation/version.hpp>
 
 namespace {
 

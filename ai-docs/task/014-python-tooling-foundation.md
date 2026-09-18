@@ -5,11 +5,11 @@
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P2
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-18
+- 创建 / 更新：2026-09-16 / 2026-09-19
 
 ## 目标与背景
 
-为质量门禁提供可复现的 Python 工具环境，当前只承载 `cmakelang` 的 CMake 格式检查。Python 工具通过 `uv` 和 `uv.lock` 管理，与桌面运行时、Python API 和 native ABI 保持边界。
+为质量门禁提供可复现的 Python 工具环境，当前承载 `cmakelang` 的 CMake 格式/lint 和固定 Cppcheck wheel。Python 工具通过 `uv` 和 `uv.lock` 管理，与桌面运行时、Python API 和 native ABI 保持边界。
 
 ## 必读
 
@@ -22,9 +22,9 @@
 
 ## 范围与非目标
 
-范围：`pyproject.toml`、`uv.lock`、Python 3.12+ 约束，以及由根 `cargo format`/`cargo lint cmake` 调用的 `cmake-format` 与 `cmake-lint`。
+范围：`pyproject.toml`、`uv.lock`、Python 3.12+ 包约束与实际托管 CPython 3.13.7；根 `cargo format`/`cargo lint cmake` 的 CMake 工具，以及 `cargo lint cppcheck` 的固定 wheel。
 
-非目标：不嵌入解释器，不实现 pybind11/Rust binding，不为 MVP 提供 Python 入口，不把 Cppclean 引入质量门禁；Cppclean 与 IWYU/Cppcheck 职责重叠且其旧版包无法在 Python 3.14 构建。
+非目标：不嵌入解释器，不实现 pybind11/Rust binding，不为 MVP 提供 Python 入口，不把 Cppclean 引入质量门禁；Cppclean 与 LLVM include-cleaner / Cppcheck 职责重叠。
 
 ## 前置条件与待决策
 
@@ -35,7 +35,7 @@
 1. 确认 CMake 格式检查是首个实际 Python 工具用途，选择 uv 和 Python 3.12+。
 2. 创建 `pyproject.toml`，固定 `cmakelang==0.6.13`，生成并提交 `uv.lock`。
 3. 在 `tests/src/main.rs` 中通过 `uv run --locked cmake-format --check` 与 `uv run --locked cmake-lint` 检查所有 CMakeLists/`.cmake` 文件。
-4. CI 安装 uv；本地和 CI 均从锁文件运行，不修改系统 Python。
+4. Cargo 自动安装固定 uv/CPython 到 target；本地和 CI 均从锁文件运行，不修改系统 Python。
 
 ## 预计改动
 
@@ -56,7 +56,7 @@
 
 ## 验证计划与结果
 
-上方命令和场景均为待执行计划。只在对应入口存在后执行，记录 cwd、平台/版本、完整命令、结果和必要日志路径；手工图形操作记录步骤与观察。失败、跳过及未覆盖范围分别注明。
+早期记录保留当时工具路径与版本，当前托管入口以 2026-09-19 记录为准。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
@@ -76,3 +76,9 @@ cmakelang 版本较旧，升级时必须重新核对 Python 支持矩阵和格�
 ## 完成摘要
 
 已完成。`uv.lock` 固定 cmakelang 0.6.13，根 `cargo format` 检查 Rust、C++/CXX、CMake 和 QML；未引入 Python 运行时或业务 API。
+
+## 2026-09-19 供给补强（042/043）
+
+固定 uv 0.8.22 官方三平台资产及 SHA256、managed CPython 3.13.7；Python 安装目录、venv 与缓存均位于 `target/panta-tools/python`。新增 Cppcheck wheel 1.5.1（实际 Cppcheck 2.17.1），由 `uv.lock` 固定平台 wheel 摘要，`--no-build` 禁止源码安装回退。CI 移除 setup-uv/apt，使用 Cargo 入口。macOS 实测首次托管解释器安装、5 个锁定包安装和 CMake lint 21 个文件通过；三平台执行证据归 042/043。
+
+2026-09-19 实测：托管 uv 0.8.22 下载 CPython 3.13.7 并按 uv.lock 安装 wheels；`cargo format`、`cargo lint cmake`、`cargo lint cppcheck` 均在 macOS arm64 通过。CMake 扫描 21 个文件；Cppcheck 原生版本 2.17.1，未使用系统解释器或系统静态分析工具。

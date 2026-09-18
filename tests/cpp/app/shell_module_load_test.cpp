@@ -1,13 +1,17 @@
 // Panta.Shell 运行时加载测试：验证资源模块及其可选 Bridge 依赖的链接契约。
 
 #include <QGuiApplication>
+#include <QObject>
 #include <QQmlApplicationEngine>
+#include <QString>
+#include <QtCore/qtmetamacros.h>
+#include <QtTest/qtest.h>
+#include <QtTest/qtestcase.h>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
 #endif
-#include <QtTest/QtTest>
-
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
+
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 #endif
 

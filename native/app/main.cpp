@@ -5,17 +5,19 @@
 /// qWarning 输出全部错误，本入口以 69（EX_UNAVAILABLE）退出，不静默降级。
 /// 窗口生命周期归 QML（ApplicationWindow visible: true），退出走关闭事件。
 
-#include <panta/foundation/version.hpp>
-
+#include <QCoreApplication>
 #include <QGuiApplication>
+#include <QObject>
 #include <QQmlApplicationEngine>
+#include <QtCore/qnamespace.h>
+#include <panta/foundation/version.hpp>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
 #endif
 #include <cstdio>
 #include <string_view>
-
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
+
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 #endif
 

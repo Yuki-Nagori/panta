@@ -33,7 +33,8 @@ endfunction()
 
 function(_configure_consumer binary_dir)
   execute_process(
-    COMMAND "${CMAKE_COMMAND}" "-S${CONSUMER_SOURCE_DIR}" "-B${binary_dir}" ${ARGN}
+    COMMAND "${CMAKE_COMMAND}" -G Ninja "-DCMAKE_MAKE_PROGRAM=${TEST_MAKE_PROGRAM}"
+            "-S${CONSUMER_SOURCE_DIR}" "-B${binary_dir}" ${ARGN}
     RESULT_VARIABLE _rc
     OUTPUT_VARIABLE _stdout
     ERROR_VARIABLE _stderr)

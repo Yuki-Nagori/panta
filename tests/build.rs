@@ -1,10 +1,3 @@
-// launcher 的供给模块还包含生产构建脚本专用的 Ninja 定位逻辑。
-// 测试 package 复用其中的 CMake/LLVM 工具链定位，因此这里明确允许
-// launcher 专用项目未被使用。
-#[allow(dead_code)]
-#[path = "../crates/launcher/src/provision.rs"]
-mod provision;
-
 use std::env;
 use std::path::PathBuf;
 
@@ -17,15 +10,23 @@ fn main() {
 
 fn run() -> Result<(), String> {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../crates/launcher/src/provision.rs");
-
     let out_dir =
         PathBuf::from(env::var_os("OUT_DIR").ok_or_else(|| "Cargo 未设置 OUT_DIR".to_string())?);
-    let target_root = out_dir
+    let mut target_root = out_dir
         .ancestors()
         .nth(4)
         .ok_or_else(|| "无法从 tests OUT_DIR 推导 target 根".to_string())?
         .to_path_buf();
+    let target = env::var("TARGET").map_err(|e| e.to_string())?;
+    if env::var("HOST").as_deref() != Ok(&target) {
+        return Err("尚未支持交叉编译".into());
+    }
+    if target_root
+        .file_name()
+        .is_some_and(|name| name == target.as_str())
+    {
+        target_root.pop();
+    }
     let profile = env::var("PROFILE").map_err(|error| format!("Cargo 未设置 PROFILE：{error}"))?;
     let build_type = match profile.as_str() {
         "debug" => "Debug",
@@ -33,8 +34,6 @@ fn run() -> Result<(), String> {
         other => return Err(format!("未知 PROFILE '{other}'，无法映射 CMAKE_BUILD_TYPE")),
     };
 
-    let cmake = provision::resolve_cmake(&target_root)?;
-    let llvm = provision::resolve_llvm_compilers(&target_root)?;
     let native_dir = target_root.join("native").join(&profile);
 
     println!(
@@ -46,18 +45,6 @@ fn run() -> Result<(), String> {
         native_dir.display()
     );
     println!("cargo:rustc-env=PANTA_TEST_BUILD_TYPE={build_type}");
-    println!("cargo:rustc-env=PANTA_TEST_CMAKE={}", cmake.display());
-    println!(
-        "cargo:rustc-env=PANTA_TEST_CLANG_FORMAT={}",
-        llvm.clang_format.display()
-    );
-    println!(
-        "cargo:rustc-env=PANTA_TEST_LLVM_ROOT={}",
-        llvm.root.display()
-    );
-    println!(
-        "cargo:rustc-env=PANTA_TEST_LLVM_VERSION={}",
-        provision::LLVM_VERSION
-    );
+    println!("cargo:rustc-env=PANTA_TEST_HOST={target}");
     Ok(())
 }

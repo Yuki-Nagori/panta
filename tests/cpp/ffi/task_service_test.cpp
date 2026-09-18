@@ -1,16 +1,13 @@
 #include "panta_ffi.h"
-
-#include <gtest/gtest.h>
-
+#include "rust/cxx.h"
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <optional>
 #include <string>
 #include <thread>
 
-// 任务 008 服务层验收：启动/成功/失败/取消/迟到事件、结构化诊断与
-// 销毁 join；UI 线程集成由后续 ViewModel 接入验证。
 namespace {
 
 using panta::ffi::task_service_cancel;
@@ -92,7 +89,10 @@ TEST(FfiTaskService, SimulatedFailureCarriesStructuredCode) {
     ASSERT_TRUE(wait_running_zero(*service, std::chrono::seconds(2)));
     const auto events = task_service_drain(*service);
     const auto failed = find_event(events, TaskEventKind::Failed);
-    ASSERT_TRUE(failed.has_value());
+    if (!failed.has_value()) {
+        ADD_FAILURE() << "未收到失败事件";
+        return;
+    }
     EXPECT_EQ(failed->task_id, id);
     EXPECT_EQ(failed->code, "task.simulated_failure");
     const std::string detail(failed->detail);
@@ -120,7 +120,10 @@ TEST(FfiTaskService, CancelRunningTaskAndRejectLateCancel) {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
-    ASSERT_TRUE(cancelled.has_value());
+    if (!cancelled.has_value()) {
+        ADD_FAILURE() << "未收到取消事件";
+        return;
+    }
     EXPECT_EQ(cancelled->code, "task.cancelled");
     EXPECT_EQ(task_service_running(*service), 0U);
 

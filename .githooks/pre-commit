@@ -1,6 +1,6 @@
 #!/bin/sh
-# 提交前轻量质量门禁：格式与 Rust lint 必须通过，否则拒绝提交。
-# 完整 workspace check、build、test 由 CI 负责，避免提交时重复构建 native 目标。
+# 提交前质量门禁：格式与 Rust lint 必须通过，否则拒绝提交。
+# 不重复执行 cargo check；Clippy 仍会运行 build.rs，可能触发 native 构建。
 # 启用方式（每台机器一次性，git 不随仓库携带 hooks 配置）：
 #   git config core.hooksPath .githooks
 set -e

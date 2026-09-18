@@ -30,13 +30,21 @@ if(NOT PANTA_USE_SYSTEM_TOOLS)
       OUTPUT_VARIABLE _panta_version
       ERROR_VARIABLE _panta_version_error
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(NOT _panta_version_status EQUAL 0
-       OR NOT _panta_version MATCHES "clang version 22\\.1\\.7")
+    if(NOT _panta_version_status EQUAL 0 OR NOT _panta_version MATCHES "clang version 22\\.1\\.7")
       message(
-        FATAL_ERROR
-          "${_panta_compiler} 未使用 LLVM 22.1.7：${_panta_version} ${_panta_version_error}")
+        FATAL_ERROR "${_panta_compiler} 未使用 LLVM 22.1.7：${_panta_version} ${_panta_version_error}")
     endif()
   endforeach()
+endif()
+
+# 编译器统一为 LLVM，标准库头与运行库仍跟随平台 SDK，避免新版 libc++
+# 头引用当前 macOS 系统运行库尚未提供的符号（如 __hash_memory）。
+if(APPLE AND NOT PANTA_USE_SYSTEM_TOOLS)
+  if(NOT EXISTS "${CMAKE_OSX_SYSROOT}/usr/include/c++/v1/string")
+    message(FATAL_ERROR "Apple SDK 缺少 libc++ 头文件，请通过 Cargo 配置 sysroot")
+  endif()
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>"
+                      "$<$<COMPILE_LANGUAGE:CXX>:-isystem${CMAKE_OSX_SYSROOT}/usr/include/c++/v1>")
 endif()
 
 if(PANTA_ENABLE_COVERAGE)
@@ -61,9 +69,11 @@ endif()
 function(panta_native_defaults target)
   target_compile_features(${target} PUBLIC cxx_std_20)
   set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
-  target_compile_options(
-    ${target} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
-                      $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
 endfunction()
 
 # 递归核对真实构建图（包括 Qt 生成的 object libraries），提前阻断上游或

@@ -1,4 +1,5 @@
 #include "panta/ffi.hpp"
+#include "rust/cxx.h"
 
 namespace panta::ffi {
 

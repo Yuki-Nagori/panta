@@ -13,6 +13,12 @@
 if(NOT DEFINED QT_PROVISION_DIR)
   set(QT_PROVISION_DIR "${CMAKE_BINARY_DIR}/qt")
 endif()
+# Cargo build 与独立格式检查可能同时准备 Qt；进程退出自动释放锁。
+file(MAKE_DIRECTORY "${QT_PROVISION_DIR}")
+file(
+  LOCK "${QT_PROVISION_DIR}/provision.lock"
+  GUARD FILE
+  TIMEOUT 900)
 set(QT_STAGING "${QT_PROVISION_DIR}/staging")
 # 每个归档解包完成后的指纹目录；staging 被清空时全部重解。
 set(QT_EXTRACTED "${QT_PROVISION_DIR}/extracted")

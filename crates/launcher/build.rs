@@ -5,61 +5,32 @@
 //! Cargo，无递归。未来 C++ 消费 Rust 库时，接入点是 CMake 侧导入 Rust 产物
 //! （任务 006 定），不得从本脚本再次触发 Cargo。
 //!
-//! 重建追踪：Cargo 对 rerun-if-changed 的目录不递归，故下方清单显式列举到
-//! 含源文件的层级；新增模块目录时功能变更必然触及已追踪的 CMakeLists，
-//! 但仍应同步本清单。qml/、resources/ 落地时（任务 005）在此追加——这是
-//! 重建追踪的扩展点。
-//!
-//! 构建脚本产物只写 OUT_DIR；失败时继承子进程输出并原样退出，不掩盖
-//! 编译器/CMake 诊断。
+//! 产物和依赖缓存位于 Cargo target；原生诊断继承到 Cargo 输出。
 
-// 供给逻辑与 build.rs 共享同一文件；单元测试经 src/main.rs 的 cfg(test)
-// 模块运行（cargo test 不执行 build script 内的测试）。
-#[path = "src/provision.rs"]
-mod provision;
+use panta_build as provision;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::SystemTime;
 
-/// 需要 CMake 增量感知的仓库路径（相对本 package 根；目录不递归）。
+/// Cargo 递归追踪源码目录；第三方与生成文件不在监听范围内。
 const RERUN_PATHS: &[&str] = &[
     "build.rs",
-    "../../native/CMakeLists.txt",
-    "../../native/CMakePresets.json",
-    "../../native/cmake",
-    "../../native/app",
-    "../../native/i18n",
-    "../../native/bridge",
-    "../../native/bridge/src",
-    "../../tests/cpp/bridge",
-    "../../native/foundation",
-    "../../native/foundation/src",
-    "../../tests/cpp/foundation",
-    "../../native/foundation/include/panta/foundation",
-    "../panta-ffi",
-    "../panta-ffi/include",
-    "../panta-ffi/src",
-    // panta-ffi 静态链接 panta-core；其源码变化刷新 staticlib 内容，
-    // 需触发 CMake 重新链接。
-    "../panta-core",
-    "../panta-core/src",
-    "../../native/ffi",
-    "../../tests/cpp/ffi",
-    "../../tests/cpp/app",
+    "../../native",
+    "../../tests/cpp",
     "../../tests/qml",
+    "../panta-ffi",
+    "../panta-core",
     "../../qml",
-    "../../qml/Themes",
-    "../../qml/Panels",
     "../../resources/i18n",
-    // 扩展点：resources/ 与更多 QML 子目录落地时在此追加（任务 005 起）。
 ];
 
 /// 影响配置结果的环境变量，变更即重建。系统工具旁路必须显式开启。
 const RERUN_ENVS: &[&str] = &[
     "CMAKE",
     "PANTA_USE_SYSTEM_TOOLS",
+    "PANTA_TOOL_CACHE_ROOT",
     "CC",
     "CXX",
     "CLANG_FORMAT",
@@ -67,6 +38,8 @@ const RERUN_ENVS: &[&str] = &[
     "CMAKE_GENERATOR_PLATFORM",
     "CMAKE_PREFIX_PATH",
     "PANTA_NATIVE_COVERAGE",
+    "DEVELOPER_DIR",
+    "MACOSX_DEPLOYMENT_TARGET",
 ];
 
 fn main() -> ExitCode {
@@ -100,25 +73,18 @@ fn orchestrate() -> Result<PathBuf, String> {
         other => return Err(format!("未知 PROFILE '{other}'，无法映射 CMAKE_BUILD_TYPE")),
     };
 
-    // 保留标准绝对路径表示，不调用 canonicalize：Windows 上它会把盘符路径
-    // 转成 `//?/D:` 长路径前缀，MinGW 会将其错误解析为 POSIX 根路径。路径可能
-    // 含空格，全程走参数数组；CMake 会在读取 -S 时消解 `..`。
+    // 路径可能含空格，全程走参数数组；CMake 在读取 -S 时消解 `..`。
     let native_dir = PathBuf::from(&manifest_dir).join("../../native");
     if !native_dir.is_dir() {
         return Err(format!("native 目录不可达：{}", native_dir.display()));
     }
-    // OUT_DIR = <target>/<profile>/build/<hash>/out；ancestors 跳过 out、
-    // hash、build、profile 四层得到 target 根。
-    let target_root = PathBuf::from(&out_dir)
-        .ancestors()
-        .nth(4)
-        .ok_or_else(|| format!("无法从 launcher OUT_DIR 推导 target 根：{out_dir}"))?
-        .to_path_buf();
-    // 产物归一（任务 041）：native 构建树与第三方缓存都放在 target 根下，
-    // 与 profile 绑定、与 launcher 哈希目录无关——build.rs 变更换 OUT_DIR
-    // 时不再整树重配、不再重下 Qt/googletest。presets 的 binaryDir 指向
-    // 同一位置（native/<presetName> 与 <profile> 同名）。
-    let binary_dir = target_root.join("native").join(&profile);
+    let target_root = provision::target_root(Path::new(&out_dir))?;
+    let native_profile = if std::env::var("PANTA_NATIVE_COVERAGE").as_deref() == Ok("1") {
+        format!("{profile}-coverage")
+    } else {
+        profile.clone()
+    };
+    let binary_dir = target_root.join("native").join(native_profile);
     let deps_root = target_root.join("panta-deps");
 
     // i18n（任务 034）：解析 resources/i18n/*.pa 并把语言字典写成构建树
@@ -129,30 +95,12 @@ fn orchestrate() -> Result<PathBuf, String> {
     emit_translation_sources(&i18n_dir, &ts_dir)?;
     // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
     let cmake = provision::resolve_cmake(&target_root)?;
-    // 供根 tests/integration/native.rs 定位同目录的 ctest：任务 011/032/043 聚合入口。
-    println!("cargo:rustc-env=PANTA_CMAKE={}", cmake.display());
-    println!(
-        "cargo:rustc-env=PANTA_NATIVE_BUILD_DIR={}",
-        binary_dir.display()
-    );
-    println!("cargo:rustc-env=PANTA_NATIVE_BUILD_TYPE={build_type}");
     let llvm = provision::resolve_llvm_compilers(&target_root)?;
-    let clang_format = llvm.clang_format.clone();
-    println!(
-        "cargo:rustc-env=PANTA_CLANG_FORMAT={}",
-        clang_format.display()
-    );
-    println!("cargo:rustc-env=PANTA_LLVM_ROOT={}", llvm.root.display());
-    println!(
-        "cargo:rustc-env=PANTA_LLVM_VERSION={}",
-        provision::LLVM_VERSION
-    );
-    let generator = std::env::var("CMAKE_GENERATOR").unwrap_or_else(|_| "Ninja".to_string());
-    let ninja = if generator.to_ascii_lowercase().contains("ninja") {
-        Some(provision::resolve_ninja(&target_root, &cmake)?)
-    } else {
-        None
-    };
+    if std::env::var("CMAKE_GENERATOR").is_ok_and(|value| value != "Ninja") {
+        return Err("统一构建仅支持 Ninja，以保证三平台导出真实 compile_commands.json".into());
+    }
+    let ninja = provision::resolve_ninja(&target_root, &cmake)?;
+    let sdk_env = provision::windows_sdk_env(&required_var("TARGET")?)?;
 
     // Cargo 的默认 feature 是唯一用户入口；把 feature 状态转换成 CMake
     // 选项，避免开发者在日常命令中重复维护两套开关。
@@ -172,7 +120,7 @@ fn orchestrate() -> Result<PathBuf, String> {
         .arg("-B")
         .arg(&binary_dir)
         .arg("-G")
-        .arg(&generator)
+        .arg("Ninja")
         .arg(format!("-DCMAKE_BUILD_TYPE={build_type}"))
         .arg(format!("-DPANTA_ENABLE_BRIDGE_MODULE={bridge_module}"))
         .arg("-DPANTA_ENABLE_FFI_TEST=ON")
@@ -195,75 +143,100 @@ fn orchestrate() -> Result<PathBuf, String> {
             "-DPANTA_SDK_PROVISION_DIR={}",
             deps_root.join("sdk").display()
         ))
-        .arg(format!("-DPANTA_I18N_TS_DIR={}", ts_dir.display()))
-        .arg(format!("-DCMAKE_C_COMPILER={}", llvm.clang.display()));
-    let cxx_compiler = match (cfg!(windows), llvm.clang_cl.as_ref()) {
-        (true, Some(path)) => path,
-        _ => &llvm.clangxx,
+        .arg(format!("-DPANTA_I18N_TS_DIR={}", ts_dir.display()));
+    let cxx_compiler = if cfg!(windows) {
+        llvm.clang_cl.as_ref().ok_or("LLVM 缺少 clang-cl")?
+    } else {
+        &llvm.clangxx
     };
-    configure.arg(format!("-DCMAKE_CXX_COMPILER={}", cxx_compiler.display()));
-    configure.arg(format!("-DPANTA_LLVM_VERSION={}", provision::LLVM_VERSION));
-    if provision::use_system_tools() {
-        configure.arg("-DPANTA_USE_SYSTEM_TOOLS=ON");
-    }
-    if cfg!(windows) && generator.to_ascii_lowercase().contains("visual studio") {
-        configure.arg("-T").arg("ClangCL");
-    }
-    if std::env::var_os("PANTA_NATIVE_COVERAGE").is_some() {
-        configure.arg("-DPANTA_ENABLE_COVERAGE=ON");
-    }
-    if let Some(ninja) = &ninja {
-        // 托管供给的 Ninja 不依赖 PATH；系统 Ninja 传显式路径同样无害。
-        configure.arg(format!("-DCMAKE_MAKE_PROGRAM={}", ninja.display()));
+    let c_compiler = if cfg!(windows) {
+        cxx_compiler
+    } else {
+        &llvm.clang
+    };
+    configure
+        .envs(sdk_env.clone())
+        .arg(format!("-DCMAKE_C_COMPILER={}", c_compiler.display()))
+        .arg(format!("-DCMAKE_CXX_COMPILER={}", cxx_compiler.display()))
+        .arg(format!("-DCMAKE_MAKE_PROGRAM={}", ninja.display()))
+        .arg(format!("-DPANTA_LLVM_VERSION={}", provision::LLVM_VERSION))
+        // 每次显式传 ON/OFF，避免上次覆盖率或系统旁路污染 CMakeCache。
+        .arg(format!(
+            "-DPANTA_USE_SYSTEM_TOOLS={}",
+            if provision::use_system_tools() {
+                "ON"
+            } else {
+                "OFF"
+            }
+        ))
+        .arg(format!(
+            "-DPANTA_ENABLE_COVERAGE={}",
+            if std::env::var("PANTA_NATIVE_COVERAGE").as_deref() == Ok("1") {
+                "ON"
+            } else {
+                "OFF"
+            }
+        ));
+    if let Some(sdk) = provision::macos_sdk()? {
+        configure.arg(format!("-DCMAKE_OSX_SYSROOT={}", sdk.display()));
+        let deployment = match std::env::var("MACOSX_DEPLOYMENT_TARGET") {
+            Ok(version) => version,
+            Err(_) => {
+                let output = Command::new("xcrun")
+                    .args(["--sdk", "macosx", "--show-sdk-version"])
+                    .output()
+                    .map_err(|e| e.to_string())?;
+                if !output.status.success() {
+                    return Err("无法查询 Apple SDK 版本".into());
+                }
+                String::from_utf8_lossy(&output.stdout).trim().to_owned()
+            }
+        };
+        configure.arg(format!("-DCMAKE_OSX_DEPLOYMENT_TARGET={deployment}"));
     }
     run_step("configure", &mut configure)?;
 
     let mut build = Command::new(&cmake);
-    // 单配置生成器会忽略 --config，多配置生成器（如 Windows Visual Studio）
-    // 则必须显式选择与 Cargo profile 对应的配置。
     build
+        .envs(sdk_env)
         .arg("--build")
         .arg(&binary_dir)
         .arg("--config")
         .arg(build_type);
     run_step("build", &mut build)?;
 
+    let ffi_database = PathBuf::from(required_var("DEP_PANTA_FFI_COMPILE_DATABASE")?);
+    let mut commands = provision::database::read(&binary_dir.join("compile_commands.json"))?;
+    commands.extend(provision::database::read(&ffi_database)?);
+    let root = PathBuf::from(&manifest_dir)
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("launcher 必须位于 crates/launcher")?
+        .to_path_buf();
+    let quality_dir = binary_dir.join("quality");
+    fs::create_dir_all(&quality_dir).map_err(|e| e.to_string())?;
+    let owned = provision::database::owned(commands.clone(), &root);
+    provision::database::write(&quality_dir.join("compile_commands.json"), &owned)?;
+    // 未使用函数分析需要看到 moc/CXX 生成的调用边；生成代码本身不作为告警对象。
+    let mut cppcheck = owned;
+    cppcheck.extend(commands.into_iter().filter(|entry| {
+        entry
+            .file
+            .file_name()
+            .is_some_and(|name| name == "mocs_compilation.cpp" || name == "lib.rs.cc")
+    }));
+    provision::database::write(&quality_dir.join("cppcheck.json"), &cppcheck)?;
+
     let exe_name = if cfg!(windows) {
         "panta-native.exe"
     } else {
         "panta-native"
     };
-    locate_product(&binary_dir, build_type, exe_name)
-}
-
-fn locate_product(
-    binary_dir: &std::path::Path,
-    build_type: &str,
-    exe_name: &str,
-) -> Result<PathBuf, String> {
-    let base = binary_dir.join("app");
-    // Ninja 等单配置生成器把产物直接放在 app/；Visual Studio 等多配置生成器
-    // 可能放在构建树根部或 app/<Config>/。同时检查三种布局，避免生成器选择
-    // 泄漏到 launcher。
-    let candidates = [
-        binary_dir.join(build_type).join(exe_name),
-        base.join(exe_name),
-        base.join(build_type).join(exe_name),
-    ];
-    candidates
-        .iter()
-        .find(|path| path.is_file())
-        .cloned()
-        .ok_or_else(|| {
-            let expected = candidates
-                .iter()
-                .map(|path| path.display().to_string())
-                .collect::<Vec<_>>()
-                .join(" 或 ");
-            format!(
-                "CMake 构建成功但未找到产物（尝试：{expected}）；检查 native/app 的 OUTPUT_NAME 与生成器配置"
-            )
-        })
+    let product = binary_dir.join("app").join(exe_name);
+    if !product.is_file() {
+        return Err(format!("native 产物不存在：{}", product.display()));
+    }
+    Ok(product)
 }
 
 fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
@@ -398,7 +371,7 @@ fn run_step(name: &str, command: &mut Command) -> Result<(), String> {
         }),
         // program not found 等启动错误在此浮出，并给出可定位的处置指引。
         Err(error) => Err(format!(
-            "无法执行 {:?}：{error}。请安装 CMake（Ninja 需在 PATH），或用 CMAKE 环境变量指定可执行文件；参见 ai-docs/standards/dependency-acquisition.md",
+            "无法执行 {:?}：{error}。请检查托管工具缓存与平台 SDK；参见 ai-docs/standards/dependency-acquisition.md",
             command.get_program()
         )),
     }

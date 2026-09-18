@@ -1,15 +1,23 @@
 /// PathHost 验收测试（任务 023）：标准目录注入、工程根解析与 cwd 无关、
 /// 引用规则拒绝矩阵、file URL 单次解码、非 Unicode 拒绝与根外符号链接。
+#include "panta_ffi.h"
 #include "path_host.hpp"
-
+#include <QChar>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileDevice>
 #include <QFileInfo>
+#include <QIODevice>
+#include <QLatin1String>
 #include <QStandardPaths>
+#include <QString>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QtCore/qtypes.h>
 #include <gtest/gtest.h>
+#include <initializer_list>
+#include <utility>
 
 namespace {
 

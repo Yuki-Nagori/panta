@@ -3,28 +3,26 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-#[allow(dead_code)]
-#[path = "../launcher/src/provision.rs"]
-mod provision;
+use panta_build as provision;
 
 fn main() -> Result<(), io::Error> {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/ffi_support.cc");
     println!("cargo:rerun-if-changed=include/panta/ffi.hpp");
-    println!("cargo:rerun-if-changed=../launcher/src/provision.rs");
     println!("cargo:rerun-if-env-changed=PANTA_USE_SYSTEM_TOOLS");
+    println!("cargo:rerun-if-env-changed=PANTA_TOOL_CACHE_ROOT");
     println!("cargo:rerun-if-env-changed=CC");
     println!("cargo:rerun-if-env-changed=CXX");
     println!("cargo:rerun-if-env-changed=CLANG_FORMAT");
+    println!("cargo:rerun-if-env-changed=DEVELOPER_DIR");
+    println!("cargo:rerun-if-env-changed=MACOSX_DEPLOYMENT_TARGET");
 
     let out_dir = PathBuf::from(
         env::var_os("OUT_DIR")
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Cargo 必须设置 OUT_DIR"))?,
     );
-    let target_root = out_dir.ancestors().nth(4).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "无法从 OUT_DIR 推导 target 根")
-    })?;
-    let llvm = provision::resolve_llvm_compilers(target_root).map_err(io::Error::other)?;
+    let target_root = provision::target_root(&out_dir).map_err(io::Error::other)?;
+    let llvm = provision::resolve_llvm_compilers(&target_root).map_err(io::Error::other)?;
     let compiler = match (
         env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc"),
         llvm.clang_cl.as_ref(),
@@ -39,12 +37,54 @@ fn main() -> Result<(), io::Error> {
     } else {
         "-std=c++20"
     };
+    let sdk_env = provision::windows_sdk_env(&env::var("TARGET").map_err(io::Error::other)?)
+        .map_err(io::Error::other)?;
+    for (key, value) in sdk_env {
+        builder.env(key, value);
+    }
+    if let Some(sdk) = provision::macos_sdk().map_err(io::Error::other)? {
+        builder
+            .flag("-isysroot")
+            .flag(sdk.as_os_str())
+            .flag("-nostdinc++")
+            .flag("-isystem")
+            .flag(sdk.join("usr/include/c++/v1").as_os_str());
+    }
     builder
         .compiler(compiler)
         .file("src/ffi_support.cc")
         .include("include")
-        .flag_if_supported(cxx_standard_flag)
-        .compile("panta_ffi_bridge");
+        .flag_if_supported(cxx_standard_flag);
+    builder.compile("panta_ffi_bridge");
+
+    // 从实际 cc 配置导出参数，保留 CXX 生成头路径、宏及 ABI 选项。
+    let tool = builder.get_compiler();
+    let directory = PathBuf::from(
+        env::var_os("CARGO_MANIFEST_DIR")
+            .ok_or_else(|| io::Error::other("Cargo 未设置 CARGO_MANIFEST_DIR"))?,
+    );
+    let commands = builder
+        .get_files()
+        .map(|file| {
+            let mut arguments = vec![tool.path().to_string_lossy().into_owned()];
+            arguments.extend(
+                tool.args()
+                    .iter()
+                    .map(|arg| arg.to_string_lossy().into_owned()),
+            );
+            arguments.push(if tool.is_like_msvc() { "/c" } else { "-c" }.into());
+            arguments.push(file.to_string_lossy().into_owned());
+            provision::database::CompileCommand {
+                directory: directory.clone(),
+                file: file.to_path_buf(),
+                arguments: Some(arguments),
+                command: None,
+            }
+        })
+        .collect::<Vec<_>>();
+    let database = out_dir.join("compile_commands.json");
+    provision::database::write(&database, &commands).map_err(io::Error::other)?;
+    println!("cargo:compile_database={}", database.display());
 
     let generated_header = find_generated_header(&out_dir).ok_or_else(|| {
         io::Error::new(
@@ -68,7 +108,7 @@ fn main() -> Result<(), io::Error> {
         )
     })?;
 
-    // launcher/build.rs passes this directory and the staticlib to native CMake.
+    // launcher/build.rs 将该头文件目录与 staticlib 一起传给 native CMake。
     println!("cargo:include={}", cxx_include.display());
     Ok(())
 }

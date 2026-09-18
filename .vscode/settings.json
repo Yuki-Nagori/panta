@@ -4,10 +4,8 @@
     "cmake.configurePreset": "debug",
     "cmake.buildPreset": "debug",
     "cmake.configureOnOpen": false,
-    // CMake Tools 配置后保留一份源码树副本，便于旧版插件读取；正式路径
-    // 仍是 Cargo 共享构建树中的 compile_commands.json。
-    "cmake.copyCompileCommands": "${workspaceFolder}/native/compile_commands.json",
-    "C_Cpp.default.compileCommands": "${workspaceFolder}/target/native/debug/compile_commands.json",
+    // Cargo 合并 CMake 与 CXX 实际编译参数，包含手写 FFI adapter。
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/target/native/debug/quality/compile_commands.json",
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "C_Cpp.default.cppStandard": "c++20",
     "C_Cpp.default.intelliSenseMode": "${default}",

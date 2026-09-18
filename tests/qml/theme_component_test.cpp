@@ -1,9 +1,13 @@
 // QML 原子组件的默认 token 与显式覆盖测试（029）。
 #include <QColor>
 #include <QGuiApplication>
+#include <QObject>
 #include <QQmlComponent>
 #include <QQmlEngine>
-#include <QtTest/QtTest>
+#include <QString>
+#include <QtCore/qtmetamacros.h>
+#include <QtTest/qtest.h>
+#include <QtTest/qtestcase.h>
 
 namespace {
 

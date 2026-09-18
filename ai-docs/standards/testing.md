@@ -45,7 +45,7 @@ tests/
 ```sh
 cargo test       # workspace Rust + 根 tests/integration/native.rs
 cargo format     # Rust、C++/CXX、QML 格式
-cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、IWYU、Cppcheck
+cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner、Cppcheck
 cargo audit      # cargo-deny 依赖、许可证和 RustSec 审计
 cargo coverage   # cargo-llvm-cov Rust 覆盖率门禁
 ```

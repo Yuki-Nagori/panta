@@ -49,9 +49,9 @@
 
 ## CI（018）
 
-- GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。Windows 使用 Visual Studio 17 2022 与 Qt MSVC2022 预编译包；check/format 不安装项目依赖，所有 CMake、Ninja、Qt 和 GoogleTest 由 Cargo 驱动的 launcher 构建按固定清单供给。
+- GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。三平台统一 Ninja；Windows 使用托管 clang-cl、MSVC Build Tools/Windows SDK 环境与 Qt MSVC2022 预编译包；CI 不自行安装项目工具；CMake、Ninja、Qt 和 GoogleTest 由 Cargo 构建或质量入口按需供给。
 - Qt 6.11.2 Linux 预编译归档面向 RHEL9，Qt 工具（包括 `rcc`、`qtpaths`、`qmlimportscanner`）需要 ICU 73。`native/cmake/qt-provision.cmake` 同步下载并校验 Qt 官方的 ICU 73 预编译归档，解包到 `qt/staging/lib`，让 Ubuntu 使用与 Qt 工具匹配的 ABI；不使用系统 ICU、不伪造 SONAME，也不源码编译 ICU。Linux 仍跳过仅供 IDE 使用的 `.qmlls.build.ini` 和当前 app 的空 import scan，保留 QML typeinfo、cachegen、资源和运行时验证。
-- 每个平台执行与本地一致的最小检查：按 rust-toolchain.toml 安装固定工具链（minimal + rustfmt + clippy）→ `cargo build --locked` → `cargo test --locked` → `cargo fmt --all -- --check` → `cargo clippy --locked --all-targets`。
+- 每个平台安装 rust-toolchain.toml 中的固定 Rust 工具链后执行 workspace check、完整 build、`panta-tests toolchain` 实际路径核验与 `cargo test --locked`；lint、format、audit 和两类 coverage 在 Ubuntu 独立运行。
 - runner 需要镜像自带的平台编译器与 rustup；平台编译器和标准库属于 Cargo 无法替代的宿主能力，项目依赖仍由 Cargo 驱动的构建引导供给。
 - 边界：当前 CI 通过 Cargo 同步验证 Rust 与已有 native/Qt 构建；VTK、OCCT、Netgen 的 SDK 供给与集成仍由 031 及后续任务扩展，测试聚合与质量门禁归 011，依赖缓存归 012。
 
@@ -77,3 +77,7 @@
 - Netgen v6.2.2604 × OCCT 8.0.1 只有源码守卫级证据，构建与网格正确性由 010 实测；这是当前清单中关系最紧的组合。
 - Qt Quick（macOS Metal 后端等）与 VTK GL 上下文的交互是 007 的重点风险；本文只固定源码版本，不预支任何兼容结论。
 - 二进制 SHA256 在实装时回填，此前不做无产物的形式校验。
+
+## 质量工具供给（042/043）
+
+`panta-build` 是 launcher、FFI 与根质量 runner 共享的支持 crate。LLVM/CMake/Ninja/uv 固定资产按版本和 SHA256 隔离并加锁安装；Cargo 扩展按固定版本安装到 `target/panta-tools/<tool>/<version>`。uv 0.8.22 和 CPython 3.13.7 在仓库内托管；cmakelang 0.6.13、Cppcheck wheel 1.5.1（Cppcheck 2.17.1）由 `uv.lock` 锁定，禁止源码安装回退。Python 工具/解释器许可证沿各分发包保留；Cppcheck 为 GPL-3.0 工具，仅开发/CI 使用，不链接进应用。详细边界与入口见 [质量工具链](../modules/quality-tooling.md)。

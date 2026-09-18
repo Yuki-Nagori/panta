@@ -12,7 +12,6 @@
 #pragma once
 
 #include "panta_ffi.h"
-
 #include <QString>
 #include <QUrl>
 #include <memory>

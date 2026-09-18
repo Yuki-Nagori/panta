@@ -10,8 +10,11 @@ project(
 option(PANTA_ENABLE_FFI_TEST "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF)
 option(PANTA_ENABLE_BRIDGE_MODULE "Build and register the Panta.Bridge QML module" ON)
 option(PANTA_ENABLE_COVERAGE "Instrument native C++ targets for LLVM coverage" OFF)
-option(PANTA_USE_SYSTEM_TOOLS "Use explicitly selected host tools instead of Cargo-managed tools" OFF)
-set(PANTA_LLVM_VERSION "" CACHE STRING "Expected managed LLVM version")
+option(PANTA_USE_SYSTEM_TOOLS "Use explicitly selected host tools instead of Cargo-managed tools"
+       OFF)
+set(PANTA_LLVM_VERSION
+    ""
+    CACHE STRING "Expected managed LLVM version")
 
 include(cmake/build-policy.cmake)
 
@@ -60,7 +63,7 @@ if(BUILD_TESTING)
     NAME Build.MsvcAbiPolicy
     COMMAND
       "${CMAKE_COMMAND}" "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/abi-policy-test"
-      "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}" -P
+      "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}" "-DTEST_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-abi.cmake")
   # SDK 供给逻辑（031）用 fixture 归档驱动：不联网（file://）、不编译
   # （consumer 为 project NONE），三平台 CI 与本地同路径。
@@ -68,6 +71,7 @@ if(BUILD_TESTING)
     NAME Build.SdkProvision
     COMMAND
       "${CMAKE_COMMAND}" "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-provision-test"
+      "-DTEST_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
       "-DPANTA_SDK_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk-provision.cmake"
       "-DCONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/sdk/consumer" -P
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-sdk-provision.cmake")

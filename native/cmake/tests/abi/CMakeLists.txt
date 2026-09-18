@@ -1,6 +1,8 @@
 # 仅验证 CMake 配置元数据，不冒充 MSVC 编译/运行验证。
 cmake_minimum_required(VERSION 3.22)
 project(panta_abi_policy_test LANGUAGES CXX)
+# 本夹具只测试 ABI 元数据的继承和拒绝覆盖，不重复执行生产编译器供给检查。
+set(PANTA_USE_SYSTEM_TOOLS ON)
 set(MSVC TRUE)
 include("${CMAKE_CURRENT_LIST_DIR}/../../build-policy.cmake")
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated.cpp" "int generated() { return 0; }\n")

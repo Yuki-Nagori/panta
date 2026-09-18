@@ -5,4 +5,10 @@ Checks: >-
   performance-*
 WarningsAsErrors: '*'
 HeaderFilterRegex: '(^|/)(native|tests/(cpp|qml)|crates/panta-ffi)/'
+# target 中的 Qt/CXX 生成头属于构建输入，不对其应用自有代码告警。
+ExcludeHeaderFilterRegex: '(^|/)target/'
 FormatStyle: file
+
+CheckOptions:
+  # QTRY_* 依赖此聚合头的等待/超时声明，include-cleaner 不追踪宏内部依赖。
+  misc-include-cleaner.IgnoreHeaders: '(^|/)(QtTest/|QtTest.framework/Headers/)qtest\.h$'

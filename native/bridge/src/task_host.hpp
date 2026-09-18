@@ -11,7 +11,6 @@
 #pragma once
 
 #include "panta_ffi.h"
-
 #include <QObject>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>

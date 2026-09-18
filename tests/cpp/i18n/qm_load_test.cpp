@@ -1,8 +1,12 @@
 /// 验证 `.pa` → TS → lrelease QM → qrc 链路产出可加载的翻译数据。
 /// 只断言已知字典条目（context + source 精确查找），不做语言切换行为测试（022）。
 #include <QFile>
+#include <QObject>
+#include <QString>
 #include <QTranslator>
-#include <QtTest>
+#include <QtCore/qtmetamacros.h>
+#include <QtTest/qtest.h>
+#include <QtTest/qtestcase.h>
 
 class QmLoadTest : public QObject {
     Q_OBJECT

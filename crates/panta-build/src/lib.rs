@@ -1,24 +1,18 @@
 //! 托管引导（任务 020/042）：LLVM、CMake/Ninja 预编译二进制的定位、下载、
 //! 校验与缓存。
 //!
-//! 原则（standards/dependency-acquisition.md）：
-//! - 默认只使用工作区 `target/` 托管缓存 → 按固定清单下载；绝不静默
-//!   采用 PATH 中的系统工具或源码编译。LLVM 同时服务 Cargo CXX 与 CMake。
-//! - 不支持固定资产的平台可显式设置 `PANTA_USE_SYSTEM_TOOLS=1`，再用
-//!   `CMAKE` 或 PATH 提供宿主工具；CI 和受支持平台不走该旁路。
-//! - 只消费带 SHA256 的官方 release 资产；哈希不符立即删除归档并报错，
-//!   不进入构建图；禁止覆盖已校验的不同版本资产（marker 不符先清场）。
-//! - 缓存位于根 `target/panta-tools/`，与 profile 无关；marker 与二进制
-//!   同时存在即可离线重复构建。
-//! - 下载用平台自带 `curl`，解包用平台自带 `tar`（CMake 压缩包）与
-//!   `cmake -E tar`（Ninja zip 需要 libarchive，三平台零额外工具）；
-//!   这些都是 OS 自带组件，符合"开发者只装 rustup 与平台编译器"。
+//! 固定资产按版本/摘要隔离；安装持有 OS 文件锁，失败保留旧版本，成功才发布。
+//! 运行期也可复用此模块，读取工具路径时才准备该工具，不在 runner 编译期下载。
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use fs2::FileExt;
 use sha2::{Digest, Sha256};
+
+pub mod database;
+pub mod python;
 
 /// 单个工具的官方资产：URL 与首次下载实测的 SHA256（升级时同步回填
 /// standards/dependency-acquisition.md）。
@@ -110,7 +104,7 @@ fn llvm_asset() -> Option<ToolAsset> {
 
 /// 解析 Cargo CXX 与 CMake 共用的固定 LLVM 工具链。
 pub fn resolve_llvm_compilers(target_root: &Path) -> Result<LlvmCompilers, String> {
-    if use_system_tools() || llvm_asset().is_none() {
+    if use_system_tools() {
         return resolve_system_llvm();
     }
 
@@ -157,6 +151,7 @@ fn resolve_system_llvm() -> Result<LlvmCompilers, String> {
     let clang_format = env_or_path("CLANG_FORMAT", "clang-format")?;
     let root = clangxx
         .parent()
+        .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
     let clang_cl = cfg!(windows).then_some(clangxx.clone());
@@ -183,10 +178,9 @@ fn env_or_path(variable: &str, name: &str) -> Result<PathBuf, String> {
     find_on_path(name).ok_or_else(|| format!("系统工具旁路需要 {variable} 或 PATH 中的 {name}"))
 }
 
-/// 解析 CMake：默认使用托管缓存/下载；只有显式开启系统工具旁路，或
-/// 当前平台没有固定资产时，才读取 `CMAKE`/PATH。
+/// 解析 CMake：仅在显式开启系统工具旁路后读取 `CMAKE`/PATH。
 pub fn resolve_cmake(target_root: &Path) -> Result<PathBuf, String> {
-    if use_system_tools() || cmake_asset().is_none() {
+    if use_system_tools() {
         if let Some(path) = std::env::var_os("CMAKE") {
             let path = PathBuf::from(path);
             if path.is_file() {
@@ -206,9 +200,9 @@ pub fn resolve_cmake(target_root: &Path) -> Result<PathBuf, String> {
 
 /// 解析 Ninja：默认使用托管缓存/下载。Ninja zip 需要 libarchive 解包，
 /// 复用上一步解析到的 cmake（系统或托管）。只有显式开启系统工具旁路，
-/// 或当前平台没有固定资产时，才读取 PATH。
+/// 才读取 PATH。
 pub fn resolve_ninja(target_root: &Path, cmake: &Path) -> Result<PathBuf, String> {
-    if (use_system_tools() || ninja_asset().is_none())
+    if use_system_tools()
         && let Some(path) = find_on_path("ninja")
     {
         return Ok(path);
@@ -228,6 +222,7 @@ enum Tool {
     Cmake,
     Ninja,
     Llvm,
+    Uv,
 }
 
 impl Tool {
@@ -236,6 +231,7 @@ impl Tool {
             Tool::Cmake => "cmake",
             Tool::Ninja => "ninja",
             Tool::Llvm => "llvm",
+            Tool::Uv => "uv",
         }
     }
 
@@ -244,6 +240,7 @@ impl Tool {
             Tool::Cmake => CMAKE_VERSION,
             Tool::Ninja => NINJA_VERSION,
             Tool::Llvm => LLVM_VERSION,
+            Tool::Uv => python::UV_VERSION,
         }
     }
 
@@ -252,6 +249,7 @@ impl Tool {
             Tool::Cmake => cmake_asset(),
             Tool::Ninja => ninja_asset(),
             Tool::Llvm => llvm_asset(),
+            Tool::Uv => python::uv_asset(),
         }
     }
 
@@ -264,6 +262,7 @@ impl Tool {
                 let candidate = root.join(&exe);
                 candidate.is_file().then_some(candidate)
             }
+            Tool::Uv => find_binary(root, "uv"),
             Tool::Cmake => find_cmake_binary(root, &exe, 0),
             Tool::Llvm => {
                 let compiler = if cfg!(windows) { "clang-cl" } else { "clang++" };
@@ -318,9 +317,10 @@ fn find_binary(dir: &Path, name: &str) -> Option<PathBuf> {
         if depth > 6 {
             continue;
         }
-        let candidate = directory.join(&exe);
-        if candidate.is_file() {
-            return Some(candidate);
+        for candidate in [directory.join(&exe), directory.join("bin").join(&exe)] {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
         }
         let entries = fs::read_dir(&directory).ok()?;
         for entry in entries.flatten() {
@@ -344,6 +344,9 @@ fn find_on_path(name: &str) -> Option<PathBuf> {
 /// 定位 → 缺失时按清单获取 → 校验 → 解包 → 写 marker。`cmake` 仅在
 /// 解压 Ninja zip 时使用。
 fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<PathBuf, String> {
+    // 覆盖率使用独立对象目录，但复用主 target 已校验的编译工具。
+    let cache_root = std::env::var_os("PANTA_TOOL_CACHE_ROOT").map(PathBuf::from);
+    let target_root = cache_root.as_deref().unwrap_or(target_root);
     let name = tool.name();
     let Some(asset) = tool.asset() else {
         return Err(format!(
@@ -355,71 +358,132 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
         ));
     };
 
-    let root = tools_root(target_root);
-    let tool_dir = root.join(name);
-    let marker = root.join(format!("{name}.sha256"));
-    let archives = root.join("archives");
-    let archive = archives.join(format!("{}-{}.archive", name, tool.version()));
-
-    // 命中缓存：marker 哈希一致且二进制存在即可离线复用。
-    if fs::read_to_string(&marker)
-        .map(|recorded| recorded.trim() == asset.sha256)
-        .unwrap_or(false)
-        && let Some(binary) = tool.locate_installed(&tool_dir)
-    {
-        return Ok(binary);
-    }
-
-    // marker 缺失或不一致 = 首次供给或版本升级：清场后重建，不覆盖已校验资产。
-    let _ = fs::remove_dir_all(&tool_dir);
-    let _ = fs::remove_file(&marker);
-    fs::create_dir_all(&tool_dir)
-        .map_err(|error| format!("创建 {} 失败：{error}", tool_dir.display()))?;
-    fs::create_dir_all(&archives)
-        .map_err(|error| format!("创建 {} 失败：{error}", archives.display()))?;
-
-    // 归档命中预期哈希则跳过下载（支持离线重建）；不符或残缺立即删除重下。
-    let archive_ready = match fs::metadata(&archive) {
-        Ok(_) => {
-            let actual = sha256_file(&archive)?;
-            if actual == asset.sha256 {
-                true
-            } else {
-                let _ = fs::remove_file(&archive);
-                false
+    let identity = format!("{}-{}", tool.version(), asset.sha256);
+    let directory = install_directory(target_root, name, &identity, |staging| {
+        let archives = tools_root(target_root).join("archives");
+        fs::create_dir_all(&archives).map_err(|e| e.to_string())?;
+        let archive = archives.join(format!("{name}-{identity}.archive"));
+        if !archive.is_file() || sha256_file(&archive)? != asset.sha256 {
+            let partial = archives.join(format!("{name}-{identity}.partial"));
+            download(&asset, &partial, name, tool.version())?;
+            let actual = sha256_file(&partial)?;
+            if actual != asset.sha256 {
+                fs::remove_file(&partial).map_err(|e| e.to_string())?;
+                return Err(format!(
+                    "{name} SHA256 不符：期望 {}，实际 {actual}",
+                    asset.sha256
+                ));
             }
+            if archive.exists() {
+                fs::remove_file(&archive).map_err(|e| e.to_string())?;
+            }
+            fs::rename(&partial, &archive).map_err(|e| e.to_string())?;
         }
-        Err(_) => false,
-    };
-    if !archive_ready {
-        download(&asset, &archive, name, tool.version())?;
-    }
-
-    let actual = sha256_file(&archive)?;
-    if actual != asset.sha256 {
-        let _ = fs::remove_file(&archive);
-        return Err(format!(
-            "{name} 归档 SHA256 不符，已拒绝进入构建：预期 {}，实际 {}；\
-             归档已删除，重试将重新下载（{asset_url}）",
-            asset.sha256,
-            actual,
-            asset_url = asset.url
-        ));
-    }
-
-    extract(tool, &archive, &tool_dir, cmake)?;
-    let binary = tool.locate_installed(&tool_dir).ok_or_else(|| {
-        format!(
-            "{name} 解包完成但在 {} 下未找到二进制；目录布局可能变化，\
-             请核对资产并更新供给脚本",
-            tool_dir.display()
-        )
+        extract(tool, &archive, staging, cmake)?;
+        let binary = tool
+            .locate_installed(staging)
+            .ok_or_else(|| format!("{name} 解包后缺少可执行文件"))?;
+        set_executable(&binary)
     })?;
-    set_executable(&binary)?;
+    tool.locate_installed(&directory).ok_or_else(|| {
+        format!(
+            "托管 {name} 缓存损坏：{}；清理该版本目录后重试",
+            directory.display()
+        )
+    })
+}
 
-    fs::write(&marker, format!("{}\n", asset.sha256))
-        .map_err(|error| format!("写入 marker {} 失败：{error}", marker.display()))?;
-    Ok(binary)
+/// OS 锁在进程退出时自动释放；锁文件不能删除，否则等待者可能锁住不同 inode。
+pub fn install_lock(target_root: &Path, name: &str) -> Result<fs::File, String> {
+    let locks = tools_root(target_root).join("locks");
+    fs::create_dir_all(&locks).map_err(|e| e.to_string())?;
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(locks.join(format!("{name}.lock")))
+        .map_err(|e| e.to_string())?;
+    file.lock_exclusive()
+        .map_err(|e| format!("获取 {name} 安装锁失败：{e}"))?;
+    Ok(file)
+}
+
+/// 在互斥区内构建临时目录，写入完成标记后原子重命名；中断残留只在下次持锁时清理。
+pub fn install_directory(
+    target_root: &Path,
+    name: &str,
+    identity: &str,
+    install: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<PathBuf, String> {
+    let _lock = install_lock(target_root, name)?;
+    let parent = tools_root(target_root).join(name);
+    let destination = parent.join(identity);
+    if fs::read_to_string(destination.join(".complete"))
+        .ok()
+        .as_deref()
+        == Some(identity)
+    {
+        return Ok(destination);
+    }
+    fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
+    let staging = parent.join(format!(".{identity}.staging"));
+    if staging.exists() {
+        fs::remove_dir_all(&staging).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
+    install(&staging)?;
+    fs::write(staging.join(".complete"), identity).map_err(|e| e.to_string())?;
+    if destination.exists() {
+        fs::remove_dir_all(&destination).map_err(|e| e.to_string())?;
+    }
+    fs::rename(&staging, &destination).map_err(|e| e.to_string())?;
+    Ok(destination)
+}
+
+/// Ninja 使用 Visual Studio 的 SDK/CRT 搜索环境，但编译器始终显式指定托管 clang-cl。
+pub fn windows_sdk_env(
+    target: &str,
+) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, String> {
+    if !target.contains("windows-msvc") {
+        return Ok(Vec::new());
+    }
+    cc::windows_registry::find_tool(target, "cl.exe")
+        .map(|tool| tool.env().to_vec())
+        .ok_or_else(|| "未找到 MSVC Build Tools / Windows SDK；请安装平台 SDK 后重试".to_owned())
+}
+
+/// 官方 LLVM 不替代 Apple SDK；显式 sysroot 保证 CXX 和 CMake 使用同一套平台头文件。
+pub fn macos_sdk() -> Result<Option<PathBuf>, String> {
+    if !cfg!(target_os = "macos") {
+        return Ok(None);
+    }
+    let output = Command::new("xcrun")
+        .args(["--sdk", "macosx", "--show-sdk-path"])
+        .output()
+        .map_err(|e| format!("无法定位 Apple SDK：{e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+    let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+    if !path.is_dir() {
+        return Err(format!("Apple SDK 不存在：{}", path.display()));
+    }
+    Ok(Some(path))
+}
+
+/// OUT_DIR 可能包含显式 --target 的 triple 层；拒绝未验证的跨目标构建。
+pub fn target_root(out: &Path) -> Result<PathBuf, String> {
+    let host = std::env::var("HOST").map_err(|e| e.to_string())?;
+    let target = std::env::var("TARGET").map_err(|e| e.to_string())?;
+    if host != target {
+        return Err(format!("尚未支持交叉编译：{host} -> {target}"));
+    }
+    let mut root = out.ancestors().nth(4).ok_or("无法解析 OUT_DIR")?;
+    if root.file_name().is_some_and(|name| name == target.as_str()) {
+        root = root.parent().ok_or("target 根缺失")?;
+    }
+    Ok(root.to_path_buf())
 }
 
 fn download(
@@ -462,7 +526,7 @@ fn extract(
     let result = match tool {
         // CMake 压缩包由平台自带 tar 解开（macOS/Windows 为 bsdtar，可直接
         // 读 zip；Linux 为 GNU tar，自动识别 gzip）。
-        Tool::Cmake | Tool::Llvm => Command::new("tar")
+        Tool::Cmake | Tool::Llvm | Tool::Uv => Command::new("tar")
             .arg("-xf")
             .arg(archive)
             .arg("-C")
@@ -530,6 +594,7 @@ mod tests {
     use super::{
         cmake_asset, exe_name, find_cmake_binary, hex, llvm_asset, ninja_asset, sha256_file,
     };
+    use super::{install_directory, python};
     use std::fs;
     use std::path::PathBuf;
 
@@ -542,7 +607,12 @@ mod tests {
 
     #[test]
     fn host_platform_has_well_formed_assets() {
-        for asset in [cmake_asset(), ninja_asset(), llvm_asset()] {
+        for asset in [
+            cmake_asset(),
+            ninja_asset(),
+            llvm_asset(),
+            python::uv_asset(),
+        ] {
             let asset = match asset {
                 Some(asset) => asset,
                 None => panic!("宿主平台应有固定资产"),
@@ -599,5 +669,91 @@ mod tests {
             None
         );
         let _ = fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn concurrent_installers_publish_once_and_failed_upgrade_preserves_previous()
+    -> Result<(), String> {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        let root = std::env::temp_dir().join(format!("panta-lock-test-{}", std::process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root).map_err(|e| e.to_string())?;
+        }
+        let count = Arc::new(AtomicUsize::new(0));
+        let workers: Vec<_> = (0..4)
+            .map(|_| {
+                let root = root.clone();
+                let count = count.clone();
+                std::thread::spawn(move || {
+                    install_directory(&root, "fixture", "v1", |staging| {
+                        count.fetch_add(1, Ordering::SeqCst);
+                        fs::write(staging.join("binary"), "v1").map_err(|e| e.to_string())
+                    })
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().map_err(|_| "安装线程 panic")??;
+        }
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert!(
+            install_directory(&root, "fixture", "v2", |staging| {
+                fs::write(staging.join("partial"), "incomplete").map_err(|e| e.to_string())?;
+                Err("模拟安装中断".into())
+            })
+            .is_err()
+        );
+        let original = root.join("panta-tools/fixture/v1/binary");
+        assert_eq!(
+            fs::read_to_string(&original).map_err(|e| e.to_string())?,
+            "v1"
+        );
+        assert!(!root.join("panta-tools/fixture/v2").exists());
+        let upgraded = install_directory(&root, "fixture", "v2", |staging| {
+            assert!(!staging.join("partial").exists());
+            fs::write(staging.join("binary"), "v2").map_err(|e| e.to_string())
+        })?;
+        assert_eq!(
+            fs::read_to_string(upgraded.join("binary")).map_err(|e| e.to_string())?,
+            "v2"
+        );
+        install_directory(&root, "fixture", "v1", |_| Err("旧版本不应重新安装".into()))?;
+        fs::remove_dir_all(root).map_err(|e| e.to_string())
+    }
+    #[test]
+    fn crash_during_install() -> Result<(), String> {
+        if let Some(root) = std::env::var_os("PANTA_TEST_INSTALL_CRASH") {
+            install_directory(
+                std::path::Path::new(&root),
+                "crash-fixture",
+                "v1",
+                |staging| {
+                    fs::write(staging.join("partial"), "partial").map_err(|e| e.to_string())?;
+                    // 不执行析构函数，模拟进程中断；OS 必须释放安装锁。
+                    std::process::exit(23);
+                },
+            )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn process_exit_releases_install_lock_and_retry_discards_partial_files() -> Result<(), String> {
+        let root = std::env::temp_dir().join(format!("panta-crash-test-{}", std::process::id()));
+        let status =
+            std::process::Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+                .args(["--exact", "tests::crash_during_install"])
+                .env("PANTA_TEST_INSTALL_CRASH", &root)
+                .status()
+                .map_err(|e| e.to_string())?;
+        assert_eq!(status.code(), Some(23));
+        let directory = install_directory(&root, "crash-fixture", "v1", |staging| {
+            assert!(!staging.join("partial").exists());
+            fs::write(staging.join("binary"), "complete").map_err(|e| e.to_string())
+        })?;
+        assert!(directory.join("binary").is_file());
+        fs::remove_dir_all(root).map_err(|e| e.to_string())
     }
 }

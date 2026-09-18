@@ -1,4 +1,12 @@
 #include "task_host.hpp"
+#include "panta_ffi.h"
+#include "rust/cxx.h"
+#include <QObject>
+#include <QString>
+#include <QtCore/qtmetamacros.h>
+#include <QtCore/qtypes.h>
+#include <cstdint>
+#include <string_view>
 
 namespace panta::bridge {
 
@@ -54,12 +62,14 @@ void TaskHost::poll() {
             emit taskSucceeded(event.task_id);
             break;
         case panta::ffi::TaskEventKind::Failed:
-            emit taskFailed(event.task_id, QString::fromUtf8(event.code.data(), event.code.size()),
-                            QString::fromUtf8(event.detail.data(), event.detail.size()));
+            emit taskFailed(
+                event.task_id,
+                QString::fromUtf8(std::string_view(event.code.data(), event.code.size())),
+                QString::fromUtf8(std::string_view(event.detail.data(), event.detail.size())));
             break;
         case panta::ffi::TaskEventKind::Cancelled:
-            emit taskCancelled(event.task_id,
-                               QString::fromUtf8(event.code.data(), event.code.size()));
+            emit taskCancelled(event.task_id, QString::fromUtf8(std::string_view(
+                                                  event.code.data(), event.code.size())));
             break;
         }
     }
