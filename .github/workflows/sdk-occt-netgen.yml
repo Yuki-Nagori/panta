@@ -55,7 +55,8 @@ jobs:
       - name: Produce OCCT and Netgen SDKs
         shell: bash
         run: |
-          cmake -S tools/sdk -B sdk-build/superbuild
+          # 本管线不消费 Qt：关闭 VTK 描述即不触发 qt-provision 下载。
+          cmake -S tools/sdk -B sdk-build/superbuild -DPANTA_SDK_ENABLE_VTK=OFF
           cmake --build sdk-build/superbuild --target occt_sdk netgen_sdk
 
       - name: Selfcheck artifacts

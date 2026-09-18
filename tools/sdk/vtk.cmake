@@ -4,10 +4,16 @@
 # （2026-09-17 git ls-remote 解引用复核；annotated tag 对象 a78e2d95…）。
 # 配置开关冻结为 007 视口所需最小面：Qt 6 + GUISupportQtQuick + Qt 组；
 # 模块裁剪与图形后端细化由 007 集成时回写。许可证随源码树收集。
+#
+# Qt ABI 契约：GUISupportQtQuick 在 C++ 层直接使用 Qt 类型，必须对着
+# 锁定预编译 6.11.2 编译（消费侧 007 用同一 staging）；因此只有本描述
+# 触发 qt-provision 供给（OCCT/Netgen 不消费 Qt，不下载）。
 
 set(PANTA_VTK_VERSION 9.7.0)
 set(PANTA_VTK_COMMIT 23f0a095621e91bbdbeace8451e22b950c8e5f46)
 # 与 qt-provision.cmake 固定归档一致的 Qt 版本；升级 Qt 时同处更新。
+# qt-provision.cmake 由顶层在 PANTA_SDK_ENABLE_VTK 分支内 include（本
+# 描述是其唯一消费者），QT_STAGING 在下方 CMAKE_PREFIX_PATH 消费。
 set(PANTA_QT_SDK_VERSION 6.11.2)
 set(PANTA_VTK_INSTALL_DIR "${PANTA_SDK_OUT_ROOT}/vtk/${PANTA_VTK_VERSION}/${PANTA_SDK_TRIPLE}")
 
