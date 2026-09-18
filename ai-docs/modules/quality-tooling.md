@@ -6,6 +6,19 @@
 
 质量工具链覆盖仓库中已经存在的 Rust、C++20、QML/Qt 和 CMake；Python 与 Node 只有在对应源码真正进入仓库后才加入。工具版本、下载来源和报告格式由任务 032 固定，优先使用预编译工具，不把工具源码加入 native 构建图。
 
+## 固定工具版本（任务 032）
+
+| 工具 | 固定版本 | 安装/来源 | 用途 |
+|---|---|---|---|
+| cargo-deny | 0.20.2 | `cargo install --locked --version 0.20.2` | 依赖审计（RustSec advisory）、许可证、重复/通配依赖；配置 `deny.toml` |
+| cargo-machete | 0.9.2 | `cargo install --locked --version 0.9.2` | 未使用依赖；build.rs 的 `DEP_*` 环境变量用法识别不到，经 `[package.metadata.cargo-machete]` 登记豁免（launcher/panta-ffi） |
+| cargo-llvm-cov | 0.9.1 | `cargo install --locked --version 0.9.1` + rustup 组件 `llvm-tools-preview` | Rust line 覆盖率；Homebrew rust（无 rustup）机器需设 `LLVM_PROFDATA`/`LLVM_COV` 指向 CLT/Xcode 的 llvm 工具 |
+| qmlformat / qmllint | 6.11.2 | Qt 预编译供给（`target/panta-deps/qt/staging/bin/`） | QML 格式门禁（CTest `Qml.FormatCheck`，qmlformat 无 --check，以 stdout diff 等价实现）与 lint |
+| clang-format | 待固定 | 待供给（020 式预编译下载或 CI runner 组件） | C++ 格式；供给方式固定前不进门禁（032 增量二） |
+| cmake-format | 未引入 | —— | 稳定可离线供给的版本确认前不引入（避免经 pip 引入 Python 运行时） |
+
+已知工具限制（2026-09-18）：stable rustc 的 `-C instrument-coverage` 不产出分支覆盖数据，Rust 门禁先以 line 覆盖率执行，branch 待工具链支持后加入；launcher（启动胶水）按登记理由排除在 Rust 覆盖率统计外（进程编排 + build.rs 调度，C++ 侧覆盖率另行测量）。
+
 质量门禁和真实图形冒烟分开。门禁必须可在无显示环境运行并能阻断错误；窗口、DPR、多显示屏和 OpenGL/Metal/Vulkan 检查作为平台场景单独记录，不能用图形冒烟代替单元覆盖率。
 
 ## 工具矩阵

@@ -14,18 +14,23 @@ bridge-module = []
 [lints]
 workspace = true
 
+# panta-ffi 在源码里只经 build.rs 的 DEP_PANTA_FFI_INCLUDE 环境变量消费，
+# cargo-machete 识别不到该用法（任务 032 工具豁免登记，非未使用依赖）。
+[package.metadata.cargo-machete]
+ignored = ["panta-ffi"]
+
 # DEP_PANTA_FFI_INCLUDE 只沿普通依赖边注入构建脚本（cargo 1.95/1.98 实测，
 # 纯 [build-dependencies] 不注入），因此 panta-ffi 必须留在本表。
 [dependencies]
-panta-ffi = { path = "../panta-ffi" }
+panta-ffi.workspace = true
 
 # build.rs 需要在启动前看到 panta-ffi 的 staticlib；普通依赖边仍保留，
 # 以便 Cargo 向 launcher build script 注入 DEP_PANTA_FFI_INCLUDE metadata。
 # panta-dsl-core（任务 034）在 build.rs 内解析 resources/i18n/*.pa 生成构建
 # 树 TS；与 panta-dslc CLI 同一内核，不引入第二套 parser。
 [build-dependencies]
-panta-ffi = { path = "../panta-ffi" }
-panta-dsl-core = { path = "../panta-dsl-core" }
+panta-ffi.workspace = true
+panta-dsl-core.workspace = true
 # 托管引导（任务 020）：下载资产的 SHA256 校验。
 sha2.workspace = true
 

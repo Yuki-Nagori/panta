@@ -10,6 +10,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quality:
+    name: cargo quality (deny, machete)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal
+
+      # 固定版本见 ai-docs/modules/quality-tooling.md（任务 032）；升级必须
+      # 同 commit 更新此处的 --version 与规范。
+      - name: Install pinned quality tools
+        shell: bash
+        run: |
+          cargo install cargo-deny --locked --version 0.20.2
+          cargo install cargo-machete --locked --version 0.9.2
+
+      - name: Dependency and license audit
+        shell: bash
+        run: cargo deny check
+
+      - name: Unused dependency check
+        shell: bash
+        run: cargo machete
+
+  coverage:
+    name: rust coverage report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          # llvm-tools-preview 提供 llvm-profdata/llvm-cov（覆盖率合并所需）。
+          rustup toolchain install "$channel" --profile minimal --component llvm-tools-preview
+
+      - name: Install pinned coverage tool
+        shell: bash
+        run: cargo install cargo-llvm-cov --locked --version 0.9.1
+
+      # 覆盖率报告（任务 032）：launcher（启动胶水）按登记理由排除，C++
+      # 覆盖率另行测量。当前为基线报告；100% line 门禁在缺口清零后启用
+      # （032 记录：panta-dslc 0%、panta-dsl-core 66.94% 为主要缺口）。
+      - name: Coverage report
+        shell: bash
+        run: cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only
+
   rust:
     name: rust (${{ matrix.os }})
     strategy:

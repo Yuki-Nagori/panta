@@ -8,7 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-panta-dsl-core = { path = "../panta-dsl-core" }
+panta-dsl-core.workspace = true
 
 [lints]
 workspace = true

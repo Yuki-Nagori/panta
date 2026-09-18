@@ -61,6 +61,20 @@ if(BUILD_TESTING)
   set_tests_properties(Qml.ThemeComponentParameters PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
   )
+  # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
+  # 同源、同版本锁定），三平台同路径。
+  find_program(PANTA_QMLFORMAT_EXECUTABLE
+    NAMES qmlformat
+    PATHS "${QT_STAGING}/bin"
+    NO_DEFAULT_PATH
+    REQUIRED
+  )
+  add_test(NAME Qml.FormatCheck
+    COMMAND "${CMAKE_COMMAND}"
+      "-DQMLFMT=${PANTA_QMLFORMAT_EXECUTABLE}"
+      "-DQML_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/../native/cmake/tests/check-qml-format.cmake"
+  )
 endif()
 
 # 资源扩展点：未来图标/内置资源在此追加 qt_add_resources（资源入口，任务 005 决策）。

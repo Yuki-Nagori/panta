@@ -21,10 +21,12 @@ repository = "https://github.com/Yuki-Nagori/panta"
 [workspace.dependencies]
 cxx = "1.0.202"
 cxx-build = "1.0.202"
-panta-core = { path = "crates/panta-core" }
+panta-core = { path = "crates/panta-core", version = "0.1.0" }
+panta-dsl-core = { path = "crates/panta-dsl-core", version = "0.1.0" }
+panta-ffi = { path = "crates/panta-ffi", version = "0.1.0" }
 pest = "2.8"
 pest_derive = "2.8"
-quick-xml = { version = "0.38", features = ["serialize"] }
+quick-xml = { version = "0.41", features = ["serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 
