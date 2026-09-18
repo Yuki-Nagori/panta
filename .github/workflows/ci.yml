@@ -1,7 +1,9 @@
-# 质量与构建门禁（任务 011/018/032）：
-# - quality：依赖审计（RustSec/许可证/重复与通配）与未使用依赖检查，单平台；
-# - coverage：Rust 函数 89% / 行 92% 阶段下限；100% 目标尚未达成。
-# - rust：三平台完整构建、测试、格式与 clippy 门禁。
+# 质量与构建门禁（任务 011/018/032/043）：
+# - check：唯一跨平台 job；每个平台都执行 check、build、test；
+# - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位；
+# - format：Ubuntu 上通过 cargo format 检查 Rust、C++/CXX、CMake、QML；
+# - dependency-audit：Ubuntu 上执行 RustSec、许可证、重复与通配审计；
+# - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++/QML instrumentation 报告。
 name: CI
 
 on:
@@ -14,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: cargo quality (deny, machete)
+  dependency-audit:
+    name: cargo deny (ubuntu)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -28,22 +30,71 @@ jobs:
 
       # 固定版本见 ai-docs/modules/quality-tooling.md（任务 032）；升级必须
       # 同 commit 更新此处的 --version 与规范。
-      - name: Install pinned quality tools
+      - name: Install pinned dependency audit tool
         shell: bash
-        run: |
-          cargo install cargo-deny --locked --version 0.20.2
-          cargo install cargo-machete --locked --version 0.9.2
+        run: cargo install cargo-deny --locked --version 0.20.2
 
       - name: Dependency and license audit
         shell: bash
         run: cargo deny check
 
-      - name: Unused dependency check
+  lint:
+    name: cargo lint (${{ matrix.tool }}, ubuntu)
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [clippy, machete, cmake, qmllint, clang-tidy, iwyu, cppcheck]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
         shell: bash
-        run: cargo machete
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
+
+      - name: Install Cargo machete
+        if: matrix.tool == 'machete'
+        shell: bash
+        run: cargo install cargo-machete --locked --version 0.9.2
+
+      - name: Prepare uv for cargo lint cmake
+        if: matrix.tool == 'cmake'
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install external native analyzers
+        if: matrix.tool == 'clang-tidy' || matrix.tool == 'iwyu' || matrix.tool == 'cppcheck'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y clang-tidy cppcheck iwyu
+
+      - name: Run selected lint
+        shell: bash
+        run: cargo lint "${{ matrix.tool }}"
+
+  format:
+    name: cargo format (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare uv for cargo format
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt
+
+      - name: Run aggregated cargo format (Rust, C++/CXX, CMake and QML)
+        shell: bash
+        run: cargo format
 
   coverage:
-    name: rust coverage gate
+    name: rust coverage gate (ubuntu)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -66,8 +117,49 @@ jobs:
         shell: bash
         run: cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92
 
-  rust:
-    name: rust (${{ matrix.os }})
+  native-coverage:
+    name: native C++ and QML coverage (ubuntu)
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+      PANTA_NATIVE_COVERAGE: "1"
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/target/native-coverage/%p.profraw
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal --component llvm-tools-preview
+
+      - name: Run native and QML tests with LLVM instrumentation
+        shell: bash
+        run: |
+          mkdir -p target/native-coverage
+          cargo test --locked
+
+      - name: Report native coverage
+        shell: bash
+        run: |
+          profdata="$(rustup which llvm-profdata)"
+          cov="$(rustup which llvm-cov)"
+          mapfile -t profiles < <(find target/native-coverage -name '*.profraw' -type f -print)
+          test "${#profiles[@]}" -gt 0
+          "$profdata" merge -sparse "${profiles[@]}" -o target/native-coverage/native.profdata
+          mapfile -t binaries < <(find target/native/debug -type f -perm -111 -name '*_test' -print)
+          test "${#binaries[@]}" -gt 0
+          objects=("${binaries[0]}")
+          for binary in "${binaries[@]:1}"; do
+            objects+=("-object" "$binary")
+          done
+          "$cov" report -instr-profile=target/native-coverage/native.profdata "${objects[@]}" \
+            --ignore-filename-regex='(/target/|googletest|/usr/)' \
+            --show-region-summary=false
+
+  check:
+    name: cargo check, build and test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -89,12 +181,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Linux graphics development package
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y libgl1-mesa-dev
-
       - name: Install pinned toolchain
         shell: bash
         run: |
@@ -112,14 +198,11 @@ jobs:
           restore-keys: |
             panta-${{ runner.os }}-${{ runner.arch }}-${{ matrix.cache_compiler }}-${{ matrix.cmake_generator }}-
 
-      - name: Build
-        run: cargo build --locked
+      - name: Check workspace and all aggregated targets
+        run: cargo check --locked --workspace --all-targets
+
+      - name: Build workspace and native targets
+        run: cargo build --locked --workspace
 
       - name: Test
         run: cargo test --locked
-
-      - name: Format
-        run: cargo fmt --all -- --check
-
-      - name: Clippy
-        run: cargo clippy --locked --all-targets -- -D warnings

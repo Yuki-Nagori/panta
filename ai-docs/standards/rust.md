@@ -19,7 +19,8 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 - `unsafe` 集中在边界模块，每处注明安全前提、所有者和线程条件。workspace 默认 `unsafe_code = "deny"`，唯一 allow 挂在 CXX 桥接模块上、只覆盖宏生成胶水；该 allow 只收窄不外扩，新增手写 unsafe 需专用模块并逐块写 `// SAFETY:`。不得为了通过类型检查无依据实现 `Send`/`Sync`。
 - 大型数据使用明确所有者和借用/共享策略；`Arc` 解决共享所有权，不自动保证内部修改安全。异步运行时是否引入由具体任务决定，不先堆叠多套 runtime。
 - panic 不作为业务错误；FFI 捕获策略依赖 panic 配置，`panic=abort` 不可由 `catch_unwind` 恢复。引擎隔离依靠外部进程，不能靠捕获 panic 承诺所有故障可恢复。
+- 单元测试留在被测 `.rs` 的 `#[cfg(test)]` 模块中以访问私有项；公共 API 的黑盒/跨模块测试放对应 crate 的 `tests/`。根跨语言聚合测试只放 [测试规范](testing.md) 规定的 `tests/integration/`。
 
 ## 验证
 
-`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 是当前 Rust 质量入口；领域测试覆盖输入修订、取消、错误转换，随首个业务 crate 建立。涉及 FFI 时同时运行 native 侧测试。
+`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 是 Rust-only 质量入口；跨语言项目验证使用根 `cargo format`、`cargo lint` 和 `cargo test`。领域测试覆盖输入修订、取消、错误转换，随首个业务 crate 建立。涉及 FFI 时同时运行 native 侧测试。

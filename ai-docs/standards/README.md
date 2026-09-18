@@ -12,6 +12,7 @@
 | 文件、产物与忽略规则 | [仓库文件规范](repository-hygiene.md) | 添加配置、目录、资产或依赖 |
 | 文档与示例 | [文档规范](documentation.md) | 新建/修改文档、任务或示例 |
 | 验证与变更评审 | [验证与评审](validation-and-review.md) | 实施和完成任务 |
+| 测试目录与入口 | [测试规范](testing.md) | 新增、移动或注册 Rust/C++/QML 测试 |
 
 ## 技术规范
 

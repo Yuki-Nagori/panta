@@ -43,7 +43,7 @@
 
 ## 预计改动
 
-现存 native/、native/app/tests/、qml/、qml/AppNoBridge.qml、launcher build.rs 与构建配置；不新增无长期用途的示例模块。上述新增路径/类型均以实际模块归属为准。
+现存 native/、tests/cpp/app/、qml/、qml/AppNoBridge.qml、launcher build.rs 与构建配置；不新增无长期用途的示例模块。上述新增路径/类型均以实际模块归属为准。
 
 ## 清理与兼容例外
 

@@ -87,8 +87,8 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 | 2026-09-18 | `cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92` | 通过：函数 89.69%（30/291 未进入），行 94.23%（163/2826 未覆盖）；仍有实际报告缺口，未宣称 100% |
 
 | 2026-09-18 | 完整 `cargo test --locked --workspace`，macOS arm64 / rustc 1.98.1；CMake 4.3.3 / clang-format 20.1.0 / Qt 6.11.2，使用本地固定/缓存供给 | 101 项 Rust/聚合测试通过，含 CTest 28/28、qmllint、自有 native + CXX 格式。沙箱内初跑 Qt 测试配置目录不可写，扩大执行权限后全部通过；新增纳管的两个 CXX 源文件已格式化 |
-| 2026-09-18 | `cargo test --locked --release --target-dir target/review-target -p panta-launcher --test native_suite`（复用第三方缓存） | Release 与自定义 target-dir 的聚合 2/2、CTest 28/28，通过；从 build.rs 导出当前构建树/配置，不再读取 Debug 旧产物 |
-| 2026-09-18 | 同一覆盖率数据分别运行 `cargo llvm-cov report --summary-only --fail-under-functions 100` 与 `--fail-under-lines 100`；临时 CTest 夹具编译真实 native_suite | 两个覆盖率受控失败均 exit 1；空套件与失败用例均使聚合测试 exit 101，成功夹具 exit 0 |
+| 2026-09-18 | `cargo test --locked --release --target-dir target/review-target -p panta-tests --test native`（复用第三方缓存） | Release 与自定义 target-dir 的聚合 2/2、CTest 28/28，通过；从 build.rs 导出当前构建树/配置，不再读取 Debug 旧产物 |
+| 2026-09-18 | 同一覆盖率数据分别运行 `cargo llvm-cov report --summary-only --fail-under-functions 100` 与 `--fail-under-lines 100`；临时 CTest 夹具编译根 `tests/integration/native.rs` | 两个覆盖率受控失败均 exit 1；空套件与失败用例均使聚合测试 exit 101，成功夹具 exit 0 |
 | 2026-09-18 | `cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、差异空白检查 | 通过。Linux/Windows 的本轮 CI 尚未运行；未将其写成本地已验证 |
 
 ## 风险与回退
@@ -98,6 +98,7 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 ## 决策与工作记录
 
 - 2026-09-18（native 与门禁批次）：聚合测试与 formatter 供给、既有 C++ 格式归一一起交付；修复 profile/target-dir、Windows ctest.exe 与多配置 -C、空套件误报，串行执行 qmllint/CTest。formatter 按版本/摘要隔离缓存，复用也校验，下载完成后原子落位；格式扫描纳入自有 CXX 并传播目录读取失败。032 与 011 在此不可分割（工具供给与统一执行入口相互依赖）。清除硬编码 Debug、PATH ctest 回退和失实覆盖率结论；无兼容层。未完成项仍保留，后续统一 LLVM 供给时须同步工具决策。
+- 2026-09-18：任务 043 将 Clang-Tidy、IWYU、Cppcheck、cargo-machete 和 cmake-lint 纳入根 `cargo lint`；IWYU 专注 include，Cppcheck 开启 unusedFunction，移除与两者重叠且 Python 3.14 不兼容的 Cppclean；cmake-format 由 uv 锁定并纳入 `cargo format`。
 
 - 2026-09-18（本轮评审）：修正指标与 CI 矛盾、全局阈值防下降和无依据排除；补齐阶段门禁说明。native 聚合须修复 Windows 后缀、配置/target-dir、空套件、源码扫描吞错与 formatter 缓存身份；无兼容例外。
 - 2026-09-18（Rust 测试批次）：新增 DSL 24 项公共 API 行为测试、FFI 取消/失败事件和路径类别/读写链验证；测试错误使用 Error + ? 传播。评审修复关闭线程测试吞掉 submit 失败，恢复 CLI 完整 usage 断言，删除只为覆盖率实例重复调用的 CLI 测试和冗余 dev-dependency。原始暂存中的重复/矛盾工作日志已收敛；未更改生产业务契约。

@@ -1,17 +1,15 @@
 # 014 — 后续 Python 工具环境
 
-- 状态：deferred
-- 阶段：MVP 后续能力
+- 状态：done
+- 阶段：验证基础
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P2
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-18
 
 ## 目标与背景
 
-在开始 Python 自动化任务时建立可复现工具环境，保留与桌面核心的清晰边界。
-
-本任务暂时搁置，仍保留为后续任务，不从任务索引中删除。当前 MVP 聚焦 OpenCASCADE、Netgen、自研 CFD 与 VTK 的 CAE 主链路，暂不接入 Python 工具环境、Python API 或 Python 驱动的工作流。拟改路径不代表文件已存在，执行前核对依赖任务的实际产物。
+为质量门禁提供可复现的 Python 工具环境，当前只承载 `cmakelang` 的 CMake 格式检查。Python 工具通过 `uv` 和 `uv.lock` 管理，与桌面运行时、Python API 和 native ABI 保持边界。
 
 ## 必读
 
@@ -24,24 +22,24 @@
 
 ## 范围与非目标
 
-范围：完成下列步骤与验收所需的最小基础设施。
+范围：`pyproject.toml`、`uv.lock`、Python 3.12+ 约束，以及由根 `cargo format`/`cargo lint cmake` 调用的 `cmake-format` 与 `cmake-lint`。
 
-非目标：当前阶段不嵌入解释器，不实现 pybind11/Rust binding，不为 MVP 提供 Python 入口，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。未来恢复本任务时，再根据第一个真实 Python 工具用途确定是否需要解释器、binding 或独立进程。
+非目标：不嵌入解释器，不实现 pybind11/Rust binding，不为 MVP 提供 Python 入口，不把 Cppclean 引入质量门禁；Cppclean 与 IWYU/Cppcheck 职责重叠且其旧版包无法在 Python 3.14 构建。
 
 ## 前置条件与待决策
 
-开始条件：本任务当前为 deferred，不进入 MVP 实施队列。后续恢复时，所列依赖任务须完成且有验证记录；动手前核实首个真实 Python 工具、所需工具和主平台。步骤中尚未确定的版本、接口、目录或工具须先写入下方决策记录，并同步受影响规范。暂缓不等同 blocked，也不表示任务取消。
+开始条件：质量工具链需要 CMake formatter，且 `uv` 可在开发机与 CI 获取。Python 最低版本、依赖版本和命令写入 `pyproject.toml`/`uv.lock`，不安装到系统 Python。
 
 ## 实施步骤
 
-1. 确认首个真实 Python 工具用途，选择并固定解释器、环境和依赖锁定方案。
-2. 创建 pyproject 配置，记录 requires-python、开发依赖与入口，不提前添加 native binding 包。
-3. 为实际工具建立模块入口、类型/格式约定和必要错误处理。
-4. 验证新虚拟环境重建、非 ASCII/空格路径及 import 无副作用。
+1. 确认 CMake 格式检查是首个实际 Python 工具用途，选择 uv 和 Python 3.12+。
+2. 创建 `pyproject.toml`，固定 `cmakelang==0.6.13`，生成并提交 `uv.lock`。
+3. 在 `tests/src/main.rs` 中通过 `uv run --locked cmake-format --check` 与 `uv run --locked cmake-lint` 检查所有 CMakeLists/`.cmake` 文件。
+4. CI 安装 uv；本地和 CI 均从锁文件运行，不修改系统 Python。
 
 ## 预计改动
 
-pyproject.toml、依赖锁、python/ 下实际工具与使用说明。执行前根据真实结构修订；不得顺手实现非目标功能。
+`pyproject.toml`、`uv.lock`、`tests/src/main.rs`、`.github/workflows/ci.yml`、README、质量工具链模块和 Python 规范。
 
 ## 清理与兼容例外
 
@@ -49,12 +47,12 @@ pyproject.toml、依赖锁、python/ 下实际工具与使用说明。执行前�
 
 ## 验收标准
 
-- [ ] 新环境按记录重建并运行实际工具，Python 最低版本声明与实测版本一致。
-- [ ] import 不启动 GUI 或执行工程修改，工具失败返回非零并保留错误上下文。
-- [ ] README 明确此任务仅提供工具环境，不宣称 Python CAE API/headless 已实现。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [x] 新环境按记录重建依赖并运行 `uv run --locked cmake-format --version` 与 `uv run --locked cmake-lint --version`，Python 最低版本声明与实测版本一致。
+- [x] 格式工具不启动 GUI 或修改工程；格式失败返回非零并保留文件路径上下文。
+- [x] README 明确此任务只提供质量工具环境，不宣称 Python CAE API/headless 已实现。
+- [x] 已同步 Python 规范、质量模块、当前可用命令和 task-index 状态。
 
-- [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 未引入旧实现或兼容代码；Cppclean 未纳入门禁，旧引用已清理。
 
 ## 验证计划与结果
 
@@ -62,18 +60,19 @@ pyproject.toml、依赖锁、python/ 下实际工具与使用说明。执行前�
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| — | 尚未执行 | 无实现证据 |
+| 2026-09-18 | `UV_CACHE_DIR=/private/tmp/panta-uv-cache uv lock`；`uv run --locked cmake-format --version`；Python 3.14.0 | 依赖锁定成功，cmakelang 0.6.13 可执行；开发环境使用 uv 临时缓存以避免写入用户缓存目录 |
+| 2026-09-18 | 根 `cargo format` 的 CMake 文件枚举与 `actionlint .github/workflows/ci.yml` | 已接入 `native/`、`qml/`、`tools/` 下 CMakeLists/`.cmake`；CI format job 安装 uv 并调用根入口 |
 
 ## 风险与回退
 
-Python 工具环境可能提前演变为第二套业务 API 或隐式桌面依赖；只围绕第一个实际工具建环境，bindings 另立任务。回退仅撤销本任务自身变更，保留已有工作与此前有效产物；范围扩大时先拆分任务。
+cmakelang 版本较旧，升级时必须重新核对 Python 支持矩阵和格式输出；uv lock 失败应阻止 CI，不回退到系统 pip。Python API、bindings 和业务脚本另立任务。
 
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施。
-- 2026-09-16：根据 MVP 范围决定暂时搁置本任务。MVP 先实现 OpenCASCADE + Netgen + 自研 CFD + VTK 的 CAE 主链路；Python tooling 保留为后续能力，待出现首个真实自动化工具需求后恢复。
-- 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
+- 2026-09-18：质量门禁需要 CMake formatter，任务恢复；统一使用 uv，锁定 Python 3.12+ 与 cmakelang 0.6.13，根 `cargo format` 负责调度。
+- 2026-09-18：评估 Cppclean 0.13；该包在 Python 3.14 的构建后端失败，且职责与 IWYU/Cppcheck 重叠，移除而不登记兼容例外。
 
 ## 完成摘要
 
-已暂时搁置，未实施。恢复后填写实现行为、验证证据、剩余限制和后续 task；全部验收有证据后才标 done。该任务保留，后续仍会推进，不标记为 cancelled。
+已完成。`uv.lock` 固定 cmakelang 0.6.13，根 `cargo format` 检查 Rust、C++/CXX、CMake 和 QML；未引入 Python 运行时或业务 API。

@@ -39,7 +39,7 @@
 
 ## 预计改动
 
-`native/CMakeLists.txt`、`native/foundation/tests/version_test.cpp`、`native/foundation/CMakeLists.txt`（测试定义）；新增 `ai-docs/standards/gtest.md`；更新 dependency-acquisition 固定清单、baseline、规范索引、task-index。与实际一致。
+`native/CMakeLists.txt`、`tests/cpp/foundation/version_test.cpp`、`native/foundation/CMakeLists.txt`（测试定义）；新增 `ai-docs/standards/gtest.md`；更新 dependency-acquisition 固定清单、baseline、规范索引、task-index。与实际一致。
 
 ## 清理与兼容例外
 
@@ -64,7 +64,7 @@
 | 2026-09-16 | `BUILD_TESTING=OFF` 独立目录 configure+build+install（显式 prefix） | `_deps` 不存在（零拉取）、仅构建 `panta_foundation`、安装树完整；`ctest` 报 no tests |
 | 2026-09-16 | debug 安装树复查 | 无任何 gtest 产物（`INSTALL_GTEST=OFF` + EXCLUDE_FROM_ALL）；与 003 安装清单一致 |
 | 2026-09-16 | 无改动重建；`clang-format --dry-run -Werror` | `ninja: no work to do`；格式通过 |
-| 2026-09-16 | 编辑器误报处理：`EXPECT_EQ` 展开在 IntelliSense 报"表达式必须包含 bool 类型"（error 711） | 实际编译 `-std=c++20` + ctest 通过（compile_commands.json 已核实含 `-std=c++20` 与 gtest 头路径）——确认为编辑器未使用真实编译配置的误报；`.vscode` 增加 `cmake.copyCompileCommands`/`C_Cpp.default.compileCommands`/`cppStandard`，处理说明写入 gtest.md |
+| 2026-09-16 | 编辑器误报处理：`EXPECT_EQ` 展开在 IntelliSense 报"表达式必须包含 bool 类型"（error 711） | 实际编译 `-std=c++20` + ctest 通过（compile_commands.json 已核实含 `-std=c++20` 与 gtest 头路径）——确认为编辑器未使用真实编译配置的误报；`.vscode` 指向 `target/native/debug/compile_commands.json`，保留 `cmake.copyCompileCommands` 副本并显式 `cppStandard`，处理说明写入 gtest.md |
 
 未覆盖：Windows CRT 匹配（`gtest_force_shared_crt`）无本机验证，待 012 runner；gmock 未启用未验证；Rust 侧与 native 测试的统一聚合归 011。
 
@@ -79,7 +79,7 @@ FetchContent 使 configure 依赖网络（与托管原则一致，首次构建�
 - 2026-09-16（决策）门控：`include(CTest)` + `BUILD_TESTING`（默认 ON）；OFF 时零拉取零构建（实测），004 的发布链可关闭测试。
 - 2026-09-16（决策）`BUILD_GMOCK=OFF`：当前无 mock 场景，需要时按对应 task 打开并说明边界；规则已写入 gtest.md。
 - 2026-09-16（决策）注册用 `gtest_discover_tests`（每用例独立 CTest 项），不用整体 `add_test`；测试名即过滤名。2026-09-17 起多配置生成器使用 `DISCOVERY_MODE PRE_TEST`，把测试发现延后到 ctest，避免构建阶段缺少 Qt runtime 阻断产物生成。
-- 2026-09-16（补充，维护者反馈）：编辑器对 `EXPECT_EQ` 展开报"非 bool"（cpptools error 711）属 IntelliSense 未使用真实编译配置的误报；共享 `.vscode/settings.json` 增加 `cmake.copyCompileCommands` + `C_Cpp.default.compileCommands`（指向 gitignored 的 `native/compile_commands.json`）与 `cppStandard=c++20`，处理指引写入 gtest.md。判定依据：真实编译带 `-std=c++20` 且 ctest 绿（见验证表）。
+- 2026-09-16（补充，维护者反馈）：编辑器对 `EXPECT_EQ` 展开报"非 bool"（cpptools error 711）属 IntelliSense 未使用真实编译配置的误报；共享 `.vscode/settings.json` 指向 gitignored 的 `target/native/debug/compile_commands.json`，同时保留 `cmake.copyCompileCommands` 与 `cppStandard=c++20`，处理指引写入 gtest.md。判定依据：真实编译带 `-std=c++20` 且 ctest 绿（见验证表）。
 - 2026-09-16（实施）实施中修正两处自身问题并记录：初稿在注释里写了 `include(GoogleTest)` 却漏了实际命令（报 Unknown CMake command）；失败还原用 `mv` 保留了旧 mtime，ninja 判定无需重编导致"复绿"假阳性——以 `touch` 强制重建后真实验证。此坑对增量构建验证有普遍意义，收录于验证表。
 - 待记录：gmock 启用时机（首个模块边界 mock 场景的 task）。
 

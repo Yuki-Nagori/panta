@@ -2,7 +2,7 @@
 
 查阅日期：2026-09-16。状态：项目规范，随任务 019 落地；版本固定见 [依赖获取](dependency-acquisition.md)。
 
-适用于 `native/` 下自有代码的单元与行为测试。Rust 侧测试遵循 [Rust](rust.md)，跨模块场景测试归 [验证与评审](validation-and-review.md)。
+适用于 `tests/cpp/` 下自有代码的单元与行为测试。CMake 注册仍位于被测模块的 `native/**/CMakeLists.txt`；Rust 侧测试遵循 [Rust](rust.md)，目录归属和根入口见 [测试规范](testing.md)。
 
 ## 官方依据
 
@@ -20,7 +20,7 @@ GoogleTest 的断言在失败时输出表达式与两侧值；`EXPECT_*` 失败�
 - 字符串比较用 `EXPECT_STREQ`/`std::string` 的 `EXPECT_EQ`，不手写 `strcmp` 包装。
 - 参数化用例（`TEST_P`）仅在多实现/多输入矩阵场景使用，不为结构整齐引入；death test（`EXPECT_DEATH`）仅用于进程级不可恢复路径，使用前确认该路径确为 abort/exit 而非可恢复错误。
 - mock（gmock，随 googletest 提供）只用于模块边界的外部依赖隔离，不为内部实现细节打桩；引入时在对应 task 说明被隔离的边界。
-- 测试二进制命名 `<被测目标>_test`（如 `panta_foundation_version_test`），与被测目标同目录放置；不把测试产物加入安装与导出。
+- 测试源按 `tests/cpp/<module>/` 分类；二进制命名 `<被测目标>_test`（如 `panta_foundation_version_test`），构建产物只在构建树中生成，不把测试产物加入安装与导出。
 - 获取与注册：googletest 经 FetchContent 按 [依赖获取](dependency-acquisition.md) 固定点拉取，仅在 `BUILD_TESTING` 下启用并 `EXCLUDE_FROM_ALL`；注册用 `gtest_discover_tests`，ctest 过滤用 `ctest --test-dir <dir> -R <用例名>`。
 - 第三方隔离：本项目告警选项只作用于自有 target，不为 gtest 关闭或放宽自有告警；gtest 自身的编译选项不回灌本树。
 
@@ -28,4 +28,4 @@ GoogleTest 的断言在失败时输出表达式与两侧值；`EXPECT_*` 失败�
 
 干净目录下 `BUILD_TESTING=ON`（默认）configure 后，gtest 以固定版本拉取并注册独立用例；`ctest` 全绿且失败注入可见 gtest 上下文。`BUILD_TESTING=OFF` 时不拉取、不构建 gtest，安装树不含测试产物。测试断言遵循本页规则，不再出现手写断言循环；聚合入口与门禁由 [011](../task/011-test-quality-entrypoints.md) 统一。
 
-编辑器诊断以编译与 ctest 为准：`EXPECT_*` 宏展开后形如 `if (const AssertionResult gtest_ar = …)`，依赖 C++11 起的上下文 bool 转换；若 IntelliSense 未使用真实编译配置会误报"表达式必须包含 bool 类型"。共享 [.vscode/settings.json](../../.vscode/settings.json) 已指向 CMake 导出的 `compile_commands.json`（configure 后由 `cmake.copyCompileCommands` 同步到 `native/compile_commands.json`，该文件被 gitignore）并显式 `c++20`；遇此类误报先执行一次 `cmake --preset debug`，再重载编辑器窗口。
+编辑器诊断以编译与 ctest 为准：`EXPECT_*` 宏展开后形如 `if (const AssertionResult gtest_ar = …)`，依赖 C++11 起的上下文 bool 转换；若 IntelliSense 未使用真实编译配置会误报"表达式必须包含 bool 类型"。共享 [.vscode/settings.json](../../.vscode/settings.json) 已指向 Cargo 共享构建树中的 `target/native/debug/compile_commands.json`，并保留 CMake Tools 的 `native/compile_commands.json` 副本与 `c++20` 设置；遇此类误报先执行一次 `cargo build` 或 `cmake --preset debug`，再重载编辑器窗口。

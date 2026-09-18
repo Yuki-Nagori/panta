@@ -86,3 +86,5 @@
 ## 完成摘要
 
 产物与缓存归一完成并经三平台 CI 复跑验证（run 35226508625）：native 构建树固定 `target/native/<profile>`（Cargo 与 presets 共用），Qt/googletest 缓存共享于 `target/panta-deps/`，compile_commands.json 只存在于构建树内并经根 `.clangd` 提供给编辑器。磁盘效果：`target` 15G → 4.4G，`native/build`（1.6G）删除，launcher 哈希更替不再重下 Qt。已知边界：presets 单独 fresh configure 缺 FFI 缓存值会被早校验明确拒绝（需先 `cargo build` 一次）；切换 generator 需删除对应 profile 目录；同 profile 并发构建不受支持（与之前一致）。
+
+2026-09-18 复查发现 CMake 默认缓存会把 `CMAKE_EXPORT_COMPILE_COMMANDS` 留为空，导致 VS Code 即使指向正确构建树也找不到数据库；`native/cmake/build-policy.cmake` 现以 `CACHE BOOL ... FORCE` 确保导出开启。`cargo build` 已验证 `target/native/debug/compile_commands.json` 生成，`.vscode/settings.json` 与 `.clangd` 统一指向该路径，并保留 CMake Tools 的源码树副本。

@@ -25,10 +25,12 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 
 | 命令 | 当前行为 |
 |---|---|
-| `cargo build --locked` | 统一构建入口：Cargo 先生成 `panta-ffi` staticlib，再经 build.rs 调度 CMake/Ninja 构建 Rust workspace/native（Qt 预编译包等首次自动下载到 `target/`） |
-| `cargo build --locked --no-default-features` | 诊断构建：通过 Cargo feature 裁剪 `Panta.Bridge` 静态模块，构建不依赖 ViewModel 的最小 Shell；默认构建启用该模块 |
-| `cargo test --locked` | 运行 workspace 的 parser、CLI、launcher 单元测试，并聚合执行 native 全部测试与 qmllint及自有 C++ 格式检查（C++ GTest、QtTest、ABI/SDK/i18n 门禁，见任务 011） |
-| `cargo fmt --all -- --check` | Rust 格式检查（C++/QML 格式与 lint 见任务 003/005） |
+| `cargo build` | 统一构建入口：Cargo 先生成 `panta-ffi` staticlib，再经 build.rs 调度 CMake/Ninja 构建 Rust workspace/native（Qt 预编译包等首次自动下载到 `target/`） |
+| `cargo build --no-default-features` | 诊断构建：通过 Cargo feature 裁剪 `Panta.Bridge` 静态模块，构建不依赖 ViewModel 的最小 Shell；默认构建启用该模块 |
+| `cargo lint` | 根 `tests/` 入口统一执行 Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、IWYU 和 Cppcheck；工具缺失或任一检查失败即非零。可用 `cargo lint <tool>` 单独运行 |
+| `cargo test` | Cargo workspace 测试入口，并由根 `tests/` package 集成测试聚合 qmllint、完整 CTest/GTest/QtTest/QML 行为套件 |
+| `cargo format` | 根 `tests/` 入口检查 Rust、C++/CXX、CMake 和 QML 格式；只改 Rust 时使用官方 `cargo fmt --all -- --check` |
+| `cargo quality` | 依次执行 `cargo format`、`cargo lint`、依赖审计、Rust 测试和 native/QML 测试 |
 | `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典 |
 | `cargo run -p panta-dslc -- format --check resources/i18n/panta-cn.pa` | 检查 `.pa` 是否为规范格式；写回使用 `format <file>` |
 | `cargo run` | 启动 Qt Quick 主窗口（当前为骨架界面：主题、命令按钮、占位面板、错误展示入口） |
@@ -36,6 +38,8 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 作为完整 CAE 桌面（工程树/视口/属性区等）的体验仍是目标：[构建说明](ai-docs/architecture/build-and-development.md) 列出落地条件；托管引导（CMake/Ninja 二进制自动供给）见任务 020。
 
 native 直接诊断构建（不经 Cargo）仍可用：在 `native/` 下执行 `cmake --preset debug`、`cmake --build --preset debug`、`ctest --preset debug`、`cmake --install build/debug`。
+
+日常命令默认使用 Cargo 的常规依赖解析。CI 和需要复现锁文件的验证会显式追加 `--locked`（例如 `cargo test --locked`）；它要求已提交的 `Cargo.lock` 与 manifests 一致，不会自动更新锁文件。根 `tests/` 目录按 `src/` 调度器、`integration/` Cargo 聚合测试、`cpp/` C++ 测试和 `qml/` QML 测试分类；Rust 单元测试仍与被测实现同文件，跨 crate 行为测试放在对应 crate 的 `tests/`。
 
 ## 开始工作
 

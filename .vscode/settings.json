@@ -1,9 +1,24 @@
 {
-    // 共享推荐设置：仅使用 ${workspaceFolder} 相对引用，不含个人绝对路径。
+    // 共享设置只使用 ${workspaceFolder} 相对路径，不写入个人机器路径。
     "cmake.sourceDirectory": "${workspaceFolder}/native",
-    // configure 后把编译数据库复制到固定相对位置，供 IntelliSense 消费，
-    // 避免 gtest 等第三方宏在编辑器中出现"非 bool"等误报（gtest.md）。
+    "cmake.configurePreset": "debug",
+    "cmake.buildPreset": "debug",
+    "cmake.configureOnOpen": false,
+    // CMake Tools 配置后保留一份源码树副本，便于旧版插件读取；正式路径
+    // 仍是 Cargo 共享构建树中的 compile_commands.json。
     "cmake.copyCompileCommands": "${workspaceFolder}/native/compile_commands.json",
-    "C_Cpp.default.compileCommands": "${workspaceFolder}/native/compile_commands.json",
-    "C_Cpp.default.cppStandard": "c++20"
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/target/native/debug/compile_commands.json",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.intelliSenseMode": "${default}",
+    // 编译数据库尚未生成时提供最小回退路径；生成后以数据库中的 -I/-F
+    // 参数为准，避免手工 includePath 覆盖真实编译选项。
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/native/**",
+        "${workspaceFolder}/tests/cpp/**",
+        "${workspaceFolder}/tests/qml/**",
+        "${workspaceFolder}/crates/panta-ffi/include/**",
+        "${workspaceFolder}/target/panta-deps/qt/staging/include/**",
+        "${workspaceFolder}/target/panta-deps/qt/staging/lib/**/Headers"
+    ]
 }
