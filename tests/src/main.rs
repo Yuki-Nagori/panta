@@ -513,7 +513,10 @@ fn run_clang_tidy(includes_only: bool) -> Result<(), Box<dyn Error>> {
     for entry in commands {
         let file = entry.source();
         let mut command = Command::new(&tool);
-        command.envs(panta_build::windows_sdk_env(env!("PANTA_TEST_HOST"))?);
+        command.envs(panta_build::native_test_env(
+            target_root(),
+            env!("PANTA_TEST_HOST"),
+        )?);
         command.arg("-p").arg(&directory).arg("-quiet");
         if includes_only {
             command.arg("--checks=-*,misc-include-cleaner");
@@ -614,11 +617,7 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
         command.args(["-R", regex]);
     }
     command.current_dir(native_dir);
-    let status = command.status()?;
-    if status.success() {
-        return Ok(());
-    }
-    Err(format!("CTest 失败（退出码 {:?}）", status.code()).into())
+    run("ctest", command)
 }
 
 fn check_cpp_format() -> Result<(), Box<dyn Error>> {

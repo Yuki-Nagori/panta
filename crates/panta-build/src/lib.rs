@@ -323,12 +323,17 @@ fn find_binary(dir: &Path, name: &str) -> Option<PathBuf> {
                 return Some(candidate);
             }
         }
-        let entries = fs::read_dir(&directory).ok()?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                directories.push((path, depth + 1));
-            }
+        let Ok(entries) = fs::read_dir(&directory) else {
+            continue;
+        };
+        let mut children = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.is_dir())
+            .collect::<Vec<_>>();
+        children.sort();
+        for path in children {
+            directories.push((path, depth + 1));
         }
     }
     None
@@ -485,7 +490,7 @@ pub fn native_test_env(
     }
     let current_path = environment
         .iter()
-        .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
+        .find(|(key, _)| env_key_eq(key, "PATH"))
         .map(|(_, value)| value.clone())
         .or_else(|| std::env::var_os("PATH"))
         .unwrap_or_default();
@@ -495,13 +500,17 @@ pub fn native_test_env(
         std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
     if let Some((_, value)) = environment
         .iter_mut()
-        .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
+        .find(|(key, _)| env_key_eq(key, "PATH"))
     {
         *value = path;
     } else {
         environment.push((std::ffi::OsString::from("PATH"), path));
     }
     Ok(environment)
+}
+
+fn env_key_eq(key: &std::ffi::OsStr, expected: &str) -> bool {
+    key.to_string_lossy().eq_ignore_ascii_case(expected)
 }
 
 /// 官方 LLVM 不替代 Apple SDK；显式 sysroot 保证 CXX 和 CMake 使用同一套平台头文件。
@@ -708,7 +717,8 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        cmake_asset, exe_name, find_cmake_binary, hex, llvm_asset, ninja_asset, sha256_file,
+        cmake_asset, env_key_eq, exe_name, find_cmake_binary, hex, llvm_asset, ninja_asset,
+        sha256_file,
     };
     use super::{install_directory, python};
     use std::fs;
@@ -772,6 +782,13 @@ mod tests {
             "{error}"
         );
         Ok(())
+    }
+
+    #[test]
+    fn environment_keys_are_case_insensitive() {
+        assert!(env_key_eq(std::ffi::OsStr::new("PATH"), "Path"));
+        assert!(env_key_eq(std::ffi::OsStr::new("Path"), "PATH"));
+        assert!(!env_key_eq(std::ffi::OsStr::new("PATHEXT"), "PATH"));
     }
 
     #[test]
