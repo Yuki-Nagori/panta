@@ -484,6 +484,13 @@ pub fn native_test_env(
     if !qt_bin.is_dir() {
         return Err(format!("托管 Qt 运行库目录不存在：{}", qt_bin.display()));
     }
+    let qt_root = qt_bin
+        .parent()
+        .ok_or_else(|| format!("托管 Qt bin 目录没有安装根：{}", qt_bin.display()))?;
+    let qt_qml = qt_root.join("qml");
+    if !qt_qml.is_dir() {
+        return Err(format!("托管 Qt QML 模块目录不存在：{}", qt_qml.display()));
+    }
     let current_path = environment
         .iter()
         .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
@@ -504,7 +511,8 @@ pub fn native_test_env(
     } else {
         environment.push((std::ffi::OsString::from("PATH"), path));
     }
-    let import_path = native_dir.as_os_str().to_os_string();
+    let import_path = std::env::join_paths([qt_qml, native_dir.to_path_buf()])
+        .map_err(|error| format!("拼接 native 测试 QML 导入路径：{error}"))?;
     for key in ["QML2_IMPORT_PATH", "QML_IMPORT_PATH"] {
         environment.push((std::ffi::OsString::from(key), import_path.clone()));
     }

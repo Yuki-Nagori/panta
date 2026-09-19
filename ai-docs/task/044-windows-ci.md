@@ -48,13 +48,14 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 ## 决策与工作记录
 
 - 已确认原下载上限不包含所有重试：curl `--max-time 1800 --retry 3` 的单次计时会重置，可能累计约两小时；这与 Windows 停滞相关，但现有日志不足以证明它就是此次停滞根因。已增加下载总墙钟 30 分钟、解包 20 分钟的父进程限制及每 30 秒的阶段进度。
-- Windows check/build 开启 `-vv`，失败/取消时尝试收集已有 build script、CMake configure 和 CTest 日志。没有替换工具链、跳过测试或更改 SHA256；删除旧无整体超时的直接 `status()` 调用，不引入兼容分支。
+- 曾临时开启 Windows check/build 的 `-vv` 并上传失败诊断，用于定位工具链和 CTest 问题；根因确认后已清理这些排查选项与诊断步骤。没有替换工具链、跳过测试或更改 SHA256；删除旧无整体超时的直接 `status()` 调用，不引入兼容分支。
 - 早期远程验证曾因自动审批拒绝一次推送而暂停；随后已有提交 `69d8c16` 进入远程运行，故本条阻塞已解除，后续以真实 CI 日志为准。
 - 2026-09-19：远程运行 [35415943085](https://github.com/Yuki-Nagori/panta/actions/runs/35415943085) 验证了阶段日志；下载和 SHA256 校验成功，Windows `tar -xf` 解包 LLVM 在 20 分钟上限后退出码 1。Linux/macOS 同轮通过。确认故障点为 Windows 解包实现。
 - 2026-09-19：改用 LLVM 官方 `LLVM-22.1.7-win64.exe`（SHA256 `e091fcf...9a0d1eb3`）并在 staging 目录执行 NSIS `/S /D=...` 静默安装；保留同版本、同来源、同目录的 clang-cl/lld/clang-format。待下一次 Windows CI 验证。
 - 2026-09-19：新运行 [35418381255](https://github.com/Yuki-Nagori/panta/actions/runs/35418381255) 已证明安装包在 `target/panta-tools/llvm/...` 内约 64 秒完成；随后 clang-cl 因默认禁用异常而拒绝 CXX 生成代码中的 `throw`。已补 FFI/CMake 的 `/EHsc`，待下一次 Windows CI 验证。
 - 2026-09-19：运行 [35418599708](https://github.com/Yuki-Nagori/panta/actions/runs/35418599708) 的 Windows job 已完成 112/112 个 native 编译步骤，clang-cl 与链接均成功；launcher 因只检查 `target/native/debug/app/panta-native.exe` 而未覆盖生成器的配置目录/构建树根目录，误报产物缺失。恢复受限于 `target/native/<profile>` 的多布局探测。
 - 2026-09-19：运行 [35418983684](https://github.com/Yuki-Nagori/panta/actions/runs/35418983684) 已验证 check/build 与 launcher 产物定位通过；Test 的 CTest discovery 因 Windows 子进程缺少托管 Qt DLL，返回 `0xc0000135`。新增 native test 环境 PATH，将 `target/panta-deps/qt/staging/bin` 放在 MSVC SDK PATH 前，去除临时 CI 详细输出与失败诊断上传，待下一次 CI 验证。
+- 2026-09-19：提交 `922139c` 的运行 [35419894410](https://github.com/Yuki-Nagori/panta/actions/runs/35419894410) 已验证 Qt DLL 环境修复、`PathHostTest` 及 `Qml.FormatCheck` 通过；Windows 仍有 `Qml.ThemeComponentParameters` 与 `Qml.ShellModuleLoads` 失败。失败原因进一步收敛为测试进程缺少托管 Qt 的 QML 模块导入路径，已把 `target/panta-deps/qt/staging/qml` 与 native 模块目录加入 Windows 测试环境，待下一次 CI 验证。
 
 ## 完成摘要
 
