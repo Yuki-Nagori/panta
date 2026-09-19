@@ -108,7 +108,7 @@ _make_url("${_v1_archive}" _v1_url)
 # 场景 2 会删除源归档证明 marker 复用不经 URL；场景 3 的重下载重建需要
 # URL 可用，从字节级备份恢复，保证 SHA256 一致。
 set(_v1_archive_backup "${_fixtures}/fixture-v1.keep.tgz")
-file(COPY_FILE "${_v1_archive}" "${_v1_archive_backup}")
+configure_file("${_v1_archive}" "${_v1_archive_backup}" COPYONLY)
 
 # fixture v2（同包名不同版本，验证版本目录隔离）
 set(_v2 "${_fixtures}/sdk-v2")
@@ -206,7 +206,7 @@ endif()
 
 # ── 3. marker 损坏重建：清 staging 后经 URL 重新下载恢复（归档已随
 # 发布删除，离线复用只由 marker 承担；源归档从备份恢复以保证 SHA256） ──
-file(COPY_FILE "${_v1_archive_backup}" "${_v1_archive}")
+configure_file("${_v1_archive_backup}" "${_v1_archive}" COPYONLY)
 file(WRITE "${_staging1}/.panta-sdk-provisioned" "corrupted\n")
 _configure_consumer(
   "${TEST_BINARY_DIR}/case2-consumer"
