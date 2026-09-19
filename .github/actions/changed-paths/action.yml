@@ -4,7 +4,8 @@
 #   rust / native / qml —— 对应域是否有变更
 # 保守默认：未识别路径一律视为代码触发全量检查；纯文档是唯一可整场跳过的类别。
 # 基线：PR 对 base 分支取 merge-base diff，push 对 event.before 取累计 diff；
-# 新分支/强推/空 diff 回退全量。
+# 新分支/强推/空 diff 回退全量。调用方必须先 checkout 且 fetch-depth: 0
+#（本地 composite action 的解析本身依赖工作区已有仓库）。
 name: Changed path categories
 description: 按变更路径输出 code/cargo_deps/rust/native/qml 分类结果
 outputs:
@@ -21,10 +22,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v7
-      with:
-        fetch-depth: 0
-
     - id: filter
       shell: bash
       env:

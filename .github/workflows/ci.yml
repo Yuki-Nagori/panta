@@ -31,6 +31,12 @@ jobs:
       native: ${{ steps.filter.outputs.native }}
       qml: ${{ steps.filter.outputs.qml }}
     steps:
+      # 本地 composite action 的解析依赖工作区已有仓库，checkout 必须在
+      # 调用前完成；分类需要全量历史取 merge-base/before diff。
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - id: filter
         uses: ./.github/actions/changed-paths
 
