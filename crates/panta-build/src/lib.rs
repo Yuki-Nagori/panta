@@ -6,7 +6,8 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use fs2::FileExt;
 use sha2::{Digest, Sha256};
@@ -363,9 +364,11 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
         let archives = tools_root(target_root).join("archives");
         fs::create_dir_all(&archives).map_err(|e| e.to_string())?;
         let archive = archives.join(format!("{name}-{identity}.archive"));
+        eprintln!("[panta-tools] {name}：检查归档缓存 {}", archive.display());
         if !archive.is_file() || sha256_file(&archive)? != asset.sha256 {
             let partial = archives.join(format!("{name}-{identity}.partial"));
             download(&asset, &partial, name, tool.version())?;
+            eprintln!("[panta-tools] {name}：校验下载归档 SHA256");
             let actual = sha256_file(&partial)?;
             if actual != asset.sha256 {
                 fs::remove_file(&partial).map_err(|e| e.to_string())?;
@@ -404,8 +407,10 @@ pub fn install_lock(target_root: &Path, name: &str) -> Result<fs::File, String> 
         .write(true)
         .open(locks.join(format!("{name}.lock")))
         .map_err(|e| e.to_string())?;
+    eprintln!("[panta-tools] {name}：等待安装锁");
     file.lock_exclusive()
         .map_err(|e| format!("获取 {name} 安装锁失败：{e}"))?;
+    eprintln!("[panta-tools] {name}：已获得安装锁");
     Ok(file)
 }
 
@@ -424,6 +429,7 @@ pub fn install_directory(
         .as_deref()
         == Some(identity)
     {
+        eprintln!("[panta-tools] {name}：命中已完成缓存");
         return Ok(destination);
     }
     fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
@@ -438,6 +444,7 @@ pub fn install_directory(
         fs::remove_dir_all(&destination).map_err(|e| e.to_string())?;
     }
     fs::rename(&staging, &destination).map_err(|e| e.to_string())?;
+    eprintln!("[panta-tools] {name}：安装完成 {}", destination.display());
     Ok(destination)
 }
 
@@ -495,8 +502,8 @@ fn download(
     let mut command = Command::new("curl");
     command
         // 速度护栏针对 CI 实测的传输停滞：60 秒均值低于 1 KiB/s 即中止并
-        // 随 --retry 重试；总上限覆盖最大的 LLVM Windows 归档（约 2 GiB）。
-        // 无上限时 cargo 会静默等待 build script，job 挂满平台上限。
+        // 随 --retry 重试。curl 的 --max-time 会在每次重试时重置，
+        // 因而额外用父进程限制整个下载（包括重试）最多 30 分钟。
         .args([
             "-fSL",
             "--retry",
@@ -516,24 +523,11 @@ fn download(
         ])
         .arg(destination)
         .arg(asset.url);
-    match command.status() {
-        Ok(status) if status.success() => Ok(()),
-        Ok(status) => Err(format!(
-            "下载 {name} {version} 失败（curl 退出码 {}）：{}；\
-             可手动下载后放置到 {}",
-            status
-                .code()
-                .map(|code| code.to_string())
-                .unwrap_or_else(|| "信号".to_owned()),
-            asset.url,
-            destination.display()
-        )),
-        Err(error) => Err(format!(
-            "无法执行 curl：{error}。{name} {version} 需经 {} 下载；\
-             平台应自带 curl，受支持平台不使用本机 CMake/Ninja 旁路",
-            asset.url
-        )),
-    }
+    run_tool_command(
+        &mut command,
+        &format!("下载 {name} {version}：{}", asset.url),
+        Duration::from_secs(30 * 60),
+    )
 }
 
 fn extract(
@@ -542,37 +536,82 @@ fn extract(
     destination: &Path,
     cmake: Option<&Path>,
 ) -> Result<(), String> {
-    let result = match tool {
+    let mut command = match tool {
         // CMake 压缩包由平台自带 tar 解开（macOS/Windows 为 bsdtar，可直接
         // 读 zip；Linux 为 GNU tar，自动识别 gzip）。
-        Tool::Cmake | Tool::Llvm | Tool::Uv => Command::new("tar")
-            .arg("-xf")
-            .arg(archive)
-            .arg("-C")
-            .arg(destination)
-            .status(),
+        Tool::Cmake | Tool::Llvm | Tool::Uv => {
+            let mut command = Command::new("tar");
+            command.arg("-xf").arg(archive).arg("-C").arg(destination);
+            command
+        }
         Tool::Ninja => {
             let Some(cmake) = cmake else {
                 return Err("内部错误：解包 Ninja 需要 cmake 路径".to_owned());
             };
-            Command::new(cmake)
+            let mut command = Command::new(cmake);
+            command
                 .args(["-E", "tar", "xf"])
                 .arg(archive)
-                .current_dir(destination)
-                .status()
+                .current_dir(destination);
+            command
         }
     };
-    match result {
-        Ok(status) if status.success() => Ok(()),
-        Ok(status) => Err(format!(
-            "{name} 解包失败（退出码 {}）",
-            status
-                .code()
-                .map(|code| code.to_string())
-                .unwrap_or_else(|| "信号".to_owned()),
-            name = tool.name()
-        )),
-        Err(error) => Err(format!("无法执行解包工具：{error}")),
+    run_tool_command(
+        &mut command,
+        &format!("解包 {}：{}", tool.name(), archive.display()),
+        Duration::from_secs(20 * 60),
+    )
+}
+
+/// 保留工具实时输出，并限制整个子进程的墙钟时间；超时后终止并回收子进程。
+fn run_tool_command(command: &mut Command, stage: &str, timeout: Duration) -> Result<(), String> {
+    eprintln!("[panta-tools] {stage}：开始（上限 {timeout:?}）");
+    let started = Instant::now();
+    let mut child = command
+        .stdin(Stdio::null())
+        .spawn()
+        .map_err(|error| format!("{stage}：无法启动 {:?}：{error}", command.get_program()))?;
+    let mut next_progress = Duration::from_secs(30);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if status.success() {
+                    eprintln!("[panta-tools] {stage}：完成（{:?}）", started.elapsed());
+                    return Ok(());
+                }
+                return Err(format!("{stage}：失败（{status}）"));
+            }
+            Ok(None) => {}
+            Err(error) => {
+                if child.kill().is_ok() {
+                    let _ = child.wait();
+                }
+                return Err(format!("{stage}：无法查询子进程状态：{error}"));
+            }
+        }
+        let elapsed = started.elapsed();
+        if elapsed >= timeout {
+            child.kill().map_err(|error| {
+                format!(
+                    "{stage}：超时（上限 {timeout:?}），无法终止 PID {}：{error}",
+                    child.id()
+                )
+            })?;
+            let status = child
+                .wait()
+                .map_err(|error| format!("{stage}：超时后无法回收子进程：{error}"))?;
+            return Err(format!(
+                "{stage}：超时（上限 {timeout:?}），子进程已终止并回收（{status}）"
+            ));
+        }
+        if elapsed >= next_progress {
+            eprintln!(
+                "[panta-tools] {stage}：仍在运行（{elapsed:?}，PID {}）",
+                child.id()
+            );
+            next_progress = elapsed + Duration::from_secs(30);
+        }
+        std::thread::sleep(Duration::from_millis(100).min(timeout - elapsed));
     }
 }
 
@@ -616,6 +655,66 @@ mod tests {
     use super::{install_directory, python};
     use std::fs;
     use std::path::PathBuf;
+
+    #[test]
+    fn tool_process_fixture() {
+        match std::env::var("PANTA_TEST_TOOL_PROCESS").as_deref() {
+            Ok("fail") => std::process::exit(23),
+            Ok("stall") => std::thread::sleep(std::time::Duration::from_secs(60)),
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn tool_process_propagates_failure_and_terminates_stalls() -> Result<(), String> {
+        use std::process::Command;
+        use std::time::{Duration, Instant};
+        let executable = std::env::current_exe().map_err(|e| e.to_string())?;
+        let command = |mode| {
+            let mut command = Command::new(&executable);
+            command
+                .args(["--exact", "tests::tool_process_fixture"])
+                .env("PANTA_TEST_TOOL_PROCESS", mode);
+            command
+        };
+        super::run_tool_command(&mut command("success"), "fixture", Duration::from_secs(10))?;
+        let error = super::run_tool_command(
+            &mut command("fail"),
+            "fixture failure",
+            Duration::from_secs(10),
+        )
+        .err()
+        .ok_or("非零退出应失败")?;
+        assert!(
+            error.contains("fixture failure") && error.contains("23"),
+            "{error}"
+        );
+        let started = Instant::now();
+        let error = super::run_tool_command(
+            &mut command("stall"),
+            "fixture timeout",
+            Duration::from_millis(300),
+        )
+        .err()
+        .ok_or("停滞进程应超时")?;
+        assert!(
+            error.contains("fixture timeout") && error.contains("已终止并回收"),
+            "{error}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(10));
+        let error = super::run_tool_command(
+            &mut Command::new(executable.join("missing")),
+            "fixture missing",
+            Duration::from_secs(10),
+        )
+        .err()
+        .ok_or("缺少可执行文件应失败")?;
+        assert!(
+            error.contains("fixture missing") && error.contains("无法启动"),
+            "{error}"
+        );
+        Ok(())
+    }
 
     #[test]
     fn hex_encodes_lowercase_fixed_width() {
