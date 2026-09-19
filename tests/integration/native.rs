@@ -4,6 +4,7 @@ use std::process::Command;
 
 #[test]
 fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
+    let target_root = Path::new(env!("PANTA_TEST_TARGET_DIR"));
     let cmake = panta_build::resolve_cmake(Path::new(env!("PANTA_TEST_TARGET_DIR")))?;
     let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
     let build_type = env!("PANTA_TEST_BUILD_TYPE");
@@ -17,7 +18,10 @@ fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
     }
 
     let status = Command::new(cmake)
-        .envs(panta_build::windows_sdk_env(env!("PANTA_TEST_HOST"))?)
+        .envs(panta_build::native_test_env(
+            target_root,
+            env!("PANTA_TEST_HOST"),
+        )?)
         .args(["--build"])
         .arg(native_dir)
         .args(["--config", build_type, "--target", "all_qmllint"])
@@ -27,7 +31,10 @@ fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
     }
 
     let status = Command::new(ctest)
-        .envs(panta_build::windows_sdk_env(env!("PANTA_TEST_HOST"))?)
+        .envs(panta_build::native_test_env(
+            target_root,
+            env!("PANTA_TEST_HOST"),
+        )?)
         .args(["--output-on-failure", "--no-tests=error", "-C", build_type])
         .current_dir(native_dir)
         .status()?;

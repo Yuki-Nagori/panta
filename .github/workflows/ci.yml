@@ -179,11 +179,10 @@ jobs:
             panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
 
       - name: Check workspace and all aggregated targets
-        # Cargo 默认隐藏 build script 输出；Windows 供给停滞时需实时看到阶段。
-        run: cargo check --locked --workspace --all-targets ${{ runner.os == 'Windows' && '-vv' || '' }}
+        run: cargo check --locked --workspace --all-targets
 
       - name: Build workspace and native targets
-        run: cargo build --locked --workspace ${{ runner.os == 'Windows' && '-vv' || '' }}
+        run: cargo build --locked --workspace
 
       - name: Verify Cargo-provisioned toolchain
         shell: bash
@@ -191,15 +190,3 @@ jobs:
 
       - name: Test
         run: cargo test --locked
-
-      - name: Upload Windows build diagnostics
-        if: ${{ always() && runner.os == 'Windows' && (failure() || cancelled()) }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build-diagnostics
-          path: |
-            target/debug/build/panta-*/output
-            target/debug/build/panta-*/stderr
-            target/native/debug/CMakeFiles/CMakeConfigureLog.yaml
-            target/native/debug/Testing/Temporary/LastTest.log
-          if-no-files-found: warn

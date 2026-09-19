@@ -101,7 +101,10 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
     let native = target.join("native/debug-coverage");
     let cmake = panta_build::resolve_cmake(target)?;
     let mut test = Command::new(cmake.with_file_name(executable_name("ctest")));
-    test.envs(panta_build::windows_sdk_env(env!("PANTA_TEST_HOST"))?);
+    test.envs(panta_build::native_test_env(
+        target,
+        env!("PANTA_TEST_HOST"),
+    )?);
     test.current_dir(&native)
         .args(["--output-on-failure", "--no-tests=error"])
         .env("LLVM_PROFILE_FILE", &profile_file);
@@ -579,7 +582,10 @@ fn run_qmllint() -> Result<(), Box<dyn Error>> {
     let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
     let build_type = env!("PANTA_TEST_BUILD_TYPE");
     let mut command = Command::new(cmake);
-    command.envs(panta_build::windows_sdk_env(env!("PANTA_TEST_HOST"))?);
+    command.envs(panta_build::native_test_env(
+        target_root(),
+        env!("PANTA_TEST_HOST"),
+    )?);
     command.args(["--build"]).arg(native_dir).args([
         "--config",
         build_type,
@@ -599,7 +605,10 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
         return Err(format!("ctest 不存在：{}", ctest.display()).into());
     }
     let mut command = Command::new(ctest);
-    command.envs(panta_build::windows_sdk_env(env!("PANTA_TEST_HOST"))?);
+    command.envs(panta_build::native_test_env(
+        target_root(),
+        env!("PANTA_TEST_HOST"),
+    )?);
     command.args(["--output-on-failure", "--no-tests=error", "-C", build_type]);
     if let Some(regex) = regex {
         command.args(["-R", regex]);

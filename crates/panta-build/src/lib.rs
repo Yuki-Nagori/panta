@@ -465,6 +465,45 @@ pub fn windows_sdk_env(
         .ok_or_else(|| "未找到 MSVC Build Tools / Windows SDK；请安装平台 SDK 后重试".to_owned())
 }
 
+/// 为 native 测试补齐托管 Qt DLL 的运行时搜索路径。
+pub fn native_test_env(
+    target_root: &Path,
+    target: &str,
+) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, String> {
+    let mut environment = windows_sdk_env(target)?;
+    if !cfg!(windows) {
+        return Ok(environment);
+    }
+
+    let qt_bin = target_root
+        .join("panta-deps")
+        .join("qt")
+        .join("staging")
+        .join("bin");
+    if !qt_bin.is_dir() {
+        return Err(format!("托管 Qt 运行库目录不存在：{}", qt_bin.display()));
+    }
+    let current_path = environment
+        .iter()
+        .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
+        .map(|(_, value)| value.clone())
+        .or_else(|| std::env::var_os("PATH"))
+        .unwrap_or_default();
+    let mut paths = vec![qt_bin];
+    paths.extend(std::env::split_paths(&current_path));
+    let path =
+        std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
+    if let Some((_, value)) = environment
+        .iter_mut()
+        .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
+    {
+        *value = path;
+    } else {
+        environment.push((std::ffi::OsString::from("PATH"), path));
+    }
+    Ok(environment)
+}
+
 /// 官方 LLVM 不替代 Apple SDK；显式 sysroot 保证 CXX 和 CMake 使用同一套平台头文件。
 pub fn macos_sdk() -> Result<Option<PathBuf>, String> {
     if !cfg!(target_os = "macos") {
