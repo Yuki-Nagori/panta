@@ -23,13 +23,25 @@
 
 本组文档依据用户提供的架构讨论附件整理。附件将桌面平台称为 MoldCAE / `moldcae`；本仓库名称是 `panta`，因此以下以 panta 指代该桌面平台。MoldCAE 是原方案名称，不代表已存在的本地目录或可执行文件。
 
-当前仓库已有 Rust workspace、Cargo 调度的 native 构建与 Qt Quick/C++ ViewModel 桌面骨架（任务 001–005）；VTK 视口及业务服务尚未完成。本组文档描述目标架构与建议契约，不宣称功能已实现；具体依赖版本、协议编码和持久化格式仍须在实施时验证并确定。文档中的字段名和 API 名用于说明语义，不是已发布接口。
+当前仓库已有 Rust workspace、Cargo 调度的 native 构建与 Qt Quick/C++ ViewModel
+桌面骨架（任务 001–005）。`panta-foundation` 已承载进程级崩溃设施，
+`panta-ffi` 负责 CXX 边界；VTK 视口的模块、适配器和创建级测试已落地，但
+由于 macOS 26 + Qt Quick + VTK 的窗口化渲染路径仍会崩溃，默认 `App.qml`
+暂时保持占位面板，任务 007 仍为 blocked。其余业务服务尚未完成。本组文档
+描述目标架构与已验证的边界，不把规划能力写成已实现；具体依赖版本、协议
+编码和持久化格式仍须在实施时验证并确定。文档中的字段名和 API 名用于说明
+语义，不是已发布接口。
 
 ## 第一阶段目标
 
 先实现 Geometry / Preprocessor + CAE UI + Visualization Platform：STEP → Geometry → Mesh → Visualization → Study Setup → Save Project。第一阶段不依赖真实 CFD 引擎完成；使用带明确标识的合成标量场验证结果显示。
 
-V1 应覆盖工程新建、打开、保存，STEP 导入，面/边/实体选择，Netgen 网格生成，表面与体网格显示，属性编辑，相机、裁剪、色标和求解器占位入口。V1 不实现 AI、自研 GPU 计算后端或物理求解内核。VTK/Qt 正常使用图形硬件不属于排除范围中的 GPU 计算开发。
+V1 应覆盖工程新建、打开、保存，STEP 导入，面/边/实体选择，Netgen 网格生成，
+表面与体网格显示，属性编辑，相机、裁剪、色标和求解器占位入口。当前 VTK
+视口只完成适配边界、最小测试图元和创建级验证；窗口化渲染的 macOS 26 阻塞
+见[任务 007](../task/007-vtk-quick-viewport.md)，不能据此宣称 V1 视口已交付。
+V1 不实现 AI、自研 GPU 计算后端或物理求解内核。VTK/Qt 正常使用图形硬件
+不属于排除范围中的 GPU 计算开发。
 
 ## 分层和依赖方向
 
@@ -45,9 +57,17 @@ QML 界面
 
 界面表达用户意图，服务协调业务，领域模型表达几何、网格、工程和结果，适配器封装第三方库。库对象不能成为跨层公共数据模型。Rust 和 C++ 在应用服务边界协作，不应为每次渲染调用形成 QML → C++ → Rust → C++ → VTK 的往返链路。
 
+进程级设施单独归 Rust 基础设施层：`panta-foundation` 实现崩溃信号、日志
+等需要操作系统边界的能力，`panta-ffi` 只把安全入口映射到 CXX；`panta-core`
+保持领域模型职责和无手写 `unsafe`。VTK 只存在于
+`native/visualization/src/vtk/` 适配器，`RenderScene`、`ViewportBackend` 和
+QML 公共头不暴露 VTK 类型。当前 `App.qml` 不默认创建 `CaeViewport`，因为
+任务 007 已记录 macOS 26 窗口化渲染阻塞；模块加载/类型创建测试仍保留，供
+构建和边界回归使用。
+
 ## 技术基线
 
-技术选型、版本验证状态和责任任务集中维护在 [技术基线](../standards/baseline.md)，编码与库使用规则见 [规范索引](../standards/README.md)。Rust/C++ 桥接由任务 006 开始验证 [CXX](../standards/cxx.md) 的最小双向路径，完整应用集成尚未完成；架构文档只说明模块职责与交互，不另维护一份版本表。
+技术选型、版本验证状态和责任任务集中维护在 [技术基线](../standards/baseline.md)，编码与库使用规则见 [规范索引](../standards/README.md)。Rust/C++ 桥接由任务 006 开始验证 [CXX](../standards/cxx.md) 的最小双向路径；进程级崩溃入口由任务 047 经 `panta-ffi` 接入，VTK 版本与线程/图形后端证据由任务 007 和 [VTK 规范](../standards/vtk.md)维护。架构文档只说明模块职责与交互，不另维护一份版本表。
 
 ## 外部边界
 

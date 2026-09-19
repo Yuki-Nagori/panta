@@ -79,6 +79,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake。执
 | 2026-09-19 | `cargo test --locked`（macOS arm64） | 全量通过（含新增 `Qml.ViewportModuleLoads`：Panta.Visualization 注册与 CaeViewport 可创建） |
 | 2026-09-19 | run 35436415890 CI（三平台） | 供给消费与跨平台编译链接通过；macOS Qml.ShellModuleLoads/ViewportModuleLoads 失败：`module "Panta.Visualization" is not installed`——静态模块消费方二进制未导入 plugin；已修复（shell 测试导入/链接，后续 App.qml 回退后仅 viewport 测试消费） |
 | 2026-09-19 | macOS 26 窗口化崩溃取证（.ips 分析 + QSG_INFO + VTK v9.7.0 源码核对） | basic 循环：updatePaintNode 无当前上下文 → glad 空表 → dispatch 内 Render 段错误（pc=0x0）；threaded 循环：RHI 创建期 NSOpenGLContext setView SIGTRAP。两种循环均崩溃，任务转 blocked（解除条件见上） |
+| 2026-09-19 | macOS arm64；`cargo build --locked` 后直接运行 `target/native/debug/app/panta_qml_viewport_module_test`（Qt 6.11.2，offscreen） | 通过，3/3；`Panta.Visualization` 静态模块可加载并创建 `CaeViewport`。该创建级结果不替代已记录的窗口化渲染阻塞 |
 
 ## 风险与回退
 

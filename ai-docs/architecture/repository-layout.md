@@ -4,7 +4,13 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置、`ai-docs/`、任务 001 落地的 Cargo workspace 骨架（根 Cargo.toml、Cargo.lock、rust-toolchain.toml 与 `crates/launcher`），以及任务 034 正在实施的 `.pa` DSL parser/CLI（`crates/panta-dsl-core`、`crates/panta-dslc`）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt 桌面骨架（`native/app`+`native/bridge`、根 `qml/` 模块与 Qt 供给脚本）。下图中其余应用源码与构建部分为规划，不应据此创建无用途的占位模块。
+当前存在根目录文档、许可证、忽略配置、`ai-docs/`、Cargo workspace、
+`panta-foundation` 进程基础设施、`panta-core` 领域模型、`panta-ffi` CXX
+边界，以及任务 034 正在实施的 `.pa` DSL parser/CLI（`crates/panta-dsl-core`、
+`crates/panta-dslc`）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt
+桌面骨架，任务 007 已落地 VTK 适配模块和创建级测试，但默认窗口集成仍因
+macOS 26 渲染阻塞保持回退。下图中其余应用源码与构建部分为规划，不应据此
+创建无用途的占位模块。
 
 ```text
 panta/
@@ -19,7 +25,10 @@ panta/
 ├── Cargo.toml / Cargo.lock    # Rust workspace 与依赖锁（任务 001 已落地）
 ├── rust-toolchain.toml        # 固定 stable 工具链（任务 001 已落地）
 ├── crates/
-│   ├── launcher/              # 统一运行入口（任务 001 骨架：仅未接入诊断）
+│   ├── launcher/              # 统一运行入口与 native 构建调度
+│   ├── panta-foundation/      # 进程级设施；当前为崩溃信号与日志（047）
+│   ├── panta-core/            # Rust 领域模型：任务、路径等（008/023）
+│   ├── panta-ffi/             # CXX DTO/句柄/错误边界与 staticlib（006/047）
 │   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034 实施中）
 │   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035 实施中）
 │   ├── core/                  # 规划：通用 ID、错误和应用契约
@@ -51,7 +60,12 @@ panta/
 
 ## 模块归属
 
-`core` 保持小而稳定，只存放多模块确实共享的基础契约，不能变成所有业务逻辑的容器。`project` 管理实体关系、修订与命令；`workflow` 管理执行过程；`storage` 管理读写和资产引用；`solver-client` 管理外部进程及事件转换。
+`panta-core` 保持领域模型职责，只存放任务、路径等 Rust 业务契约；
+`panta-foundation` 存放进程级设施和手写平台边界，不能把 unsafe 设施倒灌进
+领域 core。`panta-ffi` 只做跨语言 DTO、错误、句柄和生命周期转换。规划中的
+`core` 保持小而稳定，只存放多模块确实共享的基础契约，不能变成所有业务逻辑
+的容器。`project` 管理实体关系、修订与命令；`workflow` 管理执行过程；
+`storage` 管理读写和资产引用；`solver-client` 管理外部进程及事件转换。
 
 C++ 各模块的 `core` 定义自有类型与行为，`occt`、`netgen`、`vtk` 目录实现适配。ViewModel 不应承担几何修复、网格算法或文件格式解析。QML 组件处理布局、状态展示和交互绑定。
 

@@ -52,8 +52,9 @@ qt_policy(SET QTP0004 NEW)
 qt_policy(SET QTP0005 NEW)
 
 # VTK/OCCT/Netgen 预编译 SDK 供给（任务 031）：manifest 登记与 staging 供给
-# API；消费方（007/009/010）经 panta_require_sdk 使用。当前仅 OCCT Windows
-# 有固定资产，其余平台请求即失败并指向 038，不回退源码构建。
+# API；消费方（007/009/010）经 panta_require_sdk 使用。VTK/OCCT/Netgen 的
+# 固定制品与消费状态以 dependency-acquisition.md 和对应 task 为准，不回退
+# 到源码构建。
 include(cmake/sdk-provision.cmake)
 
 if(BUILD_TESTING)
