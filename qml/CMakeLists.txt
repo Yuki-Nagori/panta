@@ -49,6 +49,16 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qml_theme_component_test)
   target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
                                                                Qt6::Test)
+  if(WIN32)
+    # Keep the QML module DLL beside the test executable. This is also the
+    # first Windows DLL search location when CTest starts a GUI process.
+    add_custom_command(
+      TARGET panta_qml_theme_component_test
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:panta_shell>"
+              "$<TARGET_FILE_DIR:panta_qml_theme_component_test>"
+      VERBATIM)
+  endif()
   add_test(NAME Qml.ThemeComponentParameters COMMAND panta_qml_theme_component_test)
   set_tests_properties(
     Qml.ThemeComponentParameters

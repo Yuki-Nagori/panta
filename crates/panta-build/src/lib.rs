@@ -510,7 +510,14 @@ pub fn native_test_env(
         .unwrap_or_default();
     let native_qml = native_dir.join("qml");
     let native_app = native_dir.join("app");
-    let mut paths = vec![qt_bin, native_qml, native_app, native_dir.to_path_buf()];
+    let native_shell = native_dir.join("Panta").join("Shell");
+    let mut paths = vec![
+        qt_bin,
+        native_qml,
+        native_app,
+        native_shell,
+        native_dir.to_path_buf(),
+    ];
     paths.extend(std::env::split_paths(&current_path));
     let path =
         std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
@@ -522,8 +529,9 @@ pub fn native_test_env(
     } else {
         environment.push((std::ffi::OsString::from("PATH"), path));
     }
-    let import_path = std::env::join_paths([qt_qml, native_dir.to_path_buf()])
-        .map_err(|error| format!("拼接 native 测试 QML 导入路径：{error}"))?;
+    let import_path =
+        std::env::join_paths([qt_qml, native_dir.to_path_buf(), native_dir.join("qml")])
+            .map_err(|error| format!("拼接 native 测试 QML 导入路径：{error}"))?;
     for key in ["QML2_IMPORT_PATH", "QML_IMPORT_PATH"] {
         environment.push((std::ffi::OsString::from(key), import_path.clone()));
     }

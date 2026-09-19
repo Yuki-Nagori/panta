@@ -621,27 +621,6 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
     if status.success() {
         return Ok(());
     }
-
-    // CTest suppresses launcher-level failures even with --output-on-failure
-    // when a Windows child cannot initialize. Re-run the QML tests explicitly
-    // in verbose mode so the error includes each command and exit status.
-    let mut diagnostic = Command::new(ctest);
-    diagnostic.envs(panta_build::native_test_env(
-        target_root(),
-        native_dir,
-        env!("PANTA_TEST_HOST"),
-    )?);
-    diagnostic.args([
-        "--verbose",
-        "--output-on-failure",
-        "--no-tests=error",
-        "-C",
-        build_type,
-        "-R",
-        "Qml\\.(ThemeComponentParameters|ShellModuleLoads)",
-    ]);
-    diagnostic.current_dir(native_dir);
-    let _ = diagnostic.status();
     Err(format!("CTest 失败（退出码 {:?}）", status.code()).into())
 }
 

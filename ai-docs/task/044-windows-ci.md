@@ -58,6 +58,7 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 - 2026-09-19：提交 `922139c` 的运行 [35419894410](https://github.com/Yuki-Nagori/panta/actions/runs/35419894410) 已验证 Qt DLL 环境修复、`PathHostTest` 及 `Qml.FormatCheck` 通过；Windows 仍有 `Qml.ThemeComponentParameters` 与 `Qml.ShellModuleLoads` 失败。失败原因进一步收敛为 QML 测试运行时环境不完整，`d52137b` 已加入托管 Qt 的 QML 导入路径，`9aaf2c4` 又加入插件目录及 Basic Controls 样式，但运行仍复现，当前继续补齐平台插件路径。
 - 2026-09-19：运行 [35421298483](https://github.com/Yuki-Nagori/panta/actions/runs/35421298483) 仍复现上述两个 QML 测试失败；`e97517e` 已将平台插件路径同时写入 native 测试进程环境，当前把同一 Qt 运行时设置下沉到 CTest 测试属性，避免 CTest 子进程环境差异。
 - 2026-09-19：运行 [35421659951](https://github.com/Yuki-Nagori/panta/actions/runs/35421659951) 验证构建、QML 格式和其余 24 项通过，但两个启动 `QGuiApplication` 的 QML 测试仍失败；Windows 的 `offscreen` QPA 启动不稳定，改为仅 Windows 使用 Qt `minimal` 平台，Linux/macOS 继续使用 `offscreen`。
+- 2026-09-19：运行 [35423204587](https://github.com/Yuki-Nagori/panta/actions/runs/35423204587/job/105844516615) 仍只有两个 QML 启动测试失败，格式门禁已通过；额外的 CTest 重跑没有产生子进程输出，故不保留该排查代码。当前修复将 `panta_shell` DLL 复制到 Windows QML 测试可执行文件目录，并补齐生成模块目录的运行时搜索路径，待下一次实跑验证。
 
 ## 完成摘要
 

@@ -30,6 +30,16 @@ if(BUILD_TESTING)
     target_link_libraries(panta_qml_shell_module_test PRIVATE panta_bridgeplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
+  if(WIN32)
+    # Keep the QML module DLL beside the test executable. This is also the
+    # first Windows DLL search location when CTest starts a GUI process.
+    add_custom_command(
+      TARGET panta_qml_shell_module_test
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:panta_shell>"
+              "$<TARGET_FILE_DIR:panta_qml_shell_module_test>"
+      VERBATIM)
+  endif()
   add_test(NAME Qml.ShellModuleLoads COMMAND panta_qml_shell_module_test)
   set_tests_properties(
     Qml.ShellModuleLoads
