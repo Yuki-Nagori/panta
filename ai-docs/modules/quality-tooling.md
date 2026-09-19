@@ -52,7 +52,7 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 - `cargo audit`、`cargo coverage`、`cargo coverage native` 分别负责依赖审计、Rust 门禁和 native 覆盖率报告。`cargo quality` 聚合格式、lint、审计、测试，不包含 coverage。
 - `cargo run --locked -p panta-tests -- toolchain` 检查托管工具版本、Qt/GoogleTest 文件、CMakeCache 的 C/C++ 编译器/CMake/Ninja 路径，以及合并编译数据库中包括手写 CXX adapter 在内的实际编译器。系统旁路不能作为该检查的通过证据。
 - runner、FFI 与 launcher 共用 `panta-build`，无需通过 `#[path]` 导入其他 crate 私有文件或整体关闭 dead-code 告警。质量数据库位于 `target/native/<profile>/quality/compile_commands.json`；只选自有翻译单元，头文件不单独伪造编译命令。
-- CI 三平台执行 check/build/test/工具核验；Ubuntu 按工具拆分 lint，format/audit/Rust coverage/native coverage 独立运行。CI 不单独安装非 Rust 质量工具。Cargo aliases 和内部 Cargo 调用默认 `--locked`，直接 `cargo build/test/check` 按原生 Cargo 语义由调用者选择 `--locked`。
+- CI 三平台把 check/build 与 test 拆为两个 job，构建树经 artifact 传递，test 不重复编译；lint 按工具与变更路径域拆分触发（machete→rust、cmake→native、qmllint→qml/native），dependency-audit 仅随依赖清单触发，纯文档变更整场跳过。Cargo 工具缓存仅由 main push 的 check job 保存，其余 job 只恢复；缓存保存前裁剪归档与 LLVM 非白名单部分，三平台条目合计控制在仓库 10 GB 配额内。CI 不单独安装非 Rust 质量工具。Cargo aliases 和内部 Cargo 调用默认 `--locked`，直接 `cargo build/test/check` 按原生 Cargo 语义由调用者选择 `--locked`。
 
 真实窗口、DPR、多显示屏、GPU、线程及 ABI 检查单独留证。无头组件测试不能代替所有平台的真实图形生命周期验证。
 

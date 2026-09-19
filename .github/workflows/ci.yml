@@ -1,8 +1,11 @@
-# 质量与构建门禁（任务 011/018/032/043）：
-# - check：唯一跨平台 job；每个平台都执行 check、build、test；
-# - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位；
+# 质量与构建门禁（任务 011/018/032/043/046）：
+# - changes：按变更路径拆分触发，未知路径一律保守触发全量检查；
+# - check：三平台编译 job——check/build/测试目标编译与工具核验，构建树经
+#   artifact 交给 test，FFI 与 QML 耦合决定 cargo 命令级跳过不安全；
+# - test：三平台仅运行测试套件，消费 check 的构建树，不全量重编；
+# - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位，按域触发；
 # - format：Ubuntu 上通过 cargo format 检查 Rust、C++/CXX、CMake、QML；
-# - dependency-audit：Ubuntu 上执行 RustSec、许可证、重复与通配审计；
+# - dependency-audit：仅在依赖清单/审计配置变更时运行；
 # - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++ 插桩报告与 QML 行为测试。
 name: CI
 
@@ -16,12 +19,102 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: detect changed paths (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+      code: ${{ steps.filter.outputs.code }}
+      cargo_deps: ${{ steps.filter.outputs.cargo_deps }}
+      rust: ${{ steps.filter.outputs.rust }}
+      native: ${{ steps.filter.outputs.native }}
+      qml: ${{ steps.filter.outputs.qml }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # 分类必须保守：未识别路径落入 other，触发全量检查；纯文档是唯一
+      # 可以整场跳过的类别。基线：PR 对 base 分支取 merge-base diff，
+      # push 对 event.before 取累计 diff；新分支/强推无基线时全量。
+      - name: Compute changed path categories
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          files=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            files="$(git diff --name-only "origin/${BASE_REF}...HEAD" || true)"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            files="$(git diff --name-only "$BEFORE" HEAD || true)"
+          fi
+
+          docs_only=true
+          cargo_deps=false
+          rust=false
+          native=false
+          qml=false
+          other=false
+          if [ -z "$files" ]; then
+            other=true
+          fi
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            case "$f" in
+              *.md|ai-docs/*|LICENSE|.gitignore|.gitattributes) ;;
+              deny.toml) cargo_deps=true ;;
+              Cargo.lock|Cargo.toml|*/Cargo.toml) cargo_deps=true; rust=true ;;
+              crates/*|tests/src/*|tests/integration/*|.cargo/*|rust-toolchain.toml|resources/*) rust=true ;;
+              native/*|tests/cpp/*) native=true ;;
+              qml/*|tests/qml/*) qml=true ;;
+              *) other=true ;;
+            esac
+          done <<< "$files"
+          if $other; then
+            cargo_deps=true
+            rust=true
+            native=true
+            qml=true
+          fi
+          code=false
+          if $rust || $native || $qml; then
+            code=true
+            docs_only=false
+          fi
+          {
+            echo "docs_only=$docs_only"
+            echo "code=$code"
+            echo "cargo_deps=$cargo_deps"
+            echo "rust=$rust"
+            echo "native=$native"
+            echo "qml=$qml"
+          } >> "$GITHUB_OUTPUT"
+
   dependency-audit:
     name: cargo audit (ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.cargo_deps == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install pinned toolchain
         shell: bash
@@ -35,10 +128,12 @@ jobs:
 
   lint:
     name: cargo lint (${{ matrix.tool }}, ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        tool: [clippy, machete, cmake, qmllint, clang-tidy, includes, cppcheck]
+        tool: [clippy, clang-tidy, includes, cppcheck]
     runs-on: ubuntu-latest
     # 冷启动需供给 LLVM/Qt 并构建 native 树；上限防传输停滞拖满平台上限。
     timeout-minutes: 60
@@ -51,24 +146,171 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
-      # clippy/qmllint/clang-tidy/includes/cppcheck 都经由 launcher 构建脚本
-      # 触发 native 配置；供给 Qt 的 find_package(Gui) 经 WrapOpenGL 强依赖
-      # 宿主 GL 开发文件（macOS/Windows 由平台 SDK 提供，Linux 需显式安装）。
-      # machete/cmake 不进 native 构建图，跳过安装。
+      # 这些工具都经由 launcher 构建脚本触发 native 配置；供给 Qt 的
+      # find_package(Gui) 经 WrapOpenGL 强依赖宿主 GL 开发文件。
       - name: Install native platform prerequisites
-        if: ${{ matrix.tool != 'machete' && matrix.tool != 'cmake' }}
         shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
 
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
+
       - name: Run selected lint
         shell: bash
         run: cargo lint "${{ matrix.tool }}"
 
+  # machete 只读 Rust 清单与源码，不进 native 构建图：按 rust 域触发。
+  lint-machete:
+    name: cargo lint (machete, ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal
+
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run cargo machete
+        shell: bash
+        run: cargo lint machete
+
+  # cmake-lint 只检查 native CMake 文件：按 native 域触发。
+  lint-cmake:
+    name: cargo lint (cmake, ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal
+
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
+
+      - name: Run cmake lint
+        shell: bash
+        run: cargo lint cmake
+
+  # qmllint 消费 Qt 供给与 QML/bridge 输出：按 qml 或 native 域触发。
+  lint-qmllint:
+    name: cargo lint (qmllint, ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.qml == 'true' || needs.changes.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal
+
+      - name: Install native platform prerequisites
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
+
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
+
+      - name: Run qmllint
+        shell: bash
+        run: cargo lint qmllint
+
   format:
     name: cargo format (ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -80,12 +322,25 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt
 
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
+
       - name: Run aggregated cargo format (Rust, C++/CXX, CMake and QML)
         shell: bash
         run: cargo format
 
   coverage:
     name: rust coverage gate (ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -98,6 +353,18 @@ jobs:
           # llvm-tools-preview 提供 llvm-profdata/llvm-cov（覆盖率合并所需）。
           rustup toolchain install "$channel" --profile minimal --component llvm-tools-preview
 
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
       # 全局阶段下限，不等于逐模块/逐提交防下降；具体边界见
       # ai-docs/modules/quality-tooling.md。launcher 暂不纳入 Rust 插桩链。
       # 使用与固定 rustc 配套的 llvm-tools-preview；branch 数据尚未采集。
@@ -107,6 +374,8 @@ jobs:
 
   native-coverage:
     name: native C++ coverage and QML tests (ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -127,6 +396,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
 
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
+
       - name: Run native tests and report with managed LLVM
         shell: bash
         run: cargo coverage native
@@ -139,7 +419,9 @@ jobs:
           if-no-files-found: error
 
   check:
-    name: cargo check, build and test (${{ matrix.os }})
+    name: cargo check and build (${{ matrix.os }})
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -166,16 +448,27 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
 
-      - name: Cache Cargo registries and managed dependencies
-        uses: actions/cache@v4
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
             target/panta-tools
             target/panta-deps
-          key: panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'pyproject.toml', 'uv.lock', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'tests/src/main.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
           restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
             panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
 
       - name: Check workspace and all aggregated targets
@@ -184,9 +477,136 @@ jobs:
       - name: Build workspace and native targets
         run: cargo build --locked --workspace
 
+      # 测试目标在此编译（复用 build 的依赖 codegen），test job 只运行。
+      - name: Compile test binaries
+        run: cargo test --locked --workspace --no-run
+
       - name: Verify Cargo-provisioned toolchain
         shell: bash
         run: cargo run --locked --package panta-tests -- toolchain
+
+      - name: Upload build tree for test job
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-tree-${{ matrix.os }}
+          path: |
+            target/debug
+            target/native
+            !target/debug/incremental
+          retention-days: 1
+          if-no-files-found: error
+
+      # 仅 main push 保存缓存，PR 只恢复，避免条目按 PR 数量膨胀；保存前
+      # 裁剪可重下载内容：工具/Qt/SDK 归档、registry 解包副本（不缓存 src/）
+      # 与 LLVM 非白名单部分（bin 仅留 clang 系/lld 系/coverage 与 AR 工具，
+      # lib 仅留编译器资源目录 lib/clang，include 为 LLVM 开发头文件）。
+      # 白名单以 042 验证器与实际链接需求为准：clang-tidy、llvm-profdata、
+      # llvm-cov 必须在 llvm/bin 下，Windows 链接使用 lld-link。
+      - name: Prune re-downloadable content from caches
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf target/panta-tools/archives
+          find target/panta-deps -type d -name archives -prune -exec rm -rf {} +
+          llvm_trees="$(find target/panta-tools/llvm -mindepth 2 -maxdepth 2 -type d -name 'LLVM-*' 2>/dev/null || true)"
+          for tree in $llvm_trees; do
+            for entry in "$tree/bin"/*; do
+              [ -e "$entry" ] || continue
+              name="$(basename "$entry")"
+              name="${name%.exe}"
+              case "$name" in
+                clang|clang++|clang-cpp|clang-cl|clang-format|clang-tidy|clang-scan-deps|clang-apply-replacements|llvm-ar|llvm-ranlib|llvm-profdata|llvm-cov|llvm-symbolizer|lld|lld-link|ld.lld) ;;
+                *) rm -rf "$entry" ;;
+              esac
+            done
+            find "$tree/lib" -mindepth 1 -maxdepth 1 ! -name 'clang' -exec rm -rf {} +
+            rm -rf "$tree/include"
+          done
+          du -sh target/panta-tools target/panta-deps ~/.cargo/registry 2>/dev/null || true
+
+      - name: Save Cargo home cache
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+
+      - name: Save managed tools and dependencies caches
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+
+  test:
+    name: cargo test (${{ matrix.os }})
+    needs: [changes, check]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned toolchain
+        shell: bash
+        run: |
+          channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal
+
+      - name: Install native platform prerequisites
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
+
+      - name: Restore Cargo home cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/git/checkouts
+          key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore managed tools and dependencies caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            target/panta-tools
+            target/panta-deps
+          key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          restore-keys: |
+            panta-cache-${{ runner.os }}-${{ runner.arch }}-
+            panta-deps-${{ runner.os }}-${{ runner.arch }}-llvm-22.1.7-
+
+      # 构建树由 check job 在同一 runner 路径编译并打包；解包晚于 checkout，
+      # 目标文件 mtime 新于源码，cargo 不会重编。若指纹不匹配则就地重编，
+      # 结果仍正确，只是变慢。
+      - name: Download build tree from check job
+        uses: actions/download-artifact@v4
+        with:
+          name: build-tree-${{ matrix.os }}
+          path: target
 
       - name: Test
         run: cargo test --locked --workspace
