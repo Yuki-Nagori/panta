@@ -2,7 +2,7 @@
 # find_package(CONFIG) 必须可用、关键 imported target/模块、许可证与元数据
 # 齐备；任一缺失立即失败——制品不完整就不发布。
 #
-# 用法（project 模式；VTK WebGPU/Cocoa 制品不依赖 Qt staging）：
+# 用法（project 模式；VTK WebGPU 硬件窗口制品不依赖 Qt staging）：
 #   cmake -S tools/sdk/selfcheck -B <build> -DPSDK_ROOT=<安装树>
 #     -DPSDK_PACKAGE=VTK
 #     -DPSDK_REQUIRED_TARGETS="VTK::RenderingWebGPU VTK::RenderingUI"

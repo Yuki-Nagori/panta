@@ -55,7 +55,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+            libwayland-dev wayland-protocols libxkbcommon-dev
 
       - name: Produce VTK SDK
         shell: bash
@@ -71,6 +71,9 @@ jobs:
           cmake -S tools/sdk/selfcheck -B sdk-build/selfcheck \
             -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/vtk/9.7.0/${{ matrix.sdk_triple }}" \
             -DPSDK_PACKAGE=VTK \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_EXTENSIONS=OFF \
             -DPSDK_REQUIRED_TARGETS="VTK::RenderingWebGPU VTK::RenderingUI dawn::webgpu_dawn"
 
       - name: Package artifact
@@ -100,7 +103,7 @@ jobs:
           gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" \
             || gh release create sdk-vtk-9.7.0-webgpu \
                  --repo "$GITHUB_REPOSITORY" \
-                 --title "VTK 9.7.0 WebGPU/Cocoa prebuilt SDKs" \
+                 --title "VTK 9.7.0 WebGPU hardware-window SDKs" \
                  --notes-file tools/sdk/releases/vtk-9.7.0.md
           gh release upload sdk-vtk-9.7.0-webgpu sdk-build/dist/* --clobber \
             --repo "$GITHUB_REPOSITORY"
