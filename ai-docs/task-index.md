@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、014、018–020、036、039–041、043 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、根目录跨语言测试与质量入口均落地并验证），031 的供给侧已全部就绪：VTK/OCCT/Netgen 三依赖 × 三平台 manifest 全部登记并经 macOS 生产消费烟测（OCCT 弃用官方 Windows SDK 统一自托管；Netgen↔OCCT 成对发布），其剩余项即 007/009/010 的集成证据，可并行推进——**007 与 009 供给前置均满足、状态转 ready**，010 待 009，其余基础设施任务未实现。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、011、014、018–020、026、036、039–041、043–045 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、统一测试与质量入口、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、Windows CI 停滞诊断与修复、Windows CI 分支代码审查与收敛、QML 静态模块注册边界、根目录质量入口与测试聚合均落地并验证），整轮三平台 CI 已全绿：Windows/macOS/Linux 的 check、build、toolchain、test、七项 lint、聚合格式、依赖审计及 Rust/native 覆盖率检查全部通过，031 的供给侧已全部就绪：VTK/OCCT/Netgen 三依赖 × 三平台 manifest 全部登记并经 macOS 生产消费烟测（OCCT 弃用官方 Windows SDK 统一自托管；Netgen↔OCCT 成对发布），其剩余项即 007/009/010 的集成证据，可并行推进——**007 与 009 供给前置均满足、状态转 ready**，010 待 009，其余基础设施任务未完成。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -39,7 +39,7 @@ ai-docs/
 
 ## 验证节奏
 
-每个基础设施任务随实现完成自己的验收与失败路径检查，不等待 011。018 已建立三平台 CI，push/PR 时自动执行当前可用检查；011 负责把已有检查聚合到统一入口，012 负责依赖缓存与 CI 扩展。任务记录是验证证据的来源，索引状态只是摘要。
+每个基础设施任务随实现完成自己的验收与失败路径检查，不等待 011。018 已建立三平台 CI，push/PR 时自动执行当前可用检查；011 已把已有检查聚合到统一入口（043 收敛根质量入口），012 负责依赖缓存与 CI 扩展。任务记录是验证证据的来源，索引状态只是摘要。
 
 ## 基础设施队列
 
@@ -55,9 +55,9 @@ ai-docs/
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | done |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | ready |
 | 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | planned |
-| 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | in-progress |
-| 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | planned |
-| 013 | [桌面安装布局与部署冒烟](task/013-desktop-deployment-smoke.md) | 交付基础 | 011 | planned |
+| 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | done |
+| 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | in-progress |
+| 013 | [桌面安装布局与部署冒烟](task/013-desktop-deployment-smoke.md) | 交付基础 | 011 | ready |
 | 014 | [Python/uv 质量工具环境](task/014-python-tooling-foundation.md) | 验证基础 | 001 | done |
 | 018 | [三平台 CI 基础](task/018-cross-platform-ci.md) | 验证基础 | 001, 002 | done |
 | 019 | [GTest 测试配置与规则](task/019-gtest-native-testing.md) | 验证基础 | 003 | done |
@@ -71,7 +71,7 @@ ai-docs/
 
 ## 应用平台扩展队列
 
-设计入口：[重要模块说明](modules/README.md)。下列任务均未实施。
+设计入口：[重要模块说明](modules/README.md)。下列任务部分已实施或完成，状态以表内为准。
 
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
@@ -79,7 +79,7 @@ ai-docs/
 | 023 | [跨平台路径与资源引用服务](task/023-cross-platform-paths.md) | 应用平台扩展 | 005, 006 | in-progress |
 | 024 | [工程运行时上下文与变量快照](task/024-runtime-context.md) | 应用平台扩展 | 008, 023 | planned |
 | 025 | [变量 DSL 解析、求值与存储](task/025-variable-dsl.md) | 应用平台扩展 | 024, 034 | planned |
-| 026 | [C++ 静态库边界与 QML 自动注册](task/026-static-qml-modules.md) | 应用平台扩展 | 005 | in-progress |
+| 026 | [C++ 静态库边界与 QML 自动注册](task/026-static-qml-modules.md) | 应用平台扩展 | 005 | done |
 | 027 | [开发模式 QML 重载与状态恢复](task/027-qml-state-reload.md) | 应用平台扩展 | 007, 024, 026 | planned |
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | in-progress |
 | 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
@@ -94,7 +94,7 @@ ai-docs/
 | 035 | [`.pa` 格式化器与格式校验器选型](task/035-pa-formatter-and-validator.md) | 应用平台扩展 | 034 | in-progress |
 | 037 | [软件内增量更新基础](task/037-incremental-update-foundation.md) | 交付基础 | 005, 008, 013, 023 | planned |
 | 042 | [三平台自有 C++ 统一 LLVM/Clang 工具链](task/042-unified-llvm-toolchain.md) | 验证基础 | 018, 032, 038 | in-progress |
-| 043 | [根目录质量入口与测试聚合](task/043-root-quality-runner.md) | 验证基础 | 011, 032 | in-progress |
+| 043 | [根目录质量入口与测试聚合](task/043-root-quality-runner.md) | 验证基础 | 011, 032 | done |
 | 044 | [Windows CI 停滞诊断与修复](task/044-windows-ci.md) | 验证基础 | 018, 042 | done |
 | 045 | [Windows CI 分支代码审查与收敛](task/045-branch-code-review.md) | 验证基础 | 044 | done |
 
@@ -112,7 +112,7 @@ ai-docs/
 
 主线：001 → 002 → 003 → 004 → 005 → 031 → 038 → 007，完成 Cargo 启动 Qt/QML + 预编译 VTK SDK 的 M0 集成；若 031 找到可直接消费的全平台官方 SDK，038 可只完成资产登记与自检决策。
 
-平台分支：004 → 006；005 + 006 → 008 → 009 → 010，先建立 FFI、任务生命周期，再验证 OCCT 和 Netgen。两个分支都准备好后，007 + 008 + 010 → 011 → 012 / 013，统一测试、CI 和部署检查。这里是依赖图，编号相邻不意味着必须等待不相关任务；是否并行执行由实际工作安排决定。
+平台分支：004 → 006；005 + 006 → 008 → 009 → 010，先建立 FFI、任务生命周期，再验证 OCCT 和 Netgen。两个分支的集成冒烟接入已交付的统一聚合（011 已完成），012 / 013 继续依赖缓存与部署检查。这里是依赖图，编号相邻不意味着必须等待不相关任务；是否并行执行由实际工作安排决定。
 
 主题分支：005 → 029；025 + 029 → 030。先迁移组件及尺寸参数，再接主题 DSL；主题切换不依赖工程打开或引擎重载。
 

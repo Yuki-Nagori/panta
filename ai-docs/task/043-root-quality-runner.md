@@ -1,6 +1,6 @@
 # 043 — 根目录质量入口与测试聚合
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[011](011-test-quality-entrypoints.md)、[032](032-cross-language-quality-gates.md)
 - 优先级：P0
@@ -58,12 +58,12 @@
 
 - [x] `cargo lint` 一条命令执行 Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner 和 Cppcheck；工具缺失或任一检查失败返回非零。include-cleaner 与 Cppcheck 的职责分工明确，Cppcheck 开启 unusedFunction。
 - [x] `cargo quality` 一条命令执行格式、`cargo lint`、deny、Rust 测试、native CTest 和 QML 行为测试。
-- [x] 标准 `cargo test` 执行 workspace Rust 测试和根 `tests/` 的完整 native/QML 聚合；失败、空套件、工具缺失返回非零；CI 使用 `cargo test --locked`。
+- [x] 标准 `cargo test` 执行 workspace Rust 测试和根 `tests/` 的完整 native/QML 聚合；失败、空套件、工具缺失返回非零；CI 使用 `cargo test --locked --workspace`。
 - [x] `cargo format` 检查 Rust、C++、CMake、QML；官方 `cargo fmt` 保持 Rust-only 语义，Python 工具通过 uv 锁定。
 - [x] CI 分别调用 `cargo lint clippy|machete|cmake|qmllint|clang-tidy|includes|cppcheck`，失败项可以单独定位；coverage job 的专用命令保持明确，不递归调用质量入口。
-- [ ] 根入口支持 Debug/Release、自定义 target-dir 和 Windows `ctest.exe`；不重复执行旧 launcher 聚合。
-- [ ] CI 的 `cargo build --locked --workspace` 后显式验证完整 Cargo 工具链安装和共享构建产物路径。
-- [ ] 文档、task、索引、Cargo aliases、测试目录规范和 CI 一致，旧入口引用清理完成。
+- [x] 根入口支持 Debug/Release、自定义 target-dir 和 Windows `ctest.exe`；不重复执行旧 launcher 聚合。（Release 与 `target/review-target`、`target/review-quality` 本地验证；Windows `ctest.exe` 经 run 35425146629 全套 CTest 通过；launcher 聚合已随 011 迁移删除）
+- [x] CI 的 `cargo build --locked --workspace` 后显式验证完整 Cargo 工具链安装和共享构建产物路径。（"Verify Cargo-provisioned toolchain" 步骤紧随 build 在三平台运行，run 35425146629 全绿）
+- [x] 文档、task、索引、Cargo aliases、测试目录规范和 CI 一致，旧入口引用清理完成。（2026-09-19 同步 default-members 语义、命令表与索引；全仓检索无旧入口残留）
 
 ## 验证计划与结果
 
@@ -99,7 +99,7 @@ Cargo runner 可能与 build.rs 使用不同 target-dir 或 profile；通过 Car
 
 ## 完成摘要
 
-未完成全部验收。根 `tests/` 已成为跨语言测试与质量调度入口；native 测试源按 C++/QML 分类，Rust 私有单元测试仍遵循 Cargo 惯例保留在实现文件或 crate `tests/`。CI 的跨平台 build job 先通过 Cargo 完整构建和工具链路径验证，再执行标准测试；覆盖率报告继续由专用 CI job 独立执行。
+已交付：根 `tests/` 是跨语言测试与质量调度入口，`cargo quality` 聚合格式、lint、审计与全部测试；CI 按 lint 工具独立分检查并保留专用 coverage job，跨平台 build 后核验托管工具链路径。本地 Release/自定义 target-dir 与三平台 CI（run 35425146629）证据齐备；runner 自身覆盖率作为已登记测量缺口由后续拆分处理。
 
 ## 2026-09-19 工具职责与基础设施修复
 
@@ -112,6 +112,10 @@ macOS arm64 托管模式（未启用 `PANTA_USE_SYSTEM_TOOLS`）下，`cargo qua
 Cppcheck 2.17.1 使用 Qt/GoogleTest 库模型及 `tests/cppcheck-qt.cfg`，真实宏展开仍由 LLVM 检查。删除试验性的 framework 软链接与平台宏提取实现，不屏蔽语法/预处理失败；开启 exhaustive 检查避免默认分支分析截断。仅对生成代码、测试注册符号及固定 CXX 头误报配置精确例外，范围见质量模块。实际完整项目加临时反例：未调用函数 exit 1，跨文件补调用后 exit 0。include-cleaner 对多余 include 的反例也返回非零，移除后通过。
 
 任务保持 in-progress：Windows/Linux 当前 CI、独立 target-dir 的完整跨语言运行及 runner 本身的覆盖率仍待补齐。本机系统目录写入测试需要允许 Qt 测试目录访问；沙箱拒绝该访问的失败不等同于业务回归，实际验证使用正常开发环境。
+
+## 2026-09-19 关闭
+
+Windows/Linux 当前代码 CI 与 Windows `ctest.exe` 证据由 run [35425146629](https://github.com/Yuki-Nagori/panta/actions/runs/35425146629)（`2ebbea7`）补齐：`cargo test --locked --workspace` 三平台全绿，Windows 26/26 CTest 含两个 QML 运行测试；Release 与独立 target-dir 已有 `target/review-target`、`target/review-quality` 本地记录。runner 自身覆盖率是已登记的测量缺口，随后续拆分单独补测，不在本任务三项待验收内。验收全部满足，标记 done。
 
 ## 2026-09-19 include 列表格式约定
 

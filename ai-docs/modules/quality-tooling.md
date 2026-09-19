@@ -8,7 +8,7 @@
 
 ## 完成情况（2026-09-19 代码复审）
 
-**尚未完成全部验收。** Cargo 入口和 CMake 原生构建图已接通，032/042/043 仍为 `in-progress`。历史 CI 或系统工具旁路通过，不能证明当前托管 LLVM 22.1.7 的三平台冷构建可用。
+**覆盖率与 sanitizer 门禁尚未完成全部验收。** Cargo 入口、CMake 原生构建图与根质量入口已接通；当前托管 LLVM 22.1.7 代码的三平台 CI 已全绿（run 35425146629），032/042 仍为 `in-progress`，100% 覆盖率门禁与 sanitizer/平台运行库矩阵未关闭。
 
 | 检查面 | 当前实现 | 验证边界 |
 |---|---|---|
@@ -46,7 +46,7 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 
 ## 当前执行入口
 
-- `cargo build` 准备构建所需 LLVM、CMake/Ninja、Qt/GoogleTest 并完整链接；`cargo test` 保留原生 Cargo 语义，根集成测试执行 qmllint 和完整 CTest。Debug/Release 与显式本机 `--target` 的目录保持一致；跨目标构建明确拒绝。
+- `cargo build` 准备构建所需 LLVM、CMake/Ninja、Qt/GoogleTest 并完整链接；`cargo test --workspace` 保留原生 Cargo 语义，根集成测试执行 qmllint 和完整 CTest。根目录默认成员是 `panta-launcher`，裸 `cargo build`/`cargo test` 只覆盖该包及其依赖。Debug/Release 与显式本机 `--target` 的目录保持一致；跨目标构建明确拒绝。
 - `cargo format` 检查 Rust、C++/CXX、CMake、应用及测试 QML。Qt 格式工具直接供给，不配置或编译 native 工程。
 - `cargo lint clippy|machete|cmake|qmllint|clang-tidy|includes|cppcheck` 按需准备工具；不带工具名顺序执行全部。audit/machete 编译 runner 时不下载 LLVM/CMake。
 - `cargo audit`、`cargo coverage`、`cargo coverage native` 分别负责依赖审计、Rust 门禁和 native 覆盖率报告。`cargo quality` 聚合格式、lint、审计、测试，不包含 coverage。
@@ -105,4 +105,4 @@ Cargo 统一用户入口、CMake 管理 native 图、CXX 管理 Rust/C++ 边界�
 
 当前 CAE 依赖仍由 031/038 逐步交付，VTK/OCCT/Netgen 的全平台供给和消费验证不能因 CMake 接口已存在就标完成。cargo-deny 只审计 Cargo 依赖图，Qt 和 native SDK 的许可证、漏洞与制品来源仍需独立清单和更新机制。
 
-本轮已实现共享安装互斥、原子发布、按命令准备工具、Windows Ninja/SDK 环境、CXX 数据库合并和实际工具路径核验。042/043 保持 in-progress 直到新链路的三平台证据齐备。011/032 继续补逐项测试发现与跳过检查、按模块覆盖率、CXX/QML 测量缺口与 native 百分比基线。每个排除与工具限制须可追溯，实际验证结果以任务记录为准。
+本轮已实现共享安装互斥、原子发布、按命令准备工具、Windows Ninja/SDK 环境、CXX 数据库合并和实际工具路径核验。043 的三平台证据已由 run 35425146629 补齐并关闭；042 保持 in-progress，等待 sanitizer 与平台运行库矩阵证据；032 继续补按模块覆盖率、CXX/QML 测量缺口与 native 百分比基线。每个排除与工具限制须可追溯，实际验证结果以任务记录为准。

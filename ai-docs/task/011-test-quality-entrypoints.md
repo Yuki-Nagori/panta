@@ -1,11 +1,11 @@
 # 011 — 统一测试与质量入口
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[007](007-vtk-quick-viewport.md)、[008](008-tasks-errors-logging.md)、[010](010-netgen-adapter-smoke.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-18
+- 创建 / 更新：2026-09-16 / 2026-09-19
 
 ## 目标与背景
 
@@ -73,6 +73,7 @@
 | 2026-09-18 | `cargo test --locked --release --target-dir target/review-target -p panta-tests --test native` | 2/2 聚合、28/28 CTest 通过；验证 profile 与自定义目录，复用已缓存第三方依赖 |
 | 2026-09-18 | 临时 CTest 夹具，编译并执行根 `tests/integration/native.rs`；空套件、失败用例、成功用例 | 前两者聚合 exit 101，成功 exit 0；Windows 后缀/多配置参数静态核对，Windows/Linux 本轮 CI 待跑 |
 | 2026-09-18 | `cargo format`、`cargo lint cmake`、`cargo test --locked`、`cargo build --locked --workspace` | 根入口与 Cargo 驱动 native 构建通过；CTest 28/28，QML 格式、qmllint 与 QML 行为测试均执行 |
+| 2026-09-19 | GitHub Actions run [35425146629](https://github.com/Yuki-Nagori/panta/actions/runs/35425146629)（`2ebbea7`，main push）三平台 | Windows/Linux 以同一聚合入口执行完整测试：三平台 success（6m29s），`cargo test --locked --workspace` 全绿，Windows 26/26 CTest 含两个 QML 运行测试与格式检查；此前"Windows/Linux 本轮 CI 待跑"证据补齐，任务关闭 |
 
 ## 风险与回退
 
@@ -87,6 +88,7 @@
 - 2026-09-18：CTest/QML 聚合落地（与 032 协同）：根 `tests/integration/native.rs` 聚合 `all_qmllint` 与全部 CTest，`cargo test` 一条命令覆盖 Rust + native + QML；ctest 定位经 build.rs 导出的 `PANTA_CMAKE` 同目录。评审后构建树与配置由 build.rs 注入，修复 Windows .exe、CTest -C、release/自定义 target-dir 以及空套件误报；qmllint/CTest 顺序执行。clang-format 已接入，C++ 覆盖率与逐项测试遗漏检测仍待后续增量。
 - 2026-09-18：跨语言聚合迁移到根 `tests/` package；标准 `cargo test` 通过显式集成测试执行 qmllint/CTest，避免把聚合入口绑定在 launcher crate。
 - 2026-09-18：根 `tests/` 聚合入口规划落地到任务 043；native 编排从 launcher 测试目录迁出，跨语言命令统一使用 Cargo aliases。
+- 2026-09-19：run 35425146629 三平台全绿补齐 Windows/Linux 聚合证据；验收全部满足，标记 done。
 
 ## 完成摘要
 

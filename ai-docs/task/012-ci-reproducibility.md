@@ -54,10 +54,10 @@
 
 ## 验收标准
 
-- [ ] 目标 runner 上从干净 checkout 通过统一检查，并能获取真实运行记录。
-- [ ] 缓存命中与缓存删除两种路径有效；不依赖本机全局包或绝对目录。
-- [ ] 故意失败的检查会使 CI 失败，未运行的图形检查明确标为缺口。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [x] 目标 runner 上从干净 checkout 通过统一检查，并能获取真实运行记录。（run 35425146629 由 main push 触发，公开日志留存）
+- [ ] 缓存命中与缓存删除两种路径有效；不依赖本机全局包或绝对目录。（删除/冷路径已由 35425146629 证明；命中路径待下一次同键 run 观测）
+- [x] 故意失败的检查会使 CI 失败，未运行的图形检查明确标为缺口。（run 35376430562 的真实失败即时阻断 CI；图形/窗口冒烟缺口在 testing 与 quality 模块标注为独立验证）
+- [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。（2026-09-19 同步 default-members 语义与依赖获取文档）
 
 - [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
@@ -71,6 +71,7 @@
 | 2026-09-19 | CI cache 方案收窄 | 只缓存 registry/git、`target/panta-tools` 和 `target/panta-deps`；key 按 OS/架构/LLVM 与 Cargo/Python/native 供给清单区分，restore key 只回退同平台同 LLVM 依赖资产 |
 | 2026-09-19 | run 35376430562 失败诊断 | 全部 Linux job 失败于 launcher build.rs 内 `find_package(Qt6 Gui)`：`Qt6Gui could not be found because dependency WrapOpenGL could not be found`；Qt 归档下载/解包均成功，缺口是宿主 GL 开发文件。Windows job 在 build script 阶段静默挂满 6h 平台上限（`Checking panta-dslc` 后无输出），唯一无上限等待是构建引导 `curl -fSL` |
 | 2026-09-19 | 本地验证（macOS 26, arm64） | `actionlint .github/workflows/ci.yml` 通过；`cargo check --locked -p panta-build`、`cargo test --locked -p panta-build`（12 passed）、`cargo fmt --all -- --check`、`git diff --check` 通过；新 curl 参数集实测下载 ninja-mac.zip 且 SHA256 与固定清单一致。三平台实跑证据待 push 后的 run 回填 |
+| 2026-09-19 | run [35425146629](https://github.com/Yuki-Nagori/panta/actions/runs/35425146629)（`2ebbea7` 合入 main 后 push）三平台 | 修复后的缓存与前置在真实 run 生效：success，总时长 6m29s（此前失败 run 35376430562 拖满 6h）。Linux GL 前置与 curl 上限修复生效；新缓存键下无可命中旧缓存，证明"删除/冷缓存"路径可完整构建；"缓存命中"路径待下一次同键 run 观测 |
 | — | 完整缓存命中/删除验证 | 未完成 |
 
 ## 风险与回退

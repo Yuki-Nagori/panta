@@ -1,15 +1,15 @@
 # 026 — C++ 静态库边界与 QML 自动注册
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[005](005-qt-qml-shell.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-17
+- 创建 / 更新：2026-09-16 / 2026-09-19
 
 ## 目标与背景
 
-接续 005 的注册与 lint 缺口，验证静态库、正式 QML 模块和按需编译的组合。Panta.Bridge 的静态模块迁移已落地，本轮补齐可重复的运行时加载测试、Release 验证和真实的模块开关；跨平台运行仍需后续证据。
+接续 005 的注册与 lint 缺口，验证静态库、正式 QML 模块和按需编译的组合。Panta.Bridge 的静态模块迁移已落地，本轮补齐可重复的运行时加载测试、Release 验证和真实的模块开关；跨平台运行证据已由三平台 CI 补齐。
 
 ## 必读
 
@@ -52,7 +52,7 @@
 ## 验收标准
 
 - [x] ShellViewModel 自动注册可用，生成类型信息使 qmllint 可识别，现有信号行为保持。
-- [ ] 静态链接及优化构建保留注册与资源，macOS/Linux/Windows 构建和运行证据明确（当前已有 macOS Debug/Release 证据，跨平台运行待 CI）。
+- [x] 静态链接及优化构建保留注册与资源，macOS/Linux/Windows 构建和运行证据明确。（macOS Debug/Release 与开关 ON/OFF 本地验证；Linux/Windows 运行证据由 run 35425146629 的 CTest 套件补齐，含 `Qml.ShellModuleLoads` 与 QML 行为测试）
 - [x] 开关关闭 `Panta.Bridge` 时主界面无悬空 import；启用时 `ShellViewModel` 类型可用，依赖图无环。
 - [x] 脱离源码 cwd 可启动；旧手动注册与重复路径已删除，不同时保留两套注册实现。
 - [x] 代码、测试、配置和文档一致，删除废弃实现；记录真实验证并同步索引。
@@ -88,4 +88,4 @@ CMake/Cargo 构建、CTest、all_qmllint、Release 构建和真实启动验证�
 
 ## 完成摘要
 
-核心实现已完成并补齐 macOS Debug/Release、开关 ON/OFF 自动验证；仍待 Linux/Windows 运行证据。
+已交付：`Panta.Shell`/`Panta.Bridge` 静态模块注册与 typeinfo、`PANTA_ENABLE_BRIDGE_MODULE` 真实开关、脱离源码 cwd 启动；macOS Debug/Release 与开关 ON/OFF 本地验证，Linux/Windows 由 run [35425146629](https://github.com/Yuki-Nagori/panta/actions/runs/35425146629) 的 CTest 套件（含 `Qml.ShellModuleLoads` 与 QML 行为测试）验证，任务关闭。
