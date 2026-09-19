@@ -2,6 +2,8 @@
 #
 # 源码固定：tag v9.7.0 → commit 23f0a095621e91bbdbeace8451e22b950c8e5f46
 # （2026-09-17 git ls-remote 解引用复核；annotated tag 对象 a78e2d95…）。
+# CI 从 GitHub mirror 抓取；该 mirror 的 v9.7.0^{} 与上游 pin 一致，避免
+# runner 到 VTK 上游服务的源码 clone 受网络策略影响。
 # 配置开关冻结为 007 视口所需最小面：VTK WebGPU + 平台 hardware window
 # （macOS 为 Cocoa hardware window）；不启用 Qt/GUISupportQtQuick，不把 Qt
 # OpenGL scenegraph 集成带入制品。
@@ -11,35 +13,34 @@ set(PANTA_VTK_VERSION 9.7.0)
 set(PANTA_VTK_COMMIT 23f0a095621e91bbdbeace8451e22b950c8e5f46)
 set(PANTA_VTK_INSTALL_DIR "${PANTA_SDK_OUT_ROOT}/vtk/${PANTA_VTK_VERSION}/${PANTA_SDK_TRIPLE}")
 
-# VTK 9.7 的 RenderingWebGPU 在桌面平台依赖与 VTK 同步的 Dawn 预编译
-# 运行时；只打开 VTK_ENABLE_WEBGPU 而不提供 Dawn_DIR 会在 configure 阶段失败。
-# 版本、平台资产和 SHA256 取自 VTK v9.7.0 自带的 .gitlab/ci/download_dawn.cmake。
-set(PANTA_DAWN_VERSION 20251002.162335)
-set(PANTA_DAWN_BUILD_DATE 20260130.0)
+# VTK 9.7 的 RenderingWebGPU 在桌面平台依赖 Dawn；只打开
+# VTK_ENABLE_WEBGPU 而不提供 Dawn_DIR 会在 configure 阶段失败。Dawn 使用
+# GitHub native release，避免依赖 VTK 上游的外部 package endpoint。
+set(PANTA_DAWN_VERSION 20260720.160313)
+set(PANTA_DAWN_COMMIT 0bc38adde72b79013536f8ce354b639ae19ae195)
+set(PANTA_DAWN_LICENSE_SHA256 0493f897193af1796d5054659f45ec7d4c5af648fa67a99f01d30e55cc805abc)
+set(PANTA_DAWN_LICENSE_URL
+    "https://raw.githubusercontent.com/google/dawn/${PANTA_DAWN_COMMIT}/LICENSE")
 if(PANTA_SDK_TRIPLE STREQUAL "macos-arm64")
-  set(PANTA_DAWN_PLATFORM macos-arm64)
-  set(PANTA_DAWN_EXTENSION tar.gz)
-  set(PANTA_DAWN_SHA256 1e4537f51cc39500fee35cb0ab8f40b0491fe8cd9b1d8c6cc87eba35dcdf16eb)
+  set(PANTA_DAWN_PLATFORM macos-latest)
+  set(PANTA_DAWN_SHA256 0729bc3f245584181238f5d2a6bd3423613d69a6c301d7b0d21a8c7516c058e3)
 elseif(PANTA_SDK_TRIPLE STREQUAL "linux-x86_64")
-  set(PANTA_DAWN_PLATFORM linux-x86_64)
-  set(PANTA_DAWN_EXTENSION tar.gz)
-  set(PANTA_DAWN_SHA256 a0f846e06f0ebdfe5f74b0fc193e3b74421ae9c9524a9d37cf9bf39c52110921)
+  set(PANTA_DAWN_PLATFORM ubuntu-latest)
+  set(PANTA_DAWN_SHA256 67e87bd8455256fefb81cc752ede0b4704289f6b49cf72ebd9e099e409f0e2f4)
 elseif(PANTA_SDK_TRIPLE STREQUAL "windows-x86_64")
-  set(PANTA_DAWN_PLATFORM windows-x86_64)
-  set(PANTA_DAWN_EXTENSION zip)
-  set(PANTA_DAWN_SHA256 500afd33a3b3ab1e3a7153900a18f32e9979ec4c9021d645c133f0e2db3ba198)
+  set(PANTA_DAWN_PLATFORM windows-latest)
+  set(PANTA_DAWN_SHA256 7af79f8525b15802d1438c6d2cd648cbea771c2cae56b43cae07870dd0f30130)
 else()
   message(FATAL_ERROR "VTK WebGPU 制品没有登记 Dawn 平台资产：${PANTA_SDK_TRIPLE}")
 endif()
-set(PANTA_DAWN_ARCHIVE "dawn-v${PANTA_DAWN_VERSION}-${PANTA_DAWN_PLATFORM}.${PANTA_DAWN_EXTENSION}")
+set(PANTA_DAWN_ARCHIVE "Dawn-${PANTA_DAWN_COMMIT}-${PANTA_DAWN_PLATFORM}-Release.tar.gz")
 set(PANTA_DAWN_URL
-    "https://gitlab.kitware.com/api/v4/projects/6955/packages/generic/dawn/v${PANTA_DAWN_VERSION}-${PANTA_DAWN_BUILD_DATE}/${PANTA_DAWN_ARCHIVE}"
-)
+    "https://github.com/google/dawn/releases/download/v${PANTA_DAWN_VERSION}/${PANTA_DAWN_ARCHIVE}")
 
 include(ExternalProject)
 ExternalProject_Add(
   vtk_sdk
-  GIT_REPOSITORY https://gitlab.kitware.com/vtk/vtk.git
+  GIT_REPOSITORY https://github.com/Kitware/VTK.git
   GIT_TAG ${PANTA_VTK_COMMIT}
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
@@ -51,7 +52,7 @@ ExternalProject_Add(
              -DBUILD_SHARED_LIBS=ON
              -DBUILD_TESTING=OFF
              -DCMAKE_INSTALL_PREFIX=${PANTA_VTK_INSTALL_DIR}
-             -DDawn_DIR=<SOURCE_DIR>/.gitlab/dawn/lib/cmake/Dawn
+             -DDawn_DIR=<SOURCE_DIR>/.dawn/dawn/lib/cmake/Dawn
              -DVTK_GROUP_ENABLE_Qt=NO
              -DVTK_ENABLE_WEBGPU=ON
              -DVTK_MODULE_ENABLE_VTK_RenderingUI=YES
@@ -64,26 +65,27 @@ ExternalProject_Add(
   USES_TERMINAL_DOWNLOAD TRUE
   USES_TERMINAL_BUILD TRUE)
 
-# VTK 源码已 checkout 后再按上游固定脚本下载/解包 Dawn，保证 VTK 的
-# configure step 能看到 <SOURCE_DIR>/.gitlab/dawn。Dawn 不是另一个可选
+# VTK 源码已 checkout 后再下载/解包 Dawn，保证 VTK 的 configure step 能看到
+# <SOURCE_DIR>/.dawn/dawn。Dawn 不是另一个可选
 # 构建路径，而是 RenderingWebGPU 的固定外部依赖。
 ExternalProject_Add_Step(
   vtk_sdk dawn
   COMMAND
-    ${CMAKE_COMMAND} -DPANTA_DAWN_DOWNLOAD_DIR=<SOURCE_DIR>/.gitlab
-    -DPANTA_DAWN_URL=${PANTA_DAWN_URL} -DPANTA_DAWN_ARCHIVE=${PANTA_DAWN_ARCHIVE}
-    -DPANTA_DAWN_SHA256=${PANTA_DAWN_SHA256} -P ${CMAKE_CURRENT_SOURCE_DIR}/download-dawn.cmake
+    ${CMAKE_COMMAND} -DPANTA_DAWN_DOWNLOAD_DIR=<SOURCE_DIR>/.dawn -DPANTA_DAWN_URL=${PANTA_DAWN_URL}
+    -DPANTA_DAWN_ARCHIVE=${PANTA_DAWN_ARCHIVE} -DPANTA_DAWN_SHA256=${PANTA_DAWN_SHA256}
+    -DPANTA_DAWN_LICENSE_URL=${PANTA_DAWN_LICENSE_URL}
+    -DPANTA_DAWN_LICENSE_SHA256=${PANTA_DAWN_LICENSE_SHA256} -P
+    ${CMAKE_CURRENT_SOURCE_DIR}/download-dawn.cmake
   DEPENDEES update
   DEPENDERS configure
   USES_TERMINAL)
 
-# VTK 的 WebGPU 模块运行期通过 proc table 加载 Dawn；把 Dawn 的头文件、
-# CMake package 和平台库放进同一 VTK SDK，避免生成只在 CI 能 configure、
-# 消费侧却缺 runtime 的半成品。
+# 把 Dawn 的头文件、CMake package 和 native library 放进同一 VTK SDK，
+# 避免生成只在 CI 能 configure、消费侧却缺 Dawn 依赖的半成品。
 ExternalProject_Add_Step(
   vtk_sdk dawn_runtime
   COMMAND
-    ${CMAKE_COMMAND} -DPANTA_DAWN_INSTALL_DIR=<SOURCE_DIR>/.gitlab/dawn
+    ${CMAKE_COMMAND} -DPANTA_DAWN_INSTALL_DIR=<SOURCE_DIR>/.dawn/dawn
     -DPANTA_VTK_INSTALL_DIR=${PANTA_VTK_INSTALL_DIR} -P
     ${CMAKE_CURRENT_SOURCE_DIR}/install-dawn.cmake
   DEPENDEES install
@@ -98,7 +100,7 @@ file(
   "version": "@PANTA_VTK_VERSION@",
   "triple": "@PANTA_SDK_TRIPLE@",
   "source": {
-    "repository": "https://gitlab.kitware.com/vtk/vtk.git",
+    "repository": "https://github.com/Kitware/VTK.git",
     "tag": "v9.7.0",
     "commit": "@PANTA_VTK_COMMIT@"
   },
@@ -109,10 +111,13 @@ file(
   "macos_surface": "CocoaHardwareWindow",
   "dawn": {
     "version": "@PANTA_DAWN_VERSION@",
-    "build_date": "@PANTA_DAWN_BUILD_DATE@",
+    "commit": "@PANTA_DAWN_COMMIT@",
     "platform": "@PANTA_DAWN_PLATFORM@",
+    "archive": "@PANTA_DAWN_ARCHIVE@",
     "sha256": "@PANTA_DAWN_SHA256@",
-    "url": "@PANTA_DAWN_URL@"
+    "url": "@PANTA_DAWN_URL@",
+    "license_url": "@PANTA_DAWN_LICENSE_URL@",
+    "license_sha256": "@PANTA_DAWN_LICENSE_SHA256@"
   },
   "modules_highlights": ["RenderingWebGPU", "RenderingUI", "RenderingCore"],
   "cmake_package": ["lib/cmake/vtk-@PANTA_VTK_VERSION@", "vtk-config.cmake"],

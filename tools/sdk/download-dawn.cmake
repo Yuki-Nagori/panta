@@ -1,9 +1,9 @@
-# 下载并解包 VTK 9.7 RenderingWebGPU 所需的固定 Dawn 预编译资产。
+# 下载并解包 VTK 9.7 RenderingWebGPU 所需的固定 GitHub Dawn native 资产。
 
 cmake_minimum_required(VERSION 3.22)
 
 foreach(_required IN ITEMS PANTA_DAWN_DOWNLOAD_DIR PANTA_DAWN_URL PANTA_DAWN_ARCHIVE
-                           PANTA_DAWN_SHA256)
+                           PANTA_DAWN_SHA256 PANTA_DAWN_LICENSE_URL PANTA_DAWN_LICENSE_SHA256)
   if(NOT DEFINED ${_required})
     message(FATAL_ERROR "Dawn 下载缺少变量 ${_required}")
   endif()
@@ -66,4 +66,27 @@ endif()
 file(RENAME "${_extracted_dir}" "${_dawn_dir}")
 if(NOT EXISTS "${_dawn_dir}/lib/cmake/Dawn/DawnConfig.cmake")
   message(FATAL_ERROR "Dawn 制品缺少 lib/cmake/Dawn/DawnConfig.cmake：${_dawn_dir}")
+endif()
+
+set(_license "${_dawn_dir}/LICENSE")
+set(_license_valid FALSE)
+if(EXISTS "${_license}")
+  file(SHA256 "${_license}" _actual_license_sha256)
+  if(_actual_license_sha256 STREQUAL PANTA_DAWN_LICENSE_SHA256)
+    set(_license_valid TRUE)
+  else()
+    file(REMOVE "${_license}")
+  endif()
+endif()
+if(NOT _license_valid)
+  file(
+    DOWNLOAD "${PANTA_DAWN_LICENSE_URL}" "${_license}"
+    EXPECTED_HASH "SHA256=${PANTA_DAWN_LICENSE_SHA256}"
+    STATUS _license_status)
+  list(GET _license_status 0 _license_code)
+  if(_license_code)
+    list(GET _license_status 1 _license_message)
+    file(REMOVE "${_license}")
+    message(FATAL_ERROR "Dawn LICENSE 下载失败：${_license_message}")
+  endif()
 endif()
