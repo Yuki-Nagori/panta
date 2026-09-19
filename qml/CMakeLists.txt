@@ -54,7 +54,7 @@ if(BUILD_TESTING)
     Qml.ThemeComponentParameters
     PROPERTIES
       ENVIRONMENT
-      "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
+      "QT_QPA_PLATFORM=${PANTA_QML_TEST_QPA_PLATFORM};QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
   )
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。
