@@ -71,6 +71,8 @@ function(panta_native_defaults target)
   set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4 /permissive-)
+    # Rust/CXX bridge 的错误边界抛出 rust::Error；clang-cl 默认关闭异常。
+    target_compile_options(${target} PRIVATE /EHsc)
   else()
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
   endif()
