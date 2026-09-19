@@ -55,10 +55,14 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 - 2026-09-19：新运行 [35418381255](https://github.com/Yuki-Nagori/panta/actions/runs/35418381255) 已证明安装包在 `target/panta-tools/llvm/...` 内约 64 秒完成；随后 clang-cl 因默认禁用异常而拒绝 CXX 生成代码中的 `throw`。已补 FFI/CMake 的 `/EHsc`，待下一次 Windows CI 验证。
 - 2026-09-19：运行 [35418599708](https://github.com/Yuki-Nagori/panta/actions/runs/35418599708) 的 Windows job 已完成 112/112 个 native 编译步骤，clang-cl 与链接均成功；launcher 因只检查 `target/native/debug/app/panta-native.exe` 而未覆盖生成器的配置目录/构建树根目录，误报产物缺失。恢复受限于 `target/native/<profile>` 的多布局探测。
 - 2026-09-19：运行 [35418983684](https://github.com/Yuki-Nagori/panta/actions/runs/35418983684) 已验证 check/build 与 launcher 产物定位通过；Test 的 CTest discovery 因 Windows 子进程缺少托管 Qt DLL，返回 `0xc0000135`。新增 native test 环境 PATH，将 `target/panta-deps/qt/staging/bin` 放在 MSVC SDK PATH 前，去除临时 CI 详细输出与失败诊断上传，待下一次 CI 验证。
-- 2026-09-19：提交 `922139c` 的运行 [35419894410](https://github.com/Yuki-Nagori/panta/actions/runs/35419894410) 已验证 Qt DLL 环境修复、`PathHostTest` 及 `Qml.FormatCheck` 通过；Windows 仍有 `Qml.ThemeComponentParameters` 与 `Qml.ShellModuleLoads` 失败。失败原因进一步收敛为 QML 测试运行时环境不完整，`d52137b` 已加入托管 Qt 的 QML 导入路径，`9aaf2c4` 又加入插件目录及 Basic Controls 样式，但运行仍复现，当前继续补齐平台插件路径。
+- 2026-09-19：提交 `922139c` 的运行 [35419894410](https://github.com/Yuki-Nagori/panta/actions/runs/35419894410) 已验证 Qt DLL 环境修复、`PathHostTest` 及 `Qml.FormatCheck` 通过；Windows 仍有 `Qml.ThemeComponentParameters` 与 `Qml.ShellModuleLoads` 失败。当时怀疑 QML 测试运行时环境不完整（尚未证实），`d52137b` 已加入托管 Qt 的 QML 导入路径，`9aaf2c4` 又加入插件目录及 Basic Controls 样式，但运行仍复现，当前继续补齐平台插件路径。
 - 2026-09-19：运行 [35421298483](https://github.com/Yuki-Nagori/panta/actions/runs/35421298483) 仍复现上述两个 QML 测试失败；`e97517e` 已将平台插件路径同时写入 native 测试进程环境，当前把同一 Qt 运行时设置下沉到 CTest 测试属性，避免 CTest 子进程环境差异。
-- 2026-09-19：运行 [35421659951](https://github.com/Yuki-Nagori/panta/actions/runs/35421659951) 验证构建、QML 格式和其余 24 项通过，但两个启动 `QGuiApplication` 的 QML 测试仍失败；Windows 的 `offscreen` QPA 启动不稳定，改为仅 Windows 使用 Qt `minimal` 平台，Linux/macOS 继续使用 `offscreen`。
-- 2026-09-19：运行 [35423204587](https://github.com/Yuki-Nagori/panta/actions/runs/35423204587/job/105844516615) 仍只有两个 QML 启动测试失败，格式门禁已通过；额外的 CTest 重跑没有产生子进程输出，故不保留该排查代码。当前修复将 `panta_shell` DLL 复制到 Windows QML 测试可执行文件目录，并补齐生成模块目录的运行时搜索路径，待下一次实跑验证。
+- 2026-09-19：运行 [35421659951](https://github.com/Yuki-Nagori/panta/actions/runs/35421659951) 验证构建、QML 格式和其余 24 项通过，但两个启动 `QGuiApplication` 的 QML 测试仍失败；当时怀疑 Windows 的 `offscreen` QPA 启动问题（尚未证实），改为仅 Windows 使用 Qt `minimal` 平台，Linux/macOS 继续使用 `offscreen`。
+- 2026-09-19：运行 [35423204587](https://github.com/Yuki-Nagori/panta/actions/runs/35423204587/job/105844516615) 仍只有两个 QML 启动测试失败，格式门禁已通过；额外的 CTest 重跑写在 CLI 入口，实际 CI 调用 integration/native.rs，未执行该诊断；此前据此推断启动原因不成立。当前修复将 `panta_shell` DLL 复制到 Windows QML 测试可执行文件目录，并补齐生成模块目录的运行时搜索路径，待下一次实跑验证。
+
+- 2026-09-19：运行 [35423565513](https://github.com/Yuki-Nagori/panta/actions/runs/35423565513) 中 qmllint、QML 格式及其余 24 项测试通过，两个 QML 运行测试仍失败；DLL 复制未解决问题且缺少 COMMENT 导致 CMake lint 失败。本轮删除复制命令，恢复统一 offscreen，并让 QML 的 CTest 入口报告实际子进程退出状态、强制 Qt 日志到 stderr；根据真实错误再简化运行时设置。
+
+- 本轮本地验证：native 重新配置与构建成功，CTest `^Qml\.` 三项全部通过，`cargo lint cmake`、`git diff --check` 通过；Windows 退出状态待推送后验证。
 
 ## 完成摘要
 

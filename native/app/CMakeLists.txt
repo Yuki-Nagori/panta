@@ -30,22 +30,15 @@ if(BUILD_TESTING)
     target_link_libraries(panta_qml_shell_module_test PRIVATE panta_bridgeplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
-  if(WIN32)
-    # Keep the QML module DLL beside the test executable. This is also the
-    # first Windows DLL search location when CTest starts a GUI process.
-    add_custom_command(
-      TARGET panta_qml_shell_module_test
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:panta_shell>"
-              "$<TARGET_FILE_DIR:panta_qml_shell_module_test>"
-      VERBATIM)
-  endif()
-  add_test(NAME Qml.ShellModuleLoads COMMAND panta_qml_shell_module_test)
+  add_test(
+    NAME Qml.ShellModuleLoads
+    COMMAND "${CMAKE_COMMAND}" "-DTEST_EXECUTABLE=$<TARGET_FILE:panta_qml_shell_module_test>" -P
+            "${PROJECT_SOURCE_DIR}/cmake/tests/run-qml-test.cmake")
   set_tests_properties(
     Qml.ShellModuleLoads
     PROPERTIES
       ENVIRONMENT
-      "QT_QPA_PLATFORM=${PANTA_QML_TEST_QPA_PLATFORM};QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
+      "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
   )
 endif()
 
