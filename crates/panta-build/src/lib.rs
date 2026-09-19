@@ -365,7 +365,7 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
     };
 
     let identity = format!("{}-{}", tool.version(), asset.sha256);
-    let directory = install_directory(target_root, name, &identity, |staging| {
+    let install = |staging: &Path| -> Result<(), String> {
         let archives = tools_root(target_root).join("archives");
         fs::create_dir_all(&archives).map_err(|e| e.to_string())?;
         let suffix = if cfg!(windows) && matches!(tool, Tool::Llvm) {
@@ -407,7 +407,16 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
             eprintln!("[panta-tools] {name}：清理安装归档失败（忽略）：{e}");
         }
         Ok(())
-    })?;
+    };
+    let mut directory = install_directory(target_root, name, &identity, install)?;
+    // 历史缓存树可能被旧版裁剪留下悬空链接（如 clang++ → clang-<ver> 真身
+    // 被删）；marker 命中但二进制缺失时，删除该版本目录重装一次自愈，仍
+    // 失败才报损坏，不再要求手工清理。
+    if tool.locate_installed(&directory).is_none() {
+        eprintln!("[panta-tools] {name}：安装树不完整，删除后重装自愈");
+        fs::remove_dir_all(&directory).map_err(|e| e.to_string())?;
+        directory = install_directory(target_root, name, &identity, install)?;
+    }
     tool.locate_installed(&directory).ok_or_else(|| {
         format!(
             "托管 {name} 缓存损坏：{}；清理该版本目录后重试",
@@ -476,23 +485,30 @@ pub fn install_directory(
 /// 降到约 2 GB；lib 仅保留编译器资源目录 lib/clang（内建头与覆盖/消毒
 /// 运行时）。白名单与验证器同步，新增工具先登记再使用。
 fn slim_llvm(root: &Path) -> Result<(), String> {
-    const KEEP: &[&str] = &[
+    // 按前缀保留：官方发布里 clang/clang++ 常是指向 clang-<major> 等带版本
+    // 名的链接，精确名匹配会删掉真身、留下悬空链接（run 35430519988 实证）。
+    // 前缀命中后再排除确定不用的胖工具；lld 前缀会误吞 lldb 全家，先排除。
+    const KEEP_PREFIXES: &[&str] = &[
         "clang",
-        "clang++",
-        "clang-cpp",
-        "clang-cl",
-        "clang-format",
-        "clang-tidy",
-        "clang-scan-deps",
-        "clang-apply-replacements",
         "llvm-ar",
         "llvm-ranlib",
         "llvm-profdata",
         "llvm-cov",
         "llvm-symbolizer",
         "lld",
-        "lld-link",
         "ld.lld",
+    ];
+    const DROP_TOOLS: &[&str] = &[
+        "clangd",
+        "clang-repl",
+        "clang-tblgen",
+        "clang-check",
+        "clang-refactor",
+        "clang-extdef-mapping",
+        "clang-include-fixer",
+        "clang-linker-wrapper",
+        "clang-offload-bundler",
+        "clang-offload-packager",
     ];
     for entry in fs::read_dir(root).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -508,7 +524,9 @@ fn slim_llvm(root: &Path) -> Result<(), String> {
                 if name.ends_with(".exe") {
                     name.truncate(name.len() - 4);
                 }
-                if !KEEP.contains(&name.as_str()) {
+                let keep = KEEP_PREFIXES.iter().any(|p| name.starts_with(p))
+                    && !DROP_TOOLS.contains(&name.as_str());
+                if !keep {
                     let path = entry.path();
                     fs::remove_file(&path)
                         .or_else(|_| fs::remove_dir_all(&path))
@@ -818,9 +836,14 @@ mod tests {
         let tree = root.join("LLVM-22.1.7-test");
         let bin = tree.join("bin");
         fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
-        for name in ["clang", "clang-tidy.exe", "mlir-opt", "clangd"] {
+        for name in ["clang", "clang-22", "clang-tidy.exe", "mlir-opt", "clangd"] {
             fs::write(bin.join(name), "x").map_err(|e| e.to_string())?;
         }
+        // 官方包里 clang++ 常是指向版本化真身的链接：真身按前缀保留，
+        // 链接才不会悬空。
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(bin.join("clang-22"), bin.join("clang++"))
+            .map_err(|e| e.to_string())?;
         let lib = tree.join("lib");
         fs::create_dir_all(lib.join("clang").join("22").join("lib")).map_err(|e| e.to_string())?;
         fs::write(lib.join("libclang.dylib"), "x").map_err(|e| e.to_string())?;
@@ -828,14 +851,23 @@ mod tests {
 
         super::slim_llvm(&root)?;
 
-        // 白名单工具保留（.exe 剥离后匹配），其余 bin 与 lib/include 开发内容
-        // 裁除，编译器资源目录 lib/clang 原样保留。
-        for kept in ["clang", "clang-tidy.exe"] {
+        // 前缀命中的工具与版本化真身保留（.exe 剥离后匹配），clangd 与
+        // mlir-opt 裁除；lib/include 开发内容裁除，编译器资源目录 lib/clang
+        // 原样保留。
+        for kept in ["clang", "clang-22", "clang-tidy.exe"] {
             assert!(bin.join(kept).is_file(), "{kept} 不应被裁剪");
         }
         for trimmed in ["mlir-opt", "clangd"] {
             assert!(!bin.join(trimmed).exists(), "{trimmed} 应被裁剪");
         }
+        #[cfg(unix)]
+        assert!(
+            bin.join("clang++")
+                .metadata()
+                .map_err(|e| e.to_string())?
+                .is_file(),
+            "clang++ 链接不应悬空"
+        );
         assert!(!lib.join("libclang.dylib").exists(), "lib 开发库应被裁剪");
         assert!(lib.join("clang").join("22").is_dir(), "资源目录应保留");
         assert!(!tree.join("include").exists(), "include 开发头应被裁剪");
