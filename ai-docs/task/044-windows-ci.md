@@ -53,6 +53,7 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 - 2026-09-19：远程运行 [35415943085](https://github.com/Yuki-Nagori/panta/actions/runs/35415943085) 验证了阶段日志；下载和 SHA256 校验成功，Windows `tar -xf` 解包 LLVM 在 20 分钟上限后退出码 1。Linux/macOS 同轮通过。确认故障点为 Windows 解包实现。
 - 2026-09-19：改用 LLVM 官方 `LLVM-22.1.7-win64.exe`（SHA256 `e091fcf...9a0d1eb3`）并在 staging 目录执行 NSIS `/S /D=...` 静默安装；保留同版本、同来源、同目录的 clang-cl/lld/clang-format。待下一次 Windows CI 验证。
 - 2026-09-19：新运行 [35418381255](https://github.com/Yuki-Nagori/panta/actions/runs/35418381255) 已证明安装包在 `target/panta-tools/llvm/...` 内约 64 秒完成；随后 clang-cl 因默认禁用异常而拒绝 CXX 生成代码中的 `throw`。已补 FFI/CMake 的 `/EHsc`，待下一次 Windows CI 验证。
+- 2026-09-19：运行 [35418599708](https://github.com/Yuki-Nagori/panta/actions/runs/35418599708) 的 Windows job 已完成 112/112 个 native 编译步骤，clang-cl 与链接均成功；launcher 因只检查 `target/native/debug/app/panta-native.exe` 而未覆盖生成器的配置目录/构建树根目录，误报产物缺失。恢复受限于 `target/native/<profile>` 的多布局探测，待下一次 Windows CI 验证。
 
 ## 完成摘要
 

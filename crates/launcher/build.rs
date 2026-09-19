@@ -232,11 +232,34 @@ fn orchestrate() -> Result<PathBuf, String> {
     } else {
         "panta-native"
     };
-    let product = binary_dir.join("app").join(exe_name);
-    if !product.is_file() {
-        return Err(format!("native 产物不存在：{}", product.display()));
-    }
-    Ok(product)
+    locate_product(&binary_dir, build_type, exe_name)
+}
+
+fn locate_product(binary_dir: &Path, build_type: &str, exe_name: &str) -> Result<PathBuf, String> {
+    let app_dir = binary_dir.join("app");
+    // Ninja 等单配置生成器通常把产物放在 app/；多配置生成器可能使用
+    // app/<Config>/ 或 <Config>/；部分 clang-cl/Ninja 组合直接写入构建树根部。
+    // 所有候选都在 target/native/<profile> 下，不能把系统目录当作回退位置。
+    let candidates = [
+        app_dir.join(exe_name),
+        app_dir.join(build_type).join(exe_name),
+        binary_dir.join(build_type).join(exe_name),
+        binary_dir.join(exe_name),
+    ];
+    candidates
+        .iter()
+        .find(|path| path.is_file())
+        .cloned()
+        .ok_or_else(|| {
+            let expected = candidates
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(" 或 ");
+            format!(
+                "CMake 构建成功但未找到产物（尝试：{expected}）；检查 native/app 的 OUTPUT_NAME 与生成器配置"
+            )
+        })
 }
 
 fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
