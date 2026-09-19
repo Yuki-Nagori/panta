@@ -50,8 +50,9 @@ if(BUILD_TESTING)
   target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
                                                                Qt6::Test)
   add_test(NAME Qml.ThemeComponentParameters COMMAND panta_qml_theme_component_test)
-  set_tests_properties(Qml.ThemeComponentParameters PROPERTIES ENVIRONMENT
-                                                               "QT_QPA_PLATFORM=offscreen")
+  set_tests_properties(
+    Qml.ThemeComponentParameters
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic")
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。
   find_program(

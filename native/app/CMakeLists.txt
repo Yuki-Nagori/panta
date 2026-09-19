@@ -31,7 +31,9 @@ if(BUILD_TESTING)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
   add_test(NAME Qml.ShellModuleLoads COMMAND panta_qml_shell_module_test)
-  set_tests_properties(Qml.ShellModuleLoads PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  set_tests_properties(
+    Qml.ShellModuleLoads PROPERTIES ENVIRONMENT
+                                    "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic")
 endif()
 
 install(

@@ -55,7 +55,7 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 - 2026-09-19：新运行 [35418381255](https://github.com/Yuki-Nagori/panta/actions/runs/35418381255) 已证明安装包在 `target/panta-tools/llvm/...` 内约 64 秒完成；随后 clang-cl 因默认禁用异常而拒绝 CXX 生成代码中的 `throw`。已补 FFI/CMake 的 `/EHsc`，待下一次 Windows CI 验证。
 - 2026-09-19：运行 [35418599708](https://github.com/Yuki-Nagori/panta/actions/runs/35418599708) 的 Windows job 已完成 112/112 个 native 编译步骤，clang-cl 与链接均成功；launcher 因只检查 `target/native/debug/app/panta-native.exe` 而未覆盖生成器的配置目录/构建树根目录，误报产物缺失。恢复受限于 `target/native/<profile>` 的多布局探测。
 - 2026-09-19：运行 [35418983684](https://github.com/Yuki-Nagori/panta/actions/runs/35418983684) 已验证 check/build 与 launcher 产物定位通过；Test 的 CTest discovery 因 Windows 子进程缺少托管 Qt DLL，返回 `0xc0000135`。新增 native test 环境 PATH，将 `target/panta-deps/qt/staging/bin` 放在 MSVC SDK PATH 前，去除临时 CI 详细输出与失败诊断上传，待下一次 CI 验证。
-- 2026-09-19：提交 `922139c` 的运行 [35419894410](https://github.com/Yuki-Nagori/panta/actions/runs/35419894410) 已验证 Qt DLL 环境修复、`PathHostTest` 及 `Qml.FormatCheck` 通过；Windows 仍有 `Qml.ThemeComponentParameters` 与 `Qml.ShellModuleLoads` 失败。失败原因进一步收敛为测试进程缺少托管 Qt 的 QML 模块导入路径，已把 `target/panta-deps/qt/staging/qml` 与 native 模块目录加入 Windows 测试环境，待下一次 CI 验证。
+- 2026-09-19：提交 `922139c` 的运行 [35419894410](https://github.com/Yuki-Nagori/panta/actions/runs/35419894410) 已验证 Qt DLL 环境修复、`PathHostTest` 及 `Qml.FormatCheck` 通过；Windows 仍有 `Qml.ThemeComponentParameters` 与 `Qml.ShellModuleLoads` 失败。失败原因进一步收敛为 QML 测试运行时环境不完整，`d52137b` 已加入托管 Qt 的 QML/插件目录及 Basic Controls 样式，待下一次 CI 验证。
 
 ## 完成摘要
 

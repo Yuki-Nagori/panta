@@ -491,6 +491,10 @@ pub fn native_test_env(
     if !qt_qml.is_dir() {
         return Err(format!("托管 Qt QML 模块目录不存在：{}", qt_qml.display()));
     }
+    let qt_plugins = qt_root.join("plugins");
+    if !qt_plugins.is_dir() {
+        return Err(format!("托管 Qt 插件目录不存在：{}", qt_plugins.display()));
+    }
     let current_path = environment
         .iter()
         .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
@@ -516,6 +520,10 @@ pub fn native_test_env(
     for key in ["QML2_IMPORT_PATH", "QML_IMPORT_PATH"] {
         environment.push((std::ffi::OsString::from(key), import_path.clone()));
     }
+    environment.push((
+        std::ffi::OsString::from("QT_PLUGIN_PATH"),
+        qt_plugins.into_os_string(),
+    ));
     Ok(environment)
 }
 
