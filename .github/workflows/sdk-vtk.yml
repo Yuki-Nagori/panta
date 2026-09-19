@@ -2,13 +2,12 @@
 #
 # 受信 CI 语义：按 tools/sdk/ 冻结的构建描述生产制品，自检通过后上传
 # 构建产物；`publish` 输入为 true 时把归档与 .sha256 发布到 GitHub
-# Release（tag = sdk-vtk-9.7.0），发布说明含源码 pin 与许可证出处
+# Release（tag = sdk-vtk-9.7.0-webgpu），发布说明含源码 pin 与许可证出处
 # （tools/sdk/releases/vtk-9.7.0.md）。开发者与普通 CI 经 031 的
 # sdk-provision 消费发布归档，不在本地编译 VTK 源码。
 #
 # runner 工具链：cmake/ninja 为 runner 镜像预装组件（生产管线的受信
-# 环境，不是开发者基线）；Qt 依赖沿用 qt-provision 锁定预编译供给并
-# 以 actions/cache 做加速层。
+# 环境，不是开发者基线）；VTK 制品不消费 Qt，Qt Quick 由应用侧另行供给。
 
 name: SDK artifacts (VTK)
 
@@ -16,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 发布到 GitHub Release（tag sdk-vtk-9.7.0）
+        description: 发布到 GitHub Release（tag sdk-vtk-9.7.0-webgpu）
         type: boolean
         default: false
 
@@ -51,23 +50,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Linux graphics development packages
+      - name: Install Linux window-system development packages
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
-      - name: Cache Qt provision
-        uses: actions/cache@v4
-        with:
-          path: sdk-build/qt
-          key: sdk-qt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native/cmake/qt-provision.cmake') }}
-
       - name: Produce VTK SDK
         shell: bash
         run: |
-          cmake -S tools/sdk -B sdk-build/superbuild -DQT_PROVISION_DIR="$PWD/sdk-build/qt"
+          cmake -S tools/sdk -B sdk-build/superbuild
           cmake --build sdk-build/superbuild
 
       - name: Selfcheck artifact
@@ -76,8 +69,7 @@ jobs:
           cmake -S tools/sdk/selfcheck -B sdk-build/selfcheck \
             -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/vtk/9.7.0/${{ matrix.sdk_triple }}" \
             -DPSDK_PACKAGE=VTK \
-            -DPSDK_REQUIRED_TARGETS="VTK::GUISupportQtQuick VTK::RenderingQt" \
-            -DCMAKE_PREFIX_PATH="$PWD/sdk-build/qt/staging"
+            -DPSDK_REQUIRED_TARGETS="VTK::RenderingWebGPU VTK::RenderingUI"
 
       - name: Package artifact
         shell: bash
@@ -103,10 +95,10 @@ jobs:
         run: |
           # 矩阵各平台并发：Release 不存在则创建（发布说明含许可证/源码
           # 出处），资产以 --clobber 重复上传幂等。
-          gh release view sdk-vtk-9.7.0 --repo "$GITHUB_REPOSITORY" \
-            || gh release create sdk-vtk-9.7.0 \
+          gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" \
+            || gh release create sdk-vtk-9.7.0-webgpu \
                  --repo "$GITHUB_REPOSITORY" \
-                 --title "VTK 9.7.0 prebuilt SDKs" \
+                 --title "VTK 9.7.0 WebGPU/Cocoa prebuilt SDKs" \
                  --notes-file tools/sdk/releases/vtk-9.7.0.md
-          gh release upload sdk-vtk-9.7.0 sdk-build/dist/* --clobber \
+          gh release upload sdk-vtk-9.7.0-webgpu sdk-build/dist/* --clobber \
             --repo "$GITHUB_REPOSITORY"

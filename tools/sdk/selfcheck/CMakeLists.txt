@@ -2,10 +2,10 @@
 # find_package(CONFIG) 必须可用、关键 imported target/模块、许可证与元数据
 # 齐备；任一缺失立即失败——制品不完整就不发布。
 #
-# 用法（project 模式；VTK 等 Qt 相关制品需附 Qt staging 前缀）：
+# 用法（project 模式；VTK WebGPU/Cocoa 制品不依赖 Qt staging）：
 #   cmake -S tools/sdk/selfcheck -B <build> -DPSDK_ROOT=<安装树>
-#     -DPSDK_PACKAGE=VTK -DPSDK_REQUIRED_TARGETS=vtkGUISupportQtQuick
-#     -DCMAKE_PREFIX_PATH=<Qt staging>
+#     -DPSDK_PACKAGE=VTK
+#     -DPSDK_REQUIRED_TARGETS="VTK::RenderingWebGPU VTK::RenderingUI"
 # 注：不能用 cmake -P 脚本模式——VTK 的 config 会执行 add_library(IMPORTED)，
 # 脚本模式不可脚本化该命令，无法真实验证导入。
 

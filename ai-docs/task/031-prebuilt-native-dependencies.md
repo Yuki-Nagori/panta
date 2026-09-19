@@ -23,13 +23,13 @@
 
 ## 范围与非目标
 
-范围：为 macOS arm64、Linux x86_64/aarch64 和 Windows x86_64 规划并实现可复核的预编译包清单、下载/缓存/校验、解包布局、CMake package 查找和 ABI/模块诊断；首批覆盖 VTK 9.7.0（含 `GUISupportQtQuick`）、OpenCASCADE 8.0.1 与 Netgen v6.2.2604，工具链 CMake/Ninja 沿用 020 的供给边界。
+范围：为 macOS arm64、Linux x86_64/aarch64 和 Windows x86_64 规划并实现可复核的预编译包清单、下载/缓存/校验、解包布局、CMake package 查找和 ABI/模块诊断；首批覆盖 VTK 9.7.0（WebGPU + `RenderingUI`/Cocoa hardware window）、OpenCASCADE 8.0.1 与 Netgen v6.2.2604，工具链 CMake/Ninja 沿用 020 的供给边界。
 
 非目标：不把第三方源码放入普通 `cargo build` 或 CMake 构建图，不使用未锁定的系统包管理器，不在本任务实现 VTK/OCCT/Netgen 适配器，不引入 Python runtime 或用 Python wheel 冒充 C++ SDK。没有合适上游 SDK 时，可另立 CI 制品生产任务；不能静默退回本地源码构建。
 
 ## 前置条件与待决策
 
-002、004 已完成。开始前逐平台核实：官方/可信 SDK 是否包含所需 CMake config、头文件、动态库和许可证；包与 Qt 6.11.2、Apple clang/libc++、Linux glibc/编译器及 Windows MSVC ABI 的匹配；VTK `GUISupportQtQuick` 是否存在。若上游只提供源码或 Python wheel，记录事实并评估项目制品，而不是直接改成 FetchContent。
+002、004 已完成。开始前逐平台核实：官方/可信 SDK 是否包含所需 CMake config、头文件、动态库和许可证；包与 Apple clang/libc++、Linux glibc/编译器及 Windows MSVC ABI 的匹配；VTK `RenderingWebGPU`、`RenderingUI` 及目标平台 hardware window 是否存在。若上游只提供源码或 Python wheel，记录事实并评估项目制品，而不是直接改成 FetchContent。
 
 ## 实施步骤
 
@@ -51,7 +51,7 @@
 
 - [ ] 正常开发 configure/build 只消费校验通过的预编译 SDK，不编译 VTK、OCCT 或 Netgen 第三方源码。
 - [ ] 每个支持平台的包记录 URL、SHA256、版本、架构、ABI、Qt 兼容范围、模块、许可证和 CMake package 入口。
-- [ ] 缺包、哈希错误、架构/ABI 不匹配、缺少 `GUISupportQtQuick` 或 CMake target 时立即失败，并显示可操作诊断；不退回系统库或隐式源码编译。
+- [ ] 缺包、哈希错误、架构/ABI 不匹配、缺少 `RenderingWebGPU`/`RenderingUI` 或 CMake target 时立即失败，并显示可操作诊断；不退回系统库或隐式源码编译。
 - [ ] 清除缓存后可按 manifest 重建，已有正确缓存支持离线重复 configure；失败不会破坏另一版本缓存。
 - [ ] 007、009、010 能以 imported targets 接入，不需要在各适配器重复写平台路径；安装产物能定位运行库和许可证。
 - [ ] 三平台验证证据真实记录；未提供官方包的平台明确标记未覆盖，并有下一步制品任务或决策。
@@ -73,6 +73,7 @@
 | 2026-09-17 | 三平台 CI（push 5130ca3，run [35230584355](https://github.com/Yuki-Nagori/panta/actions/runs/35230584355)） | windows-2022 / macos-latest / ubuntu-latest 全绿（5m26s）：sdk-provision.cmake 的解析与 manifest 登记在三平台 configure 均执行通过。注意 CI 当前不运行 CTest（011 聚合前），`Build.SdkProvision` 的 Windows/Linux 执行证据待 CI 扩展或平台实测补齐。 |
 | 2026-09-18 | 038 Release `sdk-vtk-9.7.0` 落地（workflow run [35242622228](https://github.com/Yuki-Nagori/panta/actions/runs/35242622228)，三平台 success，1h58m）；`panta_sdk_declare_asset` 按发布资产 URL/SHA256 登记 vtk macos-arm64 / linux-x86_64 / windows-x86_64 | SHA256 取自各 `.sha256` 资产；REQUIRED_TARGETS `VTK::GUISupportQtQuick VTK::RenderingQt`；Linux glibc 基线（ubuntu-24.04 gcc13 生产）标注待 007 回写 |
 | 2026-09-18 | 生产 consumer 烟测（macOS arm64）：`cmake -S native/cmake/tests/sdk/consumer -DCONSUMER_KIND=production -DSDK_NAME=vtk -DPANTA_SDK_PROVISION_DIR=target/panta-deps/sdk -DCMAKE_PREFIX_PATH=<Qt staging>` | 通过：从 GitHub Release 下载 58MB 归档、SHA256 校验、解包发布、`find_package(VTK CONFIG)` 与 required-target 自检全部成功（staging 293MB）。consumer 工程改为 `LANGUAGES CXX`（VTK config 的 add_library(IMPORTED)/FindThreads 需要编译语言，NONE 会失败）；fixture 负例"生产缺资产"由 vtk 改 occt（vtk 已有资产，避免测试触网）。二跑零下载（离线复用）；`ctest --preset debug` 27/27 |
+| 2026-09-19 | 007 WebGPU/Cocoa 路线制品契约更新 | 旧 Release 的 `GUISupportQtQuick`/`RenderingQt` 制品不满足新路径；新制品必须提供 `VTK::RenderingWebGPU`、`VTK::RenderingUI`，并在 `panta-sdk.json` 标记 WebGPU/Cocoa；消费 manifest 等新 Release 资产和 SHA256 回填后再切换 |
 | 2026-09-18 | Release `sdk-occt-netgen-8.0.1-6.2.2604` 落地（run [35307708622](https://github.com/Yuki-Nagori/panta/actions/runs/35307708622) 三平台 success，38m）；manifest 按 6 个资产 URL/SHA256 登记 occt/netgen 三平台，**OCCT 官方 Windows 条目被自托管制品替换**（维护者决策：仅 Windows 有归档、跨平台工具链不一致） | SHA256 取自各 `.sha256` 资产；occt `PACKAGE=OpenCASCADE`（targets `TKernel TKDESTEP`）、netgen `PACKAGE=Netgen`（`ngcore nglib`——包配置为大写 `NetgenConfig.cmake`，Linux ext4 大小写敏感约束实证于 run 35304961896） |
 | 2026-09-18 | 生产 consumer 烟测（macOS arm64）：occt 与 netgen 各自从 Release 真实下载消费（netgen 未借助额外 CMAKE_PREFIX_PATH，验证供给自足性） | 双双通过：SHA256 校验、解包、`find_package` 与 required-target 自检成功（occt 111MB、netgen 9.5MB staging）；fixture 套件"缺资产"负例改为 consumer 的 missing-asset 模式（不再依赖生产 manifest 状态、不触网）；`ctest --preset debug -R Build.SdkProvision` 通过。**至此 VTK/OCCT/Netgen 三依赖 9 条 manifest 全部登记并经真实消费验证——依赖引入完毕**，007/009/010 供给前置全部满足 |
 
@@ -89,4 +90,4 @@
 
 ## 完成摘要
 
-未完成（保持 in-progress）。**供给侧已全部就绪**：VTK/OCCT/Netgen 三依赖 × 三平台 = 9 条 manifest 全部登记（Release `sdk-vtk-9.7.0` 与 `sdk-occt-netgen-8.0.1-6.2.2604`）并经 macOS 生产 consumer 真实下载消费验证 + 离线复用；OCCT 弃用官方 Windows SDK、三平台统一自托管（维护者决策）；Netgen↔OCCT 成对发布的 ABI 锁定与 `Netgen` 包名大小写约束已实证并记录。剩余项即集成任务自身的证据：007/009/010 的真实链接/运行冒烟（这同时构成 031 的三平台 configure/package smoke 记录）、Linux glibc 有效基线回写、SBOM/provenance 自动化（038）。
+未完成（保持 in-progress）。旧 VTK/OCCT/Netgen 供给链的历史验证已完成：旧 Release `sdk-vtk-9.7.0` 与 `sdk-occt-netgen-8.0.1-6.2.2604` 曾登记并经 macOS 生产 consumer 真实下载消费验证 + 离线复用；其中 VTK 旧制品仅满足 Qt/OpenGL 原型，不能作为 007 当前路线输入。OCCT 弃用官方 Windows SDK、三平台统一自托管（维护者决策）；Netgen↔OCCT 成对发布的 ABI 锁定与 `Netgen` 包名大小写约束已实证并记录。当前剩余项是生产并登记新的 VTK WebGPU/Cocoa Release（URL/SHA256/target/metadata）以及 007/009/010 的真实链接/运行冒烟、Linux glibc 有效基线回写、SBOM/provenance 自动化（038）。

@@ -2,19 +2,13 @@
 #
 # 源码固定：tag v9.7.0 → commit 23f0a095621e91bbdbeace8451e22b950c8e5f46
 # （2026-09-17 git ls-remote 解引用复核；annotated tag 对象 a78e2d95…）。
-# 配置开关冻结为 007 视口所需最小面：Qt 6 + GUISupportQtQuick + Qt 组；
-# 模块裁剪与图形后端细化由 007 集成时回写。许可证随源码树收集。
-#
-# Qt ABI 契约：GUISupportQtQuick 在 C++ 层直接使用 Qt 类型，必须对着
-# 锁定预编译 6.11.2 编译（消费侧 007 用同一 staging）；因此只有本描述
-# 触发 qt-provision 供给（OCCT/Netgen 不消费 Qt，不下载）。
+# 配置开关冻结为 007 视口所需最小面：VTK WebGPU + 平台 hardware window
+# （macOS 为 Cocoa hardware window）；不启用 Qt/GUISupportQtQuick，不把 Qt
+# OpenGL scenegraph 集成带入制品。
+# 许可证随源码树收集。
 
 set(PANTA_VTK_VERSION 9.7.0)
 set(PANTA_VTK_COMMIT 23f0a095621e91bbdbeace8451e22b950c8e5f46)
-# 与 qt-provision.cmake 固定归档一致的 Qt 版本；升级 Qt 时同处更新。
-# qt-provision.cmake 由顶层在 PANTA_SDK_ENABLE_VTK 分支内 include（本
-# 描述是其唯一消费者），QT_STAGING 在下方 CMAKE_PREFIX_PATH 消费。
-set(PANTA_QT_SDK_VERSION 6.11.2)
 set(PANTA_VTK_INSTALL_DIR "${PANTA_SDK_OUT_ROOT}/vtk/${PANTA_VTK_VERSION}/${PANTA_SDK_TRIPLE}")
 
 include(ExternalProject)
@@ -32,10 +26,10 @@ ExternalProject_Add(
              -DBUILD_SHARED_LIBS=ON
              -DBUILD_TESTING=OFF
              -DCMAKE_INSTALL_PREFIX=${PANTA_VTK_INSTALL_DIR}
-             -DCMAKE_PREFIX_PATH=${QT_STAGING}
-             -DVTK_QT_VERSION=6
-             -DVTK_GROUP_ENABLE_Qt=YES
-             -DVTK_MODULE_ENABLE_VTK_GUISupportQtQuick=YES
+             -DVTK_GROUP_ENABLE_Qt=NO
+             -DVTK_ENABLE_WEBGPU=ON
+             -DVTK_MODULE_ENABLE_VTK_RenderingUI=YES
+             -DVTK_MODULE_ENABLE_VTK_RenderingWebGPU=YES
   # 安装后补齐统一布局的非构建产物：许可证与 SDK 元数据。
   INSTALL_COMMAND ${CMAKE_COMMAND} --install . --config Release
   COMMAND ${CMAKE_COMMAND} -E make_directory ${PANTA_VTK_INSTALL_DIR}/share/licenses/VTK
@@ -57,12 +51,14 @@ file(
     "tag": "v9.7.0",
     "commit": "@PANTA_VTK_COMMIT@"
   },
-  "qt": "@PANTA_QT_SDK_VERSION@",
   "build_type": "Release",
   "shared": true,
-  "modules_highlights": ["GUISupportQtQuick", "GUISupportQt", "RenderingQt"],
+  "graphics_backend": "WebGPU",
+  "window_system": "VTK hardware window",
+  "macos_surface": "CocoaHardwareWindow",
+  "modules_highlights": ["RenderingWebGPU", "RenderingUI", "RenderingCore"],
   "cmake_package": ["lib/cmake/vtk-@PANTA_VTK_VERSION@", "vtk-config.cmake"],
-  "generator": "Ninja",
+  "generator": "@CMAKE_GENERATOR@",
   "license": "share/licenses/VTK/Copyright.txt (BSD-3)"
 }
 ]=])

@@ -6,7 +6,7 @@
 
 UI 使用 QML，3D 视口使用 C++ native Qt Quick component。VTK 是 V1 渲染后端，但不成为应用公共 API。原生视口集中处理图形上下文、窗口尺寸、设备像素比、渲染线程及资源销毁。
 
-VTK 与 Qt Quick 的具体集成方式尚未选定。第一里程碑必须验证所选 Qt/VTK 版本和图形后端的兼容性，不能把 Widgets 的集成方式直接视为 QML 的现成方案。
+VTK 采用 WebGPU render window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCocoaHardwareView` 暴露的原生 Cocoa surface 与 Metal layer，再由原生视口桥接到 Qt Quick 窗口。Qt Quick 不承载 VTK 的 OpenGL scenegraph 集成，`QQuickVTKItem` 不属于目标架构。第一里程碑必须验证 Qt Quick 与原生 Cocoa view/layer 的叠加、尺寸/高 DPI 同步和输入事件协调；新 SDK 产出前该路线仍为待执行设计。
 
 ## RenderScene 契约
 
@@ -26,7 +26,7 @@ VTK 与 Qt Quick 的具体集成方式尚未选定。第一里程碑必须验证
 
 拾取结果应返回实体 ID、命中位置和选择类型，并处理逻辑坐标与物理像素转换。几何面/边选择与网格单元选择是不同模式，需保留各自映射关系。
 
-后台线程可准备 CPU 数据，图形资源的创建和释放必须遵守所选集成方案的线程约束。检查窗口缩放、最小化、视口重建、工程关闭和连续加载，防止旧场景资源或回调访问已释放对象。
+后台线程可准备 CPU 数据，图形资源的创建和释放必须遵守 VTK WebGPU 与 Cocoa view/layer 的线程约束。检查窗口缩放、最小化、原生 view/layer 重建、工程关闭和连续加载，防止旧场景资源或回调访问已释放对象。
 
 ## V1 验收
 

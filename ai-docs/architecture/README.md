@@ -25,9 +25,10 @@
 
 当前仓库已有 Rust workspace、Cargo 调度的 native 构建与 Qt Quick/C++ ViewModel
 桌面骨架（任务 001–005）。`panta-foundation` 已承载进程级崩溃设施，
-`panta-ffi` 负责 CXX 边界；VTK 视口的模块、适配器和创建级测试已落地，但
-由于 macOS 26 + Qt Quick + VTK 的窗口化渲染路径仍会崩溃，默认 `App.qml`
-暂时保持占位面板，任务 007 仍为 blocked。其余业务服务尚未完成。本组文档
+`panta-ffi` 负责 CXX 边界；VTK 视口的旧 Qt OpenGL/QQuickVTKItem 模块、适配器和
+创建级测试曾落地，但由于 macOS 26 窗口化渲染路径崩溃，任务 007 已切换到
+VTK WebGPU + Cocoa hardware view/layer 路线，新的 SDK 与原生叠加实现尚待完成。
+默认 `App.qml` 暂时保持占位面板，任务 007 仍为 blocked。其余业务服务尚未完成。本组文档
 描述目标架构与已验证的边界，不把规划能力写成已实现；具体依赖版本、协议
 编码和持久化格式仍须在实施时验证并确定。文档中的字段名和 API 名用于说明
 语义，不是已发布接口。
@@ -38,8 +39,8 @@
 
 V1 应覆盖工程新建、打开、保存，STEP 导入，面/边/实体选择，Netgen 网格生成，
 表面与体网格显示，属性编辑，相机、裁剪、色标和求解器占位入口。当前 VTK
-视口只完成适配边界、最小测试图元和创建级验证；窗口化渲染的 macOS 26 阻塞
-见[任务 007](../task/007-vtk-quick-viewport.md)，不能据此宣称 V1 视口已交付。
+视口只完成旧适配边界、最小测试图元和创建级验证；WebGPU/Cocoa 原生 view/layer
+实现与窗口化验证仍待完成，见[任务 007](../task/007-vtk-quick-viewport.md)，不能据此宣称 V1 视口已交付。
 V1 不实现 AI、自研 GPU 计算后端或物理求解内核。VTK/Qt 正常使用图形硬件
 不属于排除范围中的 GPU 计算开发。
 
@@ -62,8 +63,8 @@ QML 界面
 保持领域模型职责和无手写 `unsafe`。VTK 只存在于
 `native/visualization/src/vtk/` 适配器，`RenderScene`、`ViewportBackend` 和
 QML 公共头不暴露 VTK 类型。当前 `App.qml` 不默认创建 `CaeViewport`，因为
-任务 007 已记录 macOS 26 窗口化渲染阻塞；模块加载/类型创建测试仍保留，供
-构建和边界回归使用。
+任务 007 正在切换 WebGPU/Cocoa 原生 view/layer 集成；模块加载/类型创建测试仍保留，供
+构建和边界回归使用。旧 QQuickVTKItem、Qt OpenGL 场景图依赖和失效 SDK 引用在新实现落地时一次性删除，不保留双路径。
 
 ## 技术基线
 
