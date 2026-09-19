@@ -13,7 +13,8 @@ VTK SDK，提供 `RenderingWebGPU` 与平台 hardware window（macOS 为 Cocoa h
 - 构建配置：Release、共享库、`VTK_GROUP_ENABLE_Qt=NO`、
   `VTK_ENABLE_WEBGPU=ON`、`VTK_MODULE_ENABLE_VTK_RenderingUI=YES`、
   `VTK_MODULE_ENABLE_VTK_RenderingWebGPU=YES`；macOS surface 使用
-  `vtkCocoaHardwareWindow` 的 Metal layer/view。
+  `vtkCocoaHardwareWindow` 的 Metal layer/view；Dawn 使用 VTK 9.7.0
+  固定的预编译平台资产，并随 VTK SDK 一起提供其头文件、CMake package 和运行库。
 - 每个归档内的 `panta-sdk.json` 记录 triple、源码 pin、构建开关与许可证
   入口（机器可读 provenance）。
 
@@ -23,6 +24,8 @@ VTK SDK，提供 `RenderingWebGPU` 与平台 hardware window（macOS 为 Cocoa h
   `share/licenses/VTK/Copyright.txt` 提供（VTK 源码树内嵌的第三方组件
   许可同样以其 Copyright.txt 为准）。
 - 本制品不链接 Qt；Qt Quick 应用侧的 Qt 供给与本制品独立。
+- Dawn 按其上游许可证随制品提供；Dawn provenance、平台和 SHA256 写入
+  `panta-sdk.json`，运行库与 VTK 安装树共用 `lib`/`bin` 布局。
 
 ## 校验
 

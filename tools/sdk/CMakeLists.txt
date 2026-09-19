@@ -27,10 +27,20 @@ set(PANTA_SDK_OUT_ROOT
 message(STATUS "panta SDK 生产：triple=${PANTA_SDK_TRIPLE} out=${PANTA_SDK_OUT_ROOT}")
 
 # 生产顺序：occt → netgen（依赖自产 OCCT，同 triple 同 ABI）；vtk 独立。
-include(${CMAKE_CURRENT_SOURCE_DIR}/occt.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/netgen.cmake)
-# VTK WebGPU/Cocoa 适配不依赖 Qt；只生产 OCCT/Netgen 时不触达 VTK。
+# 各制品 workflow 显式关闭不属于自身的 ExternalProject，避免 VTK 生产
+# 重新编译 OCCT/Netgen，或 OCCT/Netgen 生产触达 VTK/Dawn。
+option(PANTA_SDK_ENABLE_OCCT "Configure the OpenCASCADE SDK description" ON)
+option(PANTA_SDK_ENABLE_NETGEN "Configure the Netgen SDK description" ON)
 option(PANTA_SDK_ENABLE_VTK "Configure the VTK WebGPU/Cocoa SDK description" ON)
+if(PANTA_SDK_ENABLE_OCCT)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/occt.cmake)
+endif()
+if(PANTA_SDK_ENABLE_NETGEN)
+  if(NOT PANTA_SDK_ENABLE_OCCT)
+    message(FATAL_ERROR "PANTA_SDK_ENABLE_NETGEN requires PANTA_SDK_ENABLE_OCCT=ON")
+  endif()
+  include(${CMAKE_CURRENT_SOURCE_DIR}/netgen.cmake)
+endif()
 if(PANTA_SDK_ENABLE_VTK)
   include(${CMAKE_CURRENT_SOURCE_DIR}/vtk.cmake)
 endif()

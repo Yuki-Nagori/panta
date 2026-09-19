@@ -60,8 +60,10 @@ jobs:
       - name: Produce VTK SDK
         shell: bash
         run: |
-          cmake -S tools/sdk -B sdk-build/superbuild
-          cmake --build sdk-build/superbuild
+          cmake -S tools/sdk -B sdk-build/superbuild \
+            -DPANTA_SDK_ENABLE_OCCT=OFF \
+            -DPANTA_SDK_ENABLE_NETGEN=OFF
+          cmake --build sdk-build/superbuild --target vtk_sdk
 
       - name: Selfcheck artifact
         shell: bash
