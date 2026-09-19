@@ -126,5 +126,4 @@ ExternalProject_Add_Step(
   vtk_sdk metadata
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/vtk-panta-sdk-configure.json
           ${PANTA_VTK_INSTALL_DIR}/panta-sdk.json
-  DEPENDEES install)
-ExternalProject_Add_StepDependencies(vtk_sdk metadata dawn_runtime)
+  DEPENDEES install dawn_runtime)
