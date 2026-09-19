@@ -29,6 +29,8 @@ if(NOT _archive_valid)
   file(
     DOWNLOAD "${PANTA_DAWN_URL}" "${_archive}"
     EXPECTED_HASH "SHA256=${PANTA_DAWN_SHA256}"
+    INACTIVITY_TIMEOUT 120
+    TIMEOUT 1800
     STATUS _download_status
     SHOW_PROGRESS)
   list(GET _download_status 0 _download_code)
@@ -101,6 +103,8 @@ if(NOT _license_valid)
   file(
     DOWNLOAD "${PANTA_DAWN_LICENSE_URL}" "${_license}"
     EXPECTED_HASH "SHA256=${PANTA_DAWN_LICENSE_SHA256}"
+    INACTIVITY_TIMEOUT 120
+    TIMEOUT 1800
     STATUS _license_status)
   list(GET _license_status 0 _license_code)
   if(_license_code)

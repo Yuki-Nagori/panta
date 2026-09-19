@@ -71,7 +71,7 @@ jobs:
           cmake -S tools/sdk/selfcheck -B sdk-build/selfcheck \
             -DPSDK_ROOT="$PWD/sdk-build/superbuild/out/vtk/9.7.0/${{ matrix.sdk_triple }}" \
             -DPSDK_PACKAGE=VTK \
-            -DPSDK_REQUIRED_TARGETS="VTK::RenderingWebGPU VTK::RenderingUI"
+            -DPSDK_REQUIRED_TARGETS="VTK::RenderingWebGPU VTK::RenderingUI dawn::webgpu_dawn"
 
       - name: Package artifact
         shell: bash

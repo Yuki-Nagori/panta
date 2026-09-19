@@ -13,7 +13,8 @@ VTK SDK，提供 `RenderingWebGPU` 与平台 hardware window（macOS 为 Cocoa h
   version number to 9.7.0"），未做任何修改（unmodified upstream sources）。
 - 构建配置：Release、共享库、`VTK_GROUP_ENABLE_Qt=NO`、
   `VTK_ENABLE_WEBGPU=ON`、`VTK_MODULE_ENABLE_VTK_RenderingUI=YES`、
-  `VTK_MODULE_ENABLE_VTK_RenderingWebGPU=YES`；macOS surface 使用
+  `VTK_MODULE_ENABLE_VTK_RenderingWebGPU=YES`、
+  `VTK_RELOCATABLE_INSTALL=ON`；macOS surface 使用
   `vtkCocoaHardwareWindow` 的 Metal layer/view；Dawn 使用 GitHub native
   Release `v20260720.160313` 的固定平台资产，并随 VTK SDK 一起提供其头文件、
   CMake package 和 native library。

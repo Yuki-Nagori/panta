@@ -24,6 +24,10 @@ foreach(_required IN ITEMS panta-sdk.json share/licenses)
   endif()
 endforeach()
 
+# VTK 的可搬迁安装会在自身 config 中按普通 CMake 前缀查找 Dawn；把当前
+# 制品根加入依赖搜索路径，确保 selfcheck 验证的是归档内的 Dawn，而不是
+# runner 上偶然存在的系统/构建树 package。
+list(PREPEND CMAKE_PREFIX_PATH "${PSDK_ROOT}")
 find_package(${PSDK_PACKAGE} CONFIG REQUIRED PATHS "${PSDK_ROOT}" NO_DEFAULT_PATH)
 message(STATUS "selfcheck：${PSDK_PACKAGE} 配置入口可用（prefix=${PSDK_ROOT}）")
 

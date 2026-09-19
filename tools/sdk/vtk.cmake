@@ -53,6 +53,7 @@ ExternalProject_Add(
              -DBUILD_TESTING=OFF
              -DCMAKE_INSTALL_PREFIX=${PANTA_VTK_INSTALL_DIR}
              -DDawn_DIR=<SOURCE_DIR>/.dawn/dawn/lib/cmake/Dawn
+             -DVTK_RELOCATABLE_INSTALL=ON
              -DVTK_GROUP_ENABLE_Qt=NO
              -DVTK_ENABLE_WEBGPU=ON
              -DVTK_MODULE_ENABLE_VTK_RenderingUI=YES
@@ -106,6 +107,7 @@ file(
   },
   "build_type": "Release",
   "shared": true,
+  "relocatable_install": true,
   "graphics_backend": "WebGPU",
   "window_system": "VTK hardware window",
   "macos_surface": "CocoaHardwareWindow",
@@ -122,6 +124,7 @@ file(
   "modules_highlights": ["RenderingWebGPU", "RenderingUI", "RenderingCore"],
   "cmake_package": ["lib/cmake/vtk-@PANTA_VTK_VERSION@", "vtk-config.cmake"],
   "generator": "@CMAKE_GENERATOR@",
+  "license_files": ["share/licenses/VTK/Copyright.txt", "share/licenses/Dawn/LICENSE"],
   "license": "share/licenses/VTK/Copyright.txt (BSD-3)"
 }
 ]=])
