@@ -1,9 +1,9 @@
 # Build.SdkProvision 驱动（任务 031）：构造 fixture SDK 归档，以真实
 # consumer configure 驱动 sdk-provision.cmake 的成功与失败路径。
-# 不联网（file:// 下载）、不编译（project NONE）。覆盖：038 布局供给、
-# 归档缓存离线复用、marker 损坏重建、版本隔离、哈希不符清场、生产
-# manifest 缺资产诊断、OCCT 内层归档/包装目录布局、配置歧义、未登记名、
-# manifest 参数校验。
+# 不编译（project NONE）；下载走 file://。覆盖：038 布局供给、发布即删
+# 归档、marker 离线复用、marker 损坏经 URL 重下载重建、版本隔离、哈希
+# 不符清场、生产 manifest 缺资产诊断、OCCT 内层归档/包装目录布局、配置
+# 歧义、未登记名、manifest 参数校验。
 #
 # 输入：TEST_BINARY_DIR、PANTA_SDK_MODULE、CONSUMER_SOURCE_DIR。
 
@@ -79,8 +79,8 @@ function(_read_result file key out_var)
   message(FATAL_ERROR "RESULT_FILE 缺少 ${key}：${file}")
 endfunction()
 
-# 清场检查：失败路径不得留下 .tmp 解包目录或已发布 staging；哈希有效的
-# 归档缓存允许保留（支持离线重试、按版本隔离），删除归档另行显式断言。
+# 清场检查：失败路径不得留下 .tmp 解包目录或已发布 staging；归档在成功
+# 发布后即被供给器删除，残留在任何路径都属异常。
 function(_assert_no_residue root label)
   file(GLOB _tmp_hit "${root}/*/.tmp-*")
   file(GLOB _staging_hit "${root}/*/*/*/.panta-sdk-provisioned")
@@ -105,6 +105,10 @@ set(_v1_archive "${_fixtures}/fixture-v1.tgz")
 _tar_directory("${_v1}" "${_v1_archive}")
 file(SHA256 "${_v1_archive}" _v1_sha)
 _make_url("${_v1_archive}" _v1_url)
+# 场景 2 会删除源归档证明 marker 复用不经 URL；场景 3 的重下载重建需要
+# URL 可用，从字节级备份恢复，保证 SHA256 一致。
+set(_v1_archive_backup "${_fixtures}/fixture-v1.keep.tgz")
+file(COPY_FILE "${_v1_archive}" "${_v1_archive_backup}")
 
 # fixture v2（同包名不同版本，验证版本目录隔离）
 set(_v2 "${_fixtures}/sdk-v2")
@@ -175,8 +179,8 @@ if(NOT _marker1 MATCHES "sha256=${_v1_sha}")
 endif()
 file(GLOB _cached_archives "${_root1}/fixture/archives/*.archive")
 list(LENGTH _cached_archives _archive_count)
-if(NOT _archive_count EQUAL 1)
-  message(FATAL_ERROR "038 布局供给：归档缓存份数异常：${_cached_archives}")
+if(NOT _archive_count EQUAL 0)
+  message(FATAL_ERROR "038 布局供给：归档应发布即删，残留：${_cached_archives}")
 endif()
 
 # ── 2. 离线缓存复用：删除源归档后，新 consumer 用同一供给根成功 ──
@@ -200,7 +204,9 @@ if(NOT _staging2 STREQUAL "${_staging1}")
   message(FATAL_ERROR "离线缓存复用：staging 漂移：${_staging2} != ${_staging1}")
 endif()
 
-# ── 3. marker 损坏重建：清 staging 后按缓存归档恢复（源仍离线） ──
+# ── 3. marker 损坏重建：清 staging 后经 URL 重新下载恢复（归档已随
+# 发布删除，离线复用只由 marker 承担；源归档从备份恢复以保证 SHA256） ──
+file(COPY_FILE "${_v1_archive_backup}" "${_v1_archive}")
 file(WRITE "${_staging1}/.panta-sdk-provisioned" "corrupted\n")
 _configure_consumer(
   "${TEST_BINARY_DIR}/case2-consumer"
