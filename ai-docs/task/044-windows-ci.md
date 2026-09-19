@@ -1,6 +1,6 @@
 # 044 — Windows CI 停滞诊断与修复
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[018](018-cross-platform-ci.md)、[042](042-unified-llvm-toolchain.md)
 - 优先级：P1
@@ -29,9 +29,9 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 
 ## 验收标准
 
-- [ ] Windows CI 能定位安装锁、下载、摘要校验、解包与编译阶段，失败有上下文。
-- [ ] 修复有相应的本地验证及 Windows check/build/toolchain/test 实跑证据。
-- [ ] 文档、任务及索引与真实验证状态一致。
+- [x] Windows CI 能定位安装锁、下载、摘要校验、解包与编译阶段，失败有上下文。
+- [x] 修复有相应的本地验证及 Windows check/build/toolchain/test 实跑证据。
+- [x] 文档、任务及索引与真实验证状态一致。
 
 ## 清理与兼容例外
 
@@ -68,6 +68,12 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 
 - 静态资源修复本地验证：workspace build、`cargo lint qmllint`、`cargo lint cmake`、panta-build 14 项测试通过；默认 Bridge 与 `--no-default-features` 构建下三个 QML CTest 均通过；`otool -L` 确认测试不再依赖 Shell 动态库。最终 Windows CI 待验证。
 
+- 最终代码本地完整回归：`cargo test --locked` 通过（全部 Rust 测试及 28/28 CTest），提交钩子的聚合 `cargo format` 与 `cargo lint clippy` 通过。完整测试在允许系统测试目录访问的环境运行，避免将沙箱路径限制误判为 PathHost 功能失败。
+
+- Windows 最终验证：[35424505359 / Windows](https://github.com/Yuki-Nagori/panta/actions/runs/35424505359/job/105848017067)（代码提交 `d20ee8f`）check、build、toolchain、test 全部通过，26/26 CTest 成功，包含两个 QML 运行测试与格式检查；托管 LLVM/Qt 目录的 Actions cache 保存成功。
+
+- 代码提交 `d20ee8f` 的整轮 [CI 35424505359](https://github.com/Yuki-Nagori/panta/actions/runs/35424505359) 全部通过：Windows/macOS/Linux check/build/toolchain/test、七项 lint、聚合格式、依赖审计及 Rust/native 覆盖率检查。后续提交仅同步本任务与索引的完成记录。
+
 ## 完成摘要
 
-本地超时保护、阶段输出与失败日志采集已实现并验证；已确认 Windows LLVM 解包根因并改用官方安装包，修复后的 check/build/toolchain/test 仍待远程实跑，不能宣称 Windows CI 已恢复。
+Windows LLVM 改用受限于 target 的官方安装包，统一异常与运行库设置并修复 launcher 产物定位。QML 格式检查忽略平台换行差异；Shell 改为静态资源模块，消除 Windows 不加载无符号引用 DLL 导致的 qrc 缺失。统一 QML 测试环境并让 QtTest 输出到 stderr，清理重复路径、DLL 复制和临时诊断包装。Windows check/build/toolchain/test 已通过，LLVM/Qt 缓存已保存；本地完整测试及 Bridge 关闭入口亦通过。
