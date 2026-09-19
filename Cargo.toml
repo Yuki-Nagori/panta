@@ -25,6 +25,7 @@ license = "Apache-2.0"
 repository = "https://github.com/Yuki-Nagori/panta"
 
 [workspace.dependencies]
+libc = "0.2"
 panta-build = { path = "crates/panta-build", version = "0.1.0" }
 serde_json = "1.0"
 cxx = "1.0.202"

@@ -12,9 +12,20 @@ target_link_libraries(
           Qt6::Quick
           Qt6::QuickControls2)
 if(PANTA_ENABLE_BRIDGE_MODULE)
-  # main.cpp 在 QGuiApplication 前调用 prepare_graphics_environment()。
-  target_link_libraries(panta_native_app PRIVATE panta::visualization)
+  # main.cpp 在 QGuiApplication 前调用 prepare_graphics_environment() 与
+  # 崩溃处理器安装（任务 047，FFI 面）。plugin target 不传递 bridge 的
+  # PUBLIC include，FFI 消费者配方（include/staticlib/系统库）在此显式补齐。
+  target_include_directories(
+    panta_native_app PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
+                             "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
+  target_link_libraries(panta_native_app PRIVATE panta::visualization "${PANTA_FFI_STATIC_LIB}")
   target_link_libraries(panta_native_app PRIVATE panta_bridgeplugin panta_visualizationplugin)
+  if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(panta_native_app PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+  elseif(WIN32)
+    target_link_libraries(panta_native_app PRIVATE ws2_32 userenv ntdll)
+  endif()
   target_compile_definitions(panta_native_app PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
 endif()
 

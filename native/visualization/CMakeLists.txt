@@ -21,6 +21,9 @@ qt_add_qml_module(
   Panta.Visualization
   VERSION
   1.0
+  # 与 URI target path 对齐（qmllint import 解析依赖该布局，与 bridge 同型）。
+  OUTPUT_DIRECTORY
+  "${CMAKE_BINARY_DIR}/Panta/Visualization"
   SOURCES
   include/panta/visualization/cae_viewport.hpp
   include/panta/visualization/render_scene.hpp

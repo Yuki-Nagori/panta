@@ -5,12 +5,14 @@
 /// qWarning 输出全部错误，本入口以 69（EX_UNAVAILABLE）退出，不静默降级。
 /// 窗口生命周期归 QML（ApplicationWindow visible: true），退出走关闭事件。
 
+#include "panta_ffi.h"
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QtCore/qnamespace.h>
 #include <panta/foundation/version.hpp>
+#include <rust/cxx.h>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
 #include <panta/visualization/viewport_backend.hpp>
@@ -38,6 +40,13 @@ void print_version() {
 } // namespace
 
 int main(int argc, char* argv[]) {
+    // 原生崩溃此前控制台零输出（任务 047，Rust 实现 panta_core::crash）：
+    // 先于一切逻辑安装；失败以 qWarning 级别打到 stderr，不静默。
+    try {
+        panta::ffi::install_crash_handler(rust::String(""));
+    } catch (const rust::Error& error) {
+        std::fprintf(stderr, "panta-native: 崩溃日志初始化失败：%s\n", error.what());
+    }
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument = argv[index];
         if (argument == "--version") {

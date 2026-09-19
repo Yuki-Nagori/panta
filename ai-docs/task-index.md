@@ -98,6 +98,7 @@ ai-docs/
 | 044 | [Windows CI 停滞诊断与修复](task/044-windows-ci.md) | 验证基础 | 018, 042 | done |
 | 045 | [Windows CI 分支代码审查与收敛](task/045-branch-code-review.md) | 验证基础 | 044 | done |
 | 046 | [CI 触发拆分与缓存预算](task/046-ci-trigger-split-cache-budget.md) | 验证基础 | 018, 012 | done |
+| 047 | [崩溃信号处理与日志落地](task/047-crash-signal-logging.md) | 验证基础 | 008 | in-progress |
 
 ## 仓库与文档维护
 

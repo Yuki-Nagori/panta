@@ -13,6 +13,7 @@ build = "build.rs"
 crate-type = ["rlib", "staticlib"]
 
 [dependencies]
+libc.workspace = true
 cxx.workspace = true
 panta-core.workspace = true
 
