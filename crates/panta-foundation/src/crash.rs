@@ -15,6 +15,7 @@
 
 use std::os::fd::IntoRawFd;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, AtomicPtr, Ordering};
 
 /// 未安装时的哨兵 fd；安装后保存常驻 fd（不关闭，进程退出由内核回收）。
@@ -22,6 +23,8 @@ static LOG_FD: AtomicI32 = AtomicI32::new(-1);
 /// 安装期预渲染的“日志：<path>”行（以 \0 结尾）；崩溃时随信号一并输出，
 /// 免去处理器内的路径/分配操作。指针指向进程生命周期常驻的泄露分配。
 static LOG_LINE: AtomicPtr<u8> = AtomicPtr::new(std::ptr::null_mut());
+/// 安装后的真实日志路径；仅由非信号上下文查询，处理器使用 LOG_LINE 副本。
+static LOG_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 /// 触发日志落地的崩溃信号集合（顺序即文档顺序）。
 const CRASH_SIGNALS: [libc::c_int; 6] = [
@@ -154,6 +157,15 @@ pub fn install_crash_handler(log_dir: &str) -> std::io::Result<PathBuf> {
     // SAFETY: fd 有意常驻进程生命周期——处理器在任意线程/时机写入，不
     // 关闭、不交给其他所有者；进程退出由内核回收。
     let fd = file.into_raw_fd();
+    let log_line = std::ffi::CString::new(format!(" log={}\n", path.display()))
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "日志路径包含 NUL"))?;
+    // SAFETY: CString 以进程生命周期泄露，处理器只读取其 NUL 结尾字节；重复
+    // 安装时旧缓冲区也不能立即释放，因为已有信号处理器可能正在读取它。
+    let log_line = log_line.into_raw().cast::<u8>();
+    LOG_LINE.store(log_line, Ordering::SeqCst);
+    if let Ok(mut current) = LOG_PATH.lock() {
+        *current = Some(path.clone());
+    }
     LOG_FD.store(fd, Ordering::SeqCst);
     for signal in CRASH_SIGNALS {
         // SAFETY: 注册进程级崩溃处理器；signal()（BSD 语义）保持处理器
@@ -171,14 +183,7 @@ pub fn install_crash_handler(log_dir: &str) -> std::io::Result<PathBuf> {
 /// 当前崩溃日志路径（未安装返回 None）。
 #[must_use]
 pub fn crash_log_path() -> Option<PathBuf> {
-    if LOG_FD.load(Ordering::SeqCst) >= 0 {
-        Some(PathBuf::from(format!(
-            "panta-native-crash-{}.log",
-            std::process::id()
-        )))
-    } else {
-        None
-    }
+    LOG_PATH.lock().ok().and_then(|current| current.clone())
 }
 
 #[cfg(test)]
@@ -195,6 +200,7 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir)?;
         let path = install_crash_handler(&dir.to_string_lossy())?;
+        assert_eq!(crash_log_path().as_deref(), Some(path.as_path()));
 
         // SAFETY: fork/raise/waitpid 为本测试的受控进程边界；子进程仅执行
         // raise（处理器内为 async-signal-safe 路径），父进程只 waitpid 与
