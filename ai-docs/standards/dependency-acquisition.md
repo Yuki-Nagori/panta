@@ -51,7 +51,7 @@
 
 - GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。三平台统一 Ninja；Windows 使用托管 clang-cl、MSVC Build Tools/Windows SDK 环境与 Qt MSVC2022 预编译包；CI 不自行安装项目工具；CMake、Ninja、Qt 和 GoogleTest 由 Cargo 构建或质量入口按需供给。Linux 上 Qt 预编译包的 configure 与 QML 运行依赖宿主 OpenGL 前置（见"开发者前置"），由 workflow 平台前置步骤以 apt 安装，属宿主能力而非项目依赖。构建引导的 curl 下载带 connect/speed/max 上限，任务级 `timeout-minutes` 兜底传输停滞。
 - Qt 6.11.2 Linux 预编译归档面向 RHEL9，Qt 工具（包括 `rcc`、`qtpaths`、`qmlimportscanner`）需要 ICU 73。`native/cmake/qt-provision.cmake` 同步下载并校验 Qt 官方的 ICU 73 预编译归档，解包到 `qt/staging/lib`，让 Ubuntu 使用与 Qt 工具匹配的 ABI；不使用系统 ICU、不伪造 SONAME，也不源码编译 ICU。Linux 仍跳过仅供 IDE 使用的 `.qmlls.build.ini` 和当前 app 的空 import scan，保留 QML typeinfo、cachegen、资源和运行时验证。
-- 每个平台安装 rust-toolchain.toml 中的固定 Rust 工具链后执行 workspace check、完整 build、`panta-tests toolchain` 实际路径核验与 `cargo test --locked`；lint、format、audit 和两类 coverage 在 Ubuntu 独立运行。
+- 每个平台安装 rust-toolchain.toml 中的固定 Rust 工具链后执行 workspace check、完整 build、`panta-tests toolchain` 实际路径核验与 `cargo test --locked --workspace`；lint、format、audit 和两类 coverage 在 Ubuntu 独立运行。
 - runner 需要镜像自带的平台编译器与 rustup；平台编译器和标准库属于 Cargo 无法替代的宿主能力，项目依赖仍由 Cargo 驱动的构建引导供给。
 - 边界：当前 CI 通过 Cargo 同步验证 Rust 与已有 native/Qt 构建；VTK、OCCT、Netgen 的 SDK 供给与集成仍由 031 及后续任务扩展，测试聚合与质量门禁归 011，依赖缓存归 012。
 

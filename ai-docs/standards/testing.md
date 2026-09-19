@@ -34,7 +34,7 @@ tests/
 
 - C++ 单元/行为测试遵循 [GTest](gtest.md)，Qt 对象和 QML 资源加载使用 QtTest；每个可执行测试 target 名为 `<被测目标>_test`。
 - `BUILD_TESTING=ON` 时注册测试；GTest 使用 `gtest_discover_tests`，QtTest 使用 `add_test`，测试名按 `模块.行为` 命名。禁止只构建测试二进制而不注册 CTest。
-- `cargo test` 的根集成测试先构建 `all_qmllint`，再运行 `ctest --output-on-failure --no-tests=error -C <profile>`；空套件、构建失败和任一测试失败都返回非零。
+- 根集成测试（随 `cargo test --workspace` 执行）先构建 `all_qmllint`，再运行 `ctest --output-on-failure --no-tests=error -C <profile>`；空套件、构建失败和任一测试失败都返回非零。
 - QML lint/format 使用同一托管 Qt 工具版本；真实窗口、GPU、DPR 和平台生命周期验证另行记录，不能把无头 CTest 结果写成完整图形验收。
 - CMake 测试源不得通过宽泛 `GLOB` 自动发现；新增测试必须在对应模块 `CMakeLists.txt` 显式注册并同步 task/验证记录。
 
@@ -43,7 +43,7 @@ tests/
 本地日常入口：
 
 ```sh
-cargo test       # workspace Rust + 根 tests/integration/native.rs
+cargo test --workspace   # workspace Rust + 根 tests/integration/native.rs
 cargo format     # Rust、C++/CXX、QML 格式
 cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner、Cppcheck
 cargo audit      # cargo-deny 依赖、许可证和 RustSec 审计

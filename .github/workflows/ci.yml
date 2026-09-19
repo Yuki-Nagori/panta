@@ -189,4 +189,4 @@ jobs:
         run: cargo run --locked --package panta-tests -- toolchain
 
       - name: Test
-        run: cargo test --locked
+        run: cargo test --locked --workspace

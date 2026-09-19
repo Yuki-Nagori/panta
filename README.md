@@ -25,12 +25,12 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 
 | 命令 | 当前行为 |
 |---|---|
-| `cargo build` | 统一构建入口：Cargo 先生成 `panta-ffi` staticlib，再经 build.rs 调度托管 CMake/Ninja 构建 Rust workspace/native（Qt、GoogleTest 等首次自动下载到 `target/`） |
+| `cargo build` | 统一构建入口：构建 `panta-launcher` 及其依赖——先生成 `panta-ffi` staticlib，再经 build.rs 调度托管 CMake/Ninja 构建 native（Qt、GoogleTest 等首次自动下载到 `target/`）；全部成员用 `cargo build --workspace` |
 | `cargo run --locked --package panta-tests -- toolchain` | 校验最近一次 Cargo build 使用了托管 LLVM 22.1.7（clang/clang++/clang-cl/clang-format/clang-tidy）、CMake/Ninja、Qt、GoogleTest，并生成 native `compile_commands.json`；CI 在跨平台 build 后执行 |
 | `cargo build --no-default-features` | 诊断构建：通过 Cargo feature 裁剪 `Panta.Bridge` 静态模块，构建不依赖 ViewModel 的最小 Shell；默认构建启用该模块 |
 | `cargo lint` | 根 `tests/` 入口统一执行 Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner 和 Cppcheck；工具缺失或任一检查失败即非零。可用 `cargo lint <tool>` 单独运行 |
 | `cargo audit` | 通过根 runner 按固定版本准备 cargo-deny 到 `target/panta-tools/<cargo-tool>/<version>`，执行 RustSec、许可证和依赖关系审计 |
-| `cargo test` | Cargo workspace 测试入口，并由根 `tests/` package 集成测试聚合 qmllint、完整 CTest/GTest/QtTest/QML 行为套件 |
+| `cargo test --workspace` | Cargo workspace 测试入口，并由根 `tests/` package 集成测试聚合 qmllint、完整 CTest/GTest/QtTest/QML 行为套件；裸 `cargo test` 只跑默认成员 `panta-launcher` |
 | `cargo format` | 根 `tests/` 入口检查 Rust、C++/CXX、CMake 和 QML 格式；只改 Rust 时使用官方 `cargo fmt --all -- --check` |
 | `cargo coverage` | 通过根 runner 按固定版本准备 cargo-llvm-cov 到 `target/panta-tools/<cargo-tool>/<version>`，执行 Rust 覆盖率门禁；`cargo coverage native` 生成 native C++ 覆盖率报告，两个 CI job 分开运行 |
 | `cargo quality` | 依次执行 `cargo format`、`cargo lint`、依赖审计、Rust 测试和 native/QML 测试 |
@@ -42,7 +42,7 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 
 native 直接诊断构建（不经 Cargo）仍可用：在 `native/` 下执行 `cmake --preset debug`、`cmake --build --preset debug`、`ctest --preset debug`、`cmake --install build/debug`。
 
-日常命令默认使用 Cargo 的常规依赖解析。CI 和需要复现锁文件的验证会显式追加 `--locked`（例如 `cargo test --locked`）；它要求已提交的 `Cargo.lock` 与 manifests 一致，不会自动更新锁文件。根 `tests/` 目录按 `src/` 调度器、`integration/` Cargo 聚合测试、`cpp/` C++ 测试和 `qml/` QML 测试分类；Rust 单元测试仍与被测实现同文件，跨 crate 行为测试放在对应 crate 的 `tests/`。
+日常命令默认使用 Cargo 的常规依赖解析。CI 和需要复现锁文件的验证会显式追加 `--locked`（例如 `cargo test --locked --workspace`）；它要求已提交的 `Cargo.lock` 与 manifests 一致，不会自动更新锁文件。根 `tests/` 目录按 `src/` 调度器、`integration/` Cargo 聚合测试、`cpp/` C++ 测试和 `qml/` QML 测试分类；Rust 单元测试仍与被测实现同文件，跨 crate 行为测试放在对应 crate 的 `tests/`。
 
 ## 开始工作
 

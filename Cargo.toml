@@ -9,6 +9,10 @@ members = [
     "crates/panta-ffi",
     "tests",
 ]
+# 根目录默认成员固定为桌面入口：workspace 有多个可执行（panta-dslc、panta-tests）
+# 后，裸 `cargo run` 无法自动选择，按 004/040 的入口约定仍默认启动主窗口。
+# 默认成员同时收窄裸 build/test 的范围，全量检查必须显式 `--workspace`（CI 即如此）。
+default-members = ["crates/launcher"]
 
 [workspace.package]
 version = "0.1.0"

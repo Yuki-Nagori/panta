@@ -4,7 +4,7 @@
 
 ## 当前可用范围
 
-Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3）、launcher、DSL 和 FFI 成员与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked`、`cargo fmt --all -- --check` 可运行。
+Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3、默认成员 `panta-launcher`）、launcher、DSL 和 FFI 成员与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked --workspace`、`cargo fmt --all -- --check` 可运行。
 
 native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 库、`native/app` 可执行骨架与 CTest 测试；单配置 Ninja presets（`debug`/`release`），安装树可被 `find_package(panta-native)` 消费。
 
@@ -32,7 +32,7 @@ Qt 桌面可执行文件由 CMake 生成，使 moc、rcc、QML 模块处理和�
 |---|---|---|
 | `cargo build` | 由 Cargo 依赖图先构建 FFI staticlib，再构建 Rust 与 native desktop | 编排入口、原生调度、依赖发现、失败码传递 |
 | `cargo run` | 启动 CMake 生成的桌面程序 | Cargo 可运行 launcher、可执行文件定位、参数转发 |
-| `cargo test` | 提供统一验证入口 | Rust 测试及 native/集成检查的明确调度 |
+| `cargo test --workspace` | 提供统一验证入口 | Rust 测试及 native/集成检查的明确调度 |
 
 这些是目标用户体验。Cargo 默认只理解已配置的 Rust targets，不会自动运行 CTest、QML 检查或 CMake executable。若采用 launcher 或专门的调度 crate，需记录它与桌面进程之间的退出码、信号和工作目录约定。
 

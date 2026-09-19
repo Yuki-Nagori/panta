@@ -66,6 +66,7 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 | 2026-09-17 | `cargo metadata --locked --no-deps`、`cargo fmt --all -- --check`、`actionlint .github/workflows/ci.yml`、`git diff --check` | 清单、格式、workflow 和补丁静态检查通过 | 全部通过 |
 | 2026-09-17 | `cargo test --locked --workspace --exclude panta-launcher`；`cargo clippy --locked --workspace --all-targets --exclude panta-launcher -- -D warnings`；完整 workspace Clippy 使用已缓存 Qt staging | Rust 侧回归检查通过 | 测试 15/15 通过；完整 workspace Clippy 通过且无 warning |
 | 2026-09-17 | GitHub Actions run `35203709898`（`5a6f452`，Windows 日志确认 `Cache not found` 冷缓存）与 run `35204747014`（`ab0a130`，`Cache hit for restore-key`）三平台 | 干净树单一 `cargo build --locked`；缓存删除后仍可完整构建 | 通过：冷缓存 run 三平台完成全量 Build/Test/Format/Clippy（Windows 5m10s 含 Qt staging 与 native 构建），缓存命中 run 增量复跑全绿；run 日志可见缓存键含 OS/arch/compiler/generator/platform 与 Cargo.lock、rust-toolchain.toml、CI workflow、native CMake 文件哈希 |
+| 2026-09-19 | `cargo metadata --no-deps`；`cargo run --locked -- --version`；`actionlint .github/workflows/ci.yml`；`git diff --check` | workspace 有多个可执行后裸 `cargo run` 仍默认启动 launcher；CI 全量测试范围不变 | 通过：`default-members = ["crates/launcher"]` 使 `workspace_default_members` 仅含 launcher，裸 `cargo run -- --version` 解析到 `target/debug/panta-launcher` 并转发输出版本（退出码 0）；CI Test 步骤同步改 `cargo test --locked --workspace` 防止默认成员静默缩小三平台测试范围；Cargo.lock 无变化。全量聚合测试由推送后的 CI run 复核 |
 
 ## 风险与回退
 
@@ -75,6 +76,7 @@ Cargo 会区分普通依赖和 build-dependencies 的构建单元；同一 `pant
 
 - 2026-09-17：根据用户反馈创建任务；初步考虑独立编排 package，最小 Cargo workspace 复现后改用同一 `panta-ffi` 的普通依赖 + build-dependency 双边，让原生 `cargo build` 自身表达构建顺序。
 - 2026-09-17（收尾）：三平台 CI 冷缓存 run `35203709898` 以单一 `cargo build --locked` 完成全量构建，缓存命中 run `35204747014` 增量复跑全绿，缓存删除后可完整构建的验收由前者证明；任务关闭。
+- 2026-09-19（入口默认维护）：panta-dslc、panta-tests 引入新可执行后裸 `cargo run` 不再能自动选择。按维护者决策根 `[workspace]` 增加 `default-members = ["crates/launcher"]`，保住"裸 `cargo run` 启动主窗口"的 004 入口约定；代价是裸 build/test 收窄到默认成员，因此 CI 的裸 `cargo test --locked` 同步改为 `--workspace`，README、testing、quality-tooling、build-and-development、dependency-acquisition 的命令语义同步。状态保持 done。
 
 ## 完成摘要
 
