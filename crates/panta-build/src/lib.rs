@@ -495,6 +495,13 @@ pub fn native_test_env(
     if !qt_plugins.is_dir() {
         return Err(format!("托管 Qt 插件目录不存在：{}", qt_plugins.display()));
     }
+    let qt_platform_plugins = qt_plugins.join("platforms");
+    if !qt_platform_plugins.is_dir() {
+        return Err(format!(
+            "托管 Qt 平台插件目录不存在：{}",
+            qt_platform_plugins.display()
+        ));
+    }
     let current_path = environment
         .iter()
         .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
@@ -523,6 +530,10 @@ pub fn native_test_env(
     environment.push((
         std::ffi::OsString::from("QT_PLUGIN_PATH"),
         qt_plugins.into_os_string(),
+    ));
+    environment.push((
+        std::ffi::OsString::from("QT_QPA_PLATFORM_PLUGIN_PATH"),
+        qt_platform_plugins.into_os_string(),
     ));
     Ok(environment)
 }
