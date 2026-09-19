@@ -4,7 +4,7 @@
 
 ## 当前实现与目标边界
 
-当前 `native/bridge` 是 `Panta.Bridge` QML 模块的静态 backing target，`qt_add_qml_module` 生成 typeinfo 和静态 plugin，`qml/` 提供 `Panta.Shell` 的 NO_PLUGIN 资源模块。默认 `cargo build --locked` 通过 launcher 的 `bridge-module` feature 显式链接并导入 Bridge plugin，运行时和 qmllint 共用模块注册结果；026 已移除 main.cpp 的手动注册路径。诊断构建可使用 `cargo build --locked --no-default-features`，此时 launcher 传递 `PANTA_ENABLE_BRIDGE_MODULE=OFF`，裁剪 bridge 子目录并加载无 ViewModel 的 `AppNoBridge` 入口，验证 Shell 资源链路没有悬空 import。
+当前 `native/bridge` 是 `Panta.Bridge` QML 模块的静态 backing target，`qt_add_qml_module` 生成 typeinfo 和静态 plugin，`qml/` 提供 `Panta.Shell` 的 STATIC NO_PLUGIN 资源模块（Qt 将资源对象直接链接到消费者，避免 Windows 丢弃无符号引用的资源 DLL）。默认 `cargo build --locked` 通过 launcher 的 `bridge-module` feature 显式链接并导入 Bridge plugin，运行时和 qmllint 共用模块注册结果；026 已移除 main.cpp 的手动注册路径。诊断构建可使用 `cargo build --locked --no-default-features`，此时 launcher 传递 `PANTA_ENABLE_BRIDGE_MODULE=OFF`，裁剪 bridge 子目录并加载无 ViewModel 的 `AppNoBridge` 入口，验证 Shell 资源链路没有悬空 import。
 
 借鉴用户提出的 Quickshell 思路，分三层推进：静态库管编译边界，Qt 类型注册管 QML 可见性，Reloadable 契约管运行期状态延续。不是所有底层静态库都需要对应 QML URI；只有公开 UI API 的 bridge 模块需要注册，领域与适配器继续隐藏在服务后。
 

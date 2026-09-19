@@ -30,6 +30,10 @@ foreach(_file IN LISTS _qml_files)
     message(FATAL_ERROR "qmlformat 运行失败（退出码 ${_rc}）：${_file}\n${_err}")
   endif()
   file(READ "${_file}" _content)
+  # qmlformat on Windows writes CRLF while repository sources use LF. Compare
+  # logical content so the gate checks formatting rather than platform EOLs.
+  string(REPLACE "\r\n" "\n" _formatted "${_formatted}")
+  string(REPLACE "\r\n" "\n" _content "${_content}")
   if(NOT _formatted STREQUAL _content)
     list(APPEND _needs_format "${_file}")
   endif()

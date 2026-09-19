@@ -37,6 +37,8 @@ fn main() -> Result<(), io::Error> {
     } else {
         "-std=c++20"
     };
+    let cxx_exception_flag =
+        (env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")).then_some("/EHsc");
     let sdk_env = provision::windows_sdk_env(&env::var("TARGET").map_err(io::Error::other)?)
         .map_err(io::Error::other)?;
     for (key, value) in sdk_env {
@@ -55,6 +57,11 @@ fn main() -> Result<(), io::Error> {
         .file("src/ffi_support.cc")
         .include("include")
         .flag_if_supported(cxx_standard_flag);
+    if let Some(flag) = cxx_exception_flag {
+        // cxx 生成的错误边界通过 C++ exception 抛出 rust::Error；clang-cl
+        // 默认关闭异常，必须显式启用与 MSVC ABI 一致的同步展开语义。
+        builder.flag(flag);
+    }
     builder.compile("panta_ffi_bridge");
 
     // 从实际 cc 配置导出参数，保留 CXX 生成头路径、宏及 ABI 选项。

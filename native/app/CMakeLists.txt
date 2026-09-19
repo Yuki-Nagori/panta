@@ -30,8 +30,7 @@ if(BUILD_TESTING)
     target_link_libraries(panta_qml_shell_module_test PRIVATE panta_bridgeplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
-  add_test(NAME Qml.ShellModuleLoads COMMAND panta_qml_shell_module_test)
-  set_tests_properties(Qml.ShellModuleLoads PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test)
 endif()
 
 install(

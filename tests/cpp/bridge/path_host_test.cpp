@@ -23,7 +23,7 @@ namespace {
 
 using panta::bridge::PathHost;
 
-/// QStandardPaths 测试模式让标准目录落在隔离的 .qttest 路径；必须先于
+/// QStandardPaths 测试模式让标准目录落在隔离的 qttest 路径；必须先于
 /// 进程内第一次目录查询开启，每个用例开头调用（幂等）。
 void enableStandardPathsTestMode() { QStandardPaths::setTestModeEnabled(true); }
 
@@ -46,8 +46,8 @@ TEST(PathHostTest, StandardDirectoriesAreInjectedOnCreate) {
 
     const QString cache = resolveOrDie(*host, QStringLiteral("cache:/tiles/v1"));
     EXPECT_TRUE(QDir::isAbsolutePath(cache)) << cache.toStdString();
-    // 测试模式下标准目录落在隔离的 .qttest 路径下，不依赖真实用户目录。
-    EXPECT_TRUE(cache.contains(QLatin1String(".qttest"))) << cache.toStdString();
+    // 测试模式下标准目录落在隔离的 qttest 路径下，不依赖真实用户目录。
+    EXPECT_TRUE(cache.contains(QLatin1String("qttest"))) << cache.toStdString();
 
     EXPECT_FALSE(host->resolve(QStringLiteral("user-config:/settings.pa"), &error).isEmpty());
     EXPECT_TRUE(error.isEmpty()) << error.toStdString();

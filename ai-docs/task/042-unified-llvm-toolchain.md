@@ -78,7 +78,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
 | 2026-09-19 | `cargo fmt --all -- --check`、`cargo check --locked -p panta-ffi --all-targets`、`cargo clippy --locked -p panta-ffi --all-targets -- -D warnings`（系统工具旁路仅用于本机快速编译） | 通过；Cargo CXX build.rs 已显式选择统一 LLVM resolver，代码与锁文件可解析。|
-| 2026-09-19 | LLVM 22.1.7 官方 release 资产核对、依赖清单与 CI cache key 审查 | 通过；macOS ARM64、Linux x86_64、Windows x64 URL/SHA256 已固定，Windows 资产为 clang+llvm 归档，保留 clang-cl。|
+| 2026-09-19 | LLVM 22.1.7 官方 release 资产核对、依赖清单与 CI cache key 审查 | 通过；macOS ARM64、Linux x86_64、Windows x64 URL/SHA256 已固定，Windows 使用官方 `LLVM-22.1.7-win64.exe` 安装包，保留 clang-cl。|
 
 | 2026-09-19 | ABI 元数据夹具：改前 configure 失败；改后 `check-abi.cmake` 的 valid/runtime/iterator 三场景 | 通过；隔离供给检查后正例成功、两种错误覆盖均被拒绝；使用 Apple Clang，仅验证 CMake 元数据策略 |
 | 2026-09-19 | `gh run list --limit 5`，核对最近远程 CI | 最新可见 run 35356240701 为旧提交 6ae8ed3，结论 failure；不能将旧绿灯或本机系统旁路用作当前 LLVM 实现的三平台证据 |

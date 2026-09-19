@@ -46,8 +46,6 @@ if(BUILD_TESTING)
 endif()
 find_package(Qt6 6.11 REQUIRED COMPONENTS ${_panta_qt_components} PATHS "${QT_STAGING}"
                                           NO_DEFAULT_PATH)
-# AUTOMOC（QML_ELEMENT 元类型生成必需）与 Qt CMake 策略在此统一；
-# QTP0004(NEW)：子目录（Themes/、Panels/）的 qmldir 自动生成。
 qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
