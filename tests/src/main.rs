@@ -606,7 +606,7 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
     if !ctest.is_file() {
         return Err(format!("ctest 不存在：{}", ctest.display()).into());
     }
-    let mut command = Command::new(ctest);
+    let mut command = Command::new(&ctest);
     command.envs(panta_build::native_test_env(
         target_root(),
         native_dir,
@@ -617,7 +617,30 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
         command.args(["-R", regex]);
     }
     command.current_dir(native_dir);
-    run("ctest", command)
+    let status = command.status()?;
+    if status.success() {
+        return Ok(());
+    }
+
+    // CTest suppresses launcher-level failures even with --output-on-failure
+    // when a Windows child cannot initialize. Re-run only failed tests in
+    // verbose mode so the error includes the exact command and exit status.
+    let mut diagnostic = Command::new(ctest);
+    diagnostic.envs(panta_build::native_test_env(
+        target_root(),
+        native_dir,
+        env!("PANTA_TEST_HOST"),
+    )?);
+    diagnostic.args([
+        "--rerun-failed",
+        "--verbose",
+        "--no-tests=error",
+        "-C",
+        build_type,
+    ]);
+    diagnostic.current_dir(native_dir);
+    let _ = diagnostic.status();
+    Err(format!("CTest 失败（退出码 {:?}）", status.code()).into())
 }
 
 fn check_cpp_format() -> Result<(), Box<dyn Error>> {
