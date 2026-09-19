@@ -48,7 +48,7 @@ minidump/WER、Qt 消息处理、远程上报。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-09-19 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets` | 通过，1/1；fork 子进程触发 `SIGSEGV` 后由处理器写入信号/pid/回溯，恢复默认处置后仍以 `SIGSEGV` 终止；父进程读取日志并断言内容后清理临时目录 |
+| 2026-09-19 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets` | 通过，1/1；fork 子进程触发 `SIGSEGV` 后由处理器写入信号/pid/回溯和真实日志路径，恢复默认处置后仍以 `SIGSEGV` 终止；测试同时断言 `crash_log_path()` 返回实际文件路径，父进程读取日志后清理临时目录 |
 | 2026-09-19 | macOS arm64；`cargo test --locked -p panta-ffi --all-targets` | 通过，11/11；CXX 边界、panic-abort、任务/路径服务回归通过，崩溃安装入口完成 foundation 转发 |
 | 2026-09-19 | macOS arm64；`cargo build --locked` | 通过；panta-foundation → panta-ffi staticlib → Cargo 调度 native/VTK 构建链成功 |
 
