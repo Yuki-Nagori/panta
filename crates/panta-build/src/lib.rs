@@ -494,7 +494,26 @@ fn download(
 ) -> Result<(), String> {
     let mut command = Command::new("curl");
     command
-        .args(["-fSL", "--retry", "3", "--create-dirs", "-o"])
+        // 速度护栏针对 CI 实测的传输停滞：60 秒均值低于 1 KiB/s 即中止并
+        // 随 --retry 重试；总上限覆盖最大的 LLVM Windows 归档（约 2 GiB）。
+        // 无上限时 cargo 会静默等待 build script，job 挂满平台上限。
+        .args([
+            "-fSL",
+            "--retry",
+            "3",
+            "--retry-delay",
+            "5",
+            "--connect-timeout",
+            "30",
+            "--speed-limit",
+            "1024",
+            "--speed-time",
+            "60",
+            "--max-time",
+            "1800",
+            "--create-dirs",
+            "-o",
+        ])
         .arg(destination)
         .arg(asset.url);
     match command.status() {

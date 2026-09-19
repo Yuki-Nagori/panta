@@ -19,6 +19,7 @@ jobs:
   dependency-audit:
     name: cargo audit (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -39,6 +40,8 @@ jobs:
       matrix:
         tool: [clippy, machete, cmake, qmllint, clang-tidy, includes, cppcheck]
     runs-on: ubuntu-latest
+    # 冷启动需供给 LLVM/Qt 并构建 native 树；上限防传输停滞拖满平台上限。
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -48,6 +51,18 @@ jobs:
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
 
+      # clippy/qmllint/clang-tidy/includes/cppcheck 都经由 launcher 构建脚本
+      # 触发 native 配置；供给 Qt 的 find_package(Gui) 经 WrapOpenGL 强依赖
+      # 宿主 GL 开发文件（macOS/Windows 由平台 SDK 提供，Linux 需显式安装）。
+      # machete/cmake 不进 native 构建图，跳过安装。
+      - name: Install native platform prerequisites
+        if: ${{ matrix.tool != 'machete' && matrix.tool != 'cmake' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
+
       - name: Run selected lint
         shell: bash
         run: cargo lint "${{ matrix.tool }}"
@@ -55,6 +70,7 @@ jobs:
   format:
     name: cargo format (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -71,6 +87,7 @@ jobs:
   coverage:
     name: rust coverage gate (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -91,6 +108,7 @@ jobs:
   native-coverage:
     name: native C++ coverage and QML tests (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -99,6 +117,15 @@ jobs:
         run: |
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal
+
+      - name: Install native platform prerequisites
+        shell: bash
+        run: |
+          sudo apt-get update
+          # 除链接期 GL 头文件外，QML 行为测试运行还需 libEGL/libxkbcommon
+          # 运行库与软件渲染驱动。
+          sudo apt-get install -y --no-install-recommends \
+            libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
 
       - name: Run native tests and report with managed LLVM
         shell: bash
@@ -118,6 +145,8 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-2022]
     runs-on: ${{ matrix.os }}
+    # Windows 冷启动含 LLVM 2 GiB 归档下载解包与全量 native 构建。
+    timeout-minutes: 90
     env:
       CMAKE_GENERATOR: Ninja
     steps:
@@ -128,6 +157,14 @@ jobs:
         run: |
           channel="$(awk -F'"' '/^channel[[:space:]]*=/{print $2}' rust-toolchain.toml)"
           rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
+
+      - name: Install native platform prerequisites
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
 
       - name: Cache Cargo registries and managed dependencies
         uses: actions/cache@v4

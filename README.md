@@ -16,7 +16,7 @@
 | 平台 | 必要环境 |
 |---|---|
 | macOS | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
-| Linux | git、[rustup](https://rustup.rs)、C/C++ 编译器（gcc 或 clang）；发行版需 glibc ≥ 2.34（Qt 预编译包基于 RHEL 9.6） |
+| Linux | git、[rustup](https://rustup.rs)、C 编译器（Rust 链接驱动）与 OpenGL 前置（Debian/Ubuntu：`libgl-dev`、`libegl1`、`libxkbcommon0`，运行 QML 另需 `libgl1-mesa-dri`）；发行版需 glibc ≥ 2.34（Qt 预编译包基于 RHEL 9.6） |
 | Windows | git、[rustup](https://rustup.rs)、MSVC 构建工具（Visual Studio Build Tools 2022） |
 
 Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓库内执行 cargo 命令时按提示 `rustup toolchain install` 即可；其余依赖（CMake、Ninja、Qt、VTK、OCCT、Netgen）由构建引导自动拉取，无需预装，见 [依赖获取与主平台环境](ai-docs/standards/dependency-acquisition.md)。

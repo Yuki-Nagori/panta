@@ -13,6 +13,8 @@
 
 任务 040 的初版把整个 `target/` 放入缓存，可能恢复旧的 Cargo/CMake 构建树。本轮已收窄为 Cargo registry/git 与带版本校验的 `target/panta-tools`、`target/panta-deps`；native 构建树和 Cargo 编译产物不跨运行复用。远端命中/失效和清空缓存仍需当前 workflow 实跑补证。
 
+2026-09-19 首次实跑暴露两类缺口：供给 Qt 的 `find_package(Qt6 Gui)` 经 `WrapOpenGL` 依赖宿主 OpenGL 开发头文件，runner 未预装导致全部 Linux job 失败（macOS 因 SDK 自带 GL 框架通过）；构建引导的 curl 下载无空闲/总时长上限，LLVM Windows 归档传输停滞时 job 挂满 6 小时才被平台上限终止。平台前置属于宿主能力（同 MSVC/Apple SDK），由 workflow 安装并在依赖获取规范登记。
+
 ## 必读
 
 - [通用规范：repository-hygiene](../standards/repository-hygiene.md)
@@ -67,6 +69,8 @@
 |---|---|---|
 | 2026-09-17 | 任务 040 workflow 初始缓存接入 | 初版覆盖 `~/.cargo/registry`、`~/.cargo/git`、`target/`；后续复审确认整个 target 会恢复可变构建树，不能作为最终方案 |
 | 2026-09-19 | CI cache 方案收窄 | 只缓存 registry/git、`target/panta-tools` 和 `target/panta-deps`；key 按 OS/架构/LLVM 与 Cargo/Python/native 供给清单区分，restore key 只回退同平台同 LLVM 依赖资产 |
+| 2026-09-19 | run 35376430562 失败诊断 | 全部 Linux job 失败于 launcher build.rs 内 `find_package(Qt6 Gui)`：`Qt6Gui could not be found because dependency WrapOpenGL could not be found`；Qt 归档下载/解包均成功，缺口是宿主 GL 开发文件。Windows job 在 build script 阶段静默挂满 6h 平台上限（`Checking panta-dslc` 后无输出），唯一无上限等待是构建引导 `curl -fSL` |
+| 2026-09-19 | 本地验证（macOS 26, arm64） | `actionlint .github/workflows/ci.yml` 通过；`cargo check --locked -p panta-build`、`cargo test --locked -p panta-build`（12 passed）、`cargo fmt --all -- --check`、`git diff --check` 通过；新 curl 参数集实测下载 ninja-mac.zip 且 SHA256 与固定清单一致。三平台实跑证据待 push 后的 run 回填 |
 | — | 完整缓存命中/删除验证 | 未完成 |
 
 ## 风险与回退
@@ -76,6 +80,7 @@
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施。
+- 2026-09-19：Linux 平台前置补 OpenGL 开发头文件与 QML 运行库（`libgl-dev`、`libegl1`、`libxkbcommon0` 及软件渲染驱动），仅在触发 native 构建或 QML 测试的 job 安装；构建引导 curl 增加 connect/speed/max 上限，任务级 `timeout-minutes` 兜底，防止单点传输停滞拖满平台上限。缓存收窄方案不变：`panta-deps` 内 archives/extracted 均带哈希指纹，坏缓存按校验自愈。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要

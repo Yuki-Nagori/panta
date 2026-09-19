@@ -8,7 +8,7 @@
 - 预编译优先：优先使用上游或项目发布的、与目标平台、架构、编译器 ABI、Qt 版本和所需模块匹配的 SDK/二进制包。只有不存在合适的预编译包时，才可另立任务评估由 CI/维护者生成可复用制品；本地构建源码不是默认回退，也不能静默触发。
 - 包不可用或匹配检查失败时立即给出版本、平台、架构、ABI、缺失 target 和获取入口诊断；不能退回系统库或偷偷开始长时间源码编译。
 - 不把系统包管理器（Homebrew/MacPorts/apt 等）作为项目基线；个人机器上已安装的同名包只是开发便利，不能当作兼容性证据，也不得进入提交的构建配置。
-- 开发者前置：git、rustup（工具链由根 [rust-toolchain.toml](../../rust-toolchain.toml) 固定，缺失时 `rustup toolchain install`）与所在平台的 SDK/运行库（macOS：Apple 命令行工具和 SDK；Linux：glibc/sysroot；Windows：MSVC Build Tools、Windows SDK 和 CRT）。自有 C++ 编译器由 Cargo 托管的 LLVM 22.1.7 供给，不依赖 PATH 中的 Apple Clang、GCC 或 cl.exe。macOS 上 Qt 源码构建另需系统自带 `/usr/bin/perl`。首次构建需要联网，此后可离线重复构建；跨机器缓存共享由任务 012 统筹。
+- 开发者前置：git、rustup（工具链由根 [rust-toolchain.toml](../../rust-toolchain.toml) 固定，缺失时 `rustup toolchain install`）与所在平台的 SDK/运行库（macOS：Apple 命令行工具和 SDK；Linux：glibc/sysroot、C 编译器（Rust 链接驱动）与 OpenGL 前置——供给 Qt 的 `find_package(Qt6 Gui)` 经 `WrapOpenGL` 强依赖宿主 GL 开发文件，运行 QML 另需 libEGL/libxkbcommon 运行库与软件渲染驱动，Debian/Ubuntu 对应 `libgl-dev`、`libegl1`、`libxkbcommon0`、`libgl1-mesa-dri`，CI 由 ci.yml 平台前置步骤安装；Windows：MSVC Build Tools、Windows SDK 和 CRT）。自有 C++ 编译器由 Cargo 托管的 LLVM 22.1.7 供给，不依赖 PATH 中的 Apple Clang、GCC 或 cl.exe。macOS 上 Qt 源码构建另需系统自带 `/usr/bin/perl`。首次构建需要联网，此后可离线重复构建；跨机器缓存共享由任务 012 统筹。
 - 版本固定：源码 tag 附 commit SHA 校验；下载的预编译包附 SHA256，并记录目标平台、架构、编译器/运行库 ABI、Qt 兼容范围和模块清单。升级必须修改固定清单、完成对应集成验证后同一 commit 提交。
 - 选版原则（2026-09-16 维护者决策）：尽量采用各上游最新稳定版，同时核对依赖间版本关系；受关系约束不能升级时，记录原因与重评条件。
 
@@ -49,7 +49,7 @@
 
 ## CI（018）
 
-- GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。三平台统一 Ninja；Windows 使用托管 clang-cl、MSVC Build Tools/Windows SDK 环境与 Qt MSVC2022 预编译包；CI 不自行安装项目工具；CMake、Ninja、Qt 和 GoogleTest 由 Cargo 构建或质量入口按需供给。
+- GitHub Actions workflow [ci.yml](../../.github/workflows/ci.yml)：push 到 main 与全部 pull request 触发；矩阵 `macos-latest` / `ubuntu-latest` / `windows-2022`。三平台统一 Ninja；Windows 使用托管 clang-cl、MSVC Build Tools/Windows SDK 环境与 Qt MSVC2022 预编译包；CI 不自行安装项目工具；CMake、Ninja、Qt 和 GoogleTest 由 Cargo 构建或质量入口按需供给。Linux 上 Qt 预编译包的 configure 与 QML 运行依赖宿主 OpenGL 前置（见"开发者前置"），由 workflow 平台前置步骤以 apt 安装，属宿主能力而非项目依赖。构建引导的 curl 下载带 connect/speed/max 上限，任务级 `timeout-minutes` 兜底传输停滞。
 - Qt 6.11.2 Linux 预编译归档面向 RHEL9，Qt 工具（包括 `rcc`、`qtpaths`、`qmlimportscanner`）需要 ICU 73。`native/cmake/qt-provision.cmake` 同步下载并校验 Qt 官方的 ICU 73 预编译归档，解包到 `qt/staging/lib`，让 Ubuntu 使用与 Qt 工具匹配的 ABI；不使用系统 ICU、不伪造 SONAME，也不源码编译 ICU。Linux 仍跳过仅供 IDE 使用的 `.qmlls.build.ini` 和当前 app 的空 import scan，保留 QML typeinfo、cachegen、资源和运行时验证。
 - 每个平台安装 rust-toolchain.toml 中的固定 Rust 工具链后执行 workspace check、完整 build、`panta-tests toolchain` 实际路径核验与 `cargo test --locked`；lint、format、audit 和两类 coverage 在 Ubuntu 独立运行。
 - runner 需要镜像自带的平台编译器与 rustup；平台编译器和标准库属于 Cargo 无法替代的宿主能力，项目依赖仍由 Cargo 驱动的构建引导供给。
@@ -59,7 +59,7 @@
 
 当前流程（004 已接通调度；Qt 预编译供给由 005 落地，VTK/OCCT/Netgen 预编译供给由 031 负责，工具二进制由 020 负责）：
 
-1. 按 [README 环境要求](../../README.md#环境要求) 安装平台前置（macOS：Apple CLT；Linux：gcc/clang；Windows：MSVC）与 rustup；CMake/Ninja/Qt/VTK/OCCT/Netgen 由固定预编译供给处理。
+1. 按 [README 环境要求](../../README.md#环境要求) 安装平台前置（macOS：Apple CLT；Linux：C 编译器与 OpenGL 前置；Windows：MSVC）与 rustup；CMake/Ninja/Qt/VTK/OCCT/Netgen 由固定预编译供给处理。
 2. 在仓库内执行 `rustup toolchain install 1.98.1`（或首次 cargo 命令时按 rustup 提示安装）。
 3. `cargo build --locked`：launcher 的 build.rs 调度 CMake/Ninja，消费构建树内固定的预编译依赖（缺失或 ABI 不匹配时立即失败并给出诊断）；`cargo run` 启动 `panta-native` 并转发参数与退出码。VTK/OCCT/Netgen 的 SDK 供给已全部就绪（031 `native/cmake/sdk-provision.cmake`，9 条 manifest 按 Release 资产登记，缓存于 `target/panta-deps/sdk/`）；消费方任务（007/009/010）接入 `panta_require_sdk` 后，首次构建自动从 Release 下载并强校验对应 SDK。
 
