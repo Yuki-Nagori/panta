@@ -468,6 +468,7 @@ pub fn windows_sdk_env(
 /// 为 native 测试补齐托管 Qt DLL 的运行时搜索路径。
 pub fn native_test_env(
     target_root: &Path,
+    native_dir: &Path,
     target: &str,
 ) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, String> {
     let mut environment = windows_sdk_env(target)?;
@@ -489,7 +490,9 @@ pub fn native_test_env(
         .map(|(_, value)| value.clone())
         .or_else(|| std::env::var_os("PATH"))
         .unwrap_or_default();
-    let mut paths = vec![qt_bin];
+    let native_qml = native_dir.join("qml");
+    let native_app = native_dir.join("app");
+    let mut paths = vec![qt_bin, native_qml, native_app, native_dir.to_path_buf()];
     paths.extend(std::env::split_paths(&current_path));
     let path =
         std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
@@ -500,6 +503,10 @@ pub fn native_test_env(
         *value = path;
     } else {
         environment.push((std::ffi::OsString::from("PATH"), path));
+    }
+    let import_path = native_dir.as_os_str().to_os_string();
+    for key in ["QML2_IMPORT_PATH", "QML_IMPORT_PATH"] {
+        environment.push((std::ffi::OsString::from(key), import_path.clone()));
     }
     Ok(environment)
 }
