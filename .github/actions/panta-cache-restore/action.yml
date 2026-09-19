@@ -1,0 +1,38 @@
+# 恢复 Cargo home 与托管工具/依赖缓存（任务 012/046）。全部 job 只恢复；
+# 保存仅由 ci.yml 的 check job 在 main push 时执行，键的定义以
+# panta-cache-save 为单一来源，改键时两处必须同步。
+name: Restore panta caches
+description: 按 scope 恢复 cargo-home 与 tools/deps 缓存
+inputs:
+  cargo_home:
+    description: 是否恢复 ~/.cargo 的 index/cache/git
+    required: false
+    default: "true"
+  tools_deps:
+    description: 是否恢复 target/panta-tools 与 target/panta-deps
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - if: inputs.cargo_home == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          ~/.cargo/git/checkouts
+        key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+        restore-keys: |
+          cargo-home-${{ runner.os }}-${{ runner.arch }}-
+
+    - if: inputs.tools_deps == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          target/panta-tools
+          target/panta-deps
+        key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+        restore-keys: |
+          panta-cache-${{ runner.os }}-${{ runner.arch }}-

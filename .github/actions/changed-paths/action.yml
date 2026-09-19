@@ -1,0 +1,79 @@
+# 变更路径分类（任务 046）。输出：
+#   code       —— rust/native/qml 任一命中即 true（纯文档为 false）
+#   cargo_deps —— Cargo 清单或 deny.toml 变更
+#   rust / native / qml —— 对应域是否有变更
+# 保守默认：未识别路径一律视为代码触发全量检查；纯文档是唯一可整场跳过的类别。
+# 基线：PR 对 base 分支取 merge-base diff，push 对 event.before 取累计 diff；
+# 新分支/强推/空 diff 回退全量。
+name: Changed path categories
+description: 按变更路径输出 code/cargo_deps/rust/native/qml 分类结果
+outputs:
+  code:
+    value: ${{ steps.filter.outputs.code }}
+  cargo_deps:
+    value: ${{ steps.filter.outputs.cargo_deps }}
+  rust:
+    value: ${{ steps.filter.outputs.rust }}
+  native:
+    value: ${{ steps.filter.outputs.native }}
+  qml:
+    value: ${{ steps.filter.outputs.qml }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - id: filter
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.base_ref }}
+        BEFORE: ${{ github.event.before }}
+      run: |
+        set -euo pipefail
+        files=""
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          files="$(git diff --name-only "origin/${BASE_REF}...HEAD" || true)"
+        elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+          files="$(git diff --name-only "$BEFORE" HEAD || true)"
+        fi
+
+        cargo_deps=false
+        rust=false
+        native=false
+        qml=false
+        other=false
+        if [ -z "$files" ]; then
+          other=true
+        fi
+        while IFS= read -r f; do
+          [ -n "$f" ] || continue
+          case "$f" in
+            *.md|ai-docs/*|LICENSE|.gitignore|.gitattributes) ;;
+            deny.toml) cargo_deps=true ;;
+            Cargo.lock|Cargo.toml|*/Cargo.toml) cargo_deps=true; rust=true ;;
+            crates/*|tests/src/*|tests/integration/*|.cargo/*|rust-toolchain.toml|resources/*) rust=true ;;
+            native/*|tests/cpp/*) native=true ;;
+            qml/*|tests/qml/*) qml=true ;;
+            *) other=true ;;
+          esac
+        done <<< "$files"
+        if $other; then
+          cargo_deps=true
+          rust=true
+          native=true
+          qml=true
+        fi
+        code=false
+        if $rust || $native || $qml; then
+          code=true
+        fi
+        {
+          echo "code=$code"
+          echo "cargo_deps=$cargo_deps"
+          echo "rust=$rust"
+          echo "native=$native"
+          echo "qml=$qml"
+        } >> "$GITHUB_OUTPUT"

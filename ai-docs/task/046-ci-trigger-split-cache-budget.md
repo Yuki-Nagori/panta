@@ -30,16 +30,18 @@
 
 ## 实施步骤
 
-1. 新增 `changes` job：按事件取基线（PR 取 `origin/<base>`，push 取 `event.before`，新分支/空 diff 回退全量），把变更文件分为 docs / cargo_deps / rust / native / qml / 其他。
+1. 新增 `changes` job：按事件取基线（PR 取 `origin/<base>`，push 取 `event.before`，新分支/空 diff 回退全量），把变更文件分为 code / cargo_deps / rust / native / qml。
 2. 既有 job 挂 `needs: changes` 与保守门控：纯文档 → 全部跳过；dependency-audit → 触发 `cargo_deps`；machete → `rust`；cmake-lint → `native`；qmllint → `qml` 或 `native`；其余（check 矩阵、format、clippy、clang-tidy、includes、cppcheck、两类 coverage）→ 非纯文档即运行。
-3. 缓存拆为两键（cargo-home 仅 index/cache/git、panta-cache 含 tools+deps），lint/audit/format/coverage 全部 restore-only，仅 main push 的 check job 保存；保存前裁剪可重下载内容（工具归档、Qt/SDK 归档、LLVM 非白名单 bin 与 lib/include）。
-4. check job 增加裁剪后体积输出（`du -sh`），为后续预算调整留证据。
-5. check/test 拆分为两个 job：check 执行 `cargo check --all-targets`、`cargo build`、`cargo test --no-run` 与工具核验，经 artifact（retention 1 天，排除 incremental）把 `target/debug` + `target/native` 传给 test job；test 恢复缓存与构建树后只运行 `cargo test --locked --workspace`。公开仓库 artifact 不占缓存配额。
-6. 按域省编译的边界：FFI staticlib 使每个 cargo 命令都驱动 native 配置、QML 编译进应用本体，因此 cargo 命令级跳过不安全；域级跳过只在 job 触发层做（步骤 2），compile 内部消重靠 `--no-run` 顺序与 artifact 复用。
+3. 缓存拆为两键（cargo-home 仅 index/cache/git、panta-cache 含 tools+deps），lint/audit/format/coverage 全部 restore-only，仅 main push 的 check job 保存。
+4. 缓存瘦身下沉到供给代码（维护者要求不在 CI 打补丁）：panta-build 安装归档发布即删、解包后按白名单裁剪 LLVM（bin 留 clang 系/lld 系/coverage/AR，lib 仅留 lib/clang，include 移除）；Qt/SDK CMake 供给发布即删归档，Qt 复用判定不再依赖归档存在。
+5. 公共步骤封装为 `.github/actions/*` 复合 action：changed-paths、panta-toolchain、linux-gl-prereqs、panta-cache-restore、panta-cache-save。
+6. check job 输出裁剪后体积（`du -sh`），为后续预算调整留证据。
 
 ## 预计改动
 
-- `.github/workflows/ci.yml`：changes job、各 job 门控、缓存两键拆分与裁剪步骤、check/test 拆分与 artifact 传递。
+- `.github/workflows/ci.yml` 与 `.github/actions/*`：changes 门控、缓存两键、复合 action。
+- `crates/panta-build/src/lib.rs`：归档发布即删、`slim_llvm` 裁剪及单元测试。
+- `native/cmake/qt-provision.cmake`、`native/cmake/sdk-provision.cmake`：归档发布即删，Qt 复用条件改为指纹 + staging 完整性。
 - `ai-docs/task-index.md`、`ai-docs/modules/quality-tooling.md`、`ai-docs/standards/dependency-acquisition.md`：登记与 CI 结构描述同步。
 
 ## 清理与兼容例外
@@ -49,10 +51,10 @@
 ## 验收标准
 
 - [ ] 纯文档（`*.md`、`ai-docs/**` 等）push/PR 仅运行 `changes` job，其余 job 显示 skipped 且 run 绿。
-- [ ] 未知或代码路径变更触发全量检查；deny.toml 仅触发 dependency-audit；machete/cmake-lint/qmllint 按域触发；任何工具被裁剪导致构建失败即视为门控有误并回退。
+- [ ] 未知或代码路径变更触发全量检查；deny.toml 仅触发 dependency-audit；machete/cmake-lint/qmllint 按域触发。
 - [ ] 三平台新缓存条目合计 ≤ 8 GB（按 job 日志 Cache Size 汇总），main push 后 restore 命中。
-- [ ] test job 经 artifact 消费 check job 构建树，`cargo test --locked --workspace` 三平台通过且不再全量重编（编译失败在 check job 的 check/test --no-run/build 步骤暴露）。
-- [ ] LLVM 裁剪后 `panta-tests toolchain` 核验与全量 CTest 在三平台通过。
+- [ ] 缓存瘦身由供给代码完成：panta-build 发布即删归档并裁剪 LLVM（单元测试覆盖白名单与资源目录保留），Qt/SDK 供给发布即删归档且复用不依赖归档；CI 保存动作不做内容清理。
+- [ ] LLVM 裁剪后 `panta-tests toolchain` 核验与全量测试在三平台通过。
 - [ ] 文档、task、索引与 CI 实际行为一致；无未登记的兼容分支。
 
 ## 验证计划与结果
@@ -68,7 +70,9 @@
 
 ## 决策与工作记录
 
-- 2026-09-19：创建任务。选 DIY diff 脚本而非第三方 paths-filter action（少一个供应链面，未知路径默认全量）；缓存不缓存提取后 LLVM 的瘦身采用 CI 保存前裁剪，不改本地供给实现（本地开发机不受影响，本地仍保留完整树与归档自愈能力）。
+- 2026-09-19：创建任务。选 DIY diff 脚本而非第三方 paths-filter action（少一个供应链面，未知路径默认全量）。
+- 2026-09-19（撤销 test 拆分）：曾把 test 拆为独立 job 经 artifact 传递构建树，实测 upload-artifact 保留构建时 mtime、新 checkout 源码反而更新，cargo 全量重编（run 35429575198 macOS/Ubuntu test 失败于此），收益为负；按维护者决定回到 check/build/verify/test 单 job。
+- 2026-09-19（瘦身下沉供给层）：维护者指出可在代码层优化的不要放进 CI。CI 保存动作只负责存取，裁剪下沉：panta-build 发布即删归档 + `slim_llvm` 白名单裁剪（本地开发机同步受益），Qt/SDK CMake 供给发布即删归档并把复用判定改为指纹 + staging 完整性。legacy `panta-deps-*` 恢复键随首代新键落地移除。
 
 ## 完成摘要
 

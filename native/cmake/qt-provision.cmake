@@ -67,11 +67,10 @@ foreach(entry IN LISTS _qt_archives)
   list(GET _kv 1 _archive_sha)
   set(_archive_path "${QT_PROVISION_DIR}/archives/${_archive_name}")
   set(_extract_marker "${QT_EXTRACTED}/${_archive_name}.sha256")
-  # 已按同一哈希解包且 staging 仍完整则跳过；指纹不符（升级归档或清空
-  # staging）才重新下载/解包，老缓存只补新模块。
-  if(EXISTS "${_extract_marker}"
-     AND EXISTS "${QT_STAGING}/bin"
-     AND EXISTS "${_archive_path}")
+  # 已按同一哈希解包且 staging 仍完整则跳过（归档发布即删，复用不依赖
+  # 归档）；指纹不符（升级归档或清空 staging）才重新下载/解包，老缓存只补
+  # 新模块。
+  if(EXISTS "${_extract_marker}" AND EXISTS "${QT_STAGING}/bin")
     file(STRINGS "${_extract_marker}" _recorded_sha)
     if(_recorded_sha STREQUAL "${_archive_sha}")
       continue()
@@ -109,6 +108,9 @@ foreach(entry IN LISTS _qt_archives)
     message(FATAL_ERROR "Qt 归档解包失败（${_extract_result}）：${_archive_name}")
   endif()
   file(WRITE "${_extract_marker}" "${_archive_sha}\n")
+  # 归档只服务本次下载校验与解包；解包记指纹后即删，避免归档与解包树
+  # 在缓存中长期双份；staging 损坏时按指纹重新下载。
+  file(REMOVE "${_archive_path}")
 endforeach()
 
 if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.73")
@@ -146,6 +148,8 @@ if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.
     if(NOT _extract_result EQUAL 0)
       message(FATAL_ERROR "Qt ICU 归档解包失败（${_extract_result}）：${_archive_name}")
     endif()
+    # 与主归档同策略：解包成功即删，库损坏时按 staging 探测重新下载。
+    file(REMOVE "${_archive_path}")
   endforeach()
 endif()
 

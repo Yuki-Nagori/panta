@@ -5,7 +5,7 @@
 #   失败并给出修复动作，不退回系统库、Python wheel 或本地源码构建。
 # - staging 布局 `<PANTA_SDK_PROVISION_DIR>/<name>/<version>/<triple>/`，由
 #   临时目录解包后原子 rename 发布；不同版本各自成目录，互不覆盖。归档
-#   缓存于 `<name>/archives/`，哈希不符即删除，缓存归档支持离线重建。
+#   仅服务本次下载校验与解包，发布即删；复用只看 marker，损坏走受限重下载。
 # - 消费统一走 `find_package(... CONFIG ... PATHS staging NO_DEFAULT_PATH)`，
 #   平台库名不散落到适配器。
 # - Cargo 入口由 build.rs 注入共享根 `target/panta-deps/sdk`（任务 041，
@@ -324,6 +324,9 @@ function(panta_require_sdk name staging_var)
     file(REMOVE_RECURSE "${_outer_tmp}" "${_staging}")
     file(RENAME "${_sdk_tmp}" "${_staging}")
     file(WRITE "${_marker}" "sha256=${_sha256}\nconfig_prefix=${_prefix_rel}\n")
+    # 归档只服务本次下载校验与解包；发布即删（复用仅看 marker，损坏走
+    # 受限重下载），避免归档与解包树在缓存中长期双份。
+    file(REMOVE "${_archive}")
     set(_marker_prefix "${_prefix_rel}")
   endif()
 

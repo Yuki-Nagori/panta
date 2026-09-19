@@ -396,7 +396,17 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
         let binary = tool
             .locate_installed(staging)
             .ok_or_else(|| format!("{name} 解包后缺少可执行文件"))?;
-        set_executable(&binary)
+        set_executable(&binary)?;
+        if matches!(tool, Tool::Llvm) {
+            slim_llvm(staging)?;
+        }
+        // 归档只服务本次下载校验与解包；发布即删，避免与解包树在缓存中
+        // 长期双份（约 1.5 GB）。损坏路径由 marker 语义承担：安装树损坏时
+        // 删版本目录，重建走受限重下载，不依赖常驻归档。
+        if let Err(e) = fs::remove_file(&archive) {
+            eprintln!("[panta-tools] {name}：清理安装归档失败（忽略）：{e}");
+        }
+        Ok(())
     })?;
     tool.locate_installed(&directory).ok_or_else(|| {
         format!(
@@ -456,6 +466,75 @@ pub fn install_directory(
     fs::rename(&staging, &destination).map_err(|e| e.to_string())?;
     eprintln!("[panta-tools] {name}：安装完成 {}", destination.display());
     Ok(destination)
+}
+
+/// 官方 LLVM 发布包面向全量工具链消费者：bin 是数百个各 100–290 MB 的
+/// 胖二进制（含 MLIR 工具），lib 是 LLDB/MLIR 静态库与 dylib，include 是
+/// LLVM 开发头文件。本项目只用 clang 系编译器、clang-tidy 与 coverage/AR
+/// 工具（042 验证器要求 clang-tidy/llvm-profdata/llvm-cov 在 llvm/bin 下，
+/// Windows 链接使用 lld-link）。解包后按白名单裁剪，安装树从约 7.4 GB
+/// 降到约 2 GB；lib 仅保留编译器资源目录 lib/clang（内建头与覆盖/消毒
+/// 运行时）。白名单与验证器同步，新增工具先登记再使用。
+fn slim_llvm(root: &Path) -> Result<(), String> {
+    const KEEP: &[&str] = &[
+        "clang",
+        "clang++",
+        "clang-cpp",
+        "clang-cl",
+        "clang-format",
+        "clang-tidy",
+        "clang-scan-deps",
+        "clang-apply-replacements",
+        "llvm-ar",
+        "llvm-ranlib",
+        "llvm-profdata",
+        "llvm-cov",
+        "llvm-symbolizer",
+        "lld",
+        "lld-link",
+        "ld.lld",
+    ];
+    for entry in fs::read_dir(root).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_name().to_string_lossy().starts_with("LLVM-") {
+            continue;
+        }
+        let tree = entry.path();
+        let bin = tree.join("bin");
+        if bin.is_dir() {
+            for entry in fs::read_dir(&bin).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let mut name = entry.file_name().to_string_lossy().into_owned();
+                if name.ends_with(".exe") {
+                    name.truncate(name.len() - 4);
+                }
+                if !KEEP.contains(&name.as_str()) {
+                    let path = entry.path();
+                    fs::remove_file(&path)
+                        .or_else(|_| fs::remove_dir_all(&path))
+                        .map_err(|e| format!("裁剪 {} 失败：{e}", path.display()))?;
+                }
+            }
+        }
+        let lib = tree.join("lib");
+        if lib.is_dir() {
+            for entry in fs::read_dir(&lib).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                if entry.file_name() == "clang" {
+                    continue;
+                }
+                let path = entry.path();
+                fs::remove_file(&path)
+                    .or_else(|_| fs::remove_dir_all(&path))
+                    .map_err(|e| format!("裁剪 {} 失败：{e}", path.display()))?;
+            }
+        }
+        let include = tree.join("include");
+        if include.is_dir() {
+            fs::remove_dir_all(&include).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 /// Ninja 使用 Visual Studio 的 SDK/CRT 搜索环境，但编译器始终显式指定托管 clang-cl。
@@ -731,6 +810,37 @@ mod tests {
             Ok("stall") => std::thread::sleep(std::time::Duration::from_secs(60)),
             _ => {}
         }
+    }
+
+    #[test]
+    fn llvm_slim_keeps_whitelist_and_resource_dir() -> Result<(), String> {
+        let root = std::env::temp_dir().join(format!("panta-slim-test-{}", std::process::id()));
+        let tree = root.join("LLVM-22.1.7-test");
+        let bin = tree.join("bin");
+        fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
+        for name in ["clang", "clang-tidy.exe", "mlir-opt", "clangd"] {
+            fs::write(bin.join(name), "x").map_err(|e| e.to_string())?;
+        }
+        let lib = tree.join("lib");
+        fs::create_dir_all(lib.join("clang").join("22").join("lib")).map_err(|e| e.to_string())?;
+        fs::write(lib.join("libclang.dylib"), "x").map_err(|e| e.to_string())?;
+        fs::create_dir_all(tree.join("include")).map_err(|e| e.to_string())?;
+
+        super::slim_llvm(&root)?;
+
+        // 白名单工具保留（.exe 剥离后匹配），其余 bin 与 lib/include 开发内容
+        // 裁除，编译器资源目录 lib/clang 原样保留。
+        for kept in ["clang", "clang-tidy.exe"] {
+            assert!(bin.join(kept).is_file(), "{kept} 不应被裁剪");
+        }
+        for trimmed in ["mlir-opt", "clangd"] {
+            assert!(!bin.join(trimmed).exists(), "{trimmed} 应被裁剪");
+        }
+        assert!(!lib.join("libclang.dylib").exists(), "lib 开发库应被裁剪");
+        assert!(lib.join("clang").join("22").is_dir(), "资源目录应保留");
+        assert!(!tree.join("include").exists(), "include 开发头应被裁剪");
+        fs::remove_dir_all(&root).map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     #[test]
