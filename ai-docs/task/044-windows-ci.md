@@ -64,6 +64,10 @@ Windows CI 在 `cargo check --locked --workspace --all-targets` 中长时间没�
 
 - 本轮本地验证：native 重新配置与构建成功，CTest `^Qml\.` 三项全部通过，`cargo lint cmake`、`git diff --check` 通过；Windows 退出状态待推送后验证。
 
+- 2026-09-19：运行 [35424136090](https://github.com/Yuki-Nagori/panta/actions/runs/35424136090/job/105847042839) 首次取得 QtTest 日志：两个测试均已正常启动，失败为 Shell 的 qrc 资源不存在，非 qmllint 或平台插件失败。Shell 原为无消费者符号引用的共享库；改用 STATIC NO_PLUGIN，让 Qt 将资源对象链接进消费者。清理 native 构建路径、QML2_IMPORT_PATH、重复平台插件路径及临时执行包装；保留 Qt 日志到 stderr 并统一 QML 测试环境。
+
+- 静态资源修复本地验证：workspace build、`cargo lint qmllint`、`cargo lint cmake`、panta-build 14 项测试通过；默认 Bridge 与 `--no-default-features` 构建下三个 QML CTest 均通过；`otool -L` 确认测试不再依赖 Shell 动态库。最终 Windows CI 待验证。
+
 ## 完成摘要
 
 本地超时保护、阶段输出与失败日志采集已实现并验证；已确认 Windows LLVM 解包根因并改用官方安装包，修复后的 check/build/toolchain/test 仍待远程实跑，不能宣称 Windows CI 已恢复。

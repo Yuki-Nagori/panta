@@ -78,6 +78,18 @@ function(panta_native_defaults target)
   endif()
 endfunction()
 
+# QML 测试统一使用托管 Qt、无窗口平台与可定制的 Controls 样式。
+# Windows 无控制台时 QtTest 默认写调试输出；强制 stderr 使 CTest 能展示断言。
+function(panta_add_qml_test name target)
+  add_test(NAME ${name} COMMAND ${target})
+  set_tests_properties(
+    ${name}
+    PROPERTIES
+      ENVIRONMENT
+      "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QML_IMPORT_PATH=${QT_STAGING}/qml"
+  )
+endfunction()
+
 # 递归核对真实构建图（包括 Qt 生成的 object libraries），提前阻断上游或
 # 子目录覆盖运行库策略。依赖自己的源文件也必须遵守相同 ABI。
 function(panta_verify_msvc_abi directory)

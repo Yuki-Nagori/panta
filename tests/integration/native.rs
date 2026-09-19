@@ -20,7 +20,6 @@ fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
     let status = Command::new(cmake)
         .envs(panta_build::native_test_env(
             target_root,
-            native_dir,
             env!("PANTA_TEST_HOST"),
         )?)
         .args(["--build"])
@@ -34,7 +33,6 @@ fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
     let status = Command::new(ctest)
         .envs(panta_build::native_test_env(
             target_root,
-            native_dir,
             env!("PANTA_TEST_HOST"),
         )?)
         .args(["--output-on-failure", "--no-tests=error", "-C", build_type])

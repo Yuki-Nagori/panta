@@ -26,8 +26,10 @@ if(UNIX AND NOT APPLE)
   set(PANTA_QML_MODULE_OPTIONS __QT_INTERNAL_NO_GENERATE_QMLLS_BUILD_INI)
 endif()
 
+# 纯资源模块静态链接，避免 Windows 丢弃无导出符号引用的 DLL 及其资源初始化。
 qt_add_qml_module(
   panta_shell
+  STATIC
   URI
   Panta.Shell
   VERSION
@@ -49,16 +51,7 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qml_theme_component_test)
   target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
                                                                Qt6::Test)
-  add_test(
-    NAME Qml.ThemeComponentParameters
-    COMMAND "${CMAKE_COMMAND}" "-DTEST_EXECUTABLE=$<TARGET_FILE:panta_qml_theme_component_test>" -P
-            "${PROJECT_SOURCE_DIR}/cmake/tests/run-qml-test.cmake")
-  set_tests_properties(
-    Qml.ThemeComponentParameters
-    PROPERTIES
-      ENVIRONMENT
-      "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
-  )
+  panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。
   find_program(

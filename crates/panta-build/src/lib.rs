@@ -468,7 +468,6 @@ pub fn windows_sdk_env(
 /// 为 native 测试补齐托管 Qt DLL 的运行时搜索路径。
 pub fn native_test_env(
     target_root: &Path,
-    native_dir: &Path,
     target: &str,
 ) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, String> {
     let mut environment = windows_sdk_env(target)?;
@@ -484,40 +483,13 @@ pub fn native_test_env(
     if !qt_bin.is_dir() {
         return Err(format!("托管 Qt 运行库目录不存在：{}", qt_bin.display()));
     }
-    let qt_root = qt_bin
-        .parent()
-        .ok_or_else(|| format!("托管 Qt bin 目录没有安装根：{}", qt_bin.display()))?;
-    let qt_qml = qt_root.join("qml");
-    if !qt_qml.is_dir() {
-        return Err(format!("托管 Qt QML 模块目录不存在：{}", qt_qml.display()));
-    }
-    let qt_plugins = qt_root.join("plugins");
-    if !qt_plugins.is_dir() {
-        return Err(format!("托管 Qt 插件目录不存在：{}", qt_plugins.display()));
-    }
-    let qt_platform_plugins = qt_plugins.join("platforms");
-    if !qt_platform_plugins.is_dir() {
-        return Err(format!(
-            "托管 Qt 平台插件目录不存在：{}",
-            qt_platform_plugins.display()
-        ));
-    }
     let current_path = environment
         .iter()
         .find(|(key, _)| key == std::ffi::OsStr::new("PATH"))
         .map(|(_, value)| value.clone())
         .or_else(|| std::env::var_os("PATH"))
         .unwrap_or_default();
-    let native_qml = native_dir.join("qml");
-    let native_app = native_dir.join("app");
-    let native_shell = native_dir.join("Panta").join("Shell");
-    let mut paths = vec![
-        qt_bin,
-        native_qml,
-        native_app,
-        native_shell,
-        native_dir.to_path_buf(),
-    ];
+    let mut paths = vec![qt_bin];
     paths.extend(std::env::split_paths(&current_path));
     let path =
         std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
@@ -529,20 +501,6 @@ pub fn native_test_env(
     } else {
         environment.push((std::ffi::OsString::from("PATH"), path));
     }
-    let import_path =
-        std::env::join_paths([qt_qml, native_dir.to_path_buf(), native_dir.join("qml")])
-            .map_err(|error| format!("拼接 native 测试 QML 导入路径：{error}"))?;
-    for key in ["QML2_IMPORT_PATH", "QML_IMPORT_PATH"] {
-        environment.push((std::ffi::OsString::from(key), import_path.clone()));
-    }
-    environment.push((
-        std::ffi::OsString::from("QT_PLUGIN_PATH"),
-        qt_plugins.into_os_string(),
-    ));
-    environment.push((
-        std::ffi::OsString::from("QT_QPA_PLATFORM_PLUGIN_PATH"),
-        qt_platform_plugins.into_os_string(),
-    ));
     Ok(environment)
 }
 

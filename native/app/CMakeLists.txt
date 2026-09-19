@@ -30,16 +30,7 @@ if(BUILD_TESTING)
     target_link_libraries(panta_qml_shell_module_test PRIVATE panta_bridgeplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
-  add_test(
-    NAME Qml.ShellModuleLoads
-    COMMAND "${CMAKE_COMMAND}" "-DTEST_EXECUTABLE=$<TARGET_FILE:panta_qml_shell_module_test>" -P
-            "${PROJECT_SOURCE_DIR}/cmake/tests/run-qml-test.cmake")
-  set_tests_properties(
-    Qml.ShellModuleLoads
-    PROPERTIES
-      ENVIRONMENT
-      "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
-  )
+  panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test)
 endif()
 
 install(

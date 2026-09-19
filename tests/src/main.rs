@@ -103,7 +103,6 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
     let mut test = Command::new(cmake.with_file_name(executable_name("ctest")));
     test.envs(panta_build::native_test_env(
         target,
-        &native,
         env!("PANTA_TEST_HOST"),
     )?);
     test.current_dir(&native)
@@ -585,7 +584,6 @@ fn run_qmllint() -> Result<(), Box<dyn Error>> {
     let mut command = Command::new(cmake);
     command.envs(panta_build::native_test_env(
         target_root(),
-        native_dir,
         env!("PANTA_TEST_HOST"),
     )?);
     command.args(["--build"]).arg(native_dir).args([
@@ -609,7 +607,6 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
     let mut command = Command::new(&ctest);
     command.envs(panta_build::native_test_env(
         target_root(),
-        native_dir,
         env!("PANTA_TEST_HOST"),
     )?);
     command.args(["--output-on-failure", "--no-tests=error", "-C", build_type]);
