@@ -67,6 +67,8 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 | 2026-09-17 | `cargo build/test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`git diff --check` | 通过 |
 | 2026-09-17 | 三平台 CI（push 81e98e3，run [35237992065](https://github.com/Yuki-Nagori/panta/actions/runs/35237992065)；含 7919c7f 的 023 代码，前序 run 35237494179 因并发被该 push 取消） | 三平台 success：cargo build/test 在 Windows（`C:/win` 走 Prefix 分支拒绝）与 Linux/macOS 跑通全部路径单测；PathHost C++ 测试不在 CI（CTest 聚合归 011），Windows junction 证据仍待补 |
 | 2026-09-17 | 标准目录注入语义收尾（macOS arm64）：`createWithStandardRoots` 夹具——缺失多级目录自动创建且写探针无残留、空/相对路径条目 `path.standard_dir_unavailable`、Unix 只读目录写探针 `path.standard_dir_unwritable`；Rust 大小写断言（`Assets/GearBox.PA` ≠ `assets/gearbox.pa`，服务层不折叠） | `cargo test -p panta-core` 18 项通过；`ctest --preset debug` 27/27（新增 3 项注入夹具）；cargo build/fmt/clippy、`git diff --check` 通过 |
+| 2026-09-19 | managed CTest 全量复跑（macOS arm64，修复前） | 23/29；6 项使用 `PathHost::create()` 的用例因 Qt test mode 仍将 macOS 标准目录解析到用户 home 下的 `.qttest`，受控环境无法写入 user-config；显式根夹具和 VTK/FFI/QML 用例通过 |
+| 2026-09-19 | 修复后 managed CTest 全量复跑（托管 CMake 4.4.3，macOS arm64） | 29/29 通过；PathHost 测试改用 `QTemporaryDir` 显式根夹具，生产 `QStandardPaths` 路径发现未改动 |
 
 ## 风险与回退
 
@@ -76,6 +78,7 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 
 - 2026-09-16：由任务 021 编排；长期设计见模块说明，不将文档完成等同功能完成。
 - 2026-09-17：依赖 005、006 均已完成且范围/验收明确，状态调整为 ready。
+- 2026-09-19：确认 macOS 上 `QStandardPaths::setTestModeEnabled(true)` 仍会落到用户 home 下的 `.qttest`，不适合作为受控环境的写入夹具；PathHost 测试统一通过 `createWithStandardRoots` 注入 `QTemporaryDir` 根，不改变生产路径发现和不可写目录拒绝语义。
 - 2026-09-17（实施）：落地分层——`panta-core::path` 定义根类别（project/user-config/app-data/cache/session/qrc）、逻辑资源引用（`scheme:/relative` 结构化，qrc 只读不落本机路径）、Rust 工程引用规则（拒绝空引用/NUL/绝对路径（含 Unix 上伪装成相对组件的 `C:` 盘符）/词法 `..` 越界/Windows 保留名/尾随点或空格组件）与三层解析（`resolve` 纯逻辑、`resolve_existing` 存在性 + canonical 根内包含（拒符号链接/junction 越界）、`resolve_write_target` 以最深现存祖先做包含检查（覆盖未创建目标））；根必须为绝对路径且由宿主显式注入，解析与 cwd 无关（结构保证）。FFI（panta-ffi）新增 `PathService` 句柄与 `PathRef` DTO，跨边界仅传可往返 UTF-8。C++ 侧 `native/bridge` 新增 `PathHost`：QStandardPaths 类别注入（user-config→AppConfigLocation、app-data→AppDataLocation、cache→CacheLocation、session→TempLocation）、QString→UTF-8 往返校验（不可往返即拒绝，非 Unicode 策略落在此处）、file URL 单次解码（QUrl::toLocalFile，qrc/其它 scheme 不当本机路径）。Rust 单测覆盖引用规则矩阵与 unix 符号链接越界；Windows junction 实测由 CI 平台补（本地仅 macOS）。
 
 ## 完成摘要

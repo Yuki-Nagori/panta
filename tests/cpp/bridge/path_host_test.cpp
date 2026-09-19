@@ -9,23 +9,43 @@
 #include <QFileDevice>
 #include <QFileInfo>
 #include <QIODevice>
-#include <QLatin1String>
-#include <QStandardPaths>
 #include <QString>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QtCore/qtypes.h>
 #include <gtest/gtest.h>
 #include <initializer_list>
+#include <memory>
 #include <utility>
 
 namespace {
 
 using panta::bridge::PathHost;
 
-/// QStandardPaths 测试模式让标准目录落在隔离的 qttest 路径；必须先于
-/// 进程内第一次目录查询开启，每个用例开头调用（幂等）。
-void enableStandardPathsTestMode() { QStandardPaths::setTestModeEnabled(true); }
+/// 测试标准根必须位于 QTemporaryDir；QStandardPaths 的 test mode 在 macOS
+/// 仍会解析到用户 home 下的 .qttest，受沙箱权限影响，不能作为写入夹具。
+struct IsolatedStandardRoots {
+    QTemporaryDir base;
+
+    [[nodiscard]] bool isValid() const { return base.isValid(); }
+
+    [[nodiscard]] std::unique_ptr<PathHost> create(QString* error) const {
+        const QString root = base.path();
+        return PathHost::createWithStandardRoots(
+            {panta::bridge::StandardRoot{panta::ffi::PathRootKind::UserConfig,
+                                         root + QStringLiteral("/user-config"),
+                                         QStringLiteral("user-config")},
+             panta::bridge::StandardRoot{panta::ffi::PathRootKind::AppData,
+                                         root + QStringLiteral("/app-data"),
+                                         QStringLiteral("app-data")},
+             panta::bridge::StandardRoot{panta::ffi::PathRootKind::Cache,
+                                         root + QStringLiteral("/cache"), QStringLiteral("cache")},
+             panta::bridge::StandardRoot{panta::ffi::PathRootKind::Session,
+                                         root + QStringLiteral("/session"),
+                                         QStringLiteral("session")}},
+            error);
+    }
+};
 
 [[nodiscard]] QString resolveOrDie(const PathHost& host, const QString& reference) {
     QString error;
@@ -38,27 +58,28 @@ void enableStandardPathsTestMode() { QStandardPaths::setTestModeEnabled(true); }
 
 } // namespace
 
-TEST(PathHostTest, StandardDirectoriesAreInjectedOnCreate) {
-    enableStandardPathsTestMode();
+TEST(PathHostTest, StandardDirectoriesAreInjected) {
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
     QString error;
-    auto host = PathHost::create(&error);
+    auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
 
     const QString cache = resolveOrDie(*host, QStringLiteral("cache:/tiles/v1"));
     EXPECT_TRUE(QDir::isAbsolutePath(cache)) << cache.toStdString();
-    // 测试模式下标准目录落在隔离的 qttest 路径下，不依赖真实用户目录。
-    EXPECT_TRUE(cache.contains(QLatin1String("qttest"))) << cache.toStdString();
+    EXPECT_TRUE(cache.startsWith(standardRoots.base.path())) << cache.toStdString();
 
     EXPECT_FALSE(host->resolve(QStringLiteral("user-config:/settings.pa"), &error).isEmpty());
     EXPECT_TRUE(error.isEmpty()) << error.toStdString();
 }
 
 TEST(PathHostTest, ProjectResolutionIsCwdIndependentAndRelocatable) {
-    enableStandardPathsTestMode();
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
     QTemporaryDir projectRoot;
     ASSERT_TRUE(projectRoot.isValid());
     QString error;
-    auto host = PathHost::create(&error);
+    auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
     ASSERT_TRUE(host->setProjectRoot(QDir(projectRoot.path()).absolutePath(), &error))
         << error.toStdString();
@@ -83,11 +104,12 @@ TEST(PathHostTest, ProjectResolutionIsCwdIndependentAndRelocatable) {
 }
 
 TEST(PathHostTest, WriteTargetCreatesThenExistingResolves) {
-    enableStandardPathsTestMode();
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
     QTemporaryDir projectRoot;
     ASSERT_TRUE(projectRoot.isValid());
     QString error;
-    auto host = PathHost::create(&error);
+    auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
     ASSERT_TRUE(host->setProjectRoot(QDir(projectRoot.path()).absolutePath(), &error))
         << error.toStdString();
@@ -114,11 +136,12 @@ TEST(PathHostTest, WriteTargetCreatesThenExistingResolves) {
 }
 
 TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes) {
-    enableStandardPathsTestMode();
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
     QTemporaryDir projectRoot;
     ASSERT_TRUE(projectRoot.isValid());
     QString error;
-    auto host = PathHost::create(&error);
+    auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
     ASSERT_TRUE(host->setProjectRoot(QDir(projectRoot.path()).absolutePath(), &error))
         << error.toStdString();
@@ -140,7 +163,7 @@ TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes) {
     }
 
     // 未注入工程根的类别立即失败，不回退 cwd。
-    auto bareHost = PathHost::create(&error);
+    auto bareHost = standardRoots.create(&error);
     ASSERT_NE(bareHost, nullptr) << error.toStdString();
     error.clear();
     const QString unresolved = bareHost->resolve(QStringLiteral("project:/a"), &error);
@@ -148,7 +171,6 @@ TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes) {
 }
 
 TEST(PathHostTest, FileUrlsDecodeExactlyOnce) {
-    enableStandardPathsTestMode();
     QString error;
     const QString path = QStringLiteral("/tmp/panta 空格%20名字.pa");
     const QUrl url = QUrl::fromLocalFile(path);
@@ -165,7 +187,8 @@ TEST(PathHostTest, FileUrlsDecodeExactlyOnce) {
 }
 
 TEST(PathHostTest, NonRoundTrippableTextIsRejected) {
-    enableStandardPathsTestMode();
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
     // 未配对代理项无法往返 UTF-8：按当前契约拒绝，不做有损转换。
     const QString surrogate(QChar(0xD800));
     std::string utf8;
@@ -174,7 +197,7 @@ TEST(PathHostTest, NonRoundTrippableTextIsRejected) {
     EXPECT_EQ(error, QStringLiteral("path.non_unicode"));
 
     error.clear();
-    auto host = PathHost::create(&error);
+    auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
     const QString resolved =
         host->resolve(QStringLiteral("project:/") + surrogate + QStringLiteral(".pa"), &error);
@@ -247,7 +270,8 @@ TEST(PathHostTest, StandardRootInjectionRejectsUnwritableDirectory) {
 
 #ifdef Q_OS_UNIX
 TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected) {
-    enableStandardPathsTestMode();
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
     QTemporaryDir projectRoot;
     QTemporaryDir outside;
     ASSERT_TRUE(projectRoot.isValid());
@@ -261,7 +285,7 @@ TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected) {
     ASSERT_TRUE(QFile::link(outside.path(), link));
 
     QString error;
-    auto host = PathHost::create(&error);
+    auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
     ASSERT_TRUE(host->setProjectRoot(QDir(projectRoot.path()).absolutePath(), &error))
         << error.toStdString();

@@ -32,8 +32,8 @@ class PathHost {
     /// app-data→AppDataLocation、cache→CacheLocation、
     /// session→TempLocation）。注入时确保目录存在（缺失即创建，首次
     /// 启动建立布局）并以写探针验证可写；目录为空/不可创建/不可写立即
-    /// 失败：不静默回退 cwd。测试经 QStandardPaths::setTestModeEnabled
-    /// 定位到隔离目录，或直接用 createWithStandardRoots 注入夹具目录。
+    /// 失败：不静默回退 cwd。测试使用 createWithStandardRoots 注入
+    /// QTemporaryDir 夹具，避免依赖宿主用户目录权限。
     [[nodiscard]] static std::unique_ptr<PathHost> create(QString* error);
 
     /// 以显式根列表创建（create 的可测入口）；每个根按 create 同一语义
