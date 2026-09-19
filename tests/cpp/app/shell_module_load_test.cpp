@@ -12,6 +12,8 @@
 #endif
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 
+// App.qml 引入 Panta.Visualization（CaeViewport）：静态模块的消费方二进制
+// 必须同时导入并链接其 plugin，否则运行时报 "module not installed"。
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 #endif
 

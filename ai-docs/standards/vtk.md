@@ -1,8 +1,18 @@
 # VTK、Qt Quick 与渲染数据
 
-查阅日期：2026-09-16。状态：项目规范草案，尚未完成工具链集成验证。
+查阅日期：2026-09-16；007 实测回填：2026-09-19。状态：锁定版本（VTK 9.7.0 + Qt 6.11.2）已按本规范完成视口集成验证（渲染结果视觉确认待维护者记录）。
 
-适用于 VTK adapter 和 `CaeViewport`；VTK 不是公共数据模型。`QQuickVTKItem` 为优先验证候选，正式采用须在任务 007 验证锁定版本。
+适用于 VTK adapter 和 `CaeViewport`；VTK 不是公共数据模型。`QQuickVTKItem` 已在锁定版本验证采用（007）。
+
+## 9.7.0 实测细节（007，以 SDK 头文件为准）
+
+- `QQuickVTKItem::vtkUserData` 是 `vtkSmartPointer<vtkObject>` 别名（非独立基类、非裸指针）；回调内经 `SafeDownCast` 恢复自有场景数据（`vtkObject` 派生 + `vtkStandardNewMacro`）。
+- 图形 API 入口实际名为 `setGraphicsApi()`，必须在 `QGuiApplication` 构造前调用；运行期错误文案仍写 `setupGraphicsApi`，属上游不一致，以头文件为准。
+- 031 最小组件集不含全部 FiltersSources 头：`vtkTriangleSource.h` 缺失、`vtkSphereSource.h` 可用；新增图元前先核对 SDK include 与 manifest 登记，不整包拉取 VTK。
+- 后端边界落地（architecture/visualization.md）：`CaeViewport`（QQuickItem 子类，公共头自包含、零第三方类型）+ `ViewportBackend` 接口 + `src/vtk/` 适配器；QML 类型注册要求被注册头自包含（注册器不解析第三方传递包含），且被注册类不可 `final`。
+- 无头限制：offscreen/软件 scenegraph 不受 VTK 支持，运行即显式报错或中止（不静默）；无头测试仅覆盖 QML 注册与类型可创建，视口冒烟必须窗口化并人工记录。
+- QML 静态模块消费规则：凡加载引入了某静态模块 QML 的二进制/测试，必须链接并 `Q_IMPORT_QML_PLUGIN` 该模块 plugin，否则运行时报 "module not installed"。
+- macOS 实测（26.3/arm64）：OpenGLRhi 下可创建 GL 4.1 Core 上下文，模块注册与场景构建信号正常；但**窗口化渲染在两种场景图循环下均崩溃**——basic 循环同步阶段无当前上下文，glad 函数表为空，首次 Render 段错误（pc=0x0，经 dispatch_async 命令触发）；threaded 循环在 RHI 创建阶段即被 AppKit 断言（`NSOpenGLContext setView` SIGTRAP）。VTK 上游对两种循环均无适配分支（v9.7.0 源码核对），macOS 26 渲染路径待专项解决（007 记录解除条件）。
 
 ## 官方依据
 

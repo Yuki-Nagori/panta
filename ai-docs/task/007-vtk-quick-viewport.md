@@ -1,11 +1,21 @@
 # 007 — VTK 原生 Qt Quick 视口
 
-- 状态：in-progress
+- 状态：blocked
 - 阶段：M0
 - 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（供给侧已就绪）
 - 优先级：P0
 - 负责人：待分配
 - 创建 / 更新：2026-09-16 / 2026-09-19
+
+## 阻塞（macOS 26 渲染路径）
+
+模块、QML 注册、供给消费与创建级测试均已落地（CI 三平台绿）；**窗口化渲染在 macOS 26（arm64，Qt 6.11.2 + OpenGLRhi）两种场景图循环下均崩溃**，App.qml 集成已临时回退（PlaceholderPanel 恢复），App 启动不崩溃：
+
+- basic 循环（平台默认落到）：同步阶段（updatePaintNode）无当前 GL 上下文，glad 函数表加载为空（"Failed to initialize OpenGL functions" ×2），首次 `Render()` 段错误 pc=0x0——崩溃点为 dispatch_async 命令内的 Render 调用（崩溃报告 2026-09-19 18:14）。
+- threaded 循环（显式 `QSG_RENDER_LOOP=threaded`）：更早崩溃——RHI 创建阶段 `NSOpenGLContext setView` 在非主线程被 AppKit 断言（SIGTRAP，崩溃报告 18:33）。
+- VTK v9.7.0 源码核对：两种循环均无适配分支；加载器依赖 `QOpenGLContext::currentContext()` 在 updatePaintNode 时非空（threaded 循环契约）。
+
+**解除条件（任一）**：① VTK 上游修复/适配 macOS 26 + Qt 场景图循环组合；② Qt 提供受支持的方式在 sync 阶段绑定 GL 上下文；③ 007 拆分替代渲染后端任务（如自研 Metal 适配器实现 ViewportBackend 接口——接口与模块边界已为此预留）。诊断盲区：原生 SIGSEGV/SIGTRAP 在控制台零输出，证据只能取自 `~/Library/Logs/DiagnosticReports/*.ips`（维护者已指出）；崩溃信号处理/日志落地拟另立任务。
 
 ## 目标与背景
 
@@ -67,6 +77,8 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake。执
 | 2026-09-19 | 窗口化 `./target/debug/panta-launcher`（macOS arm64，8 秒采样） | QML 加载无错误；VTK OpenGL 初始化输出 2 条 "Failed to initialize OpenGL functions" 告警——渲染错误可见、不静默；**渲染结果待维护者视觉确认** |
 | 2026-09-19 | offscreen `panta-launcher -- -platform offscreen`（软件 scenegraph） | VTK 显式报不支持并 abort（API 1 = software）——无头/软件后端不受支持且错误不静默，真实视口冒烟以窗口化运行为准（vtk.md） |
 | 2026-09-19 | `cargo test --locked`（macOS arm64） | 全量通过（含新增 `Qml.ViewportModuleLoads`：Panta.Visualization 注册与 CaeViewport 可创建） |
+| 2026-09-19 | run 35436415890 CI（三平台） | 供给消费与跨平台编译链接通过；macOS Qml.ShellModuleLoads/ViewportModuleLoads 失败：`module "Panta.Visualization" is not installed`——静态模块消费方二进制未导入 plugin；已修复（shell 测试导入/链接，后续 App.qml 回退后仅 viewport 测试消费） |
+| 2026-09-19 | macOS 26 窗口化崩溃取证（.ips 分析 + QSG_INFO + VTK v9.7.0 源码核对） | basic 循环：updatePaintNode 无当前上下文 → glad 空表 → dispatch 内 Render 段错误（pc=0x0）；threaded 循环：RHI 创建期 NSOpenGLContext setView SIGTRAP。两种循环均崩溃，任务转 blocked（解除条件见上） |
 
 ## 风险与回退
 
@@ -76,6 +88,8 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake。执
 
 - 2026-09-16：开始核对主线视口 API，确认候选为 VTK 9.7.0 `GUISupportQtQuick` 的 `QQuickVTKItem`；用户决定 native 第三方库预编译优先，因此暂停实现，等待 031 提供匹配 SDK。正式模块化注册留给 026。
 - 2026-09-19：031 供给侧就绪（Release `sdk-vtk-9.7.0` 三平台 manifest 全部登记并经 macOS 生产消费烟测），解除"等待 031 SDK"的暂停，状态转 ready。
+- 2026-09-19（实施批次）：Panta.Visualization 静态模块 + ViewportBackend 适配层 + src/vtk/ 收敛（详见提交 f55c14f）；CI 三平台供给消费与编译链接通过。
+- 2026-09-19（转 blocked）：macOS 26 窗口化渲染双循环崩溃（证据与解除条件见"阻塞"节）；App.qml 集成临时回退为占位面板，模块/注册/创建级测试保留（CI 绿）。App 恢复不崩溃。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要

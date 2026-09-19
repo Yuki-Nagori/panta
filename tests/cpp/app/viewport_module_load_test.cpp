@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QString>
 #include <QUrl>
 #include <QtCore/qtmetamacros.h>
 #include <QtQml/qqmlextensionplugin.h>
@@ -26,7 +27,7 @@ class ViewportModuleLoadTest final : public QObject {
         QQmlEngine engine;
         QQmlComponent component(&engine);
         component.setData("import Panta.Visualization\nCaeViewport {}\n",
-                          QUrl("test://viewport-module-load/main.qml"));
+                          QUrl(QStringLiteral("qrc:///qt/qml/panta-tests/viewport-load/main.qml")));
         QVERIFY2(component.isReady(), component.errorString().toUtf8().constData());
         std::unique_ptr<QObject> object(component.create());
         QVERIFY2(object != nullptr, "CaeViewport 创建失败");

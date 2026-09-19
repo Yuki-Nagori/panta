@@ -3,7 +3,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Panta.Bridge
-import Panta.Visualization
 
 ApplicationWindow {
     id: root
@@ -40,11 +39,12 @@ ApplicationWindow {
             textColor: Theme.colorTextMuted
         }
 
-        // CAE 视口（任务 007）：空视口 + 测试图元；工程树/属性区由后续任务替换。
-        CaeViewport {
+        // 未来面板占位：工程树/视口/属性区由后续任务替换（架构：ui-and-bridge）。
+        // 视口集成（任务 007）因 macOS 26 渲染路径阻塞暂回退，解除后恢复
+        // CaeViewport（模块与注册测试保留，见 native/visualization）。
+        PlaceholderPanel {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            onSceneReady: console.log("CaeViewport 场景就绪")
         }
 
         // 错误展示入口：ViewModel 的用户可读摘要（详细诊断走日志，qt.md）。
