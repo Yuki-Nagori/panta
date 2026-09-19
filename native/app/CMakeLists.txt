@@ -32,8 +32,11 @@ if(BUILD_TESTING)
   endif()
   add_test(NAME Qml.ShellModuleLoads COMMAND panta_qml_shell_module_test)
   set_tests_properties(
-    Qml.ShellModuleLoads PROPERTIES ENVIRONMENT
-                                    "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic")
+    Qml.ShellModuleLoads
+    PROPERTIES
+      ENVIRONMENT
+      "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QT_QPA_PLATFORM_PLUGIN_PATH=${QT_STAGING}/plugins/platforms"
+  )
 endif()
 
 install(
