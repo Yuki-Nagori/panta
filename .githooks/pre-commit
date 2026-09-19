@@ -1,6 +1,9 @@
 #!/bin/sh
-# 提交前质量门禁：格式与 Rust lint 必须通过，否则拒绝提交。
-# 不重复执行 cargo check；Clippy 仍会运行 build.rs，可能触发 native 构建。
+# 提交前质量门禁：聚合格式与全部 lint 工具必须通过，否则拒绝提交。
+# 覆盖与 CI 相同的 format/lint 集合（clippy、machete、cmake-lint、qmllint、
+# clang-tidy、include-cleaner、cppcheck）；依赖审计、覆盖率与测试套件仍由
+# CI 承担。lint 经 build.rs 触发 native 配置，冷机首次提交会先供给
+# LLVM/Qt（受限下载），属已知的一次性成本。
 # 启用方式（每台机器一次性，git 不随仓库携带 hooks 配置）：
 #   git config core.hooksPath .githooks
 set -e
@@ -8,7 +11,7 @@ set -e
 echo "[pre-commit] cargo format"
 cargo format
 
-echo "[pre-commit] cargo lint clippy"
-cargo lint clippy
+echo "[pre-commit] cargo lint（clippy/machete/cmake/qmllint/clang-tidy/includes/cppcheck）"
+cargo lint
 
 echo "[pre-commit] 通过"

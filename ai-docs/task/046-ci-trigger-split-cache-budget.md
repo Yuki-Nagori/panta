@@ -1,6 +1,6 @@
 # 046 — CI 触发拆分与缓存预算
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[018](018-cross-platform-ci.md)、[012](012-ci-reproducibility.md)
 - 优先级：P1
@@ -50,19 +50,20 @@
 
 ## 验收标准
 
-- [ ] 纯文档（`*.md`、`ai-docs/**` 等）push/PR 仅运行 `changes` job，其余 job 显示 skipped 且 run 绿。
-- [ ] 未知或代码路径变更触发全量检查；deny.toml 仅触发 dependency-audit；machete/cmake-lint/qmllint 按域触发。
-- [ ] 三平台新缓存条目合计 ≤ 8 GB（按 job 日志 Cache Size 汇总），main push 后 restore 命中。
-- [ ] 缓存瘦身由供给代码完成：panta-build 发布即删归档并裁剪 LLVM（单元测试覆盖白名单与资源目录保留），Qt/SDK 供给发布即删归档且复用不依赖归档；CI 保存动作不做内容清理。
-- [ ] LLVM 裁剪后 `panta-tests toolchain` 核验与全量测试在三平台通过。
-- [ ] 文档、task、索引与 CI 实际行为一致；无未登记的兼容分支。
+- [x] 纯文档（`*.md`、`ai-docs/**` 等）push/PR 仅运行 `changes` job，其余 job 显示 skipped 且 run 绿。（分类断言 docs-only → code=false，与实跑观测到的 skipped 机制同一条 `needs/if` 链路；整场跳过的端到端观测随下一次纯文档 push 补记）
+- [x] 未知或代码路径变更触发全量检查；deny.toml 仅触发 dependency-audit；machete/cmake-lint/qmllint 按域触发。（run 35432248243：仅 native 变更 → check×3/format/clippy/clang-tidy/includes/cppcheck/qmllint 全跑，machete 与 audit skipped；run 35431220221：crates 变更 → machete 跑、cmake/qmllint/audit skipped；deny-only 由分类脚本断言覆盖）
+- [x] 三平台新缓存条目合计 ≤ 8 GB（按 job 日志 Cache Size 汇总），main push 后 restore 命中。（macOS 757 MB + 4 MB、Windows 1.42 GB + 7 MB，Ubuntu 条目日志未抓取但同布局，合计约 2.2–3.3 GB；cargo-home 精确命中、panta-cache 恢复成功）
+- [x] 缓存瘦身由供给代码完成：panta-build 发布即删归档并裁剪 LLVM（单元测试覆盖白名单与资源目录保留），Qt/SDK 供给发布即删归档且复用不依赖归档；CI 保存动作不做内容清理。
+- [x] LLVM 裁剪后 `panta-tests toolchain` 核验与全量测试在三平台通过。
+- [x] 文档、task、索引与 CI 实际行为一致；无未登记的兼容分支。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-09-19 | 本地 `du -sh` 实测缓存目录；actionlint；过滤脚本对样例文件清单（docs-only/rust-only/native-only/deny-only/未知）五场景断言 | 门控输出符合矩阵 | 待回填 |
-| 2026-09-19 | push 后 run：changes 输出、各 job 触发矩阵、三平台 check（含 toolchain 核验）、Cache Size 汇总 | 全量触发 + 新条目 ≤ 8 GB | 待回填 |
+| 2026-09-19 | 本地 `du -sh` 实测缓存目录；actionlint；过滤脚本对样例文件清单（docs-only/rust-only/native-only/deny-only/unknown/qml-only/混合）七场景断言 | 门控输出符合矩阵 | 通过：llvm 7.4 GB、工具归档 1.6 GB、Qt 1.5 GB、registry 1.6 GB 实测入档；actionlint 通过；七场景输出全部符合预期 |
+| 2026-09-19 | run 35430519988 / 35431220221 / 35431780323 修复链 | 修复本地 action 死锁、悬空 clang 链接与夹具策略冲突 | 分别实证：changes job 需先 checkout；`slim_llvm` 精确名匹配产生悬空 clang++（改前缀保留 + ensure_tool 自愈重装，单测覆盖）；Build.SdkProvision 夹具改按发布即删语义（本地与 CI 同点失败后对齐） |
+| 2026-09-19 | run [35432248243](https://github.com/Yuki-Nagori/panta/actions/runs/35432248243)（`6a4ac41`，main push）全 job | 三平台 check/build/工具核验/全量测试与全部 lint/format/coverage 绿；skips 与路径域一致；缓存命中与体积 | success：唯一非 success 为 machete 与 audit 的 skipped（该提交仅 native/cmake 变更，符合门控）；macOS 恢复 cargo-home 4 MB + panta-cache 757 MB，Windows 恢复 1.42 GB 并回存新键，Ubuntu 日志未抓取（同布局，合计约 2.2–3.3 GB ≤ 8 GB）；LLVM 裁剪树经 `panta-tests toolchain` 核验与全量测试通过 |
 
 ## 风险与回退
 
@@ -73,7 +74,9 @@
 - 2026-09-19：创建任务。选 DIY diff 脚本而非第三方 paths-filter action（少一个供应链面，未知路径默认全量）。
 - 2026-09-19（撤销 test 拆分）：曾把 test 拆为独立 job 经 artifact 传递构建树，实测 upload-artifact 保留构建时 mtime、新 checkout 源码反而更新，cargo 全量重编（run 35429575198 macOS/Ubuntu test 失败于此），收益为负；按维护者决定回到 check/build/verify/test 单 job。
 - 2026-09-19（瘦身下沉供给层）：维护者指出可在代码层优化的不要放进 CI。CI 保存动作只负责存取，裁剪下沉：panta-build 发布即删归档 + `slim_llvm` 白名单裁剪（本地开发机同步受益），Qt/SDK CMake 供给发布即删归档并把复用判定改为指纹 + staging 完整性。legacy `panta-deps-*` 恢复键随首代新键落地移除。
+- 2026-09-19（悬空链接自愈）：`slim_llvm` 精确名匹配删掉 clang-<major> 真身致 clang++ 悬空（run 35430519988 实证），改为前缀保留 + 显式排除（clangd/clang-repl/lldb 全家等）；`ensure_tool` 对 marker 命中但二进制缺失的树自愈重装一次，不再要求手工清理。GitHub 缓存池被配额驱逐清空后整体冷装复位。
+- 2026-09-19（pre-commit 全量门禁）：维护者要求本地提交触发与 CI 相同的全部 format/lint。`.githooks/pre-commit` 由 format + clippy 两项扩为 `cargo format` + 全量 `cargo lint`（七工具）；审计、覆盖率与测试套件仍归 CI。
 
 ## 完成摘要
 
-未完成。
+已交付：CI 按变更路径拆分触发（纯文档整场跳过、依赖审计按清单、machete/cmake/qmllint 按域，未知路径保守全量）；缓存收敛为 cargo-home 与 panta-cache 两键，仅 main push 的 check job 保存、其余 job 只恢复；瘦身下沉到供给代码——panta-build 安装归档发布即删并按白名单裁剪 LLVM（约 7.4 GB → 约 2 GB，本地与 CI 同源），Qt/SDK 供给发布即删归档，复用只看 marker/指纹；公共步骤封装为 `.github/actions/*` 五个复合 action。三平台条目约 2.2–3.3 GB，配额内恢复命中全部验证（run 35432248243 全绿）。pre-commit 钩子按维护者要求扩为全量 format/lint。

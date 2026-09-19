@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、011、012、014、018–020、026、036、039–041、043–045 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、统一测试与质量入口、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、CI 依赖缓存与可复现检查、Windows CI 停滞诊断与修复、Windows CI 分支代码审查与收敛、QML 静态模块注册边界、根目录质量入口与测试聚合均落地并验证），整轮三平台 CI 已全绿：Windows/macOS/Linux 的 check、build、toolchain、test、七项 lint、聚合格式、依赖审计及 Rust/native 覆盖率检查全部通过，031 的供给侧已全部就绪：VTK/OCCT/Netgen 三依赖 × 三平台 manifest 全部登记并经 macOS 生产消费烟测（OCCT 弃用官方 Windows SDK 统一自托管；Netgen↔OCCT 成对发布），其剩余项即 007/009/010 的集成证据，可并行推进——**007 与 009 供给前置均满足、状态转 ready**，010 待 009，其余基础设施任务未完成。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、011、012、014、018–020、026、036、039–041、043–046 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、统一测试与质量入口、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、CI 依赖缓存与可复现检查、Windows CI 停滞诊断与修复、Windows CI 分支代码审查与收敛、QML 静态模块注册边界、根目录质量入口与测试聚合、CI 触发拆分与缓存预算均落地并验证），整轮三平台 CI 已全绿：Windows/macOS/Linux 的 check、build、toolchain、test、七项 lint、聚合格式、依赖审计及 Rust/native 覆盖率检查全部通过，031 的供给侧已全部就绪：VTK/OCCT/Netgen 三依赖 × 三平台 manifest 全部登记并经 macOS 生产消费烟测（OCCT 弃用官方 Windows SDK 统一自托管；Netgen↔OCCT 成对发布），其剩余项即 007/009/010 的集成证据，可并行推进——**007 与 009 供给前置均满足、状态转 ready**，010 待 009，其余基础设施任务未完成。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -97,7 +97,7 @@ ai-docs/
 | 043 | [根目录质量入口与测试聚合](task/043-root-quality-runner.md) | 验证基础 | 011, 032 | done |
 | 044 | [Windows CI 停滞诊断与修复](task/044-windows-ci.md) | 验证基础 | 018, 042 | done |
 | 045 | [Windows CI 分支代码审查与收敛](task/045-branch-code-review.md) | 验证基础 | 044 | done |
-| 046 | [CI 触发拆分与缓存预算](task/046-ci-trigger-split-cache-budget.md) | 验证基础 | 018, 012 | in-progress |
+| 046 | [CI 触发拆分与缓存预算](task/046-ci-trigger-split-cache-budget.md) | 验证基础 | 018, 012 | done |
 
 ## 仓库与文档维护
 

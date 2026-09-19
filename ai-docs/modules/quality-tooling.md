@@ -91,7 +91,7 @@ Rust 函数覆盖 100% 是函数维度目标，函数进入一次不代表其内
 
 ## 提交门禁（git hooks）
 
-`.githooks/pre-commit` 仅执行 `cargo format` 与 `cargo lint clippy`，已移除独立 `cargo check`。Clippy 仍执行 build.rs，首次使用还可能下载 LLVM 或重建 native，不能称为纯轻量检查。新机器需一次性启用：
+`.githooks/pre-commit` 执行与 CI 相同的 `cargo format` 与全量 `cargo lint`（clippy、machete、cmake-lint、qmllint、clang-tidy、include-cleaner、cppcheck）；依赖审计、覆盖率与测试套件仍由 CI 承担。lint 工具经 build.rs 触发 native 配置，冷机首次提交会先供给 LLVM/Qt。新机器需一次性启用：
 
 ```sh
 git config core.hooksPath .githooks
