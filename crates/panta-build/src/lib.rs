@@ -80,8 +80,8 @@ fn ninja_asset() -> Option<ToolAsset> {
     }
 }
 
-/// LLVM 官方发布资产。Windows 使用官方工具链归档：它包含 clang-cl、lld-link
-/// 与 clang-format，解包到 Cargo 的托管目录，不写入用户系统目录。
+/// LLVM 官方发布资产。Windows 使用官方 NSIS 安装包：它包含 clang-cl、lld-link
+/// 与 clang-format，静默安装到 Cargo 的托管目录，不写入用户系统目录。
 fn llvm_asset() -> Option<ToolAsset> {
     if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
         Some(ToolAsset {
@@ -95,8 +95,8 @@ fn llvm_asset() -> Option<ToolAsset> {
         })
     } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
         Some(ToolAsset {
-            url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/clang+llvm-22.1.7-x86_64-pc-windows-msvc.tar.xz",
-            sha256: "3b568b5be1443d1a04c63261fa3a7aed16e126a8ed2196a1032aa8ed602144bd",
+            url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/LLVM-22.1.7-win64.exe",
+            sha256: "e091fcf965ce589c83c0f7c5356b2fcf3e658a8ec990bfcf79cce4389a0d1eb3",
         })
     } else {
         None
@@ -363,7 +363,12 @@ fn ensure_tool(tool: Tool, target_root: &Path, cmake: Option<&Path>) -> Result<P
     let directory = install_directory(target_root, name, &identity, |staging| {
         let archives = tools_root(target_root).join("archives");
         fs::create_dir_all(&archives).map_err(|e| e.to_string())?;
-        let archive = archives.join(format!("{name}-{identity}.archive"));
+        let suffix = if cfg!(windows) && matches!(tool, Tool::Llvm) {
+            "exe"
+        } else {
+            "archive"
+        };
+        let archive = archives.join(format!("{name}-{identity}.{suffix}"));
         eprintln!("[panta-tools] {name}：检查归档缓存 {}", archive.display());
         if !archive.is_file() || sha256_file(&archive)? != asset.sha256 {
             let partial = archives.join(format!("{name}-{identity}.partial"));
@@ -536,6 +541,20 @@ fn extract(
     destination: &Path,
     cmake: Option<&Path>,
 ) -> Result<(), String> {
+    if cfg!(windows) && matches!(tool, Tool::Llvm) {
+        // Windows 的 LLVM tar.xz 归档由系统 tar 解包极慢（CI 实测超过
+        // 20 分钟）；官方 NSIS 安装包包含同一套 clang-cl/lld/format，
+        // 支持静默安装和自定义目录，避免依赖 runner 上额外的 7-Zip。
+        let mut command = Command::new(archive);
+        command
+            .arg("/S")
+            .arg(format!("/D={}", destination.display()));
+        return run_tool_command(
+            &mut command,
+            &format!("安装 LLVM {}：{}", tool.version(), archive.display()),
+            Duration::from_secs(20 * 60),
+        );
+    }
     let mut command = match tool {
         // CMake 压缩包由平台自带 tar 解开（macOS/Windows 为 bsdtar，可直接
         // 读 zip；Linux 为 GNU tar，自动识别 gzip）。
