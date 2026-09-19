@@ -4,9 +4,9 @@
 //! 信息与 best-effort 回溯，随后恢复默认处置重新 raise——.ips 崩溃报告
 //! 链路与内核退出语义保持不变。
 //!
-//! 本模块是仓库内【专用手写 unsafe 边界】（rust.md）：sigaction/信号句柄
-//! 与回溯 FFI 的安全前提逐块注明；对外仅暴露安全 API。按 layering.md，
-//! 崩溃基础设施归 Rust 实现，C++ 壳经 FFI（panta_ffi）安装。
+//! 本模块是仓库内【专用手写 unsafe 边界】（rust.md）：信号句柄与回溯 FFI
+//! 的安全前提逐块注明；对外仅暴露安全 API。`panta-ffi` 只负责把安全入口
+//! 转成 CXX 可消费的 Result，不拥有本模块的底层实现。
 //!
 //! 安全取舍：write/fd 操作为 async-signal-safe；backtrace* 会调用分配器，
 //! 非严格安全——崩溃点位于分配器内时回溯可能缺失（.ips 兜底），以此换取
@@ -189,8 +189,10 @@ mod tests {
     /// 死于原信号（默认处置重发生效）。
     #[test]
     fn handler_logs_segfault_and_reraises() -> std::io::Result<()> {
-        let dir =
-            std::env::temp_dir().join(format!("panta-core-crash-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "panta-foundation-crash-test-{}",
+            std::process::id()
+        ));
         std::fs::create_dir_all(&dir)?;
         let path = install_crash_handler(&dir.to_string_lossy())?;
 

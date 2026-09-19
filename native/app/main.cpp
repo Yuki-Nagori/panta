@@ -40,7 +40,7 @@ void print_version() {
 } // namespace
 
 int main(int argc, char* argv[]) {
-    // 原生崩溃此前控制台零输出（任务 047，Rust 实现 panta_core::crash）：
+    // 原生崩溃此前控制台零输出（任务 047，Rust 实现 panta_foundation::crash）：
     // 先于一切逻辑安装；失败以 qWarning 级别打到 stderr，不静默。
     try {
         panta::ffi::install_crash_handler(rust::String(""));

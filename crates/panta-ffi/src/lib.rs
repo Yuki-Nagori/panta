@@ -7,9 +7,9 @@ const MAX_REPEAT: u32 = 8;
 /// 句柄标签按 UTF-8 字节数设界，与请求文本的有界策略一致。
 const MAX_LABEL_BYTES: usize = 64;
 
-// unsafe 由两部分组成：CXX 桥接宏生成的胶水（边界安全前提由 cxx 运行时
-// 的类型检查与 ffi.hpp 签名一致性承担），以及 crash 模块（任务 047）的
-// 信号处理 FFI（安全前提逐块注明）。本 crate 对外只暴露安全签名。
+// unsafe 由 CXX 桥接宏生成的胶水产生（边界安全前提由 cxx 运行时的类型
+// 检查与 ffi.hpp 签名一致性承担）。崩溃设施的手写 unsafe 位于
+// panta-foundation::crash，本 crate 对外只暴露安全签名。
 #[allow(unsafe_code)]
 #[cxx::bridge(namespace = "panta::ffi")]
 pub mod bridge {
@@ -135,22 +135,17 @@ pub mod bridge {
             reference: &PathRef,
         ) -> Result<String>;
 
-        /// 崩溃信号处理器安装（任务 047，panta_core::crash 的 FFI 面）：
+        /// 崩溃信号处理器安装（任务 047，panta_foundation::crash 的 FFI 面）：
         /// 返回日志路径；log_dir 为空时用系统临时目录。
         fn install_crash_handler(log_dir: &str) -> Result<String>;
     }
 }
 
-// 专用手写 unsafe 边界（任务 047，rust.md）：崩溃信号处理的安全前提
-// 逐块注明；领域模型（panta-core）保持无 unsafe。
-#[allow(unsafe_code)]
-pub mod crash;
-
 pub use bridge::{FfiRequest, FfiResponse};
 
 /// 任务 047：错误以文本跨边界（C++ 侧 qWarning 呈现，不静默）。
 fn install_crash_handler(log_dir: &str) -> Result<String, String> {
-    crate::crash::install_crash_handler(log_dir)
+    panta_foundation::crash::install_crash_handler(log_dir)
         .map(|path| path.display().to_string())
         .map_err(|error| error.to_string())
 }

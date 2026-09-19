@@ -281,9 +281,16 @@ version = "0.1.0"
 dependencies = [
  "cxx",
  "cxx-build",
- "libc",
  "panta-build",
  "panta-core",
+ "panta-foundation",
+]
+
+[[package]]
+name = "panta-foundation"
+version = "0.1.0"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

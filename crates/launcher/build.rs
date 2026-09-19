@@ -22,6 +22,7 @@ const RERUN_PATHS: &[&str] = &[
     "../../tests/qml",
     "../panta-ffi",
     "../panta-core",
+    "../panta-foundation",
     "../../qml",
     "../../resources/i18n",
 ];

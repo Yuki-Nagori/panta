@@ -13,9 +13,9 @@ build = "build.rs"
 crate-type = ["rlib", "staticlib"]
 
 [dependencies]
-libc.workspace = true
 cxx.workspace = true
 panta-core.workspace = true
+panta-foundation.workspace = true
 
 [build-dependencies]
 cxx-build.workspace = true

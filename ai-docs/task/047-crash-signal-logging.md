@@ -21,8 +21,9 @@
 
 ## 范围与非目标
 
-范围：foundation 崩溃处理器（POSIX 全量：信号名/pid/回溯落盘；Windows 最小
-信号写出）、app 入口安装、fork 自验测试。非目标：完整符号化（.ips 对照）、
+范围：Rust `panta-foundation` 崩溃处理器（POSIX 全量：信号名/pid/回溯落盘；
+Windows 最小信号写出）、经 `panta-ffi` 暴露、app 入口安装、fork 自验测试。
+`panta-core` 保持领域模型职责，不承载该进程级平台设施。非目标：完整符号化（.ips 对照）、
 minidump/WER、Qt 消息处理、远程上报。
 
 ## 实施步骤
@@ -47,13 +48,19 @@ minidump/WER、Qt 消息处理、远程上报。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-09-19 | 本地 `cargo test --locked`（含 Foundation.CrashHandler） | 待回填 |
+| 2026-09-19 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets` | 通过，1/1；fork 子进程触发 `SIGSEGV` 后由处理器写入信号/pid/回溯，恢复默认处置后仍以 `SIGSEGV` 终止；父进程读取日志并断言内容后清理临时目录 |
+| 2026-09-19 | macOS arm64；`cargo test --locked -p panta-ffi --all-targets` | 通过，11/11；CXX 边界、panic-abort、任务/路径服务回归通过，崩溃安装入口完成 foundation 转发 |
+| 2026-09-19 | macOS arm64；`cargo build --locked` | 通过；panta-foundation → panta-ffi staticlib → Cargo 调度 native/VTK 构建链成功 |
 
 ## 决策与工作记录
 
 - 2026-09-19：007 取证时发现原生崩溃控制台零输出（证据仅 .ips），维护者
   指示优先落地。backtrace* 非严格 async-signal-safe 的取舍写入头文件；
   处理后恢复默认 disposition 重发，不以处理器替代 .ips。
+- 2026-09-19：崩溃设施从 `panta-ffi/src/crash.rs` 收敛到独立的
+  `panta-foundation` crate。`panta-ffi` 只保留 CXX/错误转换入口，
+  `panta-core` 继续保持领域模型与无手写 unsafe；手写 unsafe 集中在
+  `panta-foundation::crash` 专用模块，并逐块保留 `// SAFETY:` 前提。
 
 ## 完成摘要
 

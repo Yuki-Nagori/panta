@@ -4,6 +4,7 @@ members = [
     "crates/launcher",
     "crates/panta-build",
     "crates/panta-core",
+    "crates/panta-foundation",
     "crates/panta-dsl-core",
     "crates/panta-dslc",
     "crates/panta-ffi",
@@ -27,6 +28,7 @@ repository = "https://github.com/Yuki-Nagori/panta"
 [workspace.dependencies]
 libc = "0.2"
 panta-build = { path = "crates/panta-build", version = "0.1.0" }
+panta-foundation = { path = "crates/panta-foundation", version = "0.1.0" }
 serde_json = "1.0"
 cxx = "1.0.202"
 cxx-build = "1.0.202"
@@ -40,9 +42,9 @@ serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 
 [workspace.lints.rust]
-# 默认拒绝 unsafe；唯一例外是 FFI 边界（任务 006）的 CXX 生成胶水，以桥接模块
-# 级 allow 放开（位置与安全前提见 crates/panta-ffi/src/lib.rs）。该 allow 只收窄
-# 不外扩：新增手写 unsafe 需专用模块并逐块写 // SAFETY:，规范见 standards/rust.md。
+# 默认拒绝 unsafe；已登记例外只有 FFI 边界（任务 006）的 CXX 生成胶水，以及
+# 任务 047 的 panta-foundation::crash 专用模块。两处均只在模块级 allow 放开，
+# 手写 unsafe 必须逐块写 // SAFETY:，规范见 standards/rust.md。
 unsafe_code = "deny"
 
 [workspace.lints.clippy]
