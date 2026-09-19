@@ -69,6 +69,19 @@ if(IS_DIRECTORY "${_dawn_dir}/lib64")
     message(FATAL_ERROR "Dawn 制品同时包含 lib 和 lib64，无法归一化布局：${_dawn_dir}")
   endif()
   file(RENAME "${_dawn_dir}/lib64" "${_dawn_dir}/lib")
+
+  # Ubuntu 的 Dawn 导出文件也把库路径写成 ${_IMPORT_PREFIX}/lib64/；
+  # 目录归一化后同步改写该包内相对前缀，不能替换 /usr/lib64 等系统路径。
+  set(_dawn_import_prefix [=[${_IMPORT_PREFIX}]=])
+  set(_dawn_lib64_prefix "${_dawn_import_prefix}/lib64/")
+  set(_dawn_lib_prefix "${_dawn_import_prefix}/lib/")
+  file(GLOB _dawn_cmake_files "${_dawn_dir}/lib/cmake/Dawn/*.cmake")
+  foreach(_dawn_cmake_file IN LISTS _dawn_cmake_files)
+    file(READ "${_dawn_cmake_file}" _dawn_cmake_contents)
+    string(REPLACE "${_dawn_lib64_prefix}" "${_dawn_lib_prefix}" _dawn_cmake_contents
+                   "${_dawn_cmake_contents}")
+    file(WRITE "${_dawn_cmake_file}" "${_dawn_cmake_contents}")
+  endforeach()
 endif()
 if(NOT EXISTS "${_dawn_dir}/lib/cmake/Dawn/DawnConfig.cmake")
   message(FATAL_ERROR "Dawn 制品缺少 lib/cmake/Dawn/DawnConfig.cmake：${_dawn_dir}")
