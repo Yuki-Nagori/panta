@@ -13,12 +13,14 @@
 #include <panta/foundation/version.hpp>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
+#include <panta/visualization/viewport_backend.hpp>
 #endif
 #include <cstdio>
 #include <string_view>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
+Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
 #endif
 
 namespace {
@@ -54,8 +56,15 @@ int main(int argc, char* argv[]) {
         return kExitUsage;
     }
 
+#ifdef PANTA_ENABLE_BRIDGE_MODULE
+    // VTK 视口的图形 API/表面格式选择必须在 QGuiApplication 构造前完成
+    // （standards/vtk.md）；中性入口由 VTK 适配器实现。
+    panta::visualization::prepare_graphics_environment();
+#endif
+
     const QGuiApplication app(argc, argv);
-    // 图形后端（Metal/OpenGL 等）不在此锁定；视口集成时由任务 007 统一决策。
+    // 图形 API 已由 setGraphicsApi 在上方锁定；后端实现（Metal/OpenGL）
+    // 由各平台 Qt 运行时决定。
 
     QQmlApplicationEngine engine;
     QObject::connect(

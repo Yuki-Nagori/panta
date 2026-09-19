@@ -1,6 +1,6 @@
 # 007 — VTK 原生 Qt Quick 视口
 
-- 状态：ready
+- 状态：in-progress
 - 阶段：M0
 - 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（供给侧已就绪）
 - 优先级：P0
@@ -62,7 +62,11 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake。执
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| — | 尚未执行 | 无实现证据 |
+| 2026-09-19 | 锁定版本核对：`target/panta-deps/sdk/vtk/9.7.0/*/include/vtk-9.7/QQuickVTKItem.h` 与动态库清单 | QQuickVTKItem 存在且签名与 nightly 资料有差异：`vtkUserData = vtkSmartPointer<vtkObject>`、图形 API 入口为 `setGraphicsApi()`（运行期错误文本仍写 setupGraphicsApi，保留字）；`initializeVTK/destroyingVTK/dispatch_async` 契约与规范一致，按实际头文件实现 |
+| 2026-09-19 | `cargo build --locked`（macOS arm64，managed LLVM/Qt/VTK） | 通过：native/visualization 模块（Panta.Visualization 静态 QML 模块）编译链接，app 链接 VTK dylib 链（rpath 指向 031 staging） |
+| 2026-09-19 | 窗口化 `./target/debug/panta-launcher`（macOS arm64，8 秒采样） | QML 加载无错误；VTK OpenGL 初始化输出 2 条 "Failed to initialize OpenGL functions" 告警——渲染错误可见、不静默；**渲染结果待维护者视觉确认** |
+| 2026-09-19 | offscreen `panta-launcher -- -platform offscreen`（软件 scenegraph） | VTK 显式报不支持并 abort（API 1 = software）——无头/软件后端不受支持且错误不静默，真实视口冒烟以窗口化运行为准（vtk.md） |
+| 2026-09-19 | `cargo test --locked`（macOS arm64） | 全量通过（含新增 `Qml.ViewportModuleLoads`：Panta.Visualization 注册与 CaeViewport 可创建） |
 
 ## 风险与回退
 

@@ -98,7 +98,10 @@ endif()
 add_subdirectory(foundation)
 # QM 编译与资源入口（任务 034）：依赖 Qt 供给的 lrelease 与 Cargo 生成的 TS。
 add_subdirectory(i18n)
+# VTK 原生视口核心（任务 007）：bridge 经 Panta.Bridge 注册 CaeViewport；
+# 诊断构建（AppNoBridge）不带 VTK。
 if(PANTA_ENABLE_BRIDGE_MODULE)
+  add_subdirectory(visualization)
   add_subdirectory(bridge)
 endif()
 # qml/ 位于仓库根（repository-layout）；二进制目录固定在 native 构建树内。
