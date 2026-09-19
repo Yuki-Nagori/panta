@@ -1,11 +1,11 @@
 # 007 — VTK 原生 Qt Quick 视口
 
-- 状态：planned
+- 状态：ready
 - 阶段：M0
-- 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)
+- 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（供给侧已就绪）
 - 优先级：P0
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-19
 
 ## 目标与背景
 
@@ -71,6 +71,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake。执
 ## 决策与工作记录
 
 - 2026-09-16：开始核对主线视口 API，确认候选为 VTK 9.7.0 `GUISupportQtQuick` 的 `QQuickVTKItem`；用户决定 native 第三方库预编译优先，因此暂停实现，等待 031 提供匹配 SDK。正式模块化注册留给 026。
+- 2026-09-19：031 供给侧就绪（Release `sdk-vtk-9.7.0` 三平台 manifest 全部登记并经 macOS 生产消费烟测），解除"等待 031 SDK"的暂停，状态转 ready。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要
