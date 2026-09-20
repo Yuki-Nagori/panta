@@ -3,6 +3,7 @@
 /// Qt Quick 只负责 QQuickItem 宿主的几何和可见性；VTK 的 render window
 /// 直接绘制到平台 surface，避免把 OpenGL/WebGPU 资源混入 scenegraph。
 #include "vtk_viewport.hpp"
+
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
 #include <QMetaObject>

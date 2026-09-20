@@ -24,7 +24,13 @@ Python docstring 是对象定义中的首个字符串语句；PEP 257 区分摘�
 
 公共头文件使用简洁 Doxygen 风格；实现文件用 `//` 说明局部原因。声明处维护完整契约，定义处只补实现细节，避免两份契约漂移。
 
-`#include` 列表连续排列，不添加分组空行或解释性注释；保留必要的条件编译。工具例外在对应配置中说明原因和范围，不用 include 行尾注释承载全局规则。
+`#include` 列表由 `.clang-format` 与 `.clang-tidy` 的包含规则统一生成与维护（任务 010）：
+- 排序采用 Regroup 分类块——主头/契约头（优先级 0）独立成块置顶，其余（优先级 1）
+  单块字母序；不手工维护块内顺序，也不添加规则外的分组空行。
+- 提供"编译前提副作用"的第三方契约头（如 netgen 的 mystdlib.h 提供
+  `using namespace std`）必须登记进 `.clang-tidy` 的
+  `misc-include-cleaner.IgnoreHeaders`，禁止用 NOLINT 或 clang-format off
+  在单个文件里长期规避。
 
 ```cpp
 /// 将候选网格发布到当前工程。

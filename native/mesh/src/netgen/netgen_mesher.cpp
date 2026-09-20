@@ -3,10 +3,12 @@
 /// 与区域映射经 libnglib 同源发布的 netgen C++ 头读取（Ng_Mesh* 即
 /// netgen::Mesh*）。netgen 内部索引 1 起，转换为 IR 时统一压成 0 起。
 ///
-/// mystdlib.h 必须最先包含：netgen 头（ngarray/table/hashtabl/optmem）
-/// 依赖其 `using namespace std` 提供 endl/mutex 等裸名（上游契约）。
-/// 该污染只存在于本适配器 TU；自有代码保持限定名。
-// NOLINTNEXTLINE(misc-include-cleaner)
+/// mystdlib.h 提供的 `using namespace std` 是 netgen 遗留头
+/// （ngarray/table/hashtabl/optmem）编译的硬前提（上游契约，clang-format
+/// 的包含分类与 include-cleaner 豁免规则已按此配置）。该污染只存在于
+/// 本适配器 TU；自有代码保持限定名。
+#include <mystdlib.h>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -16,7 +18,6 @@
 #include <meshing/meshclass.hpp>
 #include <meshing/meshtype.hpp>
 #include <mutex>
-#include <mystdlib.h>
 #include <panta/mesh/mesh_ir.hpp>
 #include <panta/mesh/netgen_mesher.hpp>
 #include <string>

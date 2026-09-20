@@ -10,7 +10,10 @@ ExcludeHeaderFilterRegex: '(^|/)target/'
 FormatStyle: file
 
 CheckOptions:
-  # QtGlobal 转发 qglobal.h/qtypes.h/qminmax.h/qnumeric.h，QStringLiteral 的声明也可能经 QtCore 聚合头可见；
-  # Qt 基础头是框架约定，不应为满足 include-cleaner 改成标准库替代品。
-  # QTRY_* 依赖 qtest.h 的宏内部声明，include-cleaner 同样不追踪宏内部依赖。
-  misc-include-cleaner.IgnoreHeaders: '(^|/)(QtGlobal|qglobal\.h|qtypes\.h|qminmax\.h|qnumeric\.h|qstringliteral\.h|QtTest/qtest\.h|QtTest.framework/Headers/qtest\.h)$'
+  # IgnoreHeaders 为后缀匹配语义（每条正则匹配头文件路径的后缀，`;` 分隔），
+  # 直接列文件名即可。include-cleaner 不追踪宏内部依赖，也不理解"聚合头/
+  # 契约头"的框架与上游约定，下列头按来源分类豁免删除与缺失插入：
+  # - Qt 框架头：QtGlobal 转发 qglobal 系聚合头；QTRY_* 依赖 qtest.h 宏内部。
+  # - netgen 契约头：mystdlib.h 提供 `using namespace std`（ngarray/table 等
+  #   遗留头的硬前提），其作用不可被追踪，禁止清理器删除或告警。
+  misc-include-cleaner.IgnoreHeaders: 'QtGlobal;qglobal\.h;qtypes\.h;qminmax\.h;qnumeric\.h;qstringliteral\.h;qtest\.h;mystdlib\.h'

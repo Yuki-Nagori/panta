@@ -1,4 +1,5 @@
 #include "shell_view_model.hpp"
+
 #include <QObject>
 #include <QString>
 #include <QtCore/qtmetamacros.h>
