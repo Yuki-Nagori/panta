@@ -244,13 +244,6 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
-      # 大型新 exe 构建加速的常规做法（任务 007 轮 4 已证 Defender 不是
-      # 测试挂起根因，豁免保留但不再作为修复）；仅影响本 runner。
-      - if: runner.os == 'Windows'
-        name: Disable Defender real-time scanning for fresh build outputs
-        shell: powershell
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
-
       - name: Check workspace and all aggregated targets
         run: cargo check --locked --workspace --all-targets
 
