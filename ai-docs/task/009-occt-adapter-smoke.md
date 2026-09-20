@@ -1,6 +1,6 @@
 # 009 — OCCT 依赖与 STEP 适配冒烟
 
-- 状态：in-progress
+- 状态：done
 - 阶段：CAE 接入基础
 - 依赖：[003](003-cmake-native-skeleton.md)（已完成）、[008](008-tasks-errors-logging.md)（已完成）
 - 优先级：P1
@@ -51,12 +51,12 @@ native/geometry/（include/panta/geometry/step_import.hpp 公共契约 + src/occ
 
 ## 验收标准
 
-- [ ] 样例读入有非空有效结果且单位/摘要可核验，非法文件不导致进程异常退出。
-- [ ] 名称/颜色/装配支持或不支持有记录；公共头没有泄露 OCCT 类型。
-- [ ] 重复导入和失败清理通过，OCCT 运行库可正确定位。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [x] 样例读入有非空有效结果且单位/摘要可核验，非法文件不导致进程异常退出。（mm/m 夹具与缺失/垃圾/空文件用例，macOS 本机 + 三平台 CI）
+- [x] 名称/颜色/装配支持或不支持有记录；公共头没有泄露 OCCT 类型。（决策记录：基础路径不保留 XDE 元数据；includes/公共头检查通过）
+- [x] 重复导入和失败清理通过，OCCT 运行库可正确定位。（重复导入/失败恢复用例；macOS/Linux 构建 rpath、Windows 嵌套 bin PATH 经三平台 CI 测试实证）
+- [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
-- [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。（无废弃项、无兼容例外）
 
 ## 验证计划与结果
 
@@ -71,7 +71,7 @@ native/geometry/（include/panta/geometry/step_import.hpp 公共契约 + src/occ
 | 2026-09-20 | `ctest --test-dir target/native/debug`（全量） | 36/36 通过：既有 29 项不受影响，新增 7 项 StepImport |
 | 2026-09-20 | `cargo test --locked --workspace` | 通过：18 个测试目标全 ok，含 native_and_qml_suite 36 项聚合与 panta-build 的 `windows_sdk_dll_dirs` 单测（顶层 bin + 嵌套 win64/vc14/bin 布局） |
 | 2026-09-20 | `cargo lint` + `cargo format --check`（macOS arm64） | 通过：clippy/machete/cmake-format/cmake-lint/qmllint/clang-tidy/includes/cppcheck 零告警。过程中修复：clang-tidy 要求枚举显式 `std::uint8_t` 基础、测试辅助函数相邻同型参数收敛为 `BoxExpectation` 结构体；cppcheck 对编译数据库内带引号 `-D` 宏转义误读为语法错误——改为注入裸路径 + 测试代码内字符串化宏，连带消除 `import_step_summary` 的跨 TU unusedFunction 误报 |
-| 待 CI | push 后三平台 CI（018 矩阵） | Linux/Windows 首次 configure 将真实下载 OCCT 制品并编译/测试本模块；Windows 侧同时复验 `native_test_env` 嵌套 bin PATH 修复。此前 009 验收项不勾选、任务保持 in-progress |
+| 2026-09-20 | 三平台 CI run [35514143187](https://github.com/Yuki-Nagori/panta/actions/runs/35514143187)（dcb103f，15/15 job 全绿，约 4 分钟） | 三平台首次 configure 真实下载 OCCT 8.0.1 制品并编译/链接本模块：Linux `cargo check and build` 2m34s、Windows 4m07s、macOS 2m03s 全部通过；Linux `native C++ coverage and QML tests` 36/36（含 7 项 StepImport）；Windows `Test` 步 `cargo test --workspace` 全绿（native_and_qml_suite 36 项通过，实证嵌套 `win64/vc14/bin` DLL PATH 修复）；Linux cppcheck/includes/clang-tidy 对新 TU 首次分析通过 |
 
 ## 风险与回退
 
@@ -89,8 +89,8 @@ STEP 读取成功仍可能得到空形状、错误单位或丢失元数据；逐
 - 2026-09-20（公差策略）：`BRepBndLib::Add` 的 `Bnd_Box::Get` 含形状公差 gap（典型 `Precision::Confusion` ≈1e-7 mm）；摘要按含公差的保守包络报告并在公共头记录，测试断言容差 1e-6 mm。不通过调大公差掩盖坏模型。
 - 2026-09-20（Windows 运行库）：OCCT 8 Windows 制品 DLL 位于嵌套 `win64/vc14/bin/`；`panta-build::windows_sdk_dll_dirs` 改为递归收集 `bin` 目录（深度上限 4）并更新单测，与 007 的 Qt runtime PATH 机制合并生效。产品 app 的 DLL 分发策略仍归 031/007 后续。
 - 2026-09-20（夹具与模块边界）：mm/m 样例由临时生成器（`BRepPrimAPI_MakeBox` + `STEPControl_Writer`，`STEPControl_AsIs`，`write.step.unit=MM/M`）产出后入库，生成器不入仓库，来源/单位/预期记录于 `tests/fixtures/geometry/README.md`；`write.step.unit` 须在 controller 初始化（构造 writer）后设置，否则 SetCVal 失败。geometry 模块冒烟阶段不入安装导出集，消费业务任务接入时按 foundation 模式补装。
-- 待记录：三平台 CI 复验（Linux/Windows configure 下载 OCCT、编译、测试；Windows 嵌套 bin PATH 行为）；多根/装配 STEP 样例与 XDE 元数据路线不在本任务内。
+- 待记录：多根/装配 STEP 样例与 XDE 元数据路线不在本任务内，归完整导入业务任务。
 
 ## 完成摘要
 
-未完成。macOS arm64 已实现并通过全量本机验证（实现行为、验证证据、限制与取舍见上方记录）；三平台 CI 复验通过、验收项核实后，与索引一起标 done。
+已完成。native/geometry 提供自有契约的 STEP 导入冒烟：STEPControl 基础路径、毫米坐标、源单位识别（FileUnits）、保守包围盒与去重拓扑计数；OCCT 经 031 固定供给消费，进程级串行 + 异常转结构化状态；OCCT Windows 制品嵌套 bin DLL 目录收集修复（panta-build）。验证：macOS 本机全量（ctest 36/36、cargo test workspace、七项 lint/format）+ 三平台 CI run 35514143187 全绿。限制：装配/名称/颜色元数据不保留、无中途取消、混合/未识别单位记 kUnknown——均已在决策记录与公共头注明。后续：010（Netgen，依赖已满足转 ready）；完整 STEP 导入业务（工程存储/UI/XDE 元数据）另建任务。

@@ -1,11 +1,11 @@
 # 010 — Netgen 接入与最小 Mesh IR
 
-- 状态：planned
+- 状态：ready
 - 阶段：CAE 接入基础
-- 依赖：[009](009-occt-adapter-smoke.md)
+- 依赖：[009](009-occt-adapter-smoke.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-09-20
 
 ## 目标与背景
 
@@ -70,6 +70,7 @@ native/mesh/core/、native/mesh/netgen/、小型网格测试与依赖配置。�
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施。
+- 2026-09-20：依赖 009 已完成（OCCT STEP 适配冒烟三平台 CI 全绿），依赖条件满足，状态转 ready。Netgen 制品与 OCCT 成对发布（Release `sdk-occt-netgen-8.0.1-6.2.2604`，`find_package(Netgen)` 大写 N 约束见 031 manifest 注释）；运行期依赖同平台 OCCT 资产，加载路径按 009 的消费模式处理。
 - 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
 
 ## 完成摘要
