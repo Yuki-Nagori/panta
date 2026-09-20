@@ -92,6 +92,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | macOS；`cargo build --locked --no-default-features --package panta-launcher` + `ctest --test-dir target/native/debug --output-on-failure` | 通过：无 Bridge 消融 9/9；修复 app 进程级 crash FFI 依赖未公共链接、视口测试在 Bridge 关闭时仍无条件链接的问题；随后恢复默认 Bridge 构建并复验 29/29 |
 | 2026-09-20 | macOS；`cargo test --locked --workspace` | 通过：Rust 单元/集成、CXX/Qt native suite 和 QML lint 全部通过；crash handler 测试按预期产生 SIGSEGV/UNKNOWN 诊断日志并通过 |
 | 2026-09-20 | CI run 35490867113 取证（ubuntu 全部 native job 失败于 native configure） | `FindWAYLAND.cmake:56`（038 捆绑进 VTK SDK）经 pkg-config 报缺 `wayland-protocols`，宿主前置只装了 `libwayland-dev`；`linux-gl-prereqs` 已补装该包。宿主 CI 环境无法本地复跑，待 push 后 CI 复验 |
+| 2026-09-20 | 同 run Windows 侧取证：`cargo check` 阶段 bridge 三测试 POST_BUILD discovery 链接后立即启动测试可执行文件，退出码 0xc0000135（构建期子进程 PATH 无托管 Qt runtime）；本地另证 PATH 上 ctest 4.3.3 无法消费 PRE_TEST 清单（`discover_tests` 为 CMake 4.4 内建命令），证实 a7e57ed 弃用 PRE_TEST 的动机 | 修复：launcher 构建脚本对 CMake build 子进程注入 `native_test_env`（Windows 前置托管 Qt runtime PATH，其余平台零变化），POST_BUILD 发现在统一入口下恢复可用且测试清单保留任意 ctest 可消费的纯 `add_test` 形式；bridge CMake 补注释固定约束。本地 macOS `cmake --build` + 托管 ctest 4.4.3 与 PATH ctest 4.3.3 均 29/29 通过；Windows 待 CI 复验 |
 
 ## 风险与回退
 

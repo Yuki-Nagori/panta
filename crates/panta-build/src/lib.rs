@@ -567,7 +567,9 @@ pub fn windows_sdk_env(
         .ok_or_else(|| "未找到 MSVC Build Tools / Windows SDK；请安装平台 SDK 后重试".to_owned())
 }
 
-/// 为 native 测试补齐托管 Qt DLL 的运行时搜索路径。
+/// 为 native 测试子进程补齐托管 Qt DLL 的运行时搜索路径；消费方包括
+/// ctest/测试运行器，以及构建脚本自身——Windows 下 POST_BUILD gtest
+/// discovery 在链接后立即启动测试可执行文件，构建子进程必须能解析这些 DLL。
 pub fn native_test_env(
     target_root: &Path,
     target: &str,
