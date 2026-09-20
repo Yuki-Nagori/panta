@@ -221,7 +221,7 @@ fn lint(tool: Option<&str>, check: bool) -> Result<(), Box<dyn Error>> {
             )?;
             lint(Some("clippy"), true)
         }
-        Some("machete") => cargo("machete", []),
+        Some("machete") => cargo_scanner("machete", []),
         Some("cmake") => run_cmake_lint(),
         Some("qmllint") => {
             build_launcher()?;
@@ -431,6 +431,23 @@ fn cargo(
     subcommand: &str,
     args: impl IntoIterator<Item = &'static str>,
 ) -> Result<(), Box<dyn Error>> {
+    let (description, command) = cargo_command(subcommand, args)?;
+    run(&description, command)
+}
+
+/// 扫描类工具的静默变体：通过时不转发输出，失败时原样附上全部诊断。
+fn cargo_scanner(
+    subcommand: &str,
+    args: impl IntoIterator<Item = &'static str>,
+) -> Result<(), Box<dyn Error>> {
+    let (description, command) = cargo_command(subcommand, args)?;
+    run_scanner(&description, command)
+}
+
+fn cargo_command(
+    subcommand: &str,
+    args: impl IntoIterator<Item = &'static str>,
+) -> Result<(String, Command), Box<dyn Error>> {
     let target_dir = Path::new(env!("PANTA_TEST_TARGET_DIR"));
     let mut command = if matches!(subcommand, "deny" | "machete") {
         let (name, version) = if subcommand == "deny" {
@@ -443,7 +460,8 @@ fn cargo(
         Command::new("cargo")
     };
     if !matches!(subcommand, "deny" | "machete") {
-        command.arg(subcommand);
+        // -q 去掉 Compiling/Finished 状态行；构建脚本与诊断仍透传。
+        command.arg("-q").arg(subcommand);
     }
     if env!("PANTA_TEST_BUILD_TYPE") == "Release"
         && matches!(subcommand, "build" | "test" | "clippy")
@@ -465,7 +483,23 @@ fn cargo(
         command.arg("--target-dir").arg(target_dir);
     }
     command.current_dir(repository_root()?);
-    run(&format!("cargo {subcommand}"), command)
+    Ok((format!("cargo {subcommand}"), command))
+}
+
+/// 扫描类工具的静默运行：通过时零输出，失败时原样转发全部捕获输出。
+fn run_scanner(description: &str, mut command: Command) -> Result<(), Box<dyn Error>> {
+    let output = command.output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!(
+            "{description} 失败（退出码 {:?}）\n{stdout}{stderr}",
+            output.status.code()
+        )
+        .into())
+    }
 }
 
 fn ensure_cargo_tool(name: &str, version: &str) -> Result<PathBuf, Box<dyn Error>> {
@@ -597,7 +631,7 @@ fn run_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>
             command.arg("--fix");
         }
         command.arg(&file);
-        if let Err(error) = run(&format!("clang-tidy {}", file.display()), command) {
+        if let Err(error) = run_scanner(&format!("clang-tidy {}", file.display()), command) {
             failures.push(error.to_string());
         }
     }
@@ -652,7 +686,7 @@ fn run_cppcheck() -> Result<(), Box<dyn Error>> {
             .join("tests/cppcheck-suppressions.xml")
             .display()
     ));
-    run("cppcheck", command)
+    run_scanner("cppcheck", command)
 }
 
 fn run_qmllint() -> Result<(), Box<dyn Error>> {
@@ -670,7 +704,9 @@ fn run_qmllint() -> Result<(), Box<dyn Error>> {
         "--target",
         "all_qmllint",
     ]);
-    run("qmllint", command)
+    // 通过时静默：Qt 生成的 no-op qmllint 目标会回显 "Nothing to do"，
+    // 失败时原样转发全部输出（含 qmllint 诊断）。
+    run_scanner("qmllint", command)
 }
 
 fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
@@ -741,7 +777,7 @@ fn run_cmake_tool(tool: &str, arguments: &[&str]) -> Result<(), Box<dyn Error>> 
     let root = repository_root()?;
     let mut command = panta_build::python::command(target_root(), root, tool)?;
     command.args(arguments).args(cmake_files(root)?);
-    run(tool, command)
+    run_scanner(tool, command)
 }
 
 fn target_root() -> &'static Path {
