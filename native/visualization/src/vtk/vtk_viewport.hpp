@@ -31,6 +31,7 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
 
   private:
     void ensure_render_window();
+    void schedule_refresh();
     void sync_native_surface();
     void destroy_render_window();
 

@@ -66,6 +66,8 @@ struct VtkViewport::Impl {
     QMetaObject::Connection window_visibility_connection;
     QMetaObject::Connection window_visible_connection;
     QMetaObject::Connection scene_graph_initialized_connection;
+    bool refresh_scheduled = false;
+    bool creation_warning_emitted = false;
 };
 
 VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
@@ -77,28 +79,15 @@ VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::ma
         if (new_window == nullptr) {
             return;
         }
-        const auto refresh_frame = [this]() {
-            if (window() == nullptr || !window()->isVisible()) {
-                return;
-            }
-            // QWindow::visibleChanged is emitted while Qt is still completing
-            // the native window transition. Defer the first VTK attachment
-            // until that transition has returned to the event loop.
-            QTimer::singleShot(0, this, [this]() {
-                if (window() != nullptr && window()->isVisible()) {
-                    ensure_render_window();
-                    sync_native_surface();
-                }
-            });
-        };
         impl_->window_visibility_connection =
             QObject::connect(new_window, &QWindow::visibilityChanged, this,
-                             [refresh_frame](QWindow::Visibility) { refresh_frame(); });
+                             [this](QWindow::Visibility) { schedule_refresh(); });
         impl_->window_visible_connection = QObject::connect(
-            new_window, &QWindow::visibleChanged, this, [refresh_frame](bool) { refresh_frame(); });
+            new_window, &QWindow::visibleChanged, this, [this](bool) { schedule_refresh(); });
         impl_->scene_graph_initialized_connection =
-            QObject::connect(new_window, &QQuickWindow::sceneGraphInitialized, this, refresh_frame);
-        QTimer::singleShot(0, this, refresh_frame);
+            QObject::connect(new_window, &QQuickWindow::sceneGraphInitialized, this,
+                             [this]() { schedule_refresh(); });
+        schedule_refresh();
     });
 }
 
@@ -112,7 +101,8 @@ void VtkViewport::apply_state(const RenderScene& state) {
     }
     impl_->pending = state;
     ensure_render_window();
-    if (impl_->renderer == nullptr || impl_->render_window == nullptr) {
+    if (impl_->renderer == nullptr || impl_->render_window == nullptr ||
+        impl_->primitive_actor == nullptr) {
         return;
     }
 
@@ -132,14 +122,21 @@ void VtkViewport::geometryChange(const QRectF& new_geometry, const QRectF& old_g
 void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
     QQuickItem::itemChange(change, value);
     if (change == ItemSceneChange) {
-        ensure_render_window();
-        sync_native_surface();
+        // value.window is the documented payload of this change; when window()
+        // becomes the new window is not part of the contract, so defer to the
+        // event loop and query the settled window there.
+        schedule_refresh();
     } else if (change == ItemVisibleHasChanged) {
         ensure_render_window();
         sync_native_surface();
         if (impl_->native_surface.view != nullptr) {
             set_native_surface_visible(impl_->native_surface, isVisible());
         }
+    } else if (change == ItemDevicePixelRatioHasChanged) {
+        // Moving the window between displays (or system scale changes)
+        // invalidates the pixel size derived from the previous DPR.
+        ensure_render_window();
+        sync_native_surface();
     }
 }
 
@@ -159,14 +156,23 @@ void VtkViewport::ensure_render_window() {
     if (width() <= 0 || height() <= 0) {
         return;
     }
+    // Creation is retried on later geometry/visibility events; warn once per
+    // item so unsupported platforms do not repeat the same diagnostic on
+    // every retry.
+    const auto warn_once = [this](const char* message) {
+        if (!impl_->creation_warning_emitted) {
+            impl_->creation_warning_emitted = true;
+            qWarning("%s", message);
+        }
+    };
     if (QGuiApplication::platformName() == QStringLiteral("offscreen")) {
-        qWarning("VtkViewport: offscreen 平台没有原生 surface，跳过 WebGPU 视口初始化");
+        warn_once("VtkViewport: offscreen 平台没有原生 surface，跳过 WebGPU 视口初始化");
         return;
     }
 
     impl_->hardware_window = create_native_hardware_window(window());
-    if (impl_->hardware_window == nullptr || impl_->hardware_window.get() == nullptr) {
-        qWarning("VtkViewport: 当前 Qt 平台没有可用的 VTK hardware window");
+    if (impl_->hardware_window == nullptr) {
+        warn_once("VtkViewport: 当前 Qt 平台没有可用的 VTK hardware window");
         return;
     }
 
@@ -179,7 +185,8 @@ void VtkViewport::ensure_render_window() {
 
     if (!attach_native_surface(window(), this, impl_->hardware_window.get(),
                                impl_->native_surface)) {
-        qWarning("VtkViewport: 无法把 VTK 原生 surface 接入 Qt Quick 窗口");
+        warn_once("VtkViewport: 无法把 VTK 原生 surface 接入 Qt Quick 窗口");
+        impl_->native_surface = {};
         impl_->hardware_window->Destroy();
         impl_->hardware_window.reset();
         return;
@@ -218,6 +225,24 @@ void VtkViewport::ensure_render_window() {
 
     sync_native_surface();
     Q_EMIT sceneInitialized();
+}
+
+void VtkViewport::schedule_refresh() {
+    // QWindow::visibleChanged is emitted while Qt is still completing the
+    // native window transition; window-level signals may also fire several
+    // times per transition. Queue one deferred attempt so both the transition
+    // has returned to the event loop and duplicate signals collapse.
+    if (impl_->refresh_scheduled) {
+        return;
+    }
+    impl_->refresh_scheduled = true;
+    QTimer::singleShot(0, this, [this]() {
+        impl_->refresh_scheduled = false;
+        if (window() != nullptr && window()->isVisible()) {
+            ensure_render_window();
+            sync_native_surface();
+        }
+    });
 }
 
 void VtkViewport::sync_native_surface() {
