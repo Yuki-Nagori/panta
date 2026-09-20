@@ -436,10 +436,13 @@ pub fn install_lock(target_root: &Path, name: &str) -> Result<fs::File, String> 
         .write(true)
         .open(locks.join(format!("{name}.lock")))
         .map_err(|e| e.to_string())?;
-    eprintln!("[panta-tools] {name}：等待安装锁");
-    file.lock_exclusive()
-        .map_err(|e| format!("获取 {name} 安装锁失败：{e}"))?;
-    eprintln!("[panta-tools] {name}：已获得安装锁");
+    // 未竞争时不输出；只有真的发生等待才记录，避免例行日志刷屏。
+    if file.try_lock_exclusive().is_err() {
+        eprintln!("[panta-tools] {name}：等待安装锁");
+        file.lock_exclusive()
+            .map_err(|e| format!("获取 {name} 安装锁失败：{e}"))?;
+        eprintln!("[panta-tools] {name}：已获得安装锁");
+    }
     Ok(file)
 }
 
@@ -458,7 +461,7 @@ pub fn install_directory(
         .as_deref()
         == Some(identity)
     {
-        eprintln!("[panta-tools] {name}：命中已完成缓存");
+        // 命中缓存是例行路径，不打日志；安装与自愈才输出诊断。
         return Ok(destination);
     }
     fs::create_dir_all(&parent).map_err(|e| e.to_string())?;

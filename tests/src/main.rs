@@ -253,7 +253,13 @@ fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Error>> {
     }
     check_cpp_format(check)?;
     run_cmake_format(check)?;
-    run_qml_format(check)
+    run_qml_format(check)?;
+    if check {
+        println!("format 检查通过");
+    } else {
+        println!("format 完成");
+    }
+    Ok(())
 }
 
 fn verify_toolchain() -> Result<(), Box<dyn Error>> {
@@ -722,7 +728,8 @@ fn run_cmake_format(check: bool) -> Result<(), Box<dyn Error>> {
     if check {
         run_cmake_tool("cmake-format", &["--check"])
     } else {
-        run_cmake_tool("cmake-format", &[])
+        // cmake-format 缺省把格式化结果打印到 stdout，必须显式 --in-place。
+        run_cmake_tool("cmake-format", &["--in-place"])
     }
 }
 
