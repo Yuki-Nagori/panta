@@ -92,6 +92,7 @@ Cargo runner 可能与 build.rs 使用不同 target-dir 或 profile；通过 Car
 - 2026-09-20（维护者要求）：lint/format 拆分修复与验证两种行为——`cargo format` 就地修复、`cargo format --check` 只验证；`cargo lint [tool]` 缺省为修复模式（clippy 先 `--fix` 再回落检查、clang-tidy/includes 追加 `--fix`，无修复能力的工具等价报告），`cargo lint [tool] --check` 只验证；CI 与 pre-commit 全部切到 `--check`，`cargo quality` 保持只验证。
 - 2026-09-20（维护者要求）：收敛例行输出——panta-build 供给层在未竞争锁与命中缓存时不再打印（安装/自愈仍输出）；cargo 别名加 `-q` 去掉 runner 的 cargo 状态行；`cargo format` 结束输出单行完成摘要（检查模式为 `format 检查通过`）。
 - 2026-09-20：lint 扫描工具（machete/cmake-lint/qmllint/clang-tidy/includes/cppcheck）通过时零输出，失败时原样转发全部诊断；cargo 子命令统一加 `-q` 去掉 Compiling/Finished 状态行。
+- 2026-09-20（维护者要求）：pre-commit 只保留 `cargo format --check`，移除全量 lint——lint 需要全量 native 构建支撑编译数据库，hook 里每次提交阻塞数分钟；lint 全套由 CI 承担。
 - 待办（lint 编译成本）：clang-tidy/includes/cppcheck/qmllint 经 `build_launcher()` 触发全量 native 构建，因为它们消费 `quality/*.json` 编译数据库（configure+autogen 产物）。后续在 build.rs 引入 prepare-only 模式（configure + 生成质量数据库、跳过 `cmake --build`）可把这些 lint 的准备成本降到配置级；需先验证 autogen 的 moc 翻译单元在 configure-only 数据库中的完整性，避免 cppcheck/clang-tidy 扫到缺失的生成文件。clippy 因 `--workspace` 必须执行 launcher build script，受 Rust 构建图约束维持现状。
 
 ## 本轮复审与待验收

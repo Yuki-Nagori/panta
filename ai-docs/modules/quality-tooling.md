@@ -91,7 +91,7 @@ Rust 函数覆盖 100% 是函数维度目标，函数进入一次不代表其内
 
 ## 提交门禁（git hooks）
 
-`.githooks/pre-commit` 执行与 CI 相同的 `cargo format --check` 与全量 `cargo lint --check`（clippy、machete、cmake-lint、qmllint、clang-tidy、include-cleaner、cppcheck），门禁不改动文件；依赖审计、覆盖率与测试套件仍由 CI 承担。lint 工具经 build.rs 触发 native 配置，冷机首次提交会先供给 LLVM/Qt。新机器需一次性启用：
+`.githooks/pre-commit` 只执行 `cargo format --check`（秒级、不触发 native 构建、不改动文件）；lint 全套、依赖审计、覆盖率与测试套件由 CI 承担——lint 工具经 build.rs 触发全量 native 构建支撑编译数据库，放进 hook 会让每次提交阻塞数分钟。新机器需一次性启用：
 
 ```sh
 git config core.hooksPath .githooks

@@ -19,11 +19,25 @@ Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
 #endif
 
+namespace {
+// Windows 挂起定位探针：TU 静态初始化完成后输出。
+// TODO(task 007): Windows 挂起根因确认后随全部阶段标记一起移除。
+struct StaticInitProbe {
+    StaticInitProbe() noexcept {
+        std::fputs("shell-test: TU static init done\n", stderr);
+        std::fflush(stderr);
+    }
+};
+const StaticInitProbe static_init_probe;
+} // namespace
+
 class ShellModuleLoadTest final : public QObject {
     Q_OBJECT
 
   private slots:
     void loads_shell_module() {
+        std::fputs("shell-test: creating engine\n", stderr);
+        std::fflush(stderr);
         QQmlApplicationEngine engine;
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
         engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
@@ -31,6 +45,9 @@ class ShellModuleLoadTest final : public QObject {
         engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("AppNoBridge"));
 #endif
 
+        std::fprintf(stderr, "shell-test: loaded, roots=%lld\n",
+                     static_cast<long long>(engine.rootObjects().size()));
+        std::fflush(stderr);
         QVERIFY2(!engine.rootObjects().isEmpty(), "Panta.Shell entry failed to load");
 
         auto* root = engine.rootObjects().constFirst();
@@ -59,7 +76,10 @@ int main(int argc, char** argv) {
     std::fputs("shell-test: reached main\n", stderr);
     std::fflush(stderr);
     QGuiApplication app(argc, argv);
-    std::fputs("shell-test: QGuiApplication ready\n", stderr);
+    const auto platform = QGuiApplication::platformName().toLatin1();
+    const auto qpa = qEnvironmentVariable("QT_QPA_PLATFORM").toUtf8();
+    std::fprintf(stderr, "shell-test: QGuiApplication ready platform=%s qpa=%s\n",
+                 platform.constData(), qpa.constData());
     std::fflush(stderr);
     ShellModuleLoadTest test;
     const int status = QTest::qExec(&test, argc, argv);
