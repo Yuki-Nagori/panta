@@ -25,7 +25,8 @@ VTK SDK，提供 `RenderingWebGPU` 与平台 hardware window（Linux 为 Wayland
   layer/view，Windows 使用 `vtkWin32HardwareWindow`；Dawn source tag 为
   `v20260421.125655`（commit `b073946efbf0de690e2aeec16ef0d5c68362c951`，
   VTK 9.7.0 上游 WebGPU 文档指定），并随 VTK SDK 一起提供其头文件、CMake
-  package 和 native library。
+  package 和 native library；Linux 额外随 VTK CMake package 提供上游遗漏的
+  `FindWAYLAND.cmake` 与 `FindXKBCOMMON.cmake`，保证安装树可独立被消费。
 - 每个归档内的 `panta-sdk.json` 记录 triple、源码 pin、构建开关与许可证
   入口（机器可读 provenance）。
 

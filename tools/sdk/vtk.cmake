@@ -15,6 +15,8 @@
 set(PANTA_VTK_VERSION 9.7.0)
 set(PANTA_VTK_COMMIT 23f0a095621e91bbdbeace8451e22b950c8e5f46)
 set(PANTA_VTK_INSTALL_DIR "${PANTA_SDK_OUT_ROOT}/vtk/${PANTA_VTK_VERSION}/${PANTA_SDK_TRIPLE}")
+set(PANTA_VTK_CMAKE_DIR_RELATIVE "lib/cmake/vtk-9.7")
+set(PANTA_VTK_CMAKE_DIR "${PANTA_VTK_INSTALL_DIR}/${PANTA_VTK_CMAKE_DIR_RELATIVE}")
 
 # VTK 9.7 的 RenderingWebGPU 在桌面平台依赖 Dawn；只打开
 # VTK_ENABLE_WEBGPU 而不提供 Dawn_DIR 会在 configure 阶段失败。Dawn 按 VTK
@@ -141,6 +143,22 @@ ExternalProject_Add_Step(
   DEPENDEES install
   USES_TERMINAL)
 
+if(PANTA_SDK_TRIPLE STREQUAL "linux-x86_64")
+  # VTK 的 Wayland 依赖在构建时由源码树里的 Find 模块解析，但上游的
+  # vtkInstallCMakePackage.cmake 没有把这两个模块安装进导出包。复制到 VTK
+  # 自己的 CMake module path，保证 Linux 消费者不需要 VTK 源码树或系统包提供
+  # 同名 Find module。
+  ExternalProject_Add_Step(
+    vtk_sdk wayland_cmake_modules
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/CMake/FindWAYLAND.cmake
+            ${PANTA_VTK_CMAKE_DIR}/FindWAYLAND.cmake
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/CMake/FindXKBCOMMON.cmake
+            ${PANTA_VTK_CMAKE_DIR}/FindXKBCOMMON.cmake
+    DEPENDEES install
+    DEPENDERS dawn_runtime
+    USES_TERMINAL)
+endif()
+
 # panta-sdk.json：031 供给自检与 012 缓存键的机器可读依据。
 file(
   WRITE "${CMAKE_BINARY_DIR}/vtk-panta-sdk.json.in"
@@ -171,7 +189,7 @@ file(
     "license_path": "share/licenses/Dawn/LICENSE"
   },
   "modules_highlights": ["RenderingWebGPU", "RenderingUI", "RenderingCore"],
-  "cmake_package": ["lib/cmake/vtk-@PANTA_VTK_VERSION@", "vtk-config.cmake"],
+  "cmake_package": ["@PANTA_VTK_CMAKE_DIR_RELATIVE@", "vtk-config.cmake"],
   "generator": "@CMAKE_GENERATOR@",
   "license_files": ["share/licenses/VTK/Copyright.txt", "share/licenses/Dawn/LICENSE"],
   "license": "share/licenses/VTK/Copyright.txt (BSD-3)"
