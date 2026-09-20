@@ -96,6 +96,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | Review 修复批 1（健壮性）；`cmake --build target/native/debug -j8` + `ctest --output-on-failure` | 通过 29/29：`itemChange` 补 `ItemDevicePixelRatioHasChanged` 分支（跨显示器/缩放变化重算像素尺寸，033 前置）；`ensure_render_window` 告警改每实例一次（offscreen/失败重试不再刷屏）；`ItemSceneChange` 改用文档化载荷 `value.window` 的语义并延后到事件循环（与窗口信号共用合并后的 `schedule_refresh`，重复信号折叠为一次尝试）；`apply_state` 守卫补齐 `primitive_actor`；attach 失败清理 `native_surface` 残留；冗余空指针条件去除 |
 | 2026-09-20 | Review 修复批 2（渲染提交策略）；`cmake --build target/native/debug -j8` + `ctest --output-on-failure` | 通过 29/29：`sync_native_surface` 缓存最近提交的像素尺寸，尺寸未变跳过 `SetSize`+`Render`（创建路径的双重渲染随之消除）；隐藏条目不再做渲染提交（`apply_state` 与 sync 同策略），重新显示时由可见分支强制补一帧；`CaeViewport` 宿主条目位置在构造时固定为原点，移除每次几何变化的重复 `setPosition` 与恒真的 backend 判空 |
 | 2026-09-20 | Review 修复批 3（边界与去重）；`cmake --build target/native/debug -j8` + `ctest --output-on-failure` + `cargo lint cppcheck`/`includes` | 通过 29/29，lint 通过：`panta_visualization` 的 VTK/Dawn 依赖改为 PRIVATE 链接——公共头只有 Qt 类型，不再向消费方泄漏第三方 include 路径（静态库符号经 LINK_ONLY 传播，shell/viewport 测试与 app 链接验证通过），`Qt6::Quick` 因公共头基类保持 PUBLIC；三平台重复的删除器函数收敛为 `vtk_native_surface.hpp` 的 `HardwareWindowDeleter` functor + `NativeHardwareWindow` 别名（消除函数指针删除器与空删除器隐患；首版头内联自由函数被 cppcheck unusedFunction 误报，改成员函数后通过）；Wayland 重映射对 `Render()` 的依赖补注释固定，列入真实环境验证项 |
+| 2026-09-20 | 修复系列全量门禁；macOS `cargo test --locked --workspace` | 通过：18 个测试目标全 ok，含 native CTest 29/29（shell/viewport 模块加载、QML 行为、bridge/foundation/ffi）；每个提交均通过 pre-commit 的 format/clippy/machete/cmake/qmllint/clang-tidy/includes/cppcheck 门禁。Linux（wayland-protocols）与 Windows（构建期 discovery PATH）行为待 push 后 CI 复验 |
 
 ## 风险与回退
 
@@ -110,7 +111,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 2026-09-19（路线切换）：放弃 Qt OpenGL/QQuickVTKItem 场景图集成，改为 VTK WebGPU render window + 平台 hardware window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCocoaHardwareView` 通过原生 Metal surface 与 Qt Quick 界面叠加，Linux 使用 Wayland，Windows 使用 Win32。
 - 2026-09-20：038 完成 `sdk-vtk-9.7.0-webgpu` 三平台 Release，031 已登记新资产；007 转入原生 surface/view 嵌入与事件协调实现。
 - 2026-09-20：native/visualization 删除旧 QQuickVTKItem 适配器，新增 WebGPU render window 与 macOS Cocoa、Windows Win32、Linux Wayland surface bridge；`App.qml` 恢复实际 CaeViewport 调用。macOS 无屏幕环境的启动验证发现并修复 offscreen surface 误用导致的 SIGSEGV，崩溃日志路径按任务 047 记录。
-- 待记录：目标平台真实窗口下的 resize、高 DPI、隐藏/恢复、输入协调和重开验证。
+- 待记录：目标平台真实窗口下的 resize、高 DPI、隐藏/恢复、输入协调和重开验证；Windows 桥接中 `hardware->SetSize()` 与 `SetWindowPos` 的宽高双写是否冗余（本机仅 macOS SDK，无法核对 `vtkWin32HardwareWindow` 头）。
 
 ## 完成摘要
 
