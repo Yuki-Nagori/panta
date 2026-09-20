@@ -574,9 +574,9 @@ pub fn windows_sdk_env(
 /// 运行器，以及构建脚本自身——Windows 下 POST_BUILD gtest discovery 在
 /// 链接后立即启动测试可执行文件，构建子进程必须能解析这些 DLL。
 ///
-/// Windows 追加两类目录：托管 Qt runtime（Qt6*.dll），以及 SDK 缓存里
-/// 共库构建产物的 bin（VTK Windows 制品为 vtk*-9.7.dll，CMake 链接的是
-/// 其导入库）。macOS/Linux 的共享库经构建 rpath 解析，无此需求。
+/// Windows 的 PATH 组成：托管 Qt runtime 与 SDK 共库产物 bin（VTK Windows
+/// 制品为 vtk*-9.7.dll，CMake 链接其导入库；macOS/Linux 经构建 rpath 解析
+/// 无此需求）前置到继承的 PATH 之前，整体替换后下发。
 pub fn native_test_env(
     target_root: &Path,
     target: &str,
@@ -586,40 +586,31 @@ pub fn native_test_env(
         return Ok(environment);
     }
 
-    let qt_bin = target_root
-        .join("panta-deps")
-        .join("qt")
-        .join("staging")
-        .join("bin");
+    let deps = target_root.join("panta-deps");
+    let qt_bin = deps.join("qt").join("staging").join("bin");
     if !qt_bin.is_dir() {
         return Err(format!("托管 Qt 运行库目录不存在：{}", qt_bin.display()));
     }
-    let current_path = environment
+    let inherited = environment
         .iter()
         .find(|(key, _)| env_key_eq(key, "PATH"))
         .map(|(_, value)| value.clone())
         .or_else(|| std::env::var_os("PATH"))
         .unwrap_or_default();
     let mut paths = vec![qt_bin];
-    paths.extend(windows_sdk_dll_dirs(target_root));
-    paths.extend(std::env::split_paths(&current_path));
+    paths.extend(windows_sdk_dll_dirs(&deps));
+    paths.extend(std::env::split_paths(&inherited));
     let path =
         std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
-    if let Some((_, value)) = environment
-        .iter_mut()
-        .find(|(key, _)| env_key_eq(key, "PATH"))
-    {
-        *value = path;
-    } else {
-        environment.push((std::ffi::OsString::from("PATH"), path));
-    }
+    environment.retain(|(key, _)| !env_key_eq(key, "PATH"));
+    environment.push((std::ffi::OsString::from("PATH"), path));
     Ok(environment)
 }
 
-/// SDK 缓存（`panta-deps/sdk/<name>/<version>/<triple>/bin`）里 Windows
-/// triple 的运行库目录；triple 目录不存在或无 bin 时跳过，保持幂等。
-fn windows_sdk_dll_dirs(target_root: &Path) -> Vec<PathBuf> {
-    let sdk_root = target_root.join("panta-deps").join("sdk");
+/// SDK 缓存（`<deps>/sdk/<name>/<version>/<triple>/bin`）里 Windows triple
+/// 的运行库目录；triple 目录不存在或无 bin 时跳过，保持幂等。
+fn windows_sdk_dll_dirs(deps: &Path) -> Vec<PathBuf> {
+    let sdk_root = deps.join("sdk");
     let mut dirs = Vec::new();
     let Ok(names) = fs::read_dir(&sdk_root) else {
         return dirs;
@@ -875,7 +866,7 @@ mod tests {
         // 另一 SDK 同布局；windows triple 缺 bin 时不收录。
         fs::create_dir_all(sdk.join("dawn/1.0.0/windows-x86_64/bin")).map_err(|e| e.to_string())?;
         fs::create_dir_all(sdk.join("dawn/1.0.0/macos-arm64/bin")).map_err(|e| e.to_string())?;
-        let dirs = windows_sdk_dll_dirs(&root);
+        let dirs = windows_sdk_dll_dirs(&root.join("panta-deps"));
         let expected = vec![
             sdk.join("dawn/1.0.0/windows-x86_64/bin"),
             vtk.join("windows-x86_64/bin"),
