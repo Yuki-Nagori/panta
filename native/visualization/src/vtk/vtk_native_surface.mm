@@ -61,12 +61,17 @@ void sync_native_surface(QQuickWindow*, QQuickItem* item, vtkHardwareWindow* har
     const int logical_width = qMax(1, qRound(item->width()));
     const int logical_height = qMax(1, qRound(item->height()));
 
-    // vtkCocoaHardwareWindow::SetSize() uses Cocoa screen coordinates, not
-    // backing pixels. It also updates the VTK-owned NSView frame, so apply it
-    // before restoring the QQuickItem position in the host view.
+    // vtkCocoaHardwareWindow::SetSize() uses logical points, not backing
+    // pixels. It also updates the VTK-owned NSView frame, so apply it before
+    // restoring the QQuickItem position in the host view.
     cocoa->SetSize(logical_width, logical_height);
+    // Qt 的 content view 是 flipped 坐标系（原点左上），子视图 frame 直接
+    // 使用 QML scene 坐标；仅非 flipped 宿主需要换算底部原点。
     const NSRect host_bounds = [host bounds];
-    const CGFloat y = host_bounds.size.height - static_cast<CGFloat>(scene_position.y()) - height;
+    const CGFloat y = [host isFlipped]
+                          ? static_cast<CGFloat>(scene_position.y())
+                          : host_bounds.size.height - static_cast<CGFloat>(scene_position.y()) -
+                                height;
     [view setFrame:NSMakeRect(static_cast<CGFloat>(scene_position.x()), y, width, height)];
 }
 
