@@ -91,6 +91,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | 三端 surface 结构 review；VTK 9.7 Wayland hardware-window API 对照 | 代码已实现：macOS 使用固定尺寸 Cocoa view，Windows 使用固定尺寸 child HWND，Linux 不再把 Qt 顶层 `wl_surface` 直接交给 VTK，改为创建带位置/尺寸同步的 `wl_subsurface`；Linux consumer 增加 `libwayland-dev` 与 `wayland-client` 链接。macOS 29/29 通过，Linux/Windows 编译与真实窗口运行待对应 CI/目标环境验证 |
 | 2026-09-20 | macOS；`cargo build --locked --no-default-features --package panta-launcher` + `ctest --test-dir target/native/debug --output-on-failure` | 通过：无 Bridge 消融 9/9；修复 app 进程级 crash FFI 依赖未公共链接、视口测试在 Bridge 关闭时仍无条件链接的问题；随后恢复默认 Bridge 构建并复验 29/29 |
 | 2026-09-20 | macOS；`cargo test --locked --workspace` | 通过：Rust 单元/集成、CXX/Qt native suite 和 QML lint 全部通过；crash handler 测试按预期产生 SIGSEGV/UNKNOWN 诊断日志并通过 |
+| 2026-09-20 | CI run 35490867113 取证（ubuntu 全部 native job 失败于 native configure） | `FindWAYLAND.cmake:56`（038 捆绑进 VTK SDK）经 pkg-config 报缺 `wayland-protocols`，宿主前置只装了 `libwayland-dev`；`linux-gl-prereqs` 已补装该包。宿主 CI 环境无法本地复跑，待 push 后 CI 复验 |
 
 ## 风险与回退
 
