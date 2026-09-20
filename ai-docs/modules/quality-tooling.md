@@ -47,8 +47,8 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 ## 当前执行入口
 
 - `cargo build` 准备构建所需 LLVM、CMake/Ninja、Qt/GoogleTest 并完整链接；`cargo test --workspace` 保留原生 Cargo 语义，根集成测试执行 qmllint 和完整 CTest。根目录默认成员是 `panta-launcher`，裸 `cargo build`/`cargo test` 只覆盖该包及其依赖。Debug/Release 与显式本机 `--target` 的目录保持一致；跨目标构建明确拒绝。
-- `cargo format` 检查 Rust、C++/CXX、CMake、应用及测试 QML。Qt 格式工具直接供给，不配置或编译 native 工程。
-- `cargo lint clippy|machete|cmake|qmllint|clang-tidy|includes|cppcheck` 按需准备工具；不带工具名顺序执行全部。audit/machete 编译 runner 时不下载 LLVM/CMake。
+- `cargo format` 就地修复 Rust、C++/CXX、CMake、应用及测试 QML 的格式；`cargo format --check` 只验证不改动。Qt 格式工具直接供给，不配置或编译 native 工程。
+- `cargo lint clippy|machete|cmake|qmllint|clang-tidy|includes|cppcheck` 按需准备工具；不带工具名顺序执行全部。缺省为修复模式（clippy/clang-tidy 应用可自动修复项后回落检查，其余工具只报告），`--check` 只验证不改动；CI 与 pre-commit 一律使用 `--check`。audit/machete 编译 runner 时不下载 LLVM/CMake。
 - `cargo audit`、`cargo coverage`、`cargo coverage native` 分别负责依赖审计、Rust 门禁和 native 覆盖率报告。`cargo quality` 聚合格式、lint、审计、测试，不包含 coverage。
 - `cargo run --locked -p panta-tests -- toolchain` 检查托管工具版本、Qt/GoogleTest 文件、CMakeCache 的 C/C++ 编译器/CMake/Ninja 路径，以及合并编译数据库中包括手写 CXX adapter 在内的实际编译器。系统旁路不能作为该检查的通过证据。
 - runner、FFI 与 launcher 共用 `panta-build`，无需通过 `#[path]` 导入其他 crate 私有文件或整体关闭 dead-code 告警。质量数据库位于 `target/native/<profile>/quality/compile_commands.json`；只选自有翻译单元，头文件不单独伪造编译命令。
@@ -91,7 +91,7 @@ Rust 函数覆盖 100% 是函数维度目标，函数进入一次不代表其内
 
 ## 提交门禁（git hooks）
 
-`.githooks/pre-commit` 执行与 CI 相同的 `cargo format` 与全量 `cargo lint`（clippy、machete、cmake-lint、qmllint、clang-tidy、include-cleaner、cppcheck）；依赖审计、覆盖率与测试套件仍由 CI 承担。lint 工具经 build.rs 触发 native 配置，冷机首次提交会先供给 LLVM/Qt。新机器需一次性启用：
+`.githooks/pre-commit` 执行与 CI 相同的 `cargo format --check` 与全量 `cargo lint --check`（clippy、machete、cmake-lint、qmllint、clang-tidy、include-cleaner、cppcheck），门禁不改动文件；依赖审计、覆盖率与测试套件仍由 CI 承担。lint 工具经 build.rs 触发 native 配置，冷机首次提交会先供给 LLVM/Qt。新机器需一次性启用：
 
 ```sh
 git config core.hooksPath .githooks

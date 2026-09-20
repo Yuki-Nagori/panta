@@ -7,6 +7,7 @@
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
+#include <cstdio>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
 #endif
@@ -50,5 +51,20 @@ class ShellModuleLoadTest final : public QObject {
     }
 };
 
-QTEST_MAIN(ShellModuleLoadTest)
+// Windows CI 曾在链接 Panta.Visualization 静态 plugin 的本测试出现无输出
+// 挂起（任务 007 验证表 2026-09-20）：显式 main 逐阶段冲刷 stderr 定位
+// 挂点，根因解决后移除。
+// TODO(task 007): Windows 挂起根因确认后删除阶段标记。
+int main(int argc, char** argv) {
+    std::fputs("shell-test: reached main\n", stderr);
+    std::fflush(stderr);
+    QGuiApplication app(argc, argv);
+    std::fputs("shell-test: QGuiApplication ready\n", stderr);
+    std::fflush(stderr);
+    ShellModuleLoadTest test;
+    const int status = QTest::qExec(&test, argc, argv);
+    std::fprintf(stderr, "shell-test: finished status=%d\n", status);
+    std::fflush(stderr);
+    return status;
+}
 #include "shell_module_load_test.moc"

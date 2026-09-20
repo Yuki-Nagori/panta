@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstring>
 #include <qguiapplication_platform.h>
+#include <vtkObjectFactory.h>
 #include <vtkWaylandHardwareWindow.h>
 #include <wayland-client.h>
 
@@ -23,9 +24,9 @@ namespace {
 class PantaWaylandHardwareWindow final : public vtkWaylandHardwareWindow {
   public:
     static PantaWaylandHardwareWindow* New();
-    vtkTypeMacro(PantaWaylandHardwareWindow, vtkWaylandHardwareWindow);
+    vtkTypeMacro(PantaWaylandHardwareWindow, vtkWaylandHardwareWindow)
 
-    void set_qt_surface(wl_display* display, wl_compositor* compositor, wl_surface* parent) {
+        void set_qt_surface(wl_display* display, wl_compositor* compositor, wl_surface* parent) {
         DisplayId = display;
         Compositor = compositor;
         ParentSurface = parent;
@@ -169,7 +170,9 @@ void detach_native_surface(NativeSurface& surface) {
 #elif defined(Q_OS_LINUX)
 
 NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
-    auto* application = QGuiApplication::instance();
+    // nativeInterface<T>() 的兼容约束按接收者静态类型解析：QCoreApplication*
+    // 不满足 QWaylandApplication 的要求，必须落在 QGuiApplication 上。
+    auto* application = static_cast<QGuiApplication*>(QGuiApplication::instance());
     auto* wayland = application != nullptr
                         ? application->nativeInterface<QNativeInterface::QWaylandApplication>()
                         : nullptr;

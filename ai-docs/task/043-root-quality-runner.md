@@ -80,6 +80,7 @@
 | 2026-09-19 | `cargo fmt --all -- --check`；系统旁路下 `cargo clippy --locked -p panta-tests --all-targets -- -D warnings`；`actionlint .github/workflows/ci.yml`；`sh -n .githooks/pre-commit` | 通过；只证明调度代码与语法，不证明托管 LLVM 完整构建 |
 | 2026-09-19 | `target/review-quality/validate.py` 临时受控夹具，独立 rustc 编译修改前/后 runner；使用实际 cargo-machete 0.9.2 扫描兄弟 crate 的未使用 serde | 修改前 exit 0 漏检，修改后非零且指出 fixture-unused；覆盖率参数/失败传播、IWYU 违规参数、clang-tidy 拒绝 PATH 回退、marker 版本失效共五项通过。后三类工具使用替身，未声称真实全量分析通过 |
 | 2026-09-19 | ABI 夹具改前 configure；改后 `cmake -DTEST_BINARY_DIR=target/review-quality/abi-after -DTEST_CXX_COMPILER=/usr/bin/clang++ -P native/cmake/tests/check-abi.cmake`；uv 锁定 cmake-format/check 与 cmake-lint | 改前正例被空 LLVM 版本拦截；改后正例通过、runtime/iterator 反例正确拒绝；格式/lint 通过。这是元数据测试，不是 Windows ABI 实跑 |
+| 2026-09-20 | macOS；`cargo build --locked -p panta-tests`、`cargo lint --check machete`、`cargo lint --check cmake`、`cargo format`（修复模式实际改写 main.rs 后）、`cargo format --check` | 通过：`--check` 参数解析与修复模式生效；clang-format 修复模式对 native C++ 源就地改写后检查转绿。CI（ci.yml lint 矩阵与 format job）及 pre-commit 全部切换为 `--check`；Clippy 修复/检查与 qmllint 路径行为由 pre-commit/CI 复验 |
 
 ## 风险与回退
 
@@ -88,6 +89,8 @@ Cargo runner 可能与 build.rs 使用不同 target-dir 或 profile；通过 Car
 ## 决策与工作记录
 
 - 2026-09-18：按维护者要求将跨语言质量和测试聚合提升为根 `tests/` 入口；C++/QML 源统一按语言分类，Rust 私有单元测试继续留在实现文件。
+- 2026-09-20（维护者要求）：lint/format 拆分修复与验证两种行为——`cargo format` 就地修复、`cargo format --check` 只验证；`cargo lint [tool]` 缺省为修复模式（clippy 先 `--fix` 再回落检查、clang-tidy/includes 追加 `--fix`，无修复能力的工具等价报告），`cargo lint [tool] --check` 只验证；CI 与 pre-commit 全部切到 `--check`，`cargo quality` 保持只验证。
+- 待办（lint 编译成本）：clang-tidy/includes/cppcheck/qmllint 经 `build_launcher()` 触发全量 native 构建，因为它们消费 `quality/*.json` 编译数据库（configure+autogen 产物）。后续在 build.rs 引入 prepare-only 模式（configure + 生成质量数据库、跳过 `cmake --build`）可把这些 lint 的准备成本降到配置级；需先验证 autogen 的 moc 翻译单元在 configure-only 数据库中的完整性，避免 cppcheck/clang-tidy 扫到缺失的生成文件。clippy 因 `--workspace` 必须执行 launcher build script，受 Rust 构建图约束维持现状。
 
 ## 本轮复审与待验收
 

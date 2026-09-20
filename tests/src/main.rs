@@ -13,7 +13,11 @@ fn main() -> ExitCode {
     let result = match arguments.next().as_deref() {
         Some("quality") => quality(),
         Some("test") => test_all(),
-        Some("format") => format_all(),
+        Some("format") => {
+            let mut rest: Vec<String> = arguments.collect();
+            let check = take_check_flag(&mut rest);
+            format_all(check, &rest)
+        }
         Some("audit") => audit(),
         Some("coverage") => match arguments.next().as_deref() {
             None | Some("rust") => coverage(),
@@ -21,14 +25,16 @@ fn main() -> ExitCode {
             Some(other) => Err(format!("未知 coverage 类型：{other}").into()),
         },
         Some("toolchain") => verify_toolchain(),
-        Some("lint") => lint(arguments.next().as_deref()),
+        Some("lint") => {
+            let mut rest: Vec<String> = arguments.collect();
+            let check = take_check_flag(&mut rest);
+            lint(rest.first().map(String::as_str), check)
+        }
         Some(command) => Err(format!(
-            "未知命令 '{command}'；可用：quality、audit、lint、test、format、coverage、toolchain"
+            "未知命令 '{command}'；可用：quality、audit、lint、format、coverage、toolchain"
         )
         .into()),
-        None => {
-            Err("缺少命令；可用：quality、audit、lint、test、format、coverage、toolchain".into())
-        }
+        None => Err("缺少命令；可用：quality、audit、lint、format、coverage、toolchain".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -39,9 +45,17 @@ fn main() -> ExitCode {
     }
 }
 
+/// 从剩余参数摘除 `--check`（位置不限）。缺省行为是就地修复（写文件），
+/// `--check` 只验证不改动；CI 与 pre-commit 一律带 `--check`。
+fn take_check_flag(arguments: &mut Vec<String>) -> bool {
+    let check = arguments.contains(&String::from("--check"));
+    arguments.retain(|argument| argument != "--check");
+    check
+}
+
 fn quality() -> Result<(), Box<dyn Error>> {
-    format_all()?;
-    lint(None)?;
+    format_all(true, &[])?;
+    lint(None, true)?;
     audit()?;
     test_all()
 }
@@ -169,19 +183,19 @@ fn collect_test_binaries(directory: &Path, result: &mut Vec<PathBuf>) -> std::io
     Ok(())
 }
 
-fn lint(tool: Option<&str>) -> Result<(), Box<dyn Error>> {
+fn lint(tool: Option<&str>, check: bool) -> Result<(), Box<dyn Error>> {
     match tool {
         None => {
-            lint(Some("clippy"))?;
-            lint(Some("machete"))?;
-            lint(Some("cmake"))?;
+            lint(Some("clippy"), check)?;
+            lint(Some("machete"), check)?;
+            lint(Some("cmake"), check)?;
             build_launcher()?;
-            lint(Some("qmllint"))?;
-            lint(Some("clang-tidy"))?;
-            lint(Some("includes"))?;
-            lint(Some("cppcheck"))
+            lint(Some("qmllint"), check)?;
+            lint(Some("clang-tidy"), check)?;
+            lint(Some("includes"), check)?;
+            lint(Some("cppcheck"), check)
         }
-        Some("clippy") => cargo(
+        Some("clippy") if check => cargo(
             "clippy",
             [
                 "--locked",
@@ -193,27 +207,53 @@ fn lint(tool: Option<&str>) -> Result<(), Box<dyn Error>> {
                 "warnings",
             ],
         ),
+        // 修复模式先应用机器可修复建议，再落回检查模式确认剩余问题。
+        Some("clippy") => {
+            cargo(
+                "clippy",
+                [
+                    "--fix",
+                    "--locked",
+                    "--workspace",
+                    "--all-targets",
+                    "--allow-dirty",
+                ],
+            )?;
+            lint(Some("clippy"), true)
+        }
         Some("machete") => cargo("machete", []),
         Some("cmake") => run_cmake_lint(),
         Some("qmllint") => {
             build_launcher()?;
             run_qmllint()
         }
-        Some("clang-tidy") => run_clang_tidy(false),
-        Some("includes") => run_clang_tidy(true),
+        Some("clang-tidy") => run_clang_tidy(false, check),
+        Some("includes") => run_clang_tidy(true, check),
         Some("cppcheck") => run_cppcheck(),
         Some(other) => Err(format!(
-            "未知 lint 工具 '{other}'；可用：clippy、machete、cmake、qmllint、clang-tidy、includes、cppcheck"
+            "未知 lint 工具 '{other}'；可用：clippy、machete、cmake、qmllint、clang-tidy、\
+             includes、cppcheck；--check 只检查不修复"
         )
         .into()),
     }
 }
 
-fn format_all() -> Result<(), Box<dyn Error>> {
-    cargo("fmt", ["--all", "--", "--check"])?;
-    check_cpp_format()?;
-    run_cmake_format()?;
-    run_qml_format_check()
+fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Error>> {
+    if let Some(unexpected) = rest.first() {
+        return Err(format!(
+            "format 不接受位置参数 '{unexpected}'；修复为缺省行为，\
+                            --check 只验证不改动"
+        )
+        .into());
+    }
+    if check {
+        cargo("fmt", ["--all", "--", "--check"])?;
+    } else {
+        cargo("fmt", ["--all"])?;
+    }
+    check_cpp_format(check)?;
+    run_cmake_format(check)?;
+    run_qml_format(check)
 }
 
 fn verify_toolchain() -> Result<(), Box<dyn Error>> {
@@ -452,7 +492,7 @@ fn run_qmllint_and_ctest() -> Result<(), Box<dyn Error>> {
     run_ctest(None)
 }
 
-fn run_qml_format_check() -> Result<(), Box<dyn Error>> {
+fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
     let target_root = Path::new(env!("PANTA_TEST_TARGET_DIR"));
     let qmlformat = qmlformat_path(target_root);
@@ -462,6 +502,18 @@ fn run_qml_format_check() -> Result<(), Box<dyn Error>> {
     let qmlformat = qmlformat_path(target_root);
     if !qmlformat.is_file() {
         return Err(format!("qmlformat 不存在：{}", qmlformat.display()).into());
+    }
+    if !check {
+        // 修复模式：直接就地格式化；文件清单与检查脚本（check-qml-format.cmake
+        // 按 QML_DIR 递归）保持同一来源。
+        let mut files = qml_sources(&root.join("qml"))?;
+        files.sort();
+        for file in files {
+            let mut command = Command::new(&qmlformat);
+            command.arg("-i").arg(&file);
+            run(&format!("qmlformat {}", file.display()), command)?;
+        }
+        return Ok(());
     }
     let cmake = panta_build::resolve_cmake(target_root)?;
     let script = root.join("native/cmake/tests/check-qml-format.cmake");
@@ -476,6 +528,20 @@ fn run_qml_format_check() -> Result<(), Box<dyn Error>> {
     ));
     command.args(["-P", script.to_str().ok_or("QML 格式脚本路径不是 UTF-8")?]);
     run("qmlformat", command)
+}
+
+fn qml_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type()?.is_dir() {
+            files.extend(qml_sources(&path)?);
+        } else if path.extension().is_some_and(|extension| extension == "qml") {
+            files.push(path);
+        }
+    }
+    Ok(files)
 }
 
 fn qmlformat_path(target_root: &Path) -> PathBuf {
@@ -500,7 +566,7 @@ fn provision_qml_format(root: &Path, target_root: &Path) -> Result<(), Box<dyn E
     run("准备 qmlformat", command)
 }
 
-fn run_clang_tidy(includes_only: bool) -> Result<(), Box<dyn Error>> {
+fn run_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>> {
     build_launcher()?;
     let llvm = panta_build::resolve_llvm_compilers(target_root())?;
     let tool = llvm.root.join("bin").join(executable_name("clang-tidy"));
@@ -520,6 +586,9 @@ fn run_clang_tidy(includes_only: bool) -> Result<(), Box<dyn Error>> {
         command.arg("-p").arg(&directory).arg("-quiet");
         if includes_only {
             command.arg("--checks=-*,misc-include-cleaner");
+        }
+        if !check {
+            command.arg("--fix");
         }
         command.arg(&file);
         if let Err(error) = run(&format!("clang-tidy {}", file.display()), command) {
@@ -620,7 +689,7 @@ fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
     run("ctest", command)
 }
 
-fn check_cpp_format() -> Result<(), Box<dyn Error>> {
+fn check_cpp_format(check: bool) -> Result<(), Box<dyn Error>> {
     let llvm = panta_build::resolve_llvm_compilers(target_root())?;
     let clang_format = &llvm.clang_format;
     if !clang_format.is_file() {
@@ -638,14 +707,23 @@ fn check_cpp_format() -> Result<(), Box<dyn Error>> {
     files.sort();
     for file in files {
         let mut command = Command::new(clang_format);
-        command.args(["--dry-run", "-Werror"]).arg(&file);
+        if check {
+            command.args(["--dry-run", "-Werror"]);
+        } else {
+            command.arg("-i");
+        }
+        command.arg(&file);
         run(&format!("clang-format {}", file.display()), command)?;
     }
     Ok(())
 }
 
-fn run_cmake_format() -> Result<(), Box<dyn Error>> {
-    run_cmake_tool("cmake-format", &["--check"])
+fn run_cmake_format(check: bool) -> Result<(), Box<dyn Error>> {
+    if check {
+        run_cmake_tool("cmake-format", &["--check"])
+    } else {
+        run_cmake_tool("cmake-format", &[])
+    }
 }
 
 fn run_cmake_lint() -> Result<(), Box<dyn Error>> {

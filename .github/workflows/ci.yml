@@ -5,7 +5,7 @@
 # - changes：按变更路径拆分触发，未知路径一律保守触发全量检查；
 # - check：唯一跨平台 job；每个平台都执行 check、build、测试套件与工具核验；
 # - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位，按域触发；
-# - format：Ubuntu 上通过 cargo format 检查 Rust、C++/CXX、CMake、QML；
+# - format：Ubuntu 上通过 cargo format --check 检查 Rust、C++/CXX、CMake、QML；
 # - dependency-audit：仅在依赖清单/审计配置变更时运行；
 # - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++ 插桩报告与 QML 行为测试。
 name: CI
@@ -86,7 +86,7 @@ jobs:
 
       - name: Run selected lint
         shell: bash
-        run: cargo lint "${{ matrix.tool }}"
+        run: cargo lint "${{ matrix.tool }}" --check
 
   # machete 只读 Rust 清单与源码，不进 native 构建图：按 rust 域触发，
   # 且不需要托管工具/依赖缓存。
@@ -107,7 +107,7 @@ jobs:
 
       - name: Run cargo machete
         shell: bash
-        run: cargo lint machete
+        run: cargo lint machete --check
 
   # cmake-lint 只检查 native CMake 文件：按 native 域触发。
   lint-cmake:
@@ -125,7 +125,7 @@ jobs:
 
       - name: Run cmake lint
         shell: bash
-        run: cargo lint cmake
+        run: cargo lint cmake --check
 
   # qmllint 消费 Qt 供给与 QML/bridge 输出：按 qml 或 native 域触发。
   lint-qmllint:
@@ -146,7 +146,7 @@ jobs:
 
       - name: Run qmllint
         shell: bash
-        run: cargo lint qmllint
+        run: cargo lint qmllint --check
 
   format:
     name: cargo format (ubuntu)
@@ -163,9 +163,9 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
-      - name: Run aggregated cargo format (Rust, C++/CXX, CMake and QML)
+      - name: Run aggregated cargo format check (Rust, C++/CXX, CMake and QML)
         shell: bash
-        run: cargo format
+        run: cargo format --check
 
   coverage:
     name: rust coverage gate (ubuntu)

@@ -8,10 +8,10 @@
 #   git config core.hooksPath .githooks
 set -e
 
-echo "[pre-commit] cargo format"
-cargo format
+echo "[pre-commit] cargo format --check"
+cargo format --check
 
-echo "[pre-commit] cargo lint（clippy/machete/cmake/qmllint/clang-tidy/includes/cppcheck）"
-cargo lint
+echo "[pre-commit] cargo lint --check（clippy/machete/cmake/qmllint/clang-tidy/includes/cppcheck）"
+cargo lint --check
 
 echo "[pre-commit] 通过"
