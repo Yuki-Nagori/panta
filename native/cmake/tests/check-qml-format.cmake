@@ -7,12 +7,6 @@
 if(NOT DEFINED QMLFMT OR NOT DEFINED QML_DIR)
   message(FATAL_ERROR "check-qml-format 需要 -DQMLFMT 与 -DQML_DIR")
 endif()
-execute_process(
-  COMMAND "${QMLFMT}" --version
-  OUTPUT_VARIABLE _version
-  ERROR_VARIABLE _version)
-message(STATUS "qml 格式门禁：${_version}")
-
 file(GLOB_RECURSE _qml_files "${QML_DIR}/*.qml"
      "${CMAKE_CURRENT_LIST_DIR}/../../../tests/qml/*.qml")
 if(NOT _qml_files)
@@ -43,4 +37,4 @@ if(_needs_format)
   string(REPLACE ";" "\n  " _listed "${_needs_format}")
   message(FATAL_ERROR "以下 QML 文件需要格式化（qmlformat 后不一致）：\n  ${_listed}\n" "修复：对列出文件运行 qmlformat")
 endif()
-message(STATUS "qml 格式门禁：${_qml_files} 全部合规")
+# 合规时保持静默：汇总输出由 runner 负责，脚本只在发现违规时说话。
