@@ -9,6 +9,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QRectF>
+#include <QSize>
 #include <QString>
 #include <QTimer>
 #include <QWindow>
@@ -66,6 +67,8 @@ struct VtkViewport::Impl {
     QMetaObject::Connection window_visibility_connection;
     QMetaObject::Connection window_visible_connection;
     QMetaObject::Connection scene_graph_initialized_connection;
+    /// 最近一次提交给 render window 的像素尺寸；空值表示尚无有效提交。
+    QSize applied_pixel_size;
     bool refresh_scheduled = false;
     bool creation_warning_emitted = false;
 };
@@ -110,7 +113,10 @@ void VtkViewport::apply_state(const RenderScene& state) {
                                    impl_->pending.background.greenF(),
                                    impl_->pending.background.blueF());
     impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
-    impl_->render_window->Render();
+    // 隐藏期间跳过 Render，帧由重新显示时的强制提交补上。
+    if (isVisible()) {
+        impl_->render_window->Render();
+    }
 }
 
 void VtkViewport::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
@@ -128,7 +134,9 @@ void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
         schedule_refresh();
     } else if (change == ItemVisibleHasChanged) {
         ensure_render_window();
-        sync_native_surface();
+        // 显示时强制补一帧（隐藏期间的状态变更没有渲染）；隐藏时下面的
+        // 提交策略会跳过 Render。
+        sync_native_surface(isVisible());
         if (impl_->native_surface.view != nullptr) {
             set_native_surface_visible(impl_->native_surface, isVisible());
         }
@@ -245,26 +253,35 @@ void VtkViewport::schedule_refresh() {
     });
 }
 
-void VtkViewport::sync_native_surface() {
+void VtkViewport::sync_native_surface(bool force_render) {
     if (impl_->hardware_window == nullptr || window() == nullptr ||
         impl_->native_surface.view == nullptr) {
         return;
     }
     ::panta::visualization::sync_native_surface(window(), this, impl_->hardware_window.get(),
                                                 impl_->native_surface);
-    if (impl_->render_window != nullptr) {
-        const qreal scale = window()->devicePixelRatio();
-        const int pixel_width = qMax(1, qRound(width() * scale));
-        const int pixel_height = qMax(1, qRound(height() * scale));
-        impl_->render_window->SetSize(pixel_width, pixel_height);
-        impl_->render_window->Render();
+    if (impl_->render_window == nullptr) {
+        return;
     }
+    const qreal scale = window()->devicePixelRatio();
+    const QSize pixel_size(qMax(1, qRound(width() * scale)), qMax(1, qRound(height() * scale)));
+    if (!force_render && pixel_size == impl_->applied_pixel_size) {
+        return;
+    }
+    // 隐藏的原生 surface 不做渲染提交；重新显示时由可见分支强制补帧。
+    if (!isVisible()) {
+        return;
+    }
+    impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
+    impl_->render_window->Render();
+    impl_->applied_pixel_size = pixel_size;
 }
 
 void VtkViewport::destroy_render_window() {
     if (impl_ == nullptr) {
         return;
     }
+    impl_->applied_pixel_size = QSize();
     if (impl_->render_window != nullptr) {
         impl_->render_window->Finalize();
         impl_->render_window = nullptr;

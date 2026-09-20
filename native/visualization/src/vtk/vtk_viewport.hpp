@@ -32,7 +32,9 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
   private:
     void ensure_render_window();
     void schedule_refresh();
-    void sync_native_surface();
+    /// 平台 surface 位置/尺寸同步 + 渲染提交；尺寸未变时跳过 Render，
+    /// force_render 在重新显示等场景强制补一帧。
+    void sync_native_surface(bool force_render = false);
     void destroy_render_window();
 
     struct Impl;

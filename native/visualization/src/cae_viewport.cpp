@@ -2,6 +2,7 @@
 /// 适配层驱动渲染；第三方实现细节全部在 src/vtk/。
 #include "vtk/vtk_viewport.hpp"
 #include <QObject>
+#include <QPointF>
 #include <QRectF>
 #include <memory>
 #include <panta/visualization/cae_viewport.hpp>
@@ -19,6 +20,8 @@ CaeViewport::CaeViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::ma
     impl_->backend = create_vtk_viewport_backend();
     if (auto* item = impl_->backend->item()) {
         item->setParentItem(this);
+        // 宿主条目铺满本条目且位置恒为原点；后续只随几何变化更新尺寸。
+        item->setPosition(QPointF(0, 0));
         // 具体适配器类型仅在本 cpp（模块内部）可见，公共头与 QML 面保持
         // 后端中立。
         if (auto* viewport = qobject_cast<VtkViewport*>(item)) {
@@ -40,13 +43,10 @@ void CaeViewport::componentComplete() {
 
 void CaeViewport::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
     QQuickItem::geometryChange(new_geometry, old_geometry);
-    // 后端宿主条目铺满本条目；后端把逻辑坐标转换为平台 surface 坐标，
-    // 并按设备像素比更新 VTK render window。
-    if (impl_->backend != nullptr) {
-        if (auto* item = impl_->backend->item()) {
-            item->setPosition(QPointF(0, 0));
-            item->setSize(new_geometry.size());
-        }
+    // 后端把逻辑坐标转换为平台 surface 坐标，并按设备像素比更新 VTK
+    // render window；宿主条目位置已在构造时固定为原点。
+    if (auto* item = impl_->backend->item()) {
+        item->setSize(new_geometry.size());
     }
 }
 
