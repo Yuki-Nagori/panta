@@ -1,5 +1,5 @@
-/// macOS Cocoa/Metal surface bridge. VTK owns the Cocoa hardware view and its
-/// CAMetalLayer; this file only reparents that view into Qt Quick's native view.
+/// macOS Cocoa/Metal surface 桥接。VTK 持有 Cocoa hardware view 及其
+/// CAMetalLayer；本文件只把该视图重新挂入 Qt Quick 的原生宿主视图。
 #include "vtk_native_surface.hpp"
 
 #include <QQuickItem>
@@ -14,12 +14,6 @@
 namespace panta::visualization {
 namespace {
 
-void release_hardware_window(vtkHardwareWindow* hardware) {
-    if (hardware != nullptr) {
-        hardware->Delete();
-    }
-}
-
 NSView* qt_native_view(QQuickWindow* window) {
     if (window == nullptr) {
         return nullptr;
@@ -29,9 +23,8 @@ NSView* qt_native_view(QQuickWindow* window) {
 
 } // namespace
 
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow*) {
-    return {vtkCocoaHardwareWindow::New(), &release_hardware_window};
+NativeHardwareWindow create_native_hardware_window(QQuickWindow*) {
+    return NativeHardwareWindow{vtkCocoaHardwareWindow::New()};
 }
 
 bool attach_native_surface(QQuickWindow* window, QQuickItem*, vtkHardwareWindow* hardware,
@@ -68,12 +61,17 @@ void sync_native_surface(QQuickWindow*, QQuickItem* item, vtkHardwareWindow* har
     const int logical_width = qMax(1, qRound(item->width()));
     const int logical_height = qMax(1, qRound(item->height()));
 
-    // vtkCocoaHardwareWindow::SetSize() uses Cocoa screen coordinates, not
-    // backing pixels. It also updates the VTK-owned NSView frame, so apply it
-    // before restoring the QQuickItem position in the host view.
+    // vtkCocoaHardwareWindow::SetSize() 使用逻辑点而非 backing 像素，且会
+    // 更新 VTK 持有的 NSView frame——先调用它，再恢复 QQuickItem 在宿主
+    // 视图中的位置。
     cocoa->SetSize(logical_width, logical_height);
+    // Qt 的 content view 是 flipped 坐标系（原点左上），子视图 frame 直接
+    // 使用 QML scene 坐标；仅非 flipped 宿主需要换算底部原点。
     const NSRect host_bounds = [host bounds];
-    const CGFloat y = host_bounds.size.height - static_cast<CGFloat>(scene_position.y()) - height;
+    const CGFloat y = [host isFlipped]
+                          ? static_cast<CGFloat>(scene_position.y())
+                          : host_bounds.size.height - static_cast<CGFloat>(scene_position.y()) -
+                                height;
     [view setFrame:NSMakeRect(static_cast<CGFloat>(scene_position.x()), y, width, height)];
 }
 

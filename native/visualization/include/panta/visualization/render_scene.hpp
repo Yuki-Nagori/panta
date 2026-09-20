@@ -8,11 +8,12 @@
 #pragma once
 
 #include <QColor>
+#include <cstdint>
 
 namespace panta::visualization {
 
 /// 场景修订号：GUI 侧每次状态提交自增；后端回调携带旧值即视为迟到更新。
-using SceneRevision = unsigned long long;
+using SceneRevision = std::uint64_t;
 
 struct RenderScene {
     /// 状态版本：后端已应用的修订低于此值时必须重新应用。

@@ -28,6 +28,8 @@
 
 005 的 Qt Quick 外壳和 007 的 VTK viewport 契约可用；实施前核实 Qt 6.11.2 对目标平台的 screenChanged、DPI 和窗口 framebuffer 行为，并固定舍入策略。显示 ID 的平台字段可用性和 Linux fractional scaling 的真实表现需在目标环境记录，不能凭单一开发机假设。
 
+007 实现现状（2026-09-20 review 批）：`VtkViewport` 已响应 `ItemDevicePixelRatioHasChanged`，按新 DPR 重算 render window 像素尺寸并重同步原生 surface；真实多屏迁移与系统缩放变化仍属本任务验证范围。Wayland 子表面当前使用整数 `wl_surface_set_buffer_scale`，fractional scaling（125%/150%）需评估 `wp_viewporter`/`wp_fractional_scale_v1` 接入，不能以整数倍假设收口。
+
 ## 实施步骤
 
 1. 定义显示快照、窗口状态和逻辑到像素转换的 C++ 契约，固定事件合并与发布时序。

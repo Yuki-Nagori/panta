@@ -51,6 +51,10 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_bridge_shell_view_model_test)
   target_link_libraries(panta_bridge_shell_view_model_test PRIVATE panta::bridge GTest::gtest
                                                                    Qt6::Test)
+  # POST_BUILD 发现会在链接后立即启动测试可执行文件：Cargo 统一入口由
+  # launcher 构建脚本给构建子进程注入托管 Qt runtime PATH（Windows 必需）。
+  # 不用 PRE_TEST 发现——其测试清单依赖 CMake 4.4 的 discover_tests 内建
+  # 命令，PATH 上较旧的 ctest 无法消费。
   gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE POST_BUILD)
 
   add_executable(panta_bridge_task_host_test ../../tests/cpp/bridge/task_host_test.cpp)

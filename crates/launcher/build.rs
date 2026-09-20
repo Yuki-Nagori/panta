@@ -101,7 +101,8 @@ fn orchestrate() -> Result<PathBuf, String> {
         return Err("统一构建仅支持 Ninja，以保证三平台导出真实 compile_commands.json".into());
     }
     let ninja = provision::resolve_ninja(&target_root, &cmake)?;
-    let sdk_env = provision::windows_sdk_env(&required_var("TARGET")?)?;
+    let target_triple = required_var("TARGET")?;
+    let sdk_env = provision::windows_sdk_env(&target_triple)?;
 
     // Cargo 的默认 feature 是唯一用户入口；把 feature 状态转换成 CMake
     // 选项，避免开发者在日常命令中重复维护两套开关。
@@ -199,7 +200,10 @@ fn orchestrate() -> Result<PathBuf, String> {
 
     let mut build = Command::new(&cmake);
     build
-        .envs(sdk_env)
+        // 构建期 gtest discovery（POST_BUILD）会在链接后立即启动测试可执行
+        // 文件；Windows 子进程必须能解析托管 Qt runtime（native_test_env 注
+        // 入 PATH，非 Windows 仅透传 SDK 环境）。
+        .envs(provision::native_test_env(&target_root, &target_triple)?)
         .arg("--build")
         .arg(&binary_dir)
         .arg("--config")

@@ -1,10 +1,11 @@
-/// Windows/Wayland native surface bridge. Windows uses a child HWND; Wayland
-/// uses a wl_subsurface attached to Qt Quick's top-level wl_surface.
+/// Windows/Wayland 原生 surface 桥接。Windows 使用子 HWND；Wayland 把
+/// wl_subsurface 挂到 Qt Quick 的顶层 wl_surface。
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
 #include <QPointF>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSize>
 #include <QtGlobal>
 #include <vtkHardwareWindow.h>
 
@@ -13,19 +14,27 @@
 #include <windows.h>
 #elif defined(Q_OS_LINUX)
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <qguiapplication_platform.h>
+#include <vtkObjectFactory.h>
+#include <vtkSetGet.h>
 #include <vtkWaylandHardwareWindow.h>
-#include <wayland-client.h>
+#include <vtkWindow.h>
+#include <wayland-client-core.h>
+#include <wayland-client-protocol.h>
 
 namespace {
 
 class PantaWaylandHardwareWindow final : public vtkWaylandHardwareWindow {
   public:
     static PantaWaylandHardwareWindow* New();
-    vtkTypeMacro(PantaWaylandHardwareWindow, vtkWaylandHardwareWindow);
+    // vtkTypeMacro 生成的 NewInstance 按设计逐层遮蔽基类同名非虚方法（VTK
+    // 的虚分发走 NewInstanceInternal），是 VTK 子类化惯例而非缺陷。
+    // NOLINTNEXTLINE(bugprone-derived-method-shadowing-base-method)
+    vtkTypeMacro(PantaWaylandHardwareWindow, vtkWaylandHardwareWindow)
 
-    void set_qt_surface(wl_display* display, wl_compositor* compositor, wl_surface* parent) {
+        void set_qt_surface(wl_display* display, wl_compositor* compositor, wl_surface* parent) {
         DisplayId = display;
         Compositor = compositor;
         ParentSurface = parent;
@@ -80,13 +89,16 @@ class PantaWaylandHardwareWindow final : public vtkWaylandHardwareWindow {
         Mapped = false;
     }
 
-    void set_geometry(int x, int y, int pixel_width, int pixel_height, int scale) {
-        vtkWindow::SetSize(pixel_width, pixel_height);
+    void set_geometry(const QPointF& position, const QSize& pixel_size, int scale) {
+        // 刻意绕过 vtkWaylandHardwareWindow::SetSize——其按基类自有 surface
+        // 语义实现；本类以自管 wl_subsurface 承载几何，仅需基类尺寸簿记。
+        // NOLINTNEXTLINE(bugprone-parent-virtual-call)
+        vtkWindow::SetSize(pixel_size.width(), pixel_size.height());
         if (Subsurface == nullptr || Surface == nullptr) {
             return;
         }
         wl_surface_set_buffer_scale(Surface, std::max(1, scale));
-        wl_subsurface_set_position(Subsurface, x, y);
+        wl_subsurface_set_position(Subsurface, qRound(position.x()), qRound(position.y()));
         wl_surface_commit(Surface);
     }
 
@@ -119,12 +131,6 @@ class PantaWaylandHardwareWindow final : public vtkWaylandHardwareWindow {
 
 vtkStandardNewMacro(PantaWaylandHardwareWindow);
 
-void release_hardware_window(vtkHardwareWindow* hardware) {
-    if (hardware != nullptr) {
-        hardware->Delete();
-    }
-}
-
 } // namespace
 #endif
 
@@ -132,19 +138,14 @@ namespace panta::visualization {
 
 #if defined(Q_OS_WIN)
 
-namespace {
-void release_hardware_window(vtkHardwareWindow* hardware) {
-    if (hardware != nullptr) {
-        hardware->Delete();
-    }
-}
-} // namespace
-
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow* window) {
+NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
+    // winId() 承载宿主原生窗口句柄；Qt 未提供类型化入口，整型中转是平台
+    // 句柄契约而非值语义转换。
+    const auto parent_handle = window != nullptr ? window->winId() : quintptr{0};
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     auto* hardware = vtkWin32HardwareWindow::New();
-    hardware->SetParentId(reinterpret_cast<void*>(window != nullptr ? window->winId() : 0));
-    return {hardware, &release_hardware_window};
+    hardware->SetParentId(reinterpret_cast<void*>(parent_handle));
+    return NativeHardwareWindow{hardware};
 }
 
 bool attach_native_surface(QQuickWindow*, QQuickItem*, vtkHardwareWindow* hardware,
@@ -183,18 +184,22 @@ void detach_native_surface(NativeSurface& surface) {
 
 #elif defined(Q_OS_LINUX)
 
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow* window) {
-    auto* application = QGuiApplication::instance();
+NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
+    // nativeInterface<T>() 的兼容约束按接收者静态类型解析：QCoreApplication*
+    // 不满足 QWaylandApplication 的要求，必须落在 QGuiApplication 上。
+    auto* application = static_cast<QGuiApplication*>(QGuiApplication::instance());
     auto* wayland = application != nullptr
                         ? application->nativeInterface<QNativeInterface::QWaylandApplication>()
                         : nullptr;
+    // winId() 在 Wayland 上承载 wl_surface 指针；Qt 未提供类型化入口，整型
+    // 中转是平台句柄契约而非值语义转换。
+    const auto parent_handle = window != nullptr ? window->winId() : quintptr{0};
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+    auto* parent_surface = reinterpret_cast<wl_surface*>(parent_handle);
     auto* hardware = PantaWaylandHardwareWindow::New();
-    hardware->set_qt_surface(
-        wayland != nullptr ? wayland->display() : nullptr,
-        wayland != nullptr ? wayland->compositor() : nullptr,
-        reinterpret_cast<wl_surface*>(window != nullptr ? window->winId() : 0));
-    return {hardware, &release_hardware_window};
+    hardware->set_qt_surface(wayland != nullptr ? wayland->display() : nullptr,
+                             wayland != nullptr ? wayland->compositor() : nullptr, parent_surface);
+    return NativeHardwareWindow{hardware};
 }
 
 bool attach_native_surface(QQuickWindow*, QQuickItem*, vtkHardwareWindow* hardware,
@@ -213,12 +218,16 @@ void sync_native_surface(QQuickWindow* window, QQuickItem* item, vtkHardwareWind
     }
     const QPointF position = item->mapToScene(QPointF(0, 0));
     const qreal scale = window->devicePixelRatio();
-    wayland->set_geometry(qRound(position.x()), qRound(position.y()),
-                          qMax(1, qRound(item->width() * scale)),
-                          qMax(1, qRound(item->height() * scale)), qMax(1, qRound(scale)));
+    wayland->set_geometry(
+        QPointF(qRound(position.x()), qRound(position.y())),
+        QSize(qMax(1, qRound(item->width() * scale)), qMax(1, qRound(item->height() * scale))),
+        qMax(1, qRound(scale)));
 }
 
 void set_native_surface_visible(NativeSurface& surface, bool visible) {
+    // 隐藏经 attach(null)+commit 取消映射；重新显示不在此实现——由
+    // VtkViewport 在可见分支强制 Render() 重新提交 swapchain buffer 完成
+    // 重映射（该耦合需在真实 Wayland 环境持续验证，见任务 007 验证表）。
     auto* view = static_cast<wl_surface*>(surface.view);
     if (view == nullptr || visible) {
         return;
@@ -230,10 +239,7 @@ void detach_native_surface(NativeSurface& surface) { surface = {}; }
 
 #else
 
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow*) {
-    return {nullptr, nullptr};
-}
+NativeHardwareWindow create_native_hardware_window(QQuickWindow*) { return NativeHardwareWindow{}; }
 
 bool attach_native_surface(QQuickWindow*, QQuickItem*, vtkHardwareWindow*, NativeSurface&) {
     return false;

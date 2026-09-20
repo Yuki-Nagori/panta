@@ -1,7 +1,7 @@
 [alias]
 # 根目录跨语言质量入口；实现位于 tests/，避免 shell/Node 运行时分叉。
-quality = "run --locked --package panta-tests -- quality"
-lint = "run --locked --package panta-tests -- lint"
-format = "run --locked --package panta-tests -- format"
-audit = "run --locked --package panta-tests -- audit"
-coverage = "run --locked --package panta-tests -- coverage"
+quality = "run -q --locked --package panta-tests -- quality"
+lint = "run -q --locked --package panta-tests -- lint"
+format = "run -q --locked --package panta-tests -- format"
+audit = "run -q --locked --package panta-tests -- audit"
+coverage = "run -q --locked --package panta-tests -- coverage"

@@ -1,17 +1,12 @@
 #!/bin/sh
-# 提交前质量门禁：聚合格式与全部 lint 工具必须通过，否则拒绝提交。
-# 覆盖与 CI 相同的 format/lint 集合（clippy、machete、cmake-lint、qmllint、
-# clang-tidy、include-cleaner、cppcheck）；依赖审计、覆盖率与测试套件仍由
-# CI 承担。lint 经 build.rs 触发 native 配置，冷机首次提交会先供给
-# LLVM/Qt（受限下载），属已知的一次性成本。
+# 提交前门禁只做格式检查（秒级、不触发 native 构建）；lint 全套、依赖
+# 审计、覆盖率与测试套件由 CI 承担——lint 需要全量 native 构建支撑编译
+# 数据库，放进 hook 会让每次提交阻塞数分钟。
 # 启用方式（每台机器一次性，git 不随仓库携带 hooks 配置）：
 #   git config core.hooksPath .githooks
 set -e
 
-echo "[pre-commit] cargo format"
-cargo format
-
-echo "[pre-commit] cargo lint（clippy/machete/cmake/qmllint/clang-tidy/includes/cppcheck）"
-cargo lint
+echo "[pre-commit] cargo format --check"
+cargo format --check
 
 echo "[pre-commit] 通过"
