@@ -85,6 +85,7 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 
 | 2026-09-18 | 本轮 Rust 验证，cwd 仓库根，macOS arm64，rustc 1.98.1 / cargo-llvm-cov 0.9.1 + 同工具链 llvm-tools；`cargo test --locked --workspace --exclude panta-launcher` | 90 项测试通过；新增 DSL features 24 项。移除 CLI 重复实例测试后覆盖数字不变 |
 | 2026-09-18 | `cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92` | 通过：函数 89.69%（30/291 未进入），行 94.23%（163/2826 未覆盖）；仍有实际报告缺口，未宣称 100% |
+| 2026-09-20 | macOS arm64；`cargo coverage`（commit `a613a31` 的 CI 复现，补充 crash 跨平台实现与同进程覆盖测试后） | 通过：函数 89.18%、行 93.84%，均达到 89%/92% 门禁；`panta-foundation/src/crash.rs` 函数覆盖从 75.00% 提升到 100.00%，未降低门禁 |
 
 | 2026-09-18 | 完整 `cargo test --locked --workspace`，macOS arm64 / rustc 1.98.1；CMake 4.3.3 / clang-format 20.1.0 / Qt 6.11.2，使用本地固定/缓存供给 | 101 项 Rust/聚合测试通过，含 CTest 28/28、qmllint、自有 native + CXX 格式。沙箱内初跑 Qt 测试配置目录不可写，扩大执行权限后全部通过；新增纳管的两个 CXX 源文件已格式化 |
 | 2026-09-18 | `cargo test --locked --release --target-dir target/review-target -p panta-tests --test native`（复用第三方缓存） | Release 与自定义 target-dir 的聚合 2/2、CTest 28/28，通过；从 build.rs 导出当前构建树/配置，不再读取 Debug 旧产物 |

@@ -49,6 +49,11 @@ ExternalProject_Add(
   GIT_REPOSITORY https://github.com/google/dawn.git
   GIT_TAG ${PANTA_DAWN_TAG}
   GIT_SHALLOW TRUE
+  # Dawn 的默认 git update 会递归 checkout ANGLE、SwiftShader、LLVM 等
+  # 与 webgpu_dawn 无关的整棵依赖树；其中包含不可匿名访问的
+  # chrome-internal.googlesource.com URL，并会在 Windows 触发路径长度限制。
+  # 只保留 Dawn 源码，依赖由其受控的 fetch_dawn_dependencies.py 按需取得。
+  GIT_SUBMODULES "" GIT_SUBMODULES_RECURSE FALSE
   GIT_PROGRESS TRUE
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${PANTA_DAWN_INSTALL_DIR}

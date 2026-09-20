@@ -51,6 +51,8 @@ minidump/WER、Qt 消息处理、远程上报。
 | 2026-09-19 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets` | 通过，1/1；fork 子进程触发 `SIGSEGV` 后由处理器写入信号/pid/回溯和真实日志路径，恢复默认处置后仍以 `SIGSEGV` 终止；测试同时断言 `crash_log_path()` 返回实际文件路径，父进程读取日志后清理临时目录 |
 | 2026-09-19 | macOS arm64；`cargo test --locked -p panta-ffi --all-targets` | 通过，11/11；CXX 边界、panic-abort、任务/路径服务回归通过，崩溃安装入口完成 foundation 转发 |
 | 2026-09-19 | macOS arm64；`cargo build --locked` | 通过；panta-foundation → panta-ffi staticlib → Cargo 调度 native/VTK 构建链成功 |
+| 2026-09-20 | GitHub Actions CI run [35459273420](https://github.com/Yuki-Nagori/panta/actions/runs/35459273420)（commit `a613a31`）Windows job `105940092071`、Rust coverage job `105940092069` | Windows 暴露实现只使用 Unix `std::os::fd`、POSIX 信号常量和 `libc::write`；Rust 覆盖率为 88.55%，新增 crash 模块仅 42.79% 行覆盖，低于现行 92% 门禁。保留 POSIX 完整信号路径，补 Windows 最小 SEH 日志路径，并为纯格式化/写出辅助函数增加同进程测试覆盖 |
+| 2026-09-20 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets`、`cargo check --locked -p panta-foundation --target x86_64-pc-windows-msvc`、`cargo coverage` | 通过：macOS crash 测试 2/2；Windows 目标交叉检查通过；覆盖率函数 89.18%、行 93.84%。Windows 使用 `SetUnhandledExceptionFilter` 写出最小 SEH 进程记录后继续 WER，POSIX 路径保留信号重发与 `.ips` 语义 |
 
 ## 决策与工作记录
 

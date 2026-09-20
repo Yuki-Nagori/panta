@@ -17,6 +17,12 @@
 cmake_minimum_required(VERSION 3.22)
 project(panta_sdk_production NONE)
 
+# 空的 GIT_SUBMODULES 明确表示不初始化 Dawn 的递归 submodule；依赖由
+# DAWN_FETCH_DEPENDENCIES 的选择性脚本处理。CMP0097=NEW 才保留该语义。
+if(POLICY CMP0097)
+  cmake_policy(SET CMP0097 NEW)
+endif()
+
 # triple 映射与 031 消费侧同源，避免生产/供给两侧命名漂移。
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../native/cmake/sdk-provision.cmake)
 panta_sdk_triple(PANTA_SDK_TRIPLE)
