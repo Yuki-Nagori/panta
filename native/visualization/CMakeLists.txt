@@ -50,10 +50,15 @@ if(UNIX AND NOT APPLE)
   pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
 endif()
 # WebGPU/hardware-window 路径不依赖 Qt VTK GUI 或 OpenGL scenegraph；
-# 测试图元生成所需的 FiltersSources 和 Dawn 运行时显式列出。
+# 测试图元生成所需的 FiltersSources 和 Dawn 运行时显式列出。公共头只有
+# Qt 类型，VTK/Dawn 仅为模块内部消费——PRIVATE 链接避免第三方 include
+# 路径泄漏给消费方（静态库符号仍经 LINK_ONLY 传播给最终链接者）；
+# Qt6::Quick 对应公共头的 QQuickItem 基类，保持 PUBLIC。
 target_link_libraries(
-  panta_visualization PUBLIC VTK::RenderingWebGPU VTK::RenderingUI VTK::RenderingCore
-                             VTK::FiltersSources dawn::webgpu_dawn Qt6::Quick)
+  panta_visualization
+  PRIVATE VTK::RenderingWebGPU VTK::RenderingUI VTK::RenderingCore VTK::FiltersSources
+          dawn::webgpu_dawn
+  PUBLIC Qt6::Quick)
 if(UNIX AND NOT APPLE)
   target_link_libraries(panta_visualization PRIVATE PkgConfig::WAYLAND_CLIENT)
 endif()

@@ -119,12 +119,6 @@ class PantaWaylandHardwareWindow final : public vtkWaylandHardwareWindow {
 
 vtkStandardNewMacro(PantaWaylandHardwareWindow);
 
-void release_hardware_window(vtkHardwareWindow* hardware) {
-    if (hardware != nullptr) {
-        hardware->Delete();
-    }
-}
-
 } // namespace
 #endif
 
@@ -132,19 +126,10 @@ namespace panta::visualization {
 
 #if defined(Q_OS_WIN)
 
-namespace {
-void release_hardware_window(vtkHardwareWindow* hardware) {
-    if (hardware != nullptr) {
-        hardware->Delete();
-    }
-}
-} // namespace
-
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow* window) {
+NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
     auto* hardware = vtkWin32HardwareWindow::New();
     hardware->SetParentId(reinterpret_cast<void*>(window != nullptr ? window->winId() : 0));
-    return {hardware, &release_hardware_window};
+    return NativeHardwareWindow{hardware};
 }
 
 bool attach_native_surface(QQuickWindow*, QQuickItem*, vtkHardwareWindow* hardware,
@@ -183,8 +168,7 @@ void detach_native_surface(NativeSurface& surface) {
 
 #elif defined(Q_OS_LINUX)
 
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow* window) {
+NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
     auto* application = QGuiApplication::instance();
     auto* wayland = application != nullptr
                         ? application->nativeInterface<QNativeInterface::QWaylandApplication>()
@@ -194,7 +178,7 @@ create_native_hardware_window(QQuickWindow* window) {
         wayland != nullptr ? wayland->display() : nullptr,
         wayland != nullptr ? wayland->compositor() : nullptr,
         reinterpret_cast<wl_surface*>(window != nullptr ? window->winId() : 0));
-    return {hardware, &release_hardware_window};
+    return NativeHardwareWindow{hardware};
 }
 
 bool attach_native_surface(QQuickWindow*, QQuickItem*, vtkHardwareWindow* hardware,
@@ -219,6 +203,9 @@ void sync_native_surface(QQuickWindow* window, QQuickItem* item, vtkHardwareWind
 }
 
 void set_native_surface_visible(NativeSurface& surface, bool visible) {
+    // 隐藏经 attach(null)+commit 取消映射；重新显示不在此实现——由
+    // VtkViewport 在可见分支强制 Render() 重新提交 swapchain buffer 完成
+    // 重映射（该耦合需在真实 Wayland 环境持续验证，见任务 007 验证表）。
     auto* view = static_cast<wl_surface*>(surface.view);
     if (view == nullptr || visible) {
         return;
@@ -230,10 +217,7 @@ void detach_native_surface(NativeSurface& surface) { surface = {}; }
 
 #else
 
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow*) {
-    return {nullptr, nullptr};
-}
+NativeHardwareWindow create_native_hardware_window(QQuickWindow*) { return NativeHardwareWindow{}; }
 
 bool attach_native_surface(QQuickWindow*, QQuickItem*, vtkHardwareWindow*, NativeSurface&) {
     return false;

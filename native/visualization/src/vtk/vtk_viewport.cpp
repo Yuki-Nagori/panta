@@ -59,8 +59,7 @@ void configure_default_camera(vtkWebGPURenderer* renderer) {
 struct VtkViewport::Impl {
     RenderScene pending;
     NativeSurface native_surface;
-    std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)> hardware_window{nullptr,
-                                                                                     nullptr};
+    NativeHardwareWindow hardware_window;
     vtkSmartPointer<vtkWebGPURenderWindow> render_window;
     vtkSmartPointer<vtkWebGPURenderer> renderer;
     vtkSmartPointer<vtkActor> primitive_actor;

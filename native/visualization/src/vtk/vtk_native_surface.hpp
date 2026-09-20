@@ -5,12 +5,24 @@
 #pragma once
 
 #include <memory>
+#include <vtkHardwareWindow.h>
 
 class QQuickItem;
 class QQuickWindow;
-class vtkHardwareWindow;
 
 namespace panta::visualization {
+
+/// hardware window 所有权用 unique_ptr 承载；删除器按 VTK 引用计数规则
+/// 经 Delete() 释放，三平台桥接共用这一定义。
+struct HardwareWindowDeleter {
+    void operator()(vtkHardwareWindow* hardware) const {
+        if (hardware != nullptr) {
+            hardware->Delete();
+        }
+    }
+};
+
+using NativeHardwareWindow = std::unique_ptr<vtkHardwareWindow, HardwareWindowDeleter>;
 
 struct NativeSurface {
     void* host = nullptr;
@@ -18,8 +30,7 @@ struct NativeSurface {
 };
 
 /// 为 Qt Quick 窗口创建使用其原生 surface 的 VTK hardware window。
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow* window);
+NativeHardwareWindow create_native_hardware_window(QQuickWindow* window);
 
 /// 将 hardware window 的 view/layer 接入 Qt Quick 原生窗口。
 bool attach_native_surface(QQuickWindow* window, QQuickItem* item, vtkHardwareWindow* hardware,

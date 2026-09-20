@@ -14,12 +14,6 @@
 namespace panta::visualization {
 namespace {
 
-void release_hardware_window(vtkHardwareWindow* hardware) {
-    if (hardware != nullptr) {
-        hardware->Delete();
-    }
-}
-
 NSView* qt_native_view(QQuickWindow* window) {
     if (window == nullptr) {
         return nullptr;
@@ -29,9 +23,8 @@ NSView* qt_native_view(QQuickWindow* window) {
 
 } // namespace
 
-std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)>
-create_native_hardware_window(QQuickWindow*) {
-    return {vtkCocoaHardwareWindow::New(), &release_hardware_window};
+NativeHardwareWindow create_native_hardware_window(QQuickWindow*) {
+    return NativeHardwareWindow{vtkCocoaHardwareWindow::New()};
 }
 
 bool attach_native_surface(QQuickWindow* window, QQuickItem*, vtkHardwareWindow* hardware,
