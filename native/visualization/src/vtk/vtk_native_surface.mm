@@ -1,5 +1,5 @@
-/// macOS Cocoa/Metal surface bridge. VTK owns the Cocoa hardware view and its
-/// CAMetalLayer; this file only reparents that view into Qt Quick's native view.
+/// macOS Cocoa/Metal surface 桥接。VTK 持有 Cocoa hardware view 及其
+/// CAMetalLayer；本文件只把该视图重新挂入 Qt Quick 的原生宿主视图。
 #include "vtk_native_surface.hpp"
 
 #include <QQuickItem>
@@ -61,9 +61,9 @@ void sync_native_surface(QQuickWindow*, QQuickItem* item, vtkHardwareWindow* har
     const int logical_width = qMax(1, qRound(item->width()));
     const int logical_height = qMax(1, qRound(item->height()));
 
-    // vtkCocoaHardwareWindow::SetSize() uses logical points, not backing
-    // pixels. It also updates the VTK-owned NSView frame, so apply it before
-    // restoring the QQuickItem position in the host view.
+    // vtkCocoaHardwareWindow::SetSize() 使用逻辑点而非 backing 像素，且会
+    // 更新 VTK 持有的 NSView frame——先调用它，再恢复 QQuickItem 在宿主
+    // 视图中的位置。
     cocoa->SetSize(logical_width, logical_height);
     // Qt 的 content view 是 flipped 坐标系（原点左上），子视图 frame 直接
     // 使用 QML scene 坐标；仅非 flipped 宿主需要换算底部原点。

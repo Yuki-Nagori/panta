@@ -1,5 +1,5 @@
-/// Windows/Wayland native surface bridge. Windows uses a child HWND; Wayland
-/// uses a wl_subsurface attached to Qt Quick's top-level wl_surface.
+/// Windows/Wayland 原生 surface 桥接。Windows 使用子 HWND；Wayland 把
+/// wl_subsurface 挂到 Qt Quick 的顶层 wl_surface。
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
 #include <QPointF>

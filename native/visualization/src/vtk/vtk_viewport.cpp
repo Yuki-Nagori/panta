@@ -127,9 +127,8 @@ void VtkViewport::geometryChange(const QRectF& new_geometry, const QRectF& old_g
 void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
     QQuickItem::itemChange(change, value);
     if (change == ItemSceneChange) {
-        // value.window is the documented payload of this change; when window()
-        // becomes the new window is not part of the contract, so defer to the
-        // event loop and query the settled window there.
+        // ItemSceneChange 的文档化载荷是 value.window；window() 何时切换为
+        // 新窗口不属于契约，延后到事件循环读取已就绪的 window()。
         schedule_refresh();
     } else if (change == ItemVisibleHasChanged) {
         ensure_render_window();
@@ -140,8 +139,7 @@ void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
             set_native_surface_visible(impl_->native_surface, isVisible());
         }
     } else if (change == ItemDevicePixelRatioHasChanged) {
-        // Moving the window between displays (or system scale changes)
-        // invalidates the pixel size derived from the previous DPR.
+        // 窗口跨显示器或系统缩放变化后，按旧 DPR 推导的像素尺寸失效。
         ensure_render_window();
         sync_native_surface();
     }
@@ -154,18 +152,16 @@ void VtkViewport::ensure_render_window() {
     if (window() == nullptr) {
         return;
     }
-    // QML geometry is available before the native window is shown. Creating a
-    // platform surface in that phase can make it cover the whole host view or
-    // submit against an incomplete Cocoa/Wayland window hierarchy.
+    // QML 几何在原生窗口显示前就可用；在该阶段创建平台 surface 会让它
+    // 铺满宿主视图，或对接到不完整的 Cocoa/Wayland 窗口层级。
     if (!window()->isVisible()) {
         return;
     }
     if (width() <= 0 || height() <= 0) {
         return;
     }
-    // Creation is retried on later geometry/visibility events; warn once per
-    // item so unsupported platforms do not repeat the same diagnostic on
-    // every retry.
+    // 创建会在后续几何/可见性事件里重试；告警每实例一次，避免不支持平台
+    // 在每次重试时重复输出同一诊断。
     const auto warn_once = [this](const char* message) {
         if (!impl_->creation_warning_emitted) {
             impl_->creation_warning_emitted = true;
@@ -225,7 +221,7 @@ void VtkViewport::ensure_render_window() {
     impl_->render_window->Initialize();
 
     if (impl_->render_window->GetGenericContext() == nullptr) {
-        qWarning("VtkViewport: VTK WebGPU device 初始化失败");
+        warn_once("VtkViewport: VTK WebGPU device 初始化失败");
         destroy_render_window();
         return;
     }
@@ -235,10 +231,9 @@ void VtkViewport::ensure_render_window() {
 }
 
 void VtkViewport::schedule_refresh() {
-    // QWindow::visibleChanged is emitted while Qt is still completing the
-    // native window transition; window-level signals may also fire several
-    // times per transition. Queue one deferred attempt so both the transition
-    // has returned to the event loop and duplicate signals collapse.
+    // QWindow::visibleChanged 在 Qt 尚未完成原生窗口切换时发出，窗口级
+    // 信号在同一次切换里也可能多次触发；排队一次延迟尝试，既等切换回到
+    // 事件循环，又把重复信号折叠成一次。
     if (impl_->refresh_scheduled) {
         return;
     }
@@ -277,9 +272,6 @@ void VtkViewport::sync_native_surface(bool force_render) {
 }
 
 void VtkViewport::destroy_render_window() {
-    if (impl_ == nullptr) {
-        return;
-    }
     impl_->applied_pixel_size = QSize();
     if (impl_->render_window != nullptr) {
         impl_->render_window->Finalize();
