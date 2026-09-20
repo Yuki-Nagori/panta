@@ -244,11 +244,8 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
-      # Windows 测试进程激活阻塞缓解（任务 007 验证表 2026-09-20）：链接
-      # VTK/Dawn 静态库的测试 exe 体积大（Dawn 静态库 191MB）且每次 CI
-      # 重新链接哈希都变，启动即被实时扫描阻塞——进程零输出、任何自有代码
-      # （含静态初始化探针）都未执行即超时。runner 以管理员运行，关闭实时
-      # 监控是该场景的标准做法；仅影响本 runner，不落地仓库状态。
+      # 大型新 exe 构建加速的常规做法（任务 007 轮 4 已证 Defender 不是
+      # 测试挂起根因，豁免保留但不再作为修复）；仅影响本 runner。
       - if: runner.os == 'Windows'
         name: Disable Defender real-time scanning for fresh build outputs
         shell: powershell
@@ -261,10 +258,11 @@ jobs:
         run: cargo build --locked --workspace
 
       # 取证步（任务 007 验证表 2026-09-20）：绕过 ctest 直接拉起链接
-      # VTK/Dawn 静态库的两个测试 exe。退出码三分类失败（0xc0000135 缺
-      # DLL / 0xc0000005 崩溃 / 60s 未退出 = 真挂起），stderr 落文件排除
-      # 管道因素；应用日志补充 WER 崩溃记录。仅取证——任何异常都不改变
-      # job 结果。
+      # VTK/Dawn 静态库的测试 exe。第一轮结论：直接拉起 60ms 内静默退出、
+      # ctest 拉起却挂死——两者差异聚焦 stdio 形态（文件/控制台 vs 管道）
+      # 与退出码。本轮矩阵：llvm-readobj 导出 PE 导入表；控制台 stdio 与
+      # 管道 stdio（.NET Process 真实句柄，30s 有界）分别拉起取退出码与
+      # 管道部分输出；WER 按 Provider 过滤。仅取证——不改变 job 结果。
       - if: runner.os == 'Windows'
         name: Probe VTK-linked test executables directly
         shell: powershell
@@ -273,32 +271,42 @@ jobs:
             $env:PATH = "$PWD\target\panta-deps\qt\staging\bin;$env:PATH"
             $env:QT_QPA_PLATFORM = "offscreen"
             $env:QT_FORCE_STDERR_LOGGING = "1"
-            foreach ($name in @("panta_qml_shell_module_test.exe",
-                                "panta_qml_viewport_module_test.exe")) {
-              "=== $name"
-              $found = Get-ChildItem -Path "target\native" -Recurse -Filter $name `
-                -ErrorAction SilentlyContinue | Select-Object -First 1
-              if (-not $found) {
-                "NOT FOUND under target\native; top-level layout:"
-                Get-ChildItem "target\native\debug" -Directory |
-                  Select-Object -ExpandProperty Name
-                Get-ChildItem "target\native\debug" -Recurse -Filter "*.exe" |
-                  Select-Object -First 12 -ExpandProperty FullName
-                continue
-              }
-              "path: $($found.FullName)"
-              $out = [System.IO.Path]::GetTempFileName()
-              $err = [System.IO.Path]::GetTempFileName()
-              $p = Start-Process -FilePath $found.FullName `
-                -WorkingDirectory $found.DirectoryName `
-                -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
-              if ($p.WaitForExit(60000)) { "exited code=0x{0:X}" -f $p.ExitCode }
-              else { "STILL RUNNING after 60s; killing"; $p.Kill(); $p.WaitForExit() }
-              "--- stdout"; Get-Content $out; "--- stderr"; Get-Content $err
-              Remove-Item $out, $err
+            $exe = Get-ChildItem -Path "target\native" -Recurse `
+              -Filter "panta_qml_shell_module_test.exe" | Select-Object -First 1
+            "exe: $($exe.FullName) size=$($exe.Length)"
+            $readobj = Get-ChildItem "target\panta-tools\llvm\bin" `
+              -Filter "llvm-readobj*" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($readobj) {
+              "--- PE imports:"
+              & $readobj.FullName --needed-libs $exe.FullName 2>&1 |
+                Select-String "Name:" | Select-Object -First 24
+            } else { "llvm-readobj not found" }
+            $p1 = Start-Process -FilePath $exe.FullName -NoNewWindow -PassThru
+            if ($p1.WaitForExit(30000)) {
+              "console stdio: exited code=$($p1.ExitCode)"
+            } else {
+              "console stdio: STILL RUNNING 30s; killing"; $p1.Kill()
             }
-            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1002} `
-              -MaxEvents 6 -ErrorAction SilentlyContinue |
+            $psi = New-Object System.Diagnostics.ProcessStartInfo
+            $psi.FileName = $exe.FullName
+            $psi.WorkingDirectory = $exe.DirectoryName
+            $psi.UseShellExecute = $false
+            $psi.RedirectStandardOutput = $true
+            $psi.RedirectStandardError = $true
+            $psi.RedirectStandardInput = $true
+            $p2 = [System.Diagnostics.Process]::Start($psi)
+            $outTask = $p2.StandardOutput.ReadToEndAsync()
+            $errTask = $p2.StandardError.ReadToEndAsync()
+            if ($p2.WaitForExit(30000)) {
+              "pipe stdio: exited code=$($p2.ExitCode)"
+            } else {
+              "pipe stdio: STILL RUNNING 30s; killing"; $p2.Kill()
+            }
+            "--- pipe stderr:"; $errTask.Result
+            "--- pipe stdout:"; $outTask.Result
+            Get-WinEvent -FilterHashtable @{
+              LogName='Application'; ProviderName='Application Error','Windows Error Reporting'
+            } -MaxEvents 6 -ErrorAction SilentlyContinue |
               Select-Object TimeCreated, Id, Message | Format-List
           } catch {
             "probe step error (non-fatal): $_"
