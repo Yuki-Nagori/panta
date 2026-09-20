@@ -1,10 +1,16 @@
 # VTK WebGPU 硬件窗口与渲染数据
 
-查阅日期：2026-09-20。状态：VTK 9.7.0 WebGPU 硬件窗口制品已发布；007 已删除
-`QQuickVTKItem`/Qt OpenGL scenegraph 集成，当前 native 工程已切换到原生 surface/view/layer 桥接，真实窗口验收仍进行中。
+查阅 / 更新日期：2026-09-20。状态：VTK 9.7.0 WebGPU 硬件窗口制品已发布并由任务 007 完成三平台 CI 集成（Windows 测试挂起结案，run 35510679878 全绿）；`QQuickVTKItem`/Qt OpenGL scenegraph 集成已删除，当前 native 工程为原生 surface/view/layer 桥接，真实窗口验收仍进行中。
 
 适用于 VTK adapter 和 `CaeViewport`；VTK 不是公共数据模型。QML 不直接操作
 VTK 对象，原生视口负责 VTK WebGPU 生命周期、平台 surface 与 Qt Quick 的叠加。
+
+## 消费约定（007 落地）
+
+- 消费统一走 `panta_require_sdk("vtk")`：manifest 固定 Release `sdk-vtk-9.7.0-webgpu`（C++20、`VTK_ENABLE_WEBGPU=ON`、Dawn 同包，required targets 为 `VTK::RenderingWebGPU`/`VTK::RenderingUI`/`dawn::webgpu_dawn`；Linux 制品 Wayland-only，`VTK_USE_X=OFF`，纯 X11 需另行生产变体）。
+- 链接边界：VTK/Dawn 全部 PRIVATE（公共头只有 Qt 类型，`Qt6::Quick` 因公共头基类保持 PUBLIC），静态库符号经 LINK_ONLY 传播给最终链接者；消费 `VTK::RenderingWebGPU` 的 target 必须调用 `vtk_module_autoinit`（缺省时 render window 可创建、帧可提交，但 renderer/mapper 工厂未注册，场景空白）。
+- 运行库形态：Windows 制品为 DLL（`vtk*-9.7.dll`，Dawn 静态编入 VTK DLL），测试进程 PATH 须含 SDK bin 目录（`native_test_env` 注入）；macOS/Linux dylib/so 为 `@rpath` 安装名，构建 rpath 自动解析。
+- 适配层结构：公共契约在 `include/panta/visualization/`，第三方头收敛在 `src/vtk/`（与 `geometry/src/occt`、`mesh/src/netgen` 同构）。
 
 ## 9.7.0 WebGPU 硬件窗口路线（以新 SDK 头文件为准）
 
