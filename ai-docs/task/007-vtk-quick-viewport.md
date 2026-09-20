@@ -118,6 +118,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 2026-09-20：038 完成 `sdk-vtk-9.7.0-webgpu` 三平台 Release，031 已登记新资产；007 转入原生 surface/view 嵌入与事件协调实现。
 - 2026-09-20：native/visualization 删除旧 QQuickVTKItem 适配器，新增 WebGPU render window 与 macOS Cocoa、Windows Win32、Linux Wayland surface bridge；`App.qml` 恢复实际 CaeViewport 调用。macOS 无屏幕环境的启动验证发现并修复 offscreen surface 误用导致的 SIGSEGV，崩溃日志路径按任务 047 记录。
 - 2026-09-20（Windows 挂起取证轮 3）：探针全链零输出且第三方静态库无静态初始化段 ⇒ 挂点在 CRT 启动之前，不属于本仓库代码路径；维护者无 Windows 机器，缓解与继续取证转 CI 侧（Defender 实时监控豁免 + 绕过 ctest 直接拉起 exe 按退出码三分类）。若下轮 Windows 仍挂起，以诊断步输出为准继续，不再加进程内探针。
+- 2026-09-20（官方集成路线核对）：上游 VTK 新增 `VTK::GUISupportQtWebGPU`（`QVTKWebGPUWidget`：widget 自身设原生窗口，直接以 `winId()` 构造 `WGPUSurfaceSourceWindowsHWND`/CAMetalLayer/Wayland surface 描述符经 `SetCustomSurfaceDescriptor` 交给 render window，不用 hardware window/子 HWND/几何同步）——但该模块与 API 在 v9.7.0 tag 均不存在，且本仓库 SDK 未编译任何 GUISupportQt* 模块；`QQuickVTKItem`（Qt Quick，OpenGL2）上游仍在但 9.7 SDK 未含，官方也没有 Qt Quick + WebGPU 类。当前实现符合 9.7 hardware-window 官方契约；是否升级 SDK 转官方 widget 路线列为 031/007 待决策项（Qt Quick 侧仍需自建 QQuickItem 包装，官方只提供 QWidget）。
 - 待记录：目标平台真实窗口下的 resize、高 DPI、隐藏/恢复、输入协调和重开验证；Windows 桥接中 `hardware->SetSize()` 与 `SetWindowPos` 的宽高双写是否冗余（本机仅 macOS SDK，无法核对 `vtkWin32HardwareWindow` 头）。
 
 ## 完成摘要

@@ -31,10 +31,12 @@ fn main() -> ExitCode {
             lint(rest.first().map(String::as_str), check)
         }
         Some(command) => Err(format!(
-            "未知命令 '{command}'；可用：quality、audit、lint、format、coverage、toolchain"
+            "未知命令 '{command}'；可用：quality、test、audit、lint、format、coverage、toolchain"
         )
         .into()),
-        None => Err("缺少命令；可用：quality、audit、lint、format、coverage、toolchain".into()),
+        None => {
+            Err("缺少命令；可用：quality、test、audit、lint、format、coverage、toolchain".into())
+        }
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

@@ -139,8 +139,12 @@ namespace panta::visualization {
 #if defined(Q_OS_WIN)
 
 NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
+    // winId() 承载宿主原生窗口句柄；Qt 未提供类型化入口，整型中转是平台
+    // 句柄契约而非值语义转换。
+    const auto parent_handle = window != nullptr ? window->winId() : quintptr{0};
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     auto* hardware = vtkWin32HardwareWindow::New();
-    hardware->SetParentId(reinterpret_cast<void*>(window != nullptr ? window->winId() : 0));
+    hardware->SetParentId(reinterpret_cast<void*>(parent_handle));
     return NativeHardwareWindow{hardware};
 }
 
