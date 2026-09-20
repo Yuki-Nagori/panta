@@ -102,6 +102,9 @@ add_subdirectory(i18n)
 # OCCT STEP 适配冒烟（任务 009）：经 031 固定供给消费 OpenCASCADE SDK；
 # 无 Qt/QML 依赖，业务任务接入前仅由自身 gtest 消费。
 add_subdirectory(geometry)
+# Mesh IR 与 Netgen 适配（任务 010）：netgen 侧依赖 OCCT targets，
+# 在 geometry 之后加入构建图。
+add_subdirectory(mesh)
 # VTK 原生视口核心（任务 007）：bridge 经 Panta.Bridge 注册 CaeViewport；
 # 诊断构建（AppNoBridge）不带 VTK。
 if(PANTA_ENABLE_BRIDGE_MODULE)
