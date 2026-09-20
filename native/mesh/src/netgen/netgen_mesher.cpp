@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <meshing/meshclass.hpp>
@@ -57,32 +56,21 @@ std::string meshing_failure_detail(const char* stage, nglib::Ng_Result result) {
            std::to_string(static_cast<int>(result));
 }
 
-/// 有向体积 ×6（与 Mesh IR 的节点顺序约定一致）。
-double tet_six_times_volume(const std::array<double, 3>& p0, const std::array<double, 3>& p1,
-                            const std::array<double, 3>& p2, const std::array<double, 3>& p3) {
-    const double u[3] = {p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]};
-    const double v[3] = {p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]};
-    const double w[3] = {p3[0] - p0[0], p3[1] - p0[1], p3[2] - p0[2]};
-    const double cross[3] = {u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
-                             u[0] * v[1] - u[1] * v[0]};
-    return cross[0] * w[0] + cross[1] * w[1] + cross[2] * w[2];
-}
-
 /// 排序去重：Netgen 的 1 起编号压缩为 IR 的 0 起连续 ID；返回压缩映射。
-std::vector<std::uint32_t> compact_ids(std::vector<int> values) {
+std::vector<MeshIndex> compact_ids(std::vector<int> values) {
     std::sort(values.begin(), values.end());
     values.erase(std::unique(values.begin(), values.end()), values.end());
-    std::vector<std::uint32_t> mapping;
+    std::vector<MeshIndex> mapping;
     mapping.reserve(values.size());
     for (const int value : values)
-        mapping.push_back(static_cast<std::uint32_t>(value) - 1U);
+        mapping.push_back(static_cast<MeshIndex>(value) - 1U);
     return mapping;
 }
 
-std::uint32_t compressed_index(const std::vector<std::uint32_t>& mapping, int one_based) {
-    const auto found = std::lower_bound(mapping.begin(), mapping.end(),
-                                        static_cast<std::uint32_t>(one_based) - 1U);
-    return static_cast<std::uint32_t>(found - mapping.begin());
+MeshIndex compressed_index(const std::vector<MeshIndex>& mapping, int one_based) {
+    const auto found =
+        std::lower_bound(mapping.begin(), mapping.end(), static_cast<MeshIndex>(one_based) - 1U);
+    return static_cast<MeshIndex>(found - mapping.begin());
 }
 
 /// 把 netgen::Mesh 的节点、四面体与边界面元转换为 IR；区域取自体单元
@@ -118,18 +106,17 @@ bool convert_to_ir(const netgen::Mesh& source, TetMeshGenerationResult& result) 
         face_ids.push_back(descriptor.SurfNr());
     }
 
-    const std::vector<std::uint32_t> domain_mapping = compact_ids(std::move(domain_ids));
-    const std::vector<std::uint32_t> face_mapping = compact_ids(std::move(face_ids));
-    result.mesh.region_count = static_cast<std::uint32_t>(domain_mapping.size());
-    result.mesh.boundary_group_count = static_cast<std::uint32_t>(face_mapping.size());
+    const std::vector<MeshIndex> domain_mapping = compact_ids(std::move(domain_ids));
+    const std::vector<MeshIndex> face_mapping = compact_ids(std::move(face_ids));
+    result.mesh.region_count = static_cast<MeshIndex>(domain_mapping.size());
+    result.mesh.boundary_group_count = static_cast<MeshIndex>(face_mapping.size());
 
     result.mesh.tets.reserve(static_cast<std::size_t>(source.GetNE()));
     for (const auto& element : source.VolumeElements()) {
-        const std::uint32_t region = compressed_index(domain_mapping, element.GetIndex());
-        std::array<MeshIndex, 4> nodes = {static_cast<std::uint32_t>(element[0]) - 1U,
-                                          static_cast<std::uint32_t>(element[1]) - 1U,
-                                          static_cast<std::uint32_t>(element[2]) - 1U,
-                                          static_cast<std::uint32_t>(element[3]) - 1U};
+        const MeshIndex region = compressed_index(domain_mapping, element.GetIndex());
+        std::array<MeshIndex, 4> nodes = {
+            static_cast<MeshIndex>(element[0]) - 1U, static_cast<MeshIndex>(element[1]) - 1U,
+            static_cast<MeshIndex>(element[2]) - 1U, static_cast<MeshIndex>(element[3]) - 1U};
         // 方向归一化：Netgen 的局部顺序与 IR 的正体积约定相反（见
         // generate_tet_mesh_from_step 内说明），有向体积为负时交换末两个
         // 节点，使 IR 四面体统一为标准正向。
@@ -142,11 +129,11 @@ bool convert_to_ir(const netgen::Mesh& source, TetMeshGenerationResult& result) 
     result.mesh.boundary.reserve(static_cast<std::size_t>(source.GetNSE()));
     for (const auto& element : source.SurfaceElements()) {
         const netgen::FaceDescriptor& descriptor = source.GetFaceDescriptor(element);
-        const std::uint32_t group = compressed_index(face_mapping, descriptor.SurfNr());
-        result.mesh.boundary.push_back({{static_cast<std::uint32_t>(element[0]) - 1U,
-                                         static_cast<std::uint32_t>(element[1]) - 1U,
-                                         static_cast<std::uint32_t>(element[2]) - 1U},
-                                        group});
+        const MeshIndex group = compressed_index(face_mapping, descriptor.SurfNr());
+        result.mesh.boundary.push_back(
+            {{static_cast<MeshIndex>(element[0]) - 1U, static_cast<MeshIndex>(element[1]) - 1U,
+              static_cast<MeshIndex>(element[2]) - 1U},
+             group});
     }
     return true;
 }
