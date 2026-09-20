@@ -189,7 +189,7 @@ NativeHardwareWindow create_native_hardware_window(QQuickWindow* window) {
                         : nullptr;
     // winId() 在 Wayland 上承载 wl_surface 指针；Qt 未提供类型化入口，整型
     // 中转是平台句柄契约而非值语义转换。
-    const auto parent_handle = window != nullptr ? window->winId() : WId(0);
+    const auto parent_handle = window != nullptr ? window->winId() : quintptr{0};
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
     auto* parent_surface = reinterpret_cast<wl_surface*>(parent_handle);
     auto* hardware = PantaWaylandHardwareWindow::New();

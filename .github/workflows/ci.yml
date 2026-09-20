@@ -263,30 +263,47 @@ jobs:
       # 取证步（任务 007 验证表 2026-09-20）：绕过 ctest 直接拉起链接
       # VTK/Dawn 静态库的两个测试 exe。退出码三分类失败（0xc0000135 缺
       # DLL / 0xc0000005 崩溃 / 60s 未退出 = 真挂起），stderr 落文件排除
-      # 管道因素；应用日志补充 WER 崩溃记录。仅取证，不改变 job 结果。
+      # 管道因素；应用日志补充 WER 崩溃记录。仅取证——任何异常都不改变
+      # job 结果。
       - if: runner.os == 'Windows'
         name: Probe VTK-linked test executables directly
         shell: powershell
         run: |
-          $env:PATH = "$PWD\target\panta-deps\qt\staging\bin;$env:PATH"
-          $env:QT_QPA_PLATFORM = "offscreen"
-          $env:QT_FORCE_STDERR_LOGGING = "1"
-          foreach ($exe in @("panta_qml_shell_module_test.exe",
-                             "panta_qml_viewport_module_test.exe")) {
-            "=== $exe"
-            $out = [System.IO.Path]::GetTempFileName()
-            $err = [System.IO.Path]::GetTempFileName()
-            $p = Start-Process -FilePath "target\native\debug\app\$exe" `
-              -WorkingDirectory "target\native\debug\app" `
-              -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
-            if ($p.WaitForExit(60000)) { "exited code=0x{0:X}" -f $p.ExitCode }
-            else { "STILL RUNNING after 60s; killing"; $p.Kill(); $p.WaitForExit() }
-            "--- stdout"; Get-Content $out; "--- stderr"; Get-Content $err
-            Remove-Item $out, $err
+          try {
+            $env:PATH = "$PWD\target\panta-deps\qt\staging\bin;$env:PATH"
+            $env:QT_QPA_PLATFORM = "offscreen"
+            $env:QT_FORCE_STDERR_LOGGING = "1"
+            foreach ($name in @("panta_qml_shell_module_test.exe",
+                                "panta_qml_viewport_module_test.exe")) {
+              "=== $name"
+              $found = Get-ChildItem -Path "target\native" -Recurse -Filter $name `
+                -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $found) {
+                "NOT FOUND under target\native; top-level layout:"
+                Get-ChildItem "target\native\debug" -Directory |
+                  Select-Object -ExpandProperty Name
+                Get-ChildItem "target\native\debug" -Recurse -Filter "*.exe" |
+                  Select-Object -First 12 -ExpandProperty FullName
+                continue
+              }
+              "path: $($found.FullName)"
+              $out = [System.IO.Path]::GetTempFileName()
+              $err = [System.IO.Path]::GetTempFileName()
+              $p = Start-Process -FilePath $found.FullName `
+                -WorkingDirectory $found.DirectoryName `
+                -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+              if ($p.WaitForExit(60000)) { "exited code=0x{0:X}" -f $p.ExitCode }
+              else { "STILL RUNNING after 60s; killing"; $p.Kill(); $p.WaitForExit() }
+              "--- stdout"; Get-Content $out; "--- stderr"; Get-Content $err
+              Remove-Item $out, $err
+            }
+            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1002} `
+              -MaxEvents 6 -ErrorAction SilentlyContinue |
+              Select-Object TimeCreated, Id, Message | Format-List
+          } catch {
+            "probe step error (non-fatal): $_"
           }
-          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1002} `
-            -MaxEvents 6 -ErrorAction SilentlyContinue |
-            Select-Object TimeCreated, Id, Message | Format-List
+          exit 0
 
       - name: Verify Cargo-provisioned toolchain
         shell: bash
