@@ -99,6 +99,9 @@ endif()
 add_subdirectory(foundation)
 # QM 编译与资源入口（任务 034）：依赖 Qt 供给的 lrelease 与 Cargo 生成的 TS。
 add_subdirectory(i18n)
+# OCCT STEP 适配冒烟（任务 009）：经 031 固定供给消费 OpenCASCADE SDK；
+# 无 Qt/QML 依赖，业务任务接入前仅由自身 gtest 消费。
+add_subdirectory(geometry)
 # VTK 原生视口核心（任务 007）：bridge 经 Panta.Bridge 注册 CaeViewport；
 # 诊断构建（AppNoBridge）不带 VTK。
 if(PANTA_ENABLE_BRIDGE_MODULE)

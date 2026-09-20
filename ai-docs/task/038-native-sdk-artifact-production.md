@@ -9,7 +9,7 @@
 
 ## 目标与背景
 
-VTK、OpenCASCADE、Netgen 在目标平台没有统一、完整且可直接消费的官方 C++ SDK。为了坚持预编译优先，由受信 CI 按固定源码 commit 和工具链生产可复用 SDK，开发者和普通 CI 只下载校验后的归档，不在本地构建第三方源码。当前仅完成任务编排，尚未生成制品。
+VTK、OpenCASCADE、Netgen 在目标平台没有统一、完整且可直接消费的官方 C++ SDK。为了坚持预编译优先，由受信 CI 按固定源码 commit 和工具链生产可复用 SDK，开发者和普通 CI 只下载校验后的归档，不在本地构建第三方源码。VTK WebGPU 制品（Release `sdk-vtk-9.7.0-webgpu`）与 OCCT/Netgen 制品（Release `sdk-occt-netgen-8.0.1-6.2.2604`）已生产并登记进 031 manifest；剩余为 SBOM/provenance 发布闭环与 007/009/010 的真实链接/运行冒烟覆盖。
 
 ## 必读
 
