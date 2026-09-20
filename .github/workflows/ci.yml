@@ -257,12 +257,13 @@ jobs:
       - name: Build workspace and native targets
         run: cargo build --locked --workspace
 
-      # 取证步（任务 007 验证表 2026-09-20）：绕过 ctest 直接拉起链接
-      # VTK/Dawn 静态库的测试 exe。第一轮结论：直接拉起 60ms 内静默退出、
-      # ctest 拉起却挂死——两者差异聚焦 stdio 形态（文件/控制台 vs 管道）
-      # 与退出码。本轮矩阵：llvm-readobj 导出 PE 导入表；控制台 stdio 与
-      # 管道 stdio（.NET Process 真实句柄，30s 有界）分别拉起取退出码与
-      # 管道部分输出；WER 按 Provider 过滤。仅取证——不改变 job 结果。
+      # 取证步（任务 007 验证表 2026-09-20）：轮 5 发现同名 exe 在构建树中
+      # 可能有多份（缓存恢复的陈旧产物 1.6MB 无 VTK，退出码 0xC0000135），
+      # 与 ctest 实际拉起的含 VTK 大 exe 不是同一文件。本轮对准权威路径：
+      # 枚举全部同名 exe（路径/大小/时间戳）、解析 CTestTestfile.cmake 里
+      # add_test 注册的绝对路径、对注册 exe 直接拉起（.NET 真实句柄 + 管道
+      # stdio + 25s 有界）取退出码与部分输出、llvm-readobj 导出其导入表。
+      # 仅取证——不改变 job 结果。
       - if: runner.os == 'Windows'
         name: Probe VTK-linked test executables directly
         shell: powershell
@@ -271,43 +272,49 @@ jobs:
             $env:PATH = "$PWD\target\panta-deps\qt\staging\bin;$env:PATH"
             $env:QT_QPA_PLATFORM = "offscreen"
             $env:QT_FORCE_STDERR_LOGGING = "1"
-            $exe = Get-ChildItem -Path "target\native" -Recurse `
-              -Filter "panta_qml_shell_module_test.exe" | Select-Object -First 1
-            "exe: $($exe.FullName) size=$($exe.Length)"
-            $readobj = Get-ChildItem "target\panta-tools\llvm\bin" `
-              -Filter "llvm-readobj*" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($readobj) {
-              "--- PE imports:"
-              & $readobj.FullName --needed-libs $exe.FullName 2>&1 |
-                Select-String "Name:" | Select-Object -First 24
-            } else { "llvm-readobj not found" }
-            $p1 = Start-Process -FilePath $exe.FullName -NoNewWindow -PassThru
-            if ($p1.WaitForExit(30000)) {
-              "console stdio: exited code=$($p1.ExitCode)"
-            } else {
-              "console stdio: STILL RUNNING 30s; killing"; $p1.Kill()
+            "--- all panta_qml_*_test.exe under target\native:"
+            Get-ChildItem -Path "target\native" -Recurse `
+              -Filter "panta_qml_*_test.exe" -ErrorAction SilentlyContinue |
+              Select-Object FullName, Length, LastWriteTime | Format-List
+            "--- add_test registrations for Qml tests:"
+            Get-ChildItem "target\native" -Recurse -Filter "CTestTestfile.cmake" |
+              Select-String -Pattern "Qml\.(Shell|Viewport)" |
+              Select-Object -First 6 -ExpandProperty Line
+            $registered = (Get-ChildItem "target\native" -Recurse `
+              -Filter "CTestTestfile.cmake" |
+              Select-String -Pattern "add_test\(Qml\.ShellModuleLoads[^\)]*" |
+              Select-Object -First 1).Line
+            "registered line: $registered"
+            $target = [regex]::Match($registered, '"([^"]+)"').Groups[1].Value
+            if (-not (Test-Path $target)) {
+              $target = [regex]::Match($registered, '\s(\S+\.exe)').Groups[1].Value
             }
+            "launching registered exe: $target exists=$(Test-Path $target)"
             $psi = New-Object System.Diagnostics.ProcessStartInfo
-            $psi.FileName = $exe.FullName
-            $psi.WorkingDirectory = $exe.DirectoryName
+            $psi.FileName = $target
+            $psi.WorkingDirectory = Split-Path $target
             $psi.UseShellExecute = $false
             $psi.RedirectStandardOutput = $true
             $psi.RedirectStandardError = $true
             $psi.RedirectStandardInput = $true
-            $p2 = [System.Diagnostics.Process]::Start($psi)
-            $outTask = $p2.StandardOutput.ReadToEndAsync()
-            $errTask = $p2.StandardError.ReadToEndAsync()
-            if ($p2.WaitForExit(30000)) {
-              "pipe stdio: exited code=$($p2.ExitCode)"
+            $p = [System.Diagnostics.Process]::Start($psi)
+            $outTask = $p.StandardOutput.ReadToEndAsync()
+            $errTask = $p.StandardError.ReadToEndAsync()
+            if ($p.WaitForExit(25000)) {
+              "registered exe: exited code=$($p.ExitCode)"
             } else {
-              "pipe stdio: STILL RUNNING 30s; killing"; $p2.Kill()
+              "registered exe: STILL RUNNING 25s; killing"; $p.Kill()
             }
-            "--- pipe stderr:"; $errTask.Result
-            "--- pipe stdout:"; $outTask.Result
-            Get-WinEvent -FilterHashtable @{
-              LogName='Application'; ProviderName='Application Error','Windows Error Reporting'
-            } -MaxEvents 6 -ErrorAction SilentlyContinue |
-              Select-Object TimeCreated, Id, Message | Format-List
+            "--- stderr:"; $errTask.Result
+            "--- stdout:"; $outTask.Result
+            $readobj = Get-ChildItem "target\panta-tools" -Recurse `
+              -Filter "llvm-readobj.exe" -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($readobj -and (Test-Path $target)) {
+              "--- PE imports of registered exe:"
+              & $readobj.FullName --needed-libs $target 2>&1 |
+                Select-String "Name:" | Select-Object -First 30
+            }
           } catch {
             "probe step error (non-fatal): $_"
           }
