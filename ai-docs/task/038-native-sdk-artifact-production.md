@@ -59,7 +59,9 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 
 ## 验证计划与结果
 
-先在隔离 runner 运行依赖包自检和哈希复现，再在三平台清除缓存执行 configure/package smoke；以 031、007、009、010 的真实集成命令作为最终证据。
+以下证据按“历史路线与基础构建 → 当前 WebGPU/Wayland 路线 → 其他 SDK 与消费侧”组织。历史 Qt/OpenGL 记录保留用于解释迁移背景；当前有效路线是 GitHub VTK + Dawn 源码、Linux Wayland-only、三平台 WebGPU 制品。最终仍以隔离 runner 的 configure/package smoke、制品自检，以及 031、007、009、010 的真实集成命令为准。
+
+### 1. 历史路线与基础构建
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
@@ -69,6 +71,11 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-17 | 打包 `cmake -DPKG_ROOT=<安装树> … -P tools/sdk/package.cmake` | `vtk-9.7.0-macos-arm64.tar.gz`（平铺布局，56MB），SHA256 `0cc143dc6545d96f25d537b4ee31f76f4d6e3cc7dfb147bc205c7fdd1e1b6a0f`，与 `.sha256` 文件一致 |
 | 2026-09-17 | 增量二本地回归：vtk.cmake 去除子工程硬编码 Ninja（继承外层生成器）后 `cmake -S tools/sdk …` 重配 + `cmake --build`；`python3 -c "yaml.safe_load(...)"` 校验 `sdk-vtk.yml` 与 `ci.yml` | 重配/幂等构建通过（已产出的 stamp 不重编）；两个 workflow YAML 解析通过。dispatch 级验证（三平台真实生产/发布）待推送后执行 |
 | 2026-09-18 | 用户 dispatch 实测：workflow run [35242622228](https://github.com/Yuki-Nagori/panta/actions/runs/35242622228)（三平台，1h58m） | 旧版 Release `sdk-vtk-9.7.0` 落地；仅满足 `GUISupportQtQuick`/`RenderingQt` 原型，保留为历史验证证据，不作为当前 WebGPU 硬件窗口路线消费输入 |
+
+### 2. 当前 WebGPU / Wayland 路线
+
+| 日期 | 环境 / 命令或场景 | 结果 / 证据 |
+|---|---|---|
 | 2026-09-19 | WebGPU hardware-window 制品配置更新 | `tools/sdk/vtk.cmake` 改为 `VTK_ENABLE_WEBGPU=ON`、`RenderingWebGPU` + `RenderingUI`、Qt 关闭；workflow 自检目标与新 Release tag 改为 `sdk-vtk-9.7.0-webgpu`，待维护者 dispatch 生产 |
 | 2026-09-19 | VTK SDK workflow 首次 WebGPU dispatch 失败（run [35447552846](https://github.com/Yuki-Nagori/panta/actions/runs/35447552846)） | macOS/Linux 在 VTK configure 阶段报 `Could not find the Dawn external dependency`；根因是 WebGPU 构建描述缺少 `Dawn_DIR`。Windows 旧 workflow 仍进入 `netgen_sdk` 的 MSBuild，人工取消前未进入 VTK configure。已按 VTK 9.7.0 上游固定 Dawn 资产补充下载、SHA256 校验、安装树合并和 provenance，并让 VTK workflow 不再编译无关的 OCCT/Netgen；待新 commit 重新 dispatch 验证三平台 |
 | 2026-09-19 | 本地 review：VTK-only、OCCT/Netgen-only、全禁用三种 `cmake -S tools/sdk -B … -G Ninja` 配置；VTK `cmake --build … --target help`；Dawn 下载/安装脚本 tar.gz 两种根目录 fixture；三个 workflow YAML 与 `git diff --check` | 全部通过；fixture 覆盖 Dawn 归档 SHA256、解包、`DawnConfig.cmake`、include/lib/bin/share 合并及许可证复制。提交前 pre-commit 的 cargo format/lint、cmake-format/lint、QML 格式和 qmllint 全部通过；真实 VTK 三平台生产待新 commit dispatch |
@@ -82,6 +89,8 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-20 | VTK CI run [35453562309](https://github.com/Yuki-Nagori/panta/actions/runs/35453562309)：macOS job `105924788622`、Ubuntu job `105924788655` | 两个平台均在 `RenderingWebGPU` 编译阶段失败；Ubuntu 日志明确显示 VTK 生成的命令仍带 `-std=c++17`，随后 Dawn `webgpu_cpp.h` 报 `std::span`、`requires`、dependent `typename` 等 C++20 错误，macOS 报同类错误。根因是当前 GitHub Dawn native 资产已要求 C++20，而 VTK 9.7 的 `RenderingWebGPU` 目标只声明 `PUBLIC cxx_std_17`；单独设置全局 `CMAKE_CXX_STANDARD=20` 仍会被 VTK 目标级 feature 降回 C++17，现通过 `CMAKE_PROJECT_VTK_INCLUDE` 延迟覆盖该目标为 C++20，并在子工程中显式固定 C++20/required/no extensions。真实 VTK 本地生成命令已从 `-std=c++17` 变为 `-std=c++20`，待 CI 重跑 |
 | 2026-09-20 | VTK CI run [35459293478](https://github.com/Yuki-Nagori/panta/actions/runs/35459293478)（commit `a613a31`）三平台 Dawn 下载阶段 | macOS/Ubuntu 因 ExternalProject 默认递归 checkout Dawn 全部 submodule，进入 `chrome-internal.googlesource.com/angle/es-cts` 后无认证失败；Windows 同时出现无关 SwiftShader/LLVM/PowerVR 树的 filename too long。VTK 构建尚未开始；构建描述改为 `GIT_SUBMODULES ""` + `GIT_SUBMODULES_RECURSE FALSE`，依赖交给 Dawn 的 `DAWN_FETCH_DEPENDENCIES` 选择性脚本处理 |
 | 2026-09-20 | macOS arm64；干净父级 superbuild 的 Dawn `download → configure → build` 目标 | 通过：Dawn GitHub 新鲜 clone 的全部 submodule 保持未初始化；选择性依赖脚本配置完成并拉取所需依赖；740/740 编译步骤完成，生成 `libwebgpu_dawn.a`。证明该修复覆盖下载、依赖配置和编译阶段 |
+| 2026-09-20 | Ubuntu VTK SDK CI；Dawn configure 阶段 | Wayland-only runner 没有 X11 开发包，但 Dawn 在 Linux 默认将 `DAWN_USE_X11=ON` 且 `DAWN_USE_GLFW=ON`，GLFW 因而进入 `find_package(X11 REQUIRED)` 并失败。生产配置补齐 Dawn 窗口后端开关：Linux `DAWN_USE_WAYLAND=ON`、`DAWN_USE_X11=OFF`，所有平台 `DAWN_USE_GLFW=OFF`；VTK 仍保持 `VTK_USE_X=OFF`、`VTK_USE_Wayland=ON` |
+| 2026-09-20 | 本地跨平台 superbuild configure：Linux 以 `CMAKE_SYSTEM_NAME=Linux`/`x86_64` 生成，macOS 以 host triple 生成；`cmake-format --check`、`cmake-lint`、`git diff --check` | 通过。Linux Dawn 命令只生成 `DAWN_USE_GLFW=OFF`、`DAWN_USE_X11=OFF`、`DAWN_USE_WAYLAND=ON`；macOS 生成三项全 OFF；没有重复覆盖参数。该结果证明生产构建图已避开 X11，Ubuntu runner 的完整 Dawn/VTK 编译仍待 CI 实证 |
 | 2026-09-20 | 本地 macOS arm64 真实 VTK 9.7.0 `RenderingWebGPU` 全量编译（C++20 hook + GitHub Dawn `v20260720.160313`） | C++20 标准修复生效，1,797 个编译步骤完成且不再出现 `std::span`/`requires` 语法错误；最后 2 个 Dawn 回调模板实例化错误暴露 VTK 9.7.0 与该 Dawn 版本的 API 不匹配。VTK 自带 `Rendering/WebGPU/README.md` 明确要求 Dawn `v20260421.125655`，下一步将依此固定 GitHub Dawn 资产后重跑完整构建 |
 | 2026-09-20 | 对照 VTK 9.7 官方 WebGPU 文档与本地源码 review | 官方固定 Dawn `v20260421.125655`，支持 GitHub 源码构建；VTK 的 `DawnMemoryDump` 派生类需要 RTTI，而 GitHub native release 默认按 Dawn `DAWN_ENABLE_RTTI=OFF` 构建，导致静态链接缺 `typeinfo for dawn::native::MemoryDump`。删除不稳妥的 RTTI 假 anchor，改为固定 GitHub Dawn 源码构建并显式 `DAWN_ENABLE_RTTI=ON`；同时关闭 Dawn 无关测试、工具、protobuf/IR 构建，待完整 VTK 链接与安装验证 |
 | 2026-09-20 | VTK 9.7 Linux Wayland 官方文档/源码核对 | VTK 9.7 已提供原生 `vtkWaylandHardwareWindow`、`vtkWaylandRenderWindowInteractor` 和 WebGPU Wayland surface；`VTK_USE_Wayland` 仅在 `VTK_USE_X=OFF` 时启用，当前构建描述若沿用默认值会实际产出 X11 路径。Linux WebGPU SDK 改为显式 `VTK_USE_X=OFF`、`VTK_USE_Wayland=ON`，CI 补 `libwayland-dev`（含 `wayland-scanner`）、`wayland-protocols` 和 `libxkbcommon-dev`，X11 不再作为该 SDK 的编译后端；Qt Quick 与 Wayland surface 的嵌入/事件协调仍由 007 的应用集成阶段验证。参考 [VTK 9.7 Wayland/WebGPU 架构说明](https://docs.vtk.org/en/latest/release_details/9.7/hardware-windows-and-wayland.html) 与 [VTK 9.7 build settings](https://docs.vtk.org/en/v9.7.0/build_instructions/build_settings.html) |
@@ -90,11 +99,23 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-20 | 仓库级回归：`cargo test --locked --workspace` | 通过：Rust 单元/集成测试全部通过；native_and_qml_suite 的 CTest `29/29` 全部通过，其中包含 crash 日志、FFI、路径、QML 和任务服务测试 |
 | 2026-09-19 | `.githooks/pre-commit` | 未通过：仓库聚合 formatter 在 macOS 环境调用 `uv` 时触发 `system-configuration` 动态存储 NULL object panic，尚未进入本次代码 lint；独立 `cargo fmt --check`、`cmake-format --check`、`cmake-lint`、JSON/CMake 图/diff 检查通过 |
 | 2026-09-18 | 闭环验证（031 侧）：manifest 按发布资产登记后，macOS 生产 consumer 从 Release 真实下载消费，`find_package(VTK CONFIG)` + required-target 自检通过，离线二跑零下载；ctest 27/27 | 通过。VTK 从生产到消费全链路闭环 |
+
+### 3. 其他 SDK 与消费侧证据
+
+| 日期 | 环境 / 命令或场景 | 结果 / 证据 |
+|---|---|---|
 | 2026-09-18 | macOS 本机生产 occt→netgen（Apple Silicon 全并行，OCCT 编译约 18 分钟）：`cmake -S tools/sdk -B … -DQT_PROVISION_DIR=<Qt 缓存>` → `cmake --build … --target occt_sdk netgen_sdk` | 通过，经三轮实证修正：① Netgen 必须显式指向 OCCT **安装树** config（`OpenCASCADE_DIR=<prefix>/lib/cmake/opencascade`），否则撞上构建树 config 而 `*Targets.cmake` 缺失失败；② ExternalProject 的 CMAKE_ARGS 变更需父工程重 configure 才生效；③ Netgen 在 Apple 把安装前缀 FORCE 成 `.app` bundle——经其 `INSTALL_DIR` 变量接管并把 `NG_INSTALL_DIR_*`（CACHE）压平为标准 Unix 布局。产物：OCCT 安装树 111MB（归档 28MB，SHA256 `6175fae77f8ca385…`）、Netgen 9.5MB（归档 3.2MB，SHA256 `3440438b7f5bcb58…`） |
 | 2026-09-18 | 制品自检与打包：selfcheck `OpenCASCADE`（`TKernel TKDESTEP`，OCCT 8 targets 无命名空间）、`netgen`（`ngcore nglib`，无命名空间）；package 平铺归档 | 双双通过；LGPL-2.1+例外（OCCT）/LICENSE（Netgen）随包，`panta-sdk.json` 齐。Netgen 的 `libnglib.dylib` 链接同管线 OCCT（同工具链，ABI 约束满足）；运行期 rpath 跨目录解析留待 009/010 消费侧处理（已记录）。workflow YAML 解析通过（维护者后续决策：VTK 独立管线不与 OCCT/Netgen 绑定；OCCT/Netgen 合并为一个管线一个 Release） |
 | 2026-09-18 | 首次 dispatch 失败诊断与修复（runs 35304311839/35304323682：Linux/Windows OCCT configure 终止于 Freetype 头文件缺失） | 根因：OCCT 在 Linux/Windows 默认启用 Freetype（Linux 另有 Xlib），configure 检查到"used but not found"即终止；macOS 未默认启用故本机实证未暴露。修复 `USE_FREETYPE=OFF`/`USE_XLIB=OFF`（Netgen 上游 SuperBuild 同传，证明可关）。本地复测按维护者指示跳过，以修复后 dispatch 作为验证；推送前需 dispatch `SDK artifacts (OCCT+Netgen)`（publish 可先 false 验证三平台，再 true 发布） |
 | 2026-09-18 | 二次 dispatch（run [35304961896](https://github.com/Yuki-Nagori/panta/actions/runs/35304961896)）：macOS/Windows success（Freetype/Xlib 修复生效），Ubuntu 在 Netgen 自检失败 | 根因：Netgen 安装的包配置文件名为 `NetgenConfig.cmake`（大写 N，CI 日志证实），而 `find_package(netgen)` 只检索小写变体——macOS/Windows FS 大小写不敏感故通过，Ubuntu ext4 敏感即失败。修复：自检包名改 `Netgen`（本地最小工程复现 + CI 日志双重验证）。**约束登记**：031 manifest 的 occt/netgen 条目 PACKAGE 登记为 `Netgen`；010 消费侧 `find_package(Netgen)`；OCCT 侧 `OpenCASCADE` 全大写无此问题。待三次推送后重 dispatch 验证 |
 | 2026-09-18 | OCCT/Netgen 管线零 Qt 化：tools/sdk 顶层把 qt-provision include 与 VTK 描述一起包进新开关 `PANTA_SDK_ENABLE_VTK`（默认 ON，sdk-vtk.yml 行为不变；include 在 configure 期执行，单纯挪文件无用——本地验证发现后改为开关方案）；sdk-occt-netgen.yml 传 OFF。配置级回归：OFF 模式 0 次 Qt 下载/解包，默认模式正常供给（命中缓存） | 通过；该管线 dispatch 不再白下 1.7GB Qt |
+
+### 4. 待执行与未覆盖
+
+- 当前 Dawn 窗口后端开关已在生产构建描述中补齐；仍需三平台 CI 重新生产并确认 Ubuntu 不再进入 `find_package(X11)`。
+- `sdk-vtk-9.7.0-webgpu` 的 Release 资产、031 manifest 的 URL/SHA256/目标平台与 ABI/glibc 约束，待新制品落地后回填并复核。
+- 007、009、010 的 imported targets 最小链接/运行冒烟，以及 Wayland/Cocoa/Win32 硬件窗口与 Qt Quick 的原生层叠加、事件协调，尚未由本任务覆盖。
+- SBOM、许可证和 provenance 的发布闭环，以及 OCCT/Netgen 三平台 Release/manifest 复核，仍按对应任务推进。
 
 ## 风险与回退
 
