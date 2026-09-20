@@ -273,7 +273,8 @@ impl Tool {
     }
 }
 
-fn exe_name(name: &str) -> String {
+/// 平台可执行名；测试运行器与本 crate 的工具定位共用同一后缀规则。
+pub fn exe_name(name: &str) -> String {
     if cfg!(windows) {
         format!("{name}.exe")
     } else {

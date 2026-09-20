@@ -50,7 +50,7 @@ fn main() -> ExitCode {
 /// 从剩余参数摘除 `--check`（位置不限）。缺省行为是就地修复（写文件），
 /// `--check` 只验证不改动；CI 与 pre-commit 一律带 `--check`。
 fn take_check_flag(arguments: &mut Vec<String>) -> bool {
-    let check = arguments.contains(&String::from("--check"));
+    let check = arguments.iter().any(|argument| argument == "--check");
     arguments.retain(|argument| argument != "--check");
     check
 }
@@ -116,7 +116,7 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
     run("native coverage build", build)?;
     let native = target.join("native/debug-coverage");
     let cmake = panta_build::resolve_cmake(target)?;
-    let mut test = Command::new(cmake.with_file_name(executable_name("ctest")));
+    let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
     test.envs(panta_build::native_test_env(
         target,
         env!("PANTA_TEST_HOST"),
@@ -136,7 +136,11 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
         return Err("native 测试未生成覆盖率数据".into());
     }
     let merged = report_dir.join("native.profdata");
-    let mut merge = Command::new(llvm.root.join("bin").join(executable_name("llvm-profdata")));
+    let mut merge = Command::new(
+        llvm.root
+            .join("bin")
+            .join(panta_build::exe_name("llvm-profdata")),
+    );
     merge
         .args(["merge", "-sparse"])
         .args(raw)
@@ -147,7 +151,11 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
     collect_test_binaries(&native, &mut binaries)?;
     binaries.sort();
     let first = binaries.first().ok_or("没有找到 native 覆盖率测试产物")?;
-    let mut report = Command::new(llvm.root.join("bin").join(executable_name("llvm-cov")));
+    let mut report = Command::new(
+        llvm.root
+            .join("bin")
+            .join(panta_build::exe_name("llvm-cov")),
+    );
     report
         .arg("report")
         .arg(first)
@@ -285,26 +293,33 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     require_file("托管 clang-format", clang_format)?;
     require_file(
         "托管 clang",
-        &llvm_root.join("bin").join(executable_name("clang")),
+        &llvm_root.join("bin").join(panta_build::exe_name("clang")),
     )?;
     require_file(
         "托管 clang++",
-        &llvm_root.join("bin").join(executable_name("clang++")),
+        &llvm_root.join("bin").join(panta_build::exe_name("clang++")),
     )?;
     if cfg!(windows) {
         require_file(
             "托管 clang-cl",
-            &llvm_root.join("bin").join(executable_name("clang-cl")),
+            &llvm_root
+                .join("bin")
+                .join(panta_build::exe_name("clang-cl")),
         )?;
     }
     let version_binary = if cfg!(windows) {
-        llvm_root.join("bin").join(executable_name("clang-cl"))
+        llvm_root
+            .join("bin")
+            .join(panta_build::exe_name("clang-cl"))
     } else {
-        llvm_root.join("bin").join(executable_name("clang++"))
+        llvm_root.join("bin").join(panta_build::exe_name("clang++"))
     };
     require_tool_version(&version_binary, llvm_version)?;
-    require_file("Qt qmlformat", &qt_bin.join(executable_name("qmlformat")))?;
-    require_file("Qt qmllint", &qt_bin.join(executable_name("qmllint")))?;
+    require_file(
+        "Qt qmlformat",
+        &qt_bin.join(panta_build::exe_name("qmlformat")),
+    )?;
+    require_file("Qt qmllint", &qt_bin.join(panta_build::exe_name("qmllint")))?;
     require_file("GoogleTest FetchContent", &googletest)?;
     require_file("native compile_commands.json", &compile_database)?;
     if !cmake.starts_with(&managed_cmake) {
@@ -325,7 +340,7 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
         .into());
     }
     for tool in ["clang-tidy", "llvm-cov", "llvm-profdata"] {
-        let path = llvm.root.join("bin").join(executable_name(tool));
+        let path = llvm.root.join("bin").join(panta_build::exe_name(tool));
         require_file(tool, &path)?;
         require_tool_version(&path, llvm_version)?;
     }
@@ -398,14 +413,6 @@ fn require_tool_version(path: &Path, expected: &str) -> Result<(), Box<dyn Error
     Ok(())
 }
 
-fn executable_name(name: &str) -> String {
-    if cfg!(windows) {
-        format!("{name}.exe")
-    } else {
-        name.to_owned()
-    }
-}
-
 fn require_file(label: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     if path.is_file() {
         Ok(())
@@ -451,7 +458,9 @@ fn cargo_command(
     args: impl IntoIterator<Item = &'static str>,
 ) -> Result<(String, Command), Box<dyn Error>> {
     let target_dir = Path::new(env!("PANTA_TEST_TARGET_DIR"));
-    let mut command = if matches!(subcommand, "deny" | "machete") {
+    // deny/machete 走托管的独立二进制；其余是 cargo 子命令。
+    let managed_scanner = matches!(subcommand, "deny" | "machete");
+    let mut command = if managed_scanner {
         let (name, version) = if subcommand == "deny" {
             ("cargo-deny", CARGO_DENY_VERSION)
         } else {
@@ -459,12 +468,11 @@ fn cargo_command(
         };
         Command::new(ensure_cargo_tool(name, version)?)
     } else {
-        Command::new("cargo")
-    };
-    if !matches!(subcommand, "deny" | "machete") {
+        let mut command = Command::new("cargo");
         // -q 去掉 Compiling/Finished 状态行；构建脚本与诊断仍透传。
         command.arg("-q").arg(subcommand);
-    }
+        command
+    };
     if env!("PANTA_TEST_BUILD_TYPE") == "Release"
         && matches!(subcommand, "build" | "test" | "clippy")
     {
@@ -517,12 +525,16 @@ fn ensure_cargo_tool(name: &str, version: &str) -> Result<PathBuf, Box<dyn Error
                 target_root.join("panta-tools/cargo-build").join(name),
             );
         run(&format!("安装 {name} {version}"), command).map_err(|e| e.to_string())?;
-        if !staging.join("bin").join(executable_name(name)).is_file() {
+        if !staging
+            .join("bin")
+            .join(panta_build::exe_name(name))
+            .is_file()
+        {
             return Err(format!("安装未生成 {name}"));
         }
         Ok(())
     })?;
-    Ok(root.join("bin").join(executable_name(name)))
+    Ok(root.join("bin").join(panta_build::exe_name(name)))
 }
 
 fn build_launcher() -> Result<(), Box<dyn Error>> {
@@ -611,32 +623,64 @@ fn provision_qml_format(root: &Path, target_root: &Path) -> Result<(), Box<dyn E
 fn run_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>> {
     build_launcher()?;
     let llvm = panta_build::resolve_llvm_compilers(target_root())?;
-    let tool = llvm.root.join("bin").join(executable_name("clang-tidy"));
+    let tool = llvm
+        .root
+        .join("bin")
+        .join(panta_build::exe_name("clang-tidy"));
     let directory = Path::new(env!("PANTA_TEST_NATIVE_DIR")).join("quality");
     let commands = panta_build::database::read(&directory.join("compile_commands.json"))?;
     if commands.is_empty() {
         return Err("clang-tidy 翻译单元清单为空".into());
     }
-    let mut failures = Vec::new();
-    for entry in commands {
-        let file = entry.source();
-        let mut command = Command::new(&tool);
-        command.envs(panta_build::native_test_env(
-            target_root(),
-            env!("PANTA_TEST_HOST"),
-        )?);
-        command.arg("-p").arg(&directory).arg("-quiet");
-        if includes_only {
-            command.arg("--checks=-*,misc-include-cleaner");
-        }
-        if !check {
-            command.arg("--fix");
-        }
-        command.arg(&file);
-        if let Err(error) = run_scanner(&format!("clang-tidy {}", file.display()), command) {
-            failures.push(error.to_string());
-        }
-    }
+    let env = panta_build::native_test_env(target_root(), env!("PANTA_TEST_HOST"))?;
+    // TU 之间相互独立、--fix 也只写各自源文件，按核数分片并行缩短最重
+    // 门禁（单遍串行要数分钟）；单 TU 失败不短路，聚合后原样转发完整
+    // 诊断。
+    let workers = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+        .clamp(1, 8);
+    let chunk_size = commands.len().div_ceil(workers);
+    let failures: Vec<String> = std::thread::scope(|scope| {
+        let handles: Vec<_> = commands
+            .chunks(chunk_size)
+            .map(|chunk| {
+                let tool = &tool;
+                let env = &env;
+                let directory = &directory;
+                scope.spawn(move || -> Vec<String> {
+                    let mut local = Vec::new();
+                    for entry in chunk {
+                        let file = entry.source();
+                        let mut command = Command::new(tool);
+                        command.envs(env.clone());
+                        command.arg("-p").arg(directory).arg("-quiet");
+                        if includes_only {
+                            command.arg("--checks=-*,misc-include-cleaner");
+                        }
+                        if !check {
+                            command.arg("--fix");
+                        }
+                        command.arg(&file);
+                        if let Err(error) =
+                            run_scanner(&format!("clang-tidy {}", file.display()), command)
+                        {
+                            local.push(error.to_string());
+                        }
+                    }
+                    local
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|handle| {
+                handle
+                    .join()
+                    .unwrap_or_else(|_| vec!["clang-tidy 工作线程异常退出".to_owned()])
+            })
+            .collect()
+    });
     if failures.is_empty() {
         Ok(())
     } else {
