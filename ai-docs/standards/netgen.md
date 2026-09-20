@@ -2,7 +2,7 @@
 
 查阅日期：2026-09-16。状态：项目规范草案，尚未完成工具链集成验证。
 
-适用于 `native/mesh/netgen/`。只接入网格生成，不因此把 NGSolve 求解能力带入本仓库。
+适用于 `native/mesh/src/netgen/`（适配层与 `geometry/src/occt`、`visualization/src/vtk` 同构：公共契约在模块 `include/panta/<module>/`，第三方头收敛在适配层目录）。只接入网格生成，不因此把 NGSolve 求解能力带入本仓库。
 
 ## 官方依据
 
