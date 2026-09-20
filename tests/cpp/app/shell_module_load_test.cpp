@@ -7,7 +7,6 @@
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
-#include <cstdio>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include <QtQml/qqmlextensionplugin.h>
 #endif
@@ -19,25 +18,11 @@ Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
 #endif
 
-namespace {
-// Windows 挂起定位探针：TU 静态初始化完成后输出。
-// TODO(task 007): Windows 挂起根因确认后随全部阶段标记一起移除。
-struct StaticInitProbe {
-    StaticInitProbe() noexcept {
-        std::fputs("shell-test: TU static init done\n", stderr);
-        std::fflush(stderr);
-    }
-};
-const StaticInitProbe static_init_probe;
-} // namespace
-
 class ShellModuleLoadTest final : public QObject {
     Q_OBJECT
 
   private slots:
     void loads_shell_module() {
-        std::fputs("shell-test: creating engine\n", stderr);
-        std::fflush(stderr);
         QQmlApplicationEngine engine;
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
         engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
@@ -45,9 +30,6 @@ class ShellModuleLoadTest final : public QObject {
         engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("AppNoBridge"));
 #endif
 
-        std::fprintf(stderr, "shell-test: loaded, roots=%lld\n",
-                     static_cast<long long>(engine.rootObjects().size()));
-        std::fflush(stderr);
         QVERIFY2(!engine.rootObjects().isEmpty(), "Panta.Shell entry failed to load");
 
         auto* root = engine.rootObjects().constFirst();
@@ -68,23 +50,5 @@ class ShellModuleLoadTest final : public QObject {
     }
 };
 
-// Windows CI 曾在链接 Panta.Visualization 静态 plugin 的本测试出现无输出
-// 挂起（任务 007 验证表 2026-09-20）：显式 main 逐阶段冲刷 stderr 定位
-// 挂点，根因解决后移除。
-// TODO(task 007): Windows 挂起根因确认后删除阶段标记。
-int main(int argc, char** argv) {
-    std::fputs("shell-test: reached main\n", stderr);
-    std::fflush(stderr);
-    QGuiApplication app(argc, argv);
-    const auto platform = QGuiApplication::platformName().toLatin1();
-    const auto qpa = qEnvironmentVariable("QT_QPA_PLATFORM").toUtf8();
-    std::fprintf(stderr, "shell-test: QGuiApplication ready platform=%s qpa=%s\n",
-                 platform.constData(), qpa.constData());
-    std::fflush(stderr);
-    ShellModuleLoadTest test;
-    const int status = QTest::qExec(&test, argc, argv);
-    std::fprintf(stderr, "shell-test: finished status=%d\n", status);
-    std::fflush(stderr);
-    return status;
-}
+QTEST_MAIN(ShellModuleLoadTest)
 #include "shell_module_load_test.moc"

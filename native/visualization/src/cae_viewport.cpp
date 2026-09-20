@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QPointF>
 #include <QRectF>
-#include <cstdio>
 #include <memory>
 #include <panta/visualization/cae_viewport.hpp>
 #include <panta/visualization/render_scene.hpp>
@@ -18,12 +17,7 @@ struct CaeViewport::Impl {
 };
 
 CaeViewport::CaeViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
-    // TODO(task 007): Windows 挂起定位标记，根因确认后移除。
-    std::fputs("cae-viewport: ctor enter\n", stderr);
-    std::fflush(stderr);
     impl_->backend = create_vtk_viewport_backend();
-    std::fputs("cae-viewport: backend created\n", stderr);
-    std::fflush(stderr);
     if (auto* item = impl_->backend->item()) {
         item->setParentItem(this);
         // 宿主条目铺满本条目且位置恒为原点；后续只随几何变化更新尺寸。
@@ -41,8 +35,6 @@ CaeViewport::~CaeViewport() = default;
 
 void CaeViewport::componentComplete() {
     QQuickItem::componentComplete();
-    std::fputs("cae-viewport: componentComplete\n", stderr);
-    std::fflush(stderr);
     // 初次状态提交后，后端在 GUI 线程创建原生 surface 和 WebGPU 管线；
     // 构建完成经 sceneReady 通知 GUI（渲染错误走 qWarning，不静默）。
     impl_->scene.revision = 1;

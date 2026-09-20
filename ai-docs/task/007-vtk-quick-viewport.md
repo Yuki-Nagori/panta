@@ -102,6 +102,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | CI run 35502271608 Linux 侧：configure 依赖修复确认生效（`Found wayland-protocols 1.45`、xkbcommon 命中），Linux 分支 `vtk_native_surface.cpp` 首次参与编译报 2 个错误 | 修复：补 `#include <vtkObjectFactory.h>`（`vtkStandardNewMacro` 未定义）；`nativeInterface<QWaylandApplication>()` 的兼容约束按接收者静态类型解析、`QCoreApplication*` 不满足，落点改为 `QGuiApplication*`；去除 vtkTypeMacro 多余分号（-Wextra-semi）。本机无 Linux 工具链无法本地编译该 TU，对照 clang 诊断逐条修复，待 CI 复验 |
 | 2026-09-20 | 同 run Windows 侧：`cargo check/build` 通过（构建期 discovery PATH 修复生效）；Test 步 `Qml.ShellModuleLoads`/`Qml.ViewportModuleLoads` 各超时 1500s，进程零输出（QTest 横幅未出现，同环境主题 QML 测试通过）——挂点在静态初始化或 QGuiApplication 构造，且只出现在链接 Panta.Visualization 静态 plugin 的测试 | 两个测试改为显式 main 逐阶段冲刷 stderr（reached main / QGuiApplication ready / finished，TODO(task 007) 根因确认后移除）；`panta_add_qml_test` 加 TIMEOUT 120 兜底，挂起不再拖 50 分钟。下一轮 CI 取证定位挂点后修根因 |
 | 2026-09-20 | CI 取证梳理：run 35502271608（09:25）实际 head 为 3eca8fd（不含 Linux 修复），其 Linux 编译错误属旧代码；29be64b 的 run 35503727247 跑 5 分钟即被取消，修复与诊断标记从未在 CI 跑完 | 待推：细化诊断粒度——两个测试加 TU 静态初始化探针、engine/组件创建阶段标记、平台名与 QPA 环境打印；cae_viewport/vtk_viewport 构造与 componentComplete 加模块内标记。macOS 本地验证标记链完整（TU static init → main → QGuiApplication → engine → ctor → created → finished），29/29 通过。Windows 下一轮 CI 按最后一条标记定位挂点 |
+| 2026-09-20 | CI run 35505448992 取证：两测试各 120s 超时且 `--output-on-failure` 下零输出——TU 静态初始化探针（main 之前、链接序最前）也未执行，挂点先于任何自有代码；Linux 侧新增 includes/clang-tidy 失败集中在 `vtk_native_surface.cpp`（Linux 分支首次进编译数据库） | 字节级核查 Windows SDK 归档：webgpu_dawn.lib 981 个成员及各 VTK 库均无 `.CRT$XCU` 静态初始化段，Dawn 接口/内嵌 DEFAULTLIB 仅系统 DLL（user32/ole32/advapi32/dbghelp 等）——排除第三方静态初始化死循环与缺 DLL。主嫌疑收窄为进程激活阶段阻塞（每次 CI 重链接的新大型 exe，Dawn 静态库 191MB 触发实时扫描）。行动：移除全部探针与诊断 main（恢复 QTEST_MAIN、删 `<cstdio>`）；CI Windows job 构建前关闭 Defender 实时监控，Test 前直接拉起两个 exe 取退出码与 stderr（0xc0000135/0xc0000005/挂起三分类）；`vtk_native_surface.cpp` 按 include-cleaner 拆 wayland 子头并补 `cstdint`/`vtkSetGet.h`/`vtkWindow.h`，`set_geometry` 参数收敛为 QPointF/QSize，VTK 宏 NewInstance 遮蔽与刻意跳过父类 SetSize 以 NOLINT 注明惯例豁免。macOS 29/29、format/includes/clang-tidy/cppcheck 通过；Linux 段头映射与 Windows 缓解待 CI 复验 |
 
 ## 风险与回退
 
@@ -116,6 +117,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 2026-09-19（路线切换）：放弃 Qt OpenGL/QQuickVTKItem 场景图集成，改为 VTK WebGPU render window + 平台 hardware window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCocoaHardwareView` 通过原生 Metal surface 与 Qt Quick 界面叠加，Linux 使用 Wayland，Windows 使用 Win32。
 - 2026-09-20：038 完成 `sdk-vtk-9.7.0-webgpu` 三平台 Release，031 已登记新资产；007 转入原生 surface/view 嵌入与事件协调实现。
 - 2026-09-20：native/visualization 删除旧 QQuickVTKItem 适配器，新增 WebGPU render window 与 macOS Cocoa、Windows Win32、Linux Wayland surface bridge；`App.qml` 恢复实际 CaeViewport 调用。macOS 无屏幕环境的启动验证发现并修复 offscreen surface 误用导致的 SIGSEGV，崩溃日志路径按任务 047 记录。
+- 2026-09-20（Windows 挂起取证轮 3）：探针全链零输出且第三方静态库无静态初始化段 ⇒ 挂点在 CRT 启动之前，不属于本仓库代码路径；维护者无 Windows 机器，缓解与继续取证转 CI 侧（Defender 实时监控豁免 + 绕过 ctest 直接拉起 exe 按退出码三分类）。若下轮 Windows 仍挂起，以诊断步输出为准继续，不再加进程内探针。
 - 待记录：目标平台真实窗口下的 resize、高 DPI、隐藏/恢复、输入协调和重开验证；Windows 桥接中 `hardware->SetSize()` 与 `SetWindowPos` 的宽高双写是否冗余（本机仅 macOS SDK，无法核对 `vtkWin32HardwareWindow` 头）。
 
 ## 完成摘要

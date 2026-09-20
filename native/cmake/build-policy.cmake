@@ -80,8 +80,9 @@ endfunction()
 
 # QML 测试统一使用托管 Qt、无窗口平台与可定制的 Controls 样式。
 # Windows 无控制台时 QtTest 默认写调试输出；强制 stderr 使 CTest 能展示断言。
-# TIMEOUT 兜底：这些测试正常亚秒完成；平台挂起（Windows 静态初始化曾挂
-# 1500s，见任务 007 验证表）时快速失败并保留诊断输出，不拖垮整个 CI。
+# TIMEOUT 兜底：这些测试正常亚秒完成；平台挂起（Windows 上链接 VTK/Dawn
+# 静态库的消费方二进制曾整轮挂起，见任务 007 验证表）时快速失败并保留
+# 诊断输出，不拖垮整个 CI。
 function(panta_add_qml_test name target)
   add_test(NAME ${name} COMMAND ${target})
   set_tests_properties(

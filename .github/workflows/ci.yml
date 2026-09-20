@@ -244,11 +244,49 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
+      # Windows 测试进程激活阻塞缓解（任务 007 验证表 2026-09-20）：链接
+      # VTK/Dawn 静态库的测试 exe 体积大（Dawn 静态库 191MB）且每次 CI
+      # 重新链接哈希都变，启动即被实时扫描阻塞——进程零输出、任何自有代码
+      # （含静态初始化探针）都未执行即超时。runner 以管理员运行，关闭实时
+      # 监控是该场景的标准做法；仅影响本 runner，不落地仓库状态。
+      - if: runner.os == 'Windows'
+        name: Disable Defender real-time scanning for fresh build outputs
+        shell: powershell
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
       - name: Check workspace and all aggregated targets
         run: cargo check --locked --workspace --all-targets
 
       - name: Build workspace and native targets
         run: cargo build --locked --workspace
+
+      # 取证步（任务 007 验证表 2026-09-20）：绕过 ctest 直接拉起链接
+      # VTK/Dawn 静态库的两个测试 exe。退出码三分类失败（0xc0000135 缺
+      # DLL / 0xc0000005 崩溃 / 60s 未退出 = 真挂起），stderr 落文件排除
+      # 管道因素；应用日志补充 WER 崩溃记录。仅取证，不改变 job 结果。
+      - if: runner.os == 'Windows'
+        name: Probe VTK-linked test executables directly
+        shell: powershell
+        run: |
+          $env:PATH = "$PWD\target\panta-deps\qt\staging\bin;$env:PATH"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_FORCE_STDERR_LOGGING = "1"
+          foreach ($exe in @("panta_qml_shell_module_test.exe",
+                             "panta_qml_viewport_module_test.exe")) {
+            "=== $exe"
+            $out = [System.IO.Path]::GetTempFileName()
+            $err = [System.IO.Path]::GetTempFileName()
+            $p = Start-Process -FilePath "target\native\debug\app\$exe" `
+              -WorkingDirectory "target\native\debug\app" `
+              -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+            if ($p.WaitForExit(60000)) { "exited code=0x{0:X}" -f $p.ExitCode }
+            else { "STILL RUNNING after 60s; killing"; $p.Kill(); $p.WaitForExit() }
+            "--- stdout"; Get-Content $out; "--- stderr"; Get-Content $err
+            Remove-Item $out, $err
+          }
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1002} `
+            -MaxEvents 6 -ErrorAction SilentlyContinue |
+            Select-Object TimeCreated, Id, Message | Format-List
 
       - name: Verify Cargo-provisioned toolchain
         shell: bash

@@ -16,7 +16,6 @@
 #include <QtCore/qtmetamacros.h>
 #include <QtGlobal>
 #include <QtLogging>
-#include <cstdio>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
@@ -74,9 +73,6 @@ struct VtkViewport::Impl {
 };
 
 VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
-    // TODO(task 007): Windows 挂起定位标记，根因确认后移除。
-    std::fputs("vtk-viewport: ctor enter\n", stderr);
-    std::fflush(stderr);
     setFlag(ItemHasContents, false);
     QObject::connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow* new_window) {
         QObject::disconnect(impl_->window_visibility_connection);
