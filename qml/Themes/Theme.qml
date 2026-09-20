@@ -4,12 +4,12 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property color colorBackground: "#1e1f22"
-    readonly property color colorPanel: "#2b2d31"
-    readonly property color colorText: "#e8e8e8"
-    readonly property color colorTextMuted: "#9a9da3"
-    readonly property color colorAccent: "#4f8cff"
-    readonly property color colorError: "#e5534b"
+    readonly property color colorBackground: "#f5f7fb"
+    readonly property color colorPanel: "#ffffff"
+    readonly property color colorText: "#1f2937"
+    readonly property color colorTextMuted: "#5f6b7a"
+    readonly property color colorAccent: "#2563eb"
+    readonly property color colorError: "#c62828"
 
     readonly property int spacingSmall: 8
     readonly property int spacingMedium: 16

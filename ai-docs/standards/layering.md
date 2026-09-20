@@ -39,6 +39,18 @@ C++ shell / services ⇄ panta-ffi（CXX 边界）⇄ Rust crates
 - `panta-ffi` 只负责 DTO、错误、句柄和生命周期等跨语言契约；不得把领域
   实现、VTK 对象或手写平台设施长期堆在 FFI crate 中。FFI 入口可以调用
   `panta-core` 与 `panta-foundation`，反向依赖禁止。
+- `qml/Themes/Theme.qml` 是 QML 的唯一视觉 token 门面。默认 GUI 尺寸迁移到
+  `.pa` 的 `kind: variables` 基线，主题颜色和允许覆盖的视觉 token 放在独立
+  `kind: theme` 文件中，按“基线 → 覆盖 → 校验 → C++/QML 快照”发布；`.pa`
+  不由 QML 直接解析。
+- 运行时由窗口和 item 决定的 surface 坐标、实际宽高、设备像素尺寸及
+  Wayland/Win32/Cocoa 原生对象属于 C++ 平台适配层，不是 Theme token，也不应
+  为了“集中配置”搬进 Rust。Rust 只在未来需要持久化或校验用户/工程主题选择
+  时，经既有服务与 FFI 边界承载数据，不进入 QML → C++ → Rust → C++ → VTK
+  的热路径。
+- 用户设置遵循同一边界：Rust 定义 schema、默认值和业务校验，C++/Qt adapter
+  调用 `QSettings` 完成平台存取；`QSettings` 不进入 `panta-core`，QML 不直接
+  依赖它。主题 `.pa` 是只读定义，设置只保存主题 ID 和用户偏好。
 - 手写 `unsafe` 集中在明确登记的边界模块（当前为
   `panta-foundation::crash`）；每个块写明指针、FD、线程和信号处理前提，
   对外仍提供安全 API。CXX 生成胶水的 unsafe 属于工具边界，按 FFI 规范审查。

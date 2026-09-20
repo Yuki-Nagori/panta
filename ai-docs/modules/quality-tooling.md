@@ -42,7 +42,7 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 
 仅排除生成目录的 `unusedFunction`、GoogleTest 模型生成的 `__*` 测试注册符号（`tests/cppcheck-suppressions.xml`）及固定 CXX 生成头中的 `eraseDereference` 误报。moc/CXX 的实际调用关系仍参与分析，禁止排除整个自有源目录。真实工具反例已验证：新增无调用函数返回非零，补充另一个翻译单元中的调用后通过。动态 QML/Qt 注册仍有静态模型局限，不能宣称检出所有未使用代码。
 
-`.clang-tidy` 只对 QtTest `qtest.h` 配置 include-cleaner 例外：`QTRY_*` 宏需要其等待/超时声明，但检查器不跟踪宏内部依赖。头文件列表保持连续且无注释；此例外不屏蔽其他缺失或多余 include。
+`.clang-tidy` 对 Qt 基础转发链 `QtGlobal/qglobal.h/qtypes.h/qminmax.h/qnumeric.h` 以及 `qstringliteral.h` 配置精确 include-cleaner 例外：Qt 公开 API 约定允许通过聚合/转发头使用 `qreal`、`qMax`、`qRound`、`QStringLiteral` 等基础定义，检查器不应迫使源码改用标准库替代品；范围不扩展到 Qt 业务模块或自有头。源码仍优先写稳定的 Qt 聚合入口（如 `<QtGlobal>`、`<QString>`）。另对 QtTest `qtest.h` 保留 `QTRY_*` 宏例外，因为检查器不跟踪宏内部声明。头文件列表保持连续且无注释；这些例外不屏蔽其他缺失或多余 include。
 
 ## 当前执行入口
 

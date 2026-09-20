@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008、011、012、014、018–020、026、036、039–041、043–046 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、统一测试与质量入口、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、CI 依赖缓存与可复现检查、Windows CI 停滞诊断与修复、Windows CI 分支代码审查与收敛、QML 静态模块注册边界、根目录质量入口与测试聚合、CI 触发拆分与缓存预算均落地并验证），整轮三平台 CI 已全绿：Windows/macOS/Linux 的 check、build、toolchain、test、七项 lint、聚合格式、依赖审计及 Rust/native 覆盖率检查全部通过。031 的旧 VTK Qt/OpenGL 制品已完成历史消费验证，但 007 已切换到待生产的 WebGPU 硬件窗口制品；Linux 当前为 Wayland-only，纯 X11 需要单独变体；OCCT/Netgen 仍按既有三平台 manifest 供给。其剩余项即 007/009/010 的集成证据，可并行推进——**009 供给前置满足、状态转 ready**；007 因 WebGPU 硬件窗口 SDK 与原生叠加实现待完成仍为 blocked，010 待 009，其余基础设施任务未完成。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008、011、012、014、018–020、026、036、039–041、043–046 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、统一测试与质量入口、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、CI 依赖缓存与可复现检查、Windows CI 停滞诊断与修复、Windows CI 分支代码审查与收敛、QML 静态模块注册边界、根目录质量入口与测试聚合、CI 触发拆分与缓存预算均落地并验证），整轮三平台 CI 已全绿：Windows/macOS/Linux 的 check、build、toolchain、test、七项 lint、聚合格式、依赖审计及 Rust/native 覆盖率检查全部通过。031 已登记新的 VTK WebGPU 硬件窗口 Release；Linux 当前为 Wayland-only，纯 X11 需要单独变体；OCCT/Netgen 仍按既有三平台 manifest 供给。其剩余项即 007/009/010 的集成证据，可并行推进——**009 供给前置满足、状态转 ready**；007 的 SDK 前置已解除、状态转 in-progress，010 待 009，其余基础设施任务未完成。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -51,7 +51,7 @@ ai-docs/
 | 004 | [Cargo 调度 CMake 与运行入口](task/004-cargo-native-orchestration.md) | M0 | 001, 003 | done |
 | 005 | [Qt/QML 主窗口与 C++ ViewModel](task/005-qt-qml-shell.md) | M0 | 004 | done |
 | 006 | [Rust/C++ FFI 最小契约](task/006-rust-cpp-boundary.md) | 基础平台 | 004 | done |
-| 007 | [VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031, 038 | blocked |
+| 007 | [VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031, 038 | in-progress |
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | done |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | ready |
 | 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | planned |
@@ -83,6 +83,7 @@ ai-docs/
 | 027 | [开发模式 QML 重载与状态恢复](task/027-qml-state-reload.md) | 应用平台扩展 | 007, 024, 026 | planned |
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | in-progress |
 | 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
+| 048 | [设置服务与 Qt 持久化适配](task/048-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
 
 ## 验证与质量扩展队列
 
@@ -122,4 +123,4 @@ ai-docs/
 
 014 已完成最小 Python/uv 质量工具环境：仅锁定 cmakelang 并供 `cargo format` 调用，不接入 Python 运行时/API，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 
-后续新任务使用当前最大编号加一，不复用已有编号。001–006 已完成；主线下一项先执行 [009 OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md)（CAE 接入），[007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 待新 SDK 与原生叠加实现完成后恢复。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。001–006 已完成；主线下一项先执行 [009 OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md)（CAE 接入），[007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 的 SDK 前置已解除，进入原生叠加实现。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

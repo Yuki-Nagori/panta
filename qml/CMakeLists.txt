@@ -12,7 +12,7 @@ set(PANTA_SHELL_QML_FILES
     Components/Atoms/PanelSurface.qml Panels/PlaceholderPanel.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
-  list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge)
+  list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)
 endif()
 if(NOT PANTA_ENABLE_BRIDGE_MODULE)
   # 提供无 Bridge 的最小 Shell，避免关闭可选模块后残留 Panta.Bridge import。

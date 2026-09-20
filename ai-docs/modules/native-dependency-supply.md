@@ -35,7 +35,7 @@ VTK、OpenCASCADE 和 Netgen 是 CAE 主链路的 native 依赖，开发者和�
 ## 当前盘点结论（2026-09-18）
 
 - 三个依赖的供给已全链路就绪：VTK 9.7.0（Release `sdk-vtk-9.7.0`）与 OCCT 8.0.1 + Netgen v6.2.2604（合并 Release `sdk-occt-netgen-8.0.1-6.2.2604`，成对发布——Netgen 链接其构建时的 OCCT，硬 ABI 锁定）均由 038 受信 CI 三平台生产并登记进 031 manifest；macOS 生产 consumer 烟测（occt/netgen/vtk 三依赖从 Release 真实下载消费）与离线复用全部通过。OCCT 弃用官方 Windows SDK（仅 Windows 有归档，跨平台工具链不一致，维护者决策 2026-09-18 三平台统一自托管）。
-- 实证约束（009/010/007 消费时注意）：OCCT targets 无命名空间（`TKernel`/`TKDESTEP`）；Netgen 包配置为 `NetgenConfig.cmake`，`find_package` 必须用 `Netgen`（Linux ext4 大小写敏感）；Netgen 运行期加载依赖同平台 OCCT 资产（staging 相邻，消费侧处理 rpath/加载路径）；VTK 目标为 `VTK::` 命名空间且已含 `GUISupportQtQuick`。
+- 实证约束（009/010/007 消费时注意）：OCCT targets 无命名空间（`TKernel`/`TKDESTEP`）；Netgen 包配置为 `NetgenConfig.cmake`，`find_package` 必须用 `Netgen`（Linux ext4 大小写敏感）；Netgen 运行期加载依赖同平台 OCCT 资产（staging 相邻，消费侧处理 rpath/加载路径）；VTK WebGPU 目标为 `VTK::` 命名空间，Dawn 目标为 `dawn::webgpu_dawn`，不再含 Qt VTK GUI 集成。
 - 剩余项属集成任务自身：007（视口运行时）、009（STEP 集成）、010（网格集成）的真实链接/运行冒烟，以及 Linux glibc 有效基线的运行验证回写。
 
 供给实现的验证证据见 [任务 031](../task/031-prebuilt-native-dependencies.md)：ctest `Build.SdkProvision` 用 fixture SDK（file:// 下载、project NONE）驱动成功、哈希不符、缺资产、离线缓存、marker 重建、版本隔离、内嵌归档/包装目录、配置歧义等路径，三平台可同路径执行。在全平台 manifest 和 configure/package 冒烟证据完成前，031 保持进行中，007/009/010 不启动第三方源码构建。

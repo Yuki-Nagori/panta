@@ -6,7 +6,7 @@
 
 UI 使用 QML，3D 视口使用 C++ native Qt Quick component。VTK 是 V1 渲染后端，但不成为应用公共 API。原生视口集中处理图形上下文、窗口尺寸、设备像素比、渲染线程及资源销毁。
 
-VTK 采用 WebGPU render window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCocoaHardwareView` 暴露的原生 Cocoa surface 与 Metal layer，再由原生视口桥接到 Qt Quick 窗口。Qt Quick 不承载 VTK 的 OpenGL scenegraph 集成，`QQuickVTKItem` 不属于目标架构。第一里程碑必须验证 Qt Quick 与原生 Cocoa view/layer 的叠加、尺寸/高 DPI 同步和输入事件协调；新 SDK 产出前该路线仍为待执行设计。
+VTK 采用 WebGPU render window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCocoaHardwareView` 暴露的原生 Cocoa view 与 Metal layer，再由原生视口桥接到 Qt Quick 窗口；Windows 使用 Qt Quick 原生 HWND 创建 VTK child window；Wayland 使用 Qt Quick 的 `wl_display`/`wl_compositor` 创建 `wl_subsurface`，再把该子 surface 交给 VTK。三端的 render window 均只绑定 `CaeViewport` 的原生区域，不把整个 Qt 顶层 surface 交给 VTK。Qt Quick 不承载 VTK 的 OpenGL scenegraph 集成，`QQuickVTKItem` 不属于目标架构。第一里程碑的代码路径已落地，仍需在目标平台验证叠加、尺寸/高 DPI 同步和输入事件协调。
 
 ## RenderScene 契约
 

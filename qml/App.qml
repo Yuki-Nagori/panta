@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Panta.Bridge
+import Panta.Visualization
 
 ApplicationWindow {
     id: root
@@ -10,6 +11,7 @@ ApplicationWindow {
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
     visible: true
+    visibility: Window.Maximized
     title: qsTr("panta")
     color: Theme.colorBackground
 
@@ -23,26 +25,28 @@ ApplicationWindow {
         spacing: Theme.spacingMedium
 
         ThemedLabel {
+            objectName: "shellCaption"
             Layout.fillWidth: true
-            text: viewModel.caption.length > 0 ? viewModel.caption : qsTr("panta — 桌面骨架（任务 005）")
+            text: viewModel.caption.length > 0 ? viewModel.caption : "panta — Desktop Skeleton (Task 005)"
             textSize: Theme.fontTitle
         }
 
         ThemedButton {
-            text: qsTr("推进修订")
+            objectName: "advanceRevisionButton"
+            text: "Advance Revision"
             onClicked: viewModel.tick()
         }
 
         ThemedLabel {
+            objectName: "revisionCount"
             // 重复写入同一 caption 时不产生新通知（ShellViewModel 去重，测试覆盖）。
-            text: qsTr("修订计数：") + viewModel.count
+            text: "Revision count: " + viewModel.count
             textColor: Theme.colorTextMuted
         }
 
-        // 未来面板占位：工程树/视口/属性区由后续任务替换（架构：ui-and-bridge）。
-        // 视口集成（任务 007）因 macOS 26 渲染路径阻塞暂回退，解除后恢复
-        // CaeViewport（模块与注册测试保留，见 native/visualization）。
-        PlaceholderPanel {
+        // 任务 007：VTK WebGPU 原生 surface 宿主；VTK 不进入 Qt Quick scenegraph。
+        CaeViewport {
+            objectName: "caeViewport"
             Layout.fillWidth: true
             Layout.fillHeight: true
         }

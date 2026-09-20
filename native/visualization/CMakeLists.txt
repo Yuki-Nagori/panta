@@ -5,6 +5,10 @@
 # 模块链接显式最小集，其余依赖经 imported target 传递。
 panta_require_sdk("vtk" _vtk_staging)
 
+if(APPLE)
+  enable_language(OBJCXX)
+endif()
+
 # 先声明 STATIC 库，qt_add_qml_module 才会生成静态 plugin（与 bridge 同型）。
 # qt_add_qml_module 按 URI 自动创建别名 panta::visualization，无需手动。
 add_library(panta_visualization STATIC)
@@ -30,10 +34,36 @@ qt_add_qml_module(
   include/panta/visualization/viewport_backend.hpp
   src/cae_viewport.cpp
   src/vtk/vtk_viewport.hpp
-  src/vtk/vtk_viewport.cpp)
+  src/vtk/vtk_viewport.cpp
+  src/vtk/vtk_native_surface.hpp)
+if(APPLE)
+  target_sources(panta_visualization PRIVATE src/vtk/vtk_native_surface.mm)
+else()
+  target_sources(panta_visualization PRIVATE src/vtk/vtk_native_surface.cpp)
+endif()
 add_library(panta::visualization ALIAS panta_visualization)
 panta_native_defaults(panta_visualization)
-# GUISupportQtQuick 传递 RenderingOpenGL2/CommonCore；测试图元生成所需
-# 的模块按 vtk.md 显式声明，不整包拉取 VTK。
-target_link_libraries(panta_visualization PUBLIC VTK::GUISupportQtQuick VTK::FiltersSources
-                                                 Qt6::Quick)
+# Linux embeds VTK in a Wayland subsurface instead of rendering into the
+# top-level Qt surface, so the bridge also links the Wayland client protocol.
+if(UNIX AND NOT APPLE)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+endif()
+# WebGPU/hardware-window 路径不依赖 Qt VTK GUI 或 OpenGL scenegraph；
+# 测试图元生成所需的 FiltersSources 和 Dawn 运行时显式列出。
+target_link_libraries(
+  panta_visualization PUBLIC VTK::RenderingWebGPU VTK::RenderingUI VTK::RenderingCore
+                             VTK::FiltersSources dawn::webgpu_dawn Qt6::Quick)
+if(UNIX AND NOT APPLE)
+  target_link_libraries(panta_visualization PRIVATE PkgConfig::WAYLAND_CLIENT)
+endif()
+# VTK::RenderingWebGPU 声明需要模块自动初始化；否则 render window 能创建并提交帧，
+# 但 WebGPU renderer/mapper 的实现工厂不会注册，场景会保持空白。
+vtk_module_autoinit(
+  TARGETS
+  panta_visualization
+  MODULES
+  VTK::RenderingWebGPU
+  VTK::RenderingUI
+  VTK::RenderingCore
+  VTK::FiltersSources)

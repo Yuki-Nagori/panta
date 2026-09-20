@@ -10,5 +10,7 @@ ExcludeHeaderFilterRegex: '(^|/)target/'
 FormatStyle: file
 
 CheckOptions:
-  # QTRY_* 依赖此聚合头的等待/超时声明，include-cleaner 不追踪宏内部依赖。
-  misc-include-cleaner.IgnoreHeaders: '(^|/)(QtTest/|QtTest.framework/Headers/)qtest\.h$'
+  # QtGlobal 转发 qglobal.h/qtypes.h/qminmax.h/qnumeric.h，QStringLiteral 的声明也可能经 QtCore 聚合头可见；
+  # Qt 基础头是框架约定，不应为满足 include-cleaner 改成标准库替代品。
+  # QTRY_* 依赖 qtest.h 的宏内部声明，include-cleaner 同样不追踪宏内部依赖。
+  misc-include-cleaner.IgnoreHeaders: '(^|/)(QtGlobal|qglobal\.h|qtypes\.h|qminmax\.h|qnumeric\.h|qstringliteral\.h|QtTest/qtest\.h|QtTest.framework/Headers/qtest\.h)$'

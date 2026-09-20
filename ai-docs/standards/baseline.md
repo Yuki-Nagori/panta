@@ -13,7 +13,7 @@
 | Cargo | 主开发入口 | launcher 骨架已落地（001）；native 调度待 004 | 001 / 004 |
 | CMake + Ninja | CMake 4.4.3 + Ninja 1.13.2（Cargo 引导供给，均为上游最新） | 引导实装与首次 configure | 002 / 003 |
 | Qt | 6.11.2 预编译包（qtbase+qtdeclarative，维护者决策不源码构建；Quick 运行时已由 005 实测） | 模块扩展（qtsvg 等）、部署 | 005 / 013 |
-| VTK | V1 渲染后端：9.7.0；优先使用包含 `GUISupportQtQuick` 的预编译 SDK | QQuickVTKItem、图形后端、ABI 与可用 CMake package | 002 / 007 / 031 |
+| VTK | V1 渲染后端：9.7.0 WebGPU；使用三平台预编译 hardware-window SDK | 原生 surface/view 与 Qt Quick 叠加、图形后端、ABI 与运行时加载 | 002 / 007 / 031 / 038 |
 | OCCT | CAD/STEP：8.0.1；优先使用与目标 ABI 匹配的预编译 SDK（实测前保留 7.9.3 回退点） | STEP/元数据路径、模块裁剪、与 Netgen 组合实测 | 002 / 009 / 031 |
 | Netgen | 自有 Mesh IR 的生成器：v6.2.2604；优先使用与 OCCT 匹配的预编译 SDK | 与 OCCT 8.0.1 组合实测、C++ 接口与导出 targets | 002 / 010 / 031 |
 | Python | 3.12+，后续 | 解释器、环境与工具依赖锁 | 014 |

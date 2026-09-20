@@ -1,128 +1,258 @@
-/// VtkViewport 实现：渲染线程回调内创建/更新/释放 VTK 管线。
-/// 线程与生命周期约束见 vtk_viewport.hpp 与 standards/vtk.md。
+/// VtkViewport 实现：在 GUI 线程管理 VTK WebGPU 与原生 surface。
+///
+/// Qt Quick 只负责 QQuickItem 宿主的几何和可见性；VTK 的 render window
+/// 直接绘制到平台 surface，避免把 OpenGL/WebGPU 资源混入 scenegraph。
 #include "vtk_viewport.hpp"
-#include <QObject>
+#include "vtk_native_surface.hpp"
+#include <QGuiApplication>
+#include <QMetaObject>
 #include <QQuickItem>
-#include <QQuickVTKItem.h>
+#include <QQuickWindow>
+#include <QRectF>
+#include <QString>
+#include <QTimer>
+#include <QWindow>
 #include <QtCore/qtmetamacros.h>
 #include <QtGlobal>
 #include <QtLogging>
 #include <memory>
-#include <mutex>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
 #include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkHardwareWindow.h>
 #include <vtkNew.h>
-#include <vtkObject.h>
-#include <vtkObjectFactory.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
+#include <vtkProperty.h>
+#include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
+#include <vtkWebGPURenderWindow.h>
+#include <vtkWebGPURenderer.h>
 
 namespace panta::visualization {
+
 namespace {
 
-/// vtkUserData 载体：承载渲染线程的管线对象，经 SafeDownCast 恢复。
-/// 生命周期由 QQuickVTKItem 的 vtkSmartPointer 持有，销毁在渲染线程。
-class VtkSceneData final : public vtkObject {
-  public:
-    static VtkSceneData* New();
-    // vtkTypeMacro 生成的 NewInstance 按宏契约遮蔽基类版本，属 VTK 惯例；
-    // 宏本体无独立头可包含，include-cleaner 一并抑制。
-    // clang-format off
-    vtkTypeMacro(VtkSceneData, vtkObject); // NOLINT(bugprone-derived-method-shadowing-base-method,misc-include-cleaner)
-    // clang-format on
+constexpr double kDefaultSphereRadius = 0.5;
+constexpr double kDefaultSphereRed = 0.18;
+constexpr double kDefaultSphereGreen = 0.58;
+constexpr double kDefaultSphereBlue = 0.95;
+constexpr double kDefaultCameraX = 0.0;
+constexpr double kDefaultCameraY = 0.0;
+constexpr double kDefaultCameraZ = 4.5;
+constexpr double kDefaultCameraNear = 0.1;
+constexpr double kDefaultCameraFar = 100.0;
+constexpr double kDefaultCameraViewAngle = 30.0;
 
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkActor> triangle_actor;
-    SceneRevision applied_revision = 0;
-
-  private:
-    VtkSceneData() = default;
-    ~VtkSceneData() override = default;
-};
-
-vtkStandardNewMacro(VtkSceneData);
+void configure_default_camera(vtkWebGPURenderer* renderer) {
+    vtkCamera* camera = renderer->GetActiveCamera();
+    camera->SetPosition(kDefaultCameraX, kDefaultCameraY, kDefaultCameraZ);
+    camera->SetFocalPoint(0.0, 0.0, 0.0);
+    camera->SetViewUp(0.0, 1.0, 0.0);
+    camera->SetViewAngle(kDefaultCameraViewAngle);
+    camera->SetClippingRange(kDefaultCameraNear, kDefaultCameraFar);
+}
 
 } // namespace
 
-VtkViewport::VtkViewport(QQuickItem* parent) : QQuickVTKItem(parent) {}
+struct VtkViewport::Impl {
+    RenderScene pending;
+    NativeSurface native_surface;
+    std::unique_ptr<vtkHardwareWindow, void (*)(vtkHardwareWindow*)> hardware_window{nullptr,
+                                                                                     nullptr};
+    vtkSmartPointer<vtkWebGPURenderWindow> render_window;
+    vtkSmartPointer<vtkWebGPURenderer> renderer;
+    vtkSmartPointer<vtkActor> primitive_actor;
+    QMetaObject::Connection window_visibility_connection;
+    QMetaObject::Connection window_visible_connection;
+    QMetaObject::Connection scene_graph_initialized_connection;
+};
 
-VtkViewport::~VtkViewport() = default;
+VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
+    setFlag(ItemHasContents, false);
+    QObject::connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow* new_window) {
+        QObject::disconnect(impl_->window_visibility_connection);
+        QObject::disconnect(impl_->window_visible_connection);
+        QObject::disconnect(impl_->scene_graph_initialized_connection);
+        if (new_window == nullptr) {
+            return;
+        }
+        const auto refresh_frame = [this]() {
+            if (window() == nullptr || !window()->isVisible()) {
+                return;
+            }
+            // QWindow::visibleChanged is emitted while Qt is still completing
+            // the native window transition. Defer the first VTK attachment
+            // until that transition has returned to the event loop.
+            QTimer::singleShot(0, this, [this]() {
+                if (window() != nullptr && window()->isVisible()) {
+                    ensure_render_window();
+                    sync_native_surface();
+                }
+            });
+        };
+        impl_->window_visibility_connection =
+            QObject::connect(new_window, &QWindow::visibilityChanged, this,
+                             [refresh_frame](QWindow::Visibility) { refresh_frame(); });
+        impl_->window_visible_connection = QObject::connect(
+            new_window, &QWindow::visibleChanged, this, [refresh_frame](bool) { refresh_frame(); });
+        impl_->scene_graph_initialized_connection =
+            QObject::connect(new_window, &QQuickWindow::sceneGraphInitialized, this, refresh_frame);
+        QTimer::singleShot(0, this, refresh_frame);
+    });
+}
+
+VtkViewport::~VtkViewport() { destroy_render_window(); }
 
 QQuickItem* VtkViewport::item() { return this; }
 
 void VtkViewport::apply_state(const RenderScene& state) {
-    {
-        std::scoped_lock lock(mutex_);
-        pending_ = state;
+    if (state.revision < impl_->pending.revision) {
+        return;
     }
-    // 应用统一发生在渲染线程回调；初始化完成前提交的命令由集成层排队。
-    dispatch_async([this](vtkRenderWindow* render_window, const vtkUserData& user_data) {
-        auto* data = VtkSceneData::SafeDownCast(user_data);
-        if (data == nullptr) {
-            qWarning("VtkViewport: dispatch_async 收到未知场景数据，忽略");
-            return;
-        }
-        RenderScene pending;
-        {
-            std::scoped_lock lock(mutex_);
-            pending = pending_;
-        }
-        // 迟到更新拒绝：渲染线程已应用的修订更高时丢弃旧提交。
-        if (pending.revision < data->applied_revision) {
-            return;
-        }
-        data->applied_revision = pending.revision;
-        data->renderer->SetBackground(pending.background.redF(), pending.background.greenF(),
-                                      pending.background.blueF());
-        data->triangle_actor->SetVisibility(pending.primitive_visible);
-        render_window->Render();
-    });
+    impl_->pending = state;
+    ensure_render_window();
+    if (impl_->renderer == nullptr || impl_->render_window == nullptr) {
+        return;
+    }
+
+    impl_->renderer->SetBackground(impl_->pending.background.redF(),
+                                   impl_->pending.background.greenF(),
+                                   impl_->pending.background.blueF());
+    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
+    impl_->render_window->Render();
 }
 
-QQuickVTKItem::vtkUserData VtkViewport::initializeVTK(vtkRenderWindow* render_window) {
-    auto* data = VtkSceneData::New();
+void VtkViewport::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
+    QQuickItem::geometryChange(new_geometry, old_geometry);
+    ensure_render_window();
+    sync_native_surface();
+}
 
-    // 测试图元（007 范围：小型测试数据，完整网格后处理为非目标）。
-    // SDK 未登记 FiltersSources 全集，实际头文件核对后选用 vtkSphereSource。
+void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
+    QQuickItem::itemChange(change, value);
+    if (change == ItemSceneChange) {
+        ensure_render_window();
+        sync_native_surface();
+    } else if (change == ItemVisibleHasChanged) {
+        ensure_render_window();
+        sync_native_surface();
+        if (impl_->native_surface.view != nullptr) {
+            set_native_surface_visible(impl_->native_surface, isVisible());
+        }
+    }
+}
+
+void VtkViewport::ensure_render_window() {
+    if (impl_->render_window != nullptr) {
+        return;
+    }
+    if (window() == nullptr) {
+        return;
+    }
+    // QML geometry is available before the native window is shown. Creating a
+    // platform surface in that phase can make it cover the whole host view or
+    // submit against an incomplete Cocoa/Wayland window hierarchy.
+    if (!window()->isVisible()) {
+        return;
+    }
+    if (width() <= 0 || height() <= 0) {
+        return;
+    }
+    if (QGuiApplication::platformName() == QStringLiteral("offscreen")) {
+        qWarning("VtkViewport: offscreen 平台没有原生 surface，跳过 WebGPU 视口初始化");
+        return;
+    }
+
+    impl_->hardware_window = create_native_hardware_window(window());
+    if (impl_->hardware_window == nullptr || impl_->hardware_window.get() == nullptr) {
+        qWarning("VtkViewport: 当前 Qt 平台没有可用的 VTK hardware window");
+        return;
+    }
+
+    const qreal scale = window()->devicePixelRatio();
+    const int pixel_width = qMax(1, qRound(width() * scale));
+    const int pixel_height = qMax(1, qRound(height() * scale));
+    impl_->hardware_window->SetShowWindow(false);
+    impl_->hardware_window->SetSize(pixel_width, pixel_height);
+    impl_->hardware_window->Create();
+
+    if (!attach_native_surface(window(), this, impl_->hardware_window.get(),
+                               impl_->native_surface)) {
+        qWarning("VtkViewport: 无法把 VTK 原生 surface 接入 Qt Quick 窗口");
+        impl_->hardware_window->Destroy();
+        impl_->hardware_window.reset();
+        return;
+    }
+
+    impl_->render_window = vtkSmartPointer<vtkWebGPURenderWindow>::New();
+    impl_->render_window->SetShowWindow(false);
+    impl_->render_window->SetHardwareWindow(impl_->hardware_window.get());
+    impl_->render_window->SetSize(pixel_width, pixel_height);
+    impl_->renderer = vtkSmartPointer<vtkWebGPURenderer>::New();
+    impl_->primitive_actor = vtkSmartPointer<vtkActor>::New();
+
     vtkNew<vtkSphereSource> primitive;
+    primitive->SetRadius(kDefaultSphereRadius);
     primitive->SetThetaResolution(24);
     primitive->SetPhiResolution(16);
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputConnection(primitive->GetOutputPort());
-    data->triangle_actor->SetMapper(mapper);
-    data->renderer->AddActor(data->triangle_actor);
+    impl_->primitive_actor->SetMapper(mapper);
+    impl_->primitive_actor->GetProperty()->SetColor(kDefaultSphereRed, kDefaultSphereGreen,
+                                                    kDefaultSphereBlue);
+    impl_->renderer->AddActor(impl_->primitive_actor);
+    configure_default_camera(impl_->renderer);
+    impl_->renderer->SetBackground(impl_->pending.background.redF(),
+                                   impl_->pending.background.greenF(),
+                                   impl_->pending.background.blueF());
+    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
+    impl_->render_window->AddRenderer(impl_->renderer);
+    impl_->render_window->Initialize();
 
-    RenderScene initial;
-    {
-        std::scoped_lock lock(mutex_);
-        initial = pending_;
-    }
-    data->renderer->SetBackground(initial.background.redF(), initial.background.greenF(),
-                                  initial.background.blueF());
-    data->applied_revision = initial.revision;
-    render_window->AddRenderer(data->renderer);
-    // 渲染线程内发出：QML 侧经队列连接收到“场景已构建”通知。
-    Q_EMIT sceneInitialized();
-    return data;
-}
-
-void VtkViewport::destroyingVTK(vtkRenderWindow* render_window, vtkUserData user_data) {
-    auto* data = VtkSceneData::SafeDownCast(user_data);
-    if (data == nullptr) {
-        qWarning("VtkViewport: destroyingVTK 收到未知场景数据，忽略");
+    if (impl_->render_window->GetGenericContext() == nullptr) {
+        qWarning("VtkViewport: VTK WebGPU device 初始化失败");
+        destroy_render_window();
         return;
     }
-    // 仅解除渲染窗口关联；VTK 对象生命周期由 data 的引用计数在渲染线程
-    // 结束（QQuickVTKItem 契约），GUI/worker 不触碰。
-    render_window->RemoveRenderer(data->renderer);
+
+    sync_native_surface();
+    Q_EMIT sceneInitialized();
 }
 
-void prepare_graphics_environment() {
-    // 必须在 QGuiApplication 构造前调用（native/app/main.cpp）。
-    VtkViewport::setGraphicsApi();
+void VtkViewport::sync_native_surface() {
+    if (impl_->hardware_window == nullptr || window() == nullptr ||
+        impl_->native_surface.view == nullptr) {
+        return;
+    }
+    ::panta::visualization::sync_native_surface(window(), this, impl_->hardware_window.get(),
+                                                impl_->native_surface);
+    if (impl_->render_window != nullptr) {
+        const qreal scale = window()->devicePixelRatio();
+        const int pixel_width = qMax(1, qRound(width() * scale));
+        const int pixel_height = qMax(1, qRound(height() * scale));
+        impl_->render_window->SetSize(pixel_width, pixel_height);
+        impl_->render_window->Render();
+    }
+}
+
+void VtkViewport::destroy_render_window() {
+    if (impl_ == nullptr) {
+        return;
+    }
+    if (impl_->render_window != nullptr) {
+        impl_->render_window->Finalize();
+        impl_->render_window = nullptr;
+    }
+    if (impl_->native_surface.view != nullptr) {
+        detach_native_surface(impl_->native_surface);
+    }
+    impl_->renderer = nullptr;
+    impl_->primitive_actor = nullptr;
+    if (impl_->hardware_window != nullptr) {
+        impl_->hardware_window->Destroy();
+        impl_->hardware_window.reset();
+    }
 }
 
 std::unique_ptr<ViewportBackend> create_vtk_viewport_backend() {

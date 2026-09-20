@@ -39,7 +39,7 @@ class ThemeComponentTest final : public QObject {
             engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedLabel.qml"),
             owner);
         QVERIFY(label != nullptr);
-        QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#e8e8e8")));
+        QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#1f2937")));
         QCOMPARE(label->property("textSize").toInt(), 14);
     }
 

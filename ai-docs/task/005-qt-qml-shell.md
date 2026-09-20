@@ -98,4 +98,4 @@ native/app 的非 Qt 骨架实现（打印版本退出）被 Qt 实现替换；`
 
 ## 完成摘要
 
-已交付：Qt 6.11.2 预编译供给链（三平台固定清单 + SHA256 强校验 + `cmake -E tar` 解包，缓存于构建树）；Qt Quick 主窗口（深色主题、命令按钮、修订计数、占位面板、错误展示入口）经 `cargo run` 一键启动；ShellViewModel（caption 去重通知 / tick 命令 / error 属性）以 GTest+QSignalSpy 全量断言；qmllint 经 `all_qmllint` 接入；QML 修改触发增量重建实测。验证包括真实 GUI 交互（维护者人工 9 次点击 + AX 程序化点击 + SIGTERM 143 转发）。剩余限制：Linux/Windows 运行验证待 012；resize 拖拽未自动化实测。026 已消除手动注册类型对 qmllint 不可见的限制。后续：007（VTK 视口）已 ready，主线推进；006（FFI）可并行。
+已交付：Qt 6.11.2 预编译供给链（三平台固定清单 + SHA256 强校验 + `cmake -E tar` 解包，缓存于构建树）；Qt Quick 主窗口（浅色主题、命令按钮、修订计数、007 原生视口、错误展示入口）经 `cargo run` 一键启动；ShellViewModel（caption 去重通知 / tick 命令 / error 属性）以 GTest+QSignalSpy 全量断言；qmllint 经 `all_qmllint` 接入；QML 修改触发增量重建实测。验证包括真实 GUI 交互（维护者人工 9 次点击 + AX 程序化点击 + SIGTERM 143 转发）。剩余限制：Linux/Windows 运行验证待 012；resize 拖拽未自动化实测。026 已消除手动注册类型对 qmllint 不可见的限制。007 继续负责 VTK 视口的真实窗口验收；006（FFI）可并行。

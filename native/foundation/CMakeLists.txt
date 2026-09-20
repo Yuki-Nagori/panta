@@ -33,9 +33,9 @@ if(BUILD_TESTING)
     PRIVATE PANTA_TEST_EXPECT_MAJOR=${PROJECT_VERSION_MAJOR}
             PANTA_TEST_EXPECT_MINOR=${PROJECT_VERSION_MINOR}
             PANTA_TEST_EXPECT_PATCH=${PROJECT_VERSION_PATCH})
-  # 多配置生成器（Windows Visual Studio）在构建阶段可能尚未准备好 Qt
-  # runtime；延后发现用例到 ctest，避免 configure/build 被测试启动阻断。
-  gtest_discover_tests(panta_foundation_version_test DISCOVERY_MODE PRE_TEST)
+  # 在构建后生成稳定的 CTest 用例清单；避免依赖仅由新 CMake/CTest 提供的
+  # PRE_TEST discover_tests 命令，保证托管 CMake 与 runner ctest 可互操作。
+  gtest_discover_tests(panta_foundation_version_test DISCOVERY_MODE POST_BUILD)
 endif()
 
 install(

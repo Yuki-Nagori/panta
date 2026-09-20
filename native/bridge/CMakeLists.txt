@@ -51,17 +51,17 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_bridge_shell_view_model_test)
   target_link_libraries(panta_bridge_shell_view_model_test PRIVATE panta::bridge GTest::gtest
                                                                    Qt6::Test)
-  gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE PRE_TEST)
+  gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE POST_BUILD)
 
   add_executable(panta_bridge_task_host_test ../../tests/cpp/bridge/task_host_test.cpp)
   panta_native_defaults(panta_bridge_task_host_test)
   target_link_libraries(panta_bridge_task_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
-  gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE PRE_TEST)
+  gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE POST_BUILD)
 
   # 路径宿主（023）覆盖标准目录注入、cwd 无关、拒绝矩阵、file URL 与
   # 非 Unicode 策略；symlink 用例仅在 Unix 编译（Windows junction 记录待测）。
   add_executable(panta_bridge_path_host_test ../../tests/cpp/bridge/path_host_test.cpp)
   panta_native_defaults(panta_bridge_path_host_test)
   target_link_libraries(panta_bridge_path_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
-  gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE PRE_TEST)
+  gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE POST_BUILD)
 endif()

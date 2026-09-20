@@ -9,6 +9,7 @@ ApplicationWindow {
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
     visible: true
+    visibility: Window.Maximized
     title: qsTr("panta")
     color: Theme.colorBackground
 
@@ -18,6 +19,7 @@ ApplicationWindow {
         spacing: Theme.spacingMedium
 
         ThemedLabel {
+            objectName: "shellCaption"
             Layout.fillWidth: true
             text: qsTr("panta — 最小 Shell（Bridge 已关闭）")
             textSize: Theme.fontTitle

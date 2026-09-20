@@ -4,7 +4,7 @@
 
 UI 源文案统一英文，翻译由语言字典提供，具体规划见[国际化](../modules/internationalization.md)。C++ 静态库、QML 自动注册和开发模式状态重载见[模块与热重载](../modules/qml-modules-and-reload.md)，尚未实施。
 
-组件按原子控件、组合组件、业务面板和页面拼装；尺寸输入统一绑定 Theme，后续由独立应用主题 DSL 提供值。详细职责与数据流见[组件库与主题 DSL](../modules/qml-components-and-theme.md)。
+组件按原子控件、组合组件、业务面板和页面拼装；尺寸输入统一绑定 Theme，后续由分层的应用主题 DSL 提供值：`kind: variables` 管 GUI 尺寸基线，`kind: theme` 管主题覆盖。详细职责与数据流见[组件库与主题 DSL](../modules/qml-components-and-theme.md)。
 
 ## 界面构成
 

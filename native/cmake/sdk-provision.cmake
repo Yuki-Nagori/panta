@@ -384,71 +384,85 @@ endfunction()
 #    ai-docs/standards/dependency-acquisition.md；登记数据必须来自下载实测）──
 
 panta_sdk_declare_version(vtk 9.7.0)
-# VTK 9.7.0 制品（038 受信 CI 生产，Release sdk-vtk-9.7.0，2026-09-18 登记；
-# 发布说明与合规元数据见 tools/sdk/releases/vtk-9.7.0.md）。源码 tag
+# VTK 9.7.0 WebGPU 制品（038 受信 CI 生产，Release sdk-vtk-9.7.0-webgpu，
+# 2026-09-20 三平台 production/selfcheck/package success；发布说明与合规元数据见
+# tools/sdk/releases/vtk-9.7.0.md）。源码 tag
 # v9.7.0 → commit 23f0a095621e91bbdbeace8451e22b950c8e5f46（unmodified）；
-# Release/共享库/Qt6/GUISupportQtQuick，Qt 为锁定预编译 6.11.2。
+# Release/共享库/C++20/WebGPU hardware-window，不链接 Qt；Dawn 与 VTK 同包，
+# 三平台 REQUIRED_TARGETS 以真实归档内的 imported targets 为准。
 # Linux 注意：ubuntu-24.04 gcc13 生产，有效 glibc 基线高于 Qt 的 RHEL9
 # （≥2.34）；实际下限由 007 运行验证后回写。
 panta_sdk_declare_asset(
   vtk
   macos-arm64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-macos-arm64.tar.gz
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-macos-arm64.tar.gz
   SHA256
-  eb3c2f298c1640d347b42cfbd0715fb05b95eb403e0cff2cbb1d2139f6feca58
+  191f93371d6129780ff7c1363faf860c5e2bb279989ebe1d66e3ed0b5b932114
   PACKAGE
   VTK
   REQUIRED_TARGETS
-  VTK::GUISupportQtQuick
-  VTK::RenderingQt
+  VTK::RenderingWebGPU
+  VTK::RenderingUI
+  dawn::webgpu_dawn
   ABI
   macos-15-apple-clang-arm64-Release-shared
   MODULES
-  GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt
-  及默认模块集
+  RenderingWebGPU/RenderingUI/RenderingCore
+  及
+  vtkCocoaHardwareWindow（Cocoa）
   LICENSE
   share/licenses/VTK/Copyright.txt
+  share/licenses/Dawn/LICENSE（Dawn
+  上游许可证）
   (BSD-3))
 panta_sdk_declare_asset(
   vtk
   linux-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-linux-x86_64.tar.gz
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-linux-x86_64.tar.gz
   SHA256
-  d2b54fb37eb82bc27c3ce1840556a4c92129b6c0fb9d07ac4f0407ac66e2f80c
+  01a84e97d35b0a0f1ae443bea7215e18ed0617e7e186277f384cc139a4011602
   PACKAGE
   VTK
   REQUIRED_TARGETS
-  VTK::GUISupportQtQuick
-  VTK::RenderingQt
+  VTK::RenderingWebGPU
+  VTK::RenderingUI
+  dawn::webgpu_dawn
   ABI
   ubuntu-24.04-gcc13-x86_64-Release-shared
   MODULES
-  GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt
-  及默认模块集
+  RenderingWebGPU/RenderingUI/RenderingCore
+  及
+  vtkWaylandHardwareWindow（Wayland，VTK_USE_X=OFF）
   LICENSE
   share/licenses/VTK/Copyright.txt
+  share/licenses/Dawn/LICENSE（Dawn
+  上游许可证）
   (BSD-3))
 panta_sdk_declare_asset(
   vtk
   windows-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0/vtk-9.7.0-windows-x86_64.tar.gz
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-windows-x86_64.tar.gz
   SHA256
-  023931171a60b1a74bb97766d26713dabab73d4ff0ed4b6f706aba67cf60a710
+  771877f2c8cb170131d863c7791b450ab7c8f09306eaf1f328445dcd5fad3c78
   PACKAGE
   VTK
   REQUIRED_TARGETS
-  VTK::GUISupportQtQuick
-  VTK::RenderingQt
+  VTK::RenderingWebGPU
+  VTK::RenderingUI
+  dawn::webgpu_dawn
   ABI
   windows-msvc2022-v143-x64-Release-shared-MD
   MODULES
-  GUISupportQtQuick/GUISupportQt/RenderingQt/ViewsQt
-  及默认模块集
+  RenderingWebGPU/RenderingUI/RenderingCore
+  及
+  vtkWin32HardwareWindow（Win32）
   LICENSE
   share/licenses/VTK/Copyright.txt
+  share/licenses/Dawn/LICENSE（Dawn
+  上游许可证）
   (BSD-3))
 
 panta_sdk_declare_version(occt 8.0.1)

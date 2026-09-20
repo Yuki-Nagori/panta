@@ -9,4 +9,4 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
-          libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri
+          libgl-dev libegl1 libxkbcommon0 libgl1-mesa-dri libwayland-dev

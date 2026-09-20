@@ -7,25 +7,25 @@ target_link_libraries(
   PRIVATE panta::foundation
           panta::shell
           panta::i18n
+          "${PANTA_FFI_STATIC_LIB}"
           Qt6::Gui
           Qt6::Qml
           Qt6::Quick
           Qt6::QuickControls2)
+target_include_directories(
+  panta_native_app PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
+                           "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
+if(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(panta_native_app PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+elseif(WIN32)
+  target_link_libraries(panta_native_app PRIVATE ws2_32 userenv ntdll)
+endif()
 if(PANTA_ENABLE_BRIDGE_MODULE)
-  # main.cpp 在 QGuiApplication 前调用 prepare_graphics_environment() 与
-  # 崩溃处理器安装（任务 047，FFI 面）。plugin target 不传递 bridge 的
-  # PUBLIC include，FFI 消费者配方（include/staticlib/系统库）在此显式补齐。
-  target_include_directories(
-    panta_native_app PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
-                             "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
-  target_link_libraries(panta_native_app PRIVATE panta::visualization "${PANTA_FFI_STATIC_LIB}")
+  # main.cpp 的进程级 crash handler 已在上方链接 FFI；这里仅追加 Bridge/VTK
+  # 的插件和渲染依赖，关闭 Bridge 时不会把可选模块带入 app。
+  target_link_libraries(panta_native_app PRIVATE panta::visualization)
   target_link_libraries(panta_native_app PRIVATE panta_bridgeplugin panta_visualizationplugin)
-  if(UNIX)
-    find_package(Threads REQUIRED)
-    target_link_libraries(panta_native_app PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
-  elseif(WIN32)
-    target_link_libraries(panta_native_app PRIVATE ws2_32 userenv ntdll)
-  endif()
   target_compile_definitions(panta_native_app PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
 endif()
 
@@ -40,19 +40,22 @@ if(BUILD_TESTING)
   target_link_libraries(panta_qml_shell_module_test PRIVATE panta::shell Qt6::Gui Qt6::Qml
                                                             Qt6::Test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
-    target_link_libraries(panta_qml_shell_module_test PRIVATE panta_bridgeplugin)
+    target_link_libraries(panta_qml_shell_module_test
+                          PRIVATE panta::visualization panta_bridgeplugin panta_visualizationplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
   panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test)
 
-  # 视口模块加载测试（任务 007）：只验证 QML 注册与类型可创建，渲染线程
-  # 管线不在无头环境触发（VTK 对软件 scenegraph 会显式报错，见 vtk.md）。
-  add_executable(panta_qml_viewport_module_test ../../tests/cpp/app/viewport_module_load_test.cpp)
-  panta_native_defaults(panta_qml_viewport_module_test)
-  target_link_libraries(
-    panta_qml_viewport_module_test PRIVATE panta::visualization panta_visualizationplugin Qt6::Gui
-                                           Qt6::Qml Qt6::Test)
-  panta_add_qml_test(Qml.ViewportModuleLoads panta_qml_viewport_module_test)
+  if(PANTA_ENABLE_BRIDGE_MODULE)
+    # 视口模块加载测试（任务 007）：只验证 QML 注册与类型可创建，渲染线程
+    # 管线不在无头环境触发（VTK 对软件 scenegraph 会显式报错，见 vtk.md）。
+    add_executable(panta_qml_viewport_module_test ../../tests/cpp/app/viewport_module_load_test.cpp)
+    panta_native_defaults(panta_qml_viewport_module_test)
+    target_link_libraries(
+      panta_qml_viewport_module_test PRIVATE panta::visualization panta_visualizationplugin
+                                             Qt6::Gui Qt6::Qml Qt6::Test)
+    panta_add_qml_test(Qml.ViewportModuleLoads panta_qml_viewport_module_test)
+  endif()
 endif()
 
 install(

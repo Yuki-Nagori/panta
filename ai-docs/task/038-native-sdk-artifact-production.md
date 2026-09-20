@@ -93,6 +93,7 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-20 | 本地跨平台 superbuild configure：Linux 以 `CMAKE_SYSTEM_NAME=Linux`/`x86_64` 生成，macOS 以 host triple 生成；`cmake-format --check`、`cmake-lint`、`git diff --check` | 通过。Linux Dawn 命令只生成 `DAWN_USE_GLFW=OFF`、`DAWN_USE_X11=OFF`、`DAWN_USE_WAYLAND=ON`；macOS 生成三项全 OFF；没有重复覆盖参数。该结果证明生产构建图已避开 X11，Ubuntu runner 的完整 Dawn/VTK 编译仍待 CI 实证 |
 | 2026-09-20 | VTK CI run [35479202321](https://github.com/Yuki-Nagori/panta/actions/runs/35479202321)；Ubuntu `Selfcheck artifact` | `Produce VTK SDK` 已完成；selfcheck 在加载 `VTK-vtk-module-find-packages.cmake` 时失败，因 VTK 导出包调用 `find_package(WAYLAND)`，但上游安装树漏装源码内的 `FindWAYLAND.cmake`（后续还会需要 `FindXKBCOMMON.cmake`）。不是 Wayland/Dawn 编译失败；修复为将两个必要 Find 模块随 VTK CMake package 安装，待重跑确认 Linux 消费闭环 |
 | 2026-09-20 | 本地 Ubuntu 修复回归：Linux/macOS superbuild configure、Ninja step graph、CMake module copy fixture、metadata JSON、`cmake-format`/`cmake-lint`/`git diff --check` | 通过。Linux 图为 `install → wayland_cmake_modules → dawn_runtime → metadata`，macOS 不注册 Linux 专用 step；metadata 路径校正为真实的 `lib/cmake/vtk-9.7`，两份 Find module 均能复制到该目录。Ubuntu runner 的完整 selfcheck/打包仍待 CI 重跑 |
+| 2026-09-20 | VTK WebGPU Release [sdk-vtk-9.7.0-webgpu](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-vtk-9.7.0-webgpu)，workflow run [35479202321](https://github.com/Yuki-Nagori/panta/actions/runs/35479202321) | macOS arm64、Ubuntu x86_64、Windows x86_64 全部 production/selfcheck/package/upload success；归档内 `panta-sdk.json` 核对为 C++20、WebGPU、Cocoa/Wayland/Win32，required targets 为 `VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn`。Release 已可供 031 manifest 消费 |
 | 2026-09-20 | 本地 macOS arm64 真实 VTK 9.7.0 `RenderingWebGPU` 全量编译（C++20 hook + GitHub Dawn `v20260720.160313`） | C++20 标准修复生效，1,797 个编译步骤完成且不再出现 `std::span`/`requires` 语法错误；最后 2 个 Dawn 回调模板实例化错误暴露 VTK 9.7.0 与该 Dawn 版本的 API 不匹配。VTK 自带 `Rendering/WebGPU/README.md` 明确要求 Dawn `v20260421.125655`，下一步将依此固定 GitHub Dawn 资产后重跑完整构建 |
 | 2026-09-20 | 对照 VTK 9.7 官方 WebGPU 文档与本地源码 review | 官方固定 Dawn `v20260421.125655`，支持 GitHub 源码构建；VTK 的 `DawnMemoryDump` 派生类需要 RTTI，而 GitHub native release 默认按 Dawn `DAWN_ENABLE_RTTI=OFF` 构建，导致静态链接缺 `typeinfo for dawn::native::MemoryDump`。删除不稳妥的 RTTI 假 anchor，改为固定 GitHub Dawn 源码构建并显式 `DAWN_ENABLE_RTTI=ON`；同时关闭 Dawn 无关测试、工具、protobuf/IR 构建，待完整 VTK 链接与安装验证 |
 | 2026-09-20 | VTK 9.7 Linux Wayland 官方文档/源码核对 | VTK 9.7 已提供原生 `vtkWaylandHardwareWindow`、`vtkWaylandRenderWindowInteractor` 和 WebGPU Wayland surface；`VTK_USE_Wayland` 仅在 `VTK_USE_X=OFF` 时启用，当前构建描述若沿用默认值会实际产出 X11 路径。Linux WebGPU SDK 改为显式 `VTK_USE_X=OFF`、`VTK_USE_Wayland=ON`，CI 补 `libwayland-dev`（含 `wayland-scanner`）、`wayland-protocols` 和 `libxkbcommon-dev`，X11 不再作为该 SDK 的编译后端；Qt Quick 与 Wayland surface 的嵌入/事件协调仍由 007 的应用集成阶段验证。参考 [VTK 9.7 Wayland/WebGPU 架构说明](https://docs.vtk.org/en/latest/release_details/9.7/hardware-windows-and-wayland.html) 与 [VTK 9.7 build settings](https://docs.vtk.org/en/v9.7.0/build_instructions/build_settings.html) |
@@ -114,8 +115,8 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 
 ### 4. 待执行与未覆盖
 
-- 当前 Dawn 窗口后端开关已在生产构建描述中补齐，VTK Wayland Find 模块也已随安装树补齐；仍需三平台 CI 重新生产并确认 Ubuntu selfcheck 不再缺失 `WAYLAND`/`XKBCOMMON`。
-- `sdk-vtk-9.7.0-webgpu` 的 Release 资产、031 manifest 的 URL/SHA256/目标平台与 ABI/glibc 约束，待新制品落地后回填并复核。
+- 当前 Dawn 窗口后端开关、VTK Wayland Find 模块和 `sdk-vtk-9.7.0-webgpu` 三平台 Release 已完成；031 manifest 已回填真实 URL/SHA256/目标平台与 ABI。
+- VTK 生产闭环已完成；剩余为 OCCT/Netgen 三平台 Release/manifest 复核、SBOM/provenance 自动化，以及 007/009/010 的真实链接/运行冒烟。
 - 007、009、010 的 imported targets 最小链接/运行冒烟，以及 Wayland/Cocoa/Win32 硬件窗口与 Qt Quick 的原生层叠加、事件协调，尚未由本任务覆盖。
 - SBOM、许可证和 provenance 的发布闭环，以及 OCCT/Netgen 三平台 Release/manifest 复核，仍按对应任务推进。
 
@@ -133,4 +134,4 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 
 ## 完成摘要
 
-未完成（保持 in-progress）。旧 VTK Qt/OpenGL Release 已完成历史生产/消费闭环；现行 VTK 构建描述已切换到 WebGPU hardware-window（Linux Wayland、macOS Cocoa、Windows Win32），待维护者 dispatch `sdk-vtk-9.7.0-webgpu` 并把真实 URL/SHA256/targets 回填 031 manifest。OCCT/Netgen 合并 workflow 经 macOS 本机生产、自检与打包实证，仍需按既有计划完成其余交付证据。剩余：新 VTK 制品三平台发布与消费、OCCT/Netgen 三平台 Release/manifest 完整证据、SBOM/provenance 自动化、007/009/010 的真实链接/运行冒烟、Linux glibc 有效基线回写。
+未完成（保持 in-progress）。VTK WebGPU hardware-window 三平台 production/selfcheck/package/release 已完成，031 manifest 已切换并记录真实 SHA256、ABI、targets 与窗口系统；OCCT/Netgen 合并 workflow 已有三平台 Release。剩余：OCCT/Netgen manifest 最终复核、SBOM/provenance 自动化、007/009/010 的真实链接/运行冒烟，以及 Linux glibc 有效基线回写。

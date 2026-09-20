@@ -1,44 +1,41 @@
-/// VtkViewport：VTK 后端适配器——本仓库 VTK 专属代码的唯一收敛点。
-/// 基于 GUISupportQtQuick 的 QQuickVTKItem：VTK 状态只在渲染线程的
-/// initializeVTK / destroyingVTK / dispatch_async 回调内触碰；GUI 经
-/// apply_state 提交 RenderScene，回调按 revision 拒绝迟到更新。
-/// 应用/QML 不感知本类型（standards/vtk.md：VTK 不是公共 API）。
+/// VtkViewport：VTK WebGPU 后端适配器。
+///
+/// 该类型只作为 QQuickItem 宿主参与布局；VTK 不进入 Qt Quick scenegraph。
+/// 原生 view/layer/surface 的创建和尺寸同步由 vtk_native_surface 平台桥接完成。
 #pragma once
 
-#include <QQuickVTKItem.h>
+#include <QQuickItem>
 #include <memory>
-#include <mutex>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
 
-class vtkRenderWindow;
-
 namespace panta::visualization {
 
-class VtkViewport final : public QQuickVTKItem, public ViewportBackend {
+class VtkViewport final : public QQuickItem, public ViewportBackend {
     Q_OBJECT
 
   public:
     explicit VtkViewport(QQuickItem* parent = nullptr);
     ~VtkViewport() override;
 
-    // ViewportBackend
     QQuickItem* item() override;
     void apply_state(const RenderScene& state) override;
 
-  protected:
-    // QQuickVTKItem 渲染线程回调（vtkUserData = vtkSmartPointer<vtkObject>）
-    vtkUserData initializeVTK(vtkRenderWindow* render_window) override;
-    void destroyingVTK(vtkRenderWindow* render_window, vtkUserData user_data) override;
-
   signals:
-    /// 渲染线程管线搭建完成后发出（跨线程队列投递到 GUI）。
+    /// 原生 surface 与最小 VTK 场景已建立。
     void sceneInitialized();
 
+  protected:
+    void geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) override;
+    void itemChange(ItemChange change, const ItemChangeData& value) override;
+
   private:
-    /// GUI 提交、渲染线程消费的待应用状态；revision 高者为新。
-    std::mutex mutex_;
-    RenderScene pending_{};
+    void ensure_render_window();
+    void sync_native_surface();
+    void destroy_render_window();
+
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace panta::visualization
