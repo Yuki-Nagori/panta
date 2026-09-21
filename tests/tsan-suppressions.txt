@@ -6,5 +6,9 @@
 called_from_lib:libnglib
 called_from_lib:libngcore
 # Qt 预编译 SDK（Linux QML 测试的已知报告：libQt6Core/libQt6Qml，2026-09-21；
-# macOS 同测试无报告）。libQt6 前缀覆盖 Core/Qml/Quick/Gui 全族。
-called_from_lib:libQt6
+# macOS 同测试无报告）。called_from_lib 要求单一库精确匹配，命中多个库会被
+# TSan 拒绝并中止测试进程，必须逐库登记。
+called_from_lib:libQt6Core
+called_from_lib:libQt6Gui
+called_from_lib:libQt6Qml
+called_from_lib:libQt6Quick
