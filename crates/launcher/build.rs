@@ -39,6 +39,7 @@ const RERUN_ENVS: &[&str] = &[
     "CMAKE_GENERATOR_PLATFORM",
     "CMAKE_PREFIX_PATH",
     "PANTA_NATIVE_COVERAGE",
+    "PANTA_NATIVE_SANITIZER",
     "DEVELOPER_DIR",
     "MACOSX_DEPLOYMENT_TARGET",
 ];
@@ -80,11 +81,17 @@ fn orchestrate() -> Result<PathBuf, String> {
         return Err(format!("native 目录不可达：{}", native_dir.display()));
     }
     let target_root = provision::target_root(Path::new(&out_dir))?;
-    let native_profile = if std::env::var("PANTA_NATIVE_COVERAGE").as_deref() == Ok("1") {
+    // 覆盖率与 sanitizer（任务 042）各自使用独立构建树，避免插桩产物与
+    // 普通产物互相覆盖；组合非法由 build-policy.cmake 在 configure 期拒绝。
+    let sanitizer = std::env::var("PANTA_NATIVE_SANITIZER").unwrap_or_default();
+    let mut native_profile = if std::env::var("PANTA_NATIVE_COVERAGE").as_deref() == Ok("1") {
         format!("{profile}-coverage")
     } else {
         profile.clone()
     };
+    if !sanitizer.is_empty() {
+        native_profile = format!("{native_profile}-sanitizer-{}", sanitizer.replace(',', "-"));
+    }
     let binary_dir = target_root.join("native").join(native_profile);
     let deps_root = target_root.join("panta-deps");
 
@@ -178,7 +185,9 @@ fn orchestrate() -> Result<PathBuf, String> {
             } else {
                 "OFF"
             }
-        ));
+        ))
+        // 每次显式传 sanitizer 组合（可为空），避免上次插桩配置残留 CMakeCache。
+        .arg(format!("-DPANTA_SANITIZER={sanitizer}"));
     if let Some(sdk) = provision::macos_sdk()? {
         configure.arg(format!("-DCMAKE_OSX_SYSROOT={}", sdk.display()));
         let deployment = match std::env::var("MACOSX_DEPLOYMENT_TARGET") {

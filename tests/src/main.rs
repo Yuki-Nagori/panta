@@ -7,6 +7,11 @@ const TESTS_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 const CARGO_DENY_VERSION: &str = "0.20.2";
 const CARGO_MACHETE_VERSION: &str = "0.9.2";
 const CARGO_LLVM_COV_VERSION: &str = "0.9.1";
+/// Miri 只随 nightly 发布：固定日期保证可复现，升级时同步回填 032 验证表。
+const MIRI_NIGHTLY: &str = "nightly-2026-09-15";
+/// Miri 只解释纯 Rust crate：CXX FFI 调用与进程/构建类 crate（panta-build、
+/// panta-tests、launcher）不在 Miri 语义内。
+const MIRI_PACKAGES: &[&str] = &["panta-core", "panta-dsl-core", "panta-foundation"];
 
 fn main() -> ExitCode {
     let mut arguments = std::env::args().skip(1);
@@ -24,6 +29,9 @@ fn main() -> ExitCode {
             Some("native") => native_coverage(),
             Some(other) => Err(format!("未知 coverage 类型：{other}").into()),
         },
+        Some("sanitize") => sanitize(),
+        // 对外叫 ub-check：别名 `miri` 会遮蔽 cargo-miri 外部子命令。
+        Some("ub-check") => miri(),
         Some("toolchain") => verify_toolchain(),
         Some("lint") => {
             let mut rest: Vec<String> = arguments.collect();
@@ -31,12 +39,15 @@ fn main() -> ExitCode {
             lint(rest.first().map(String::as_str), check)
         }
         Some(command) => Err(format!(
-            "未知命令 '{command}'；可用：quality、test、audit、lint、format、coverage、toolchain"
+            "未知命令 '{command}'；可用：quality、test、audit、lint、format、coverage、sanitize、\
+             ub-check、toolchain"
         )
         .into()),
-        None => {
-            Err("缺少命令；可用：quality、test、audit、lint、format、coverage、toolchain".into())
-        }
+        None => Err(
+            "缺少命令；可用：quality、test、audit、lint、format、coverage、sanitize、ub-check、\
+                 toolchain"
+                .into(),
+        ),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -191,6 +202,134 @@ fn collect_test_binaries(directory: &Path, result: &mut Vec<PathBuf>) -> std::io
         }
     }
     Ok(())
+}
+
+/// sanitizer 矩阵（任务 042）：ASan+UBSan 是三平台主组合；TSan 与其他
+/// sanitizer 运行库互斥，只能独立构建，且官方支持平台不含 Windows；clang-cl
+/// 仅支持部分 UBSan 检查，Windows 矩阵只验证 ASan。官方依据见任务 042。
+fn sanitizer_profiles() -> &'static [(&'static str, &'static str)] {
+    if cfg!(windows) {
+        &[("asan", "address")]
+    } else {
+        &[("asan-ubsan", "address,undefined"), ("tsan", "thread")]
+    }
+}
+
+fn sanitize() -> Result<(), Box<dyn Error>> {
+    for (name, flags) in sanitizer_profiles() {
+        sanitize_profile(name, flags)?;
+    }
+    Ok(())
+}
+
+/// 每个组合构建独立的插桩 CMake 树并完整执行 CTest；UBSan 以
+/// `-fno-sanitize-recover=undefined` 保证错误即非零退出，sanitizer 缺省
+/// 退出码（ASan/UBSan 非零、TSan 66）经 CTest 原样失败。目录名由 flags
+/// 派生，与 launcher build.rs 的构建树命名规则保持一致。
+fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
+    let root = repository_root()?;
+    let target = target_root();
+    let mut build = Command::new("cargo");
+    build
+        .current_dir(root)
+        .args(["build", "--locked", "-p", "panta-launcher", "--target-dir"])
+        .arg(target)
+        .env("PANTA_NATIVE_SANITIZER", flags);
+    run(&format!("sanitizer {name} build"), build)?;
+    let native = target
+        .join("native")
+        .join(format!("debug-sanitizer-{}", flags.replace(',', "-")));
+    if !native.is_dir() {
+        return Err(format!("sanitizer 构建树不存在：{}", native.display()).into());
+    }
+    let cmake = panta_build::resolve_cmake(target)?;
+    let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
+    test.envs(sanitizer_test_env(target)?);
+    test.current_dir(&native)
+        .args(["--output-on-failure", "--no-tests=error"]);
+    run(&format!("sanitizer {name} ctest"), test)
+}
+
+/// sanitizer 测试环境：托管 LLVM bin 前置到 PATH，让运行时报告用配套
+/// llvm-symbolizer 符号化；Windows 的 ASan 动态运行库 DLL 由编译器资源
+/// 目录解析。LeakSanitizer 在 macOS 默认关闭，按官方文档显式开启；第三方
+/// SDK 与系统运行时的已知泄漏按 `tests/lsan-suppressions.txt` 抑制，自有
+/// 代码泄漏仍然阻断。
+fn sanitizer_test_env(
+    target: &Path,
+) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, Box<dyn Error>> {
+    let mut environment = panta_build::native_test_env(target, env!("PANTA_TEST_HOST"))?;
+    let llvm = panta_build::resolve_llvm_compilers(target)?;
+    let mut prepend = vec![llvm.root.join("bin")];
+    if cfg!(windows) {
+        let output = Command::new(&llvm.clangxx)
+            .arg("-print-resource-dir")
+            .output()?;
+        if !output.status.success() {
+            return Err("clang -print-resource-dir 失败".into());
+        }
+        let resource = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+        let runtime = resource.join("lib").join("windows");
+        if !runtime.is_dir() {
+            return Err(format!("ASan 运行库目录不存在：{}", runtime.display()).into());
+        }
+        prepend.push(runtime);
+    }
+    let inherited = environment
+        .iter()
+        .find(|(key, _)| key.to_string_lossy().eq_ignore_ascii_case("PATH"))
+        .map(|(_, value)| value.clone())
+        // 非 Windows 的 SDK 环境不含 PATH；保留进程 PATH，ctest 的脚本类
+        // 测试仍需要系统工具（cmake/sh/tar）可解析。
+        .or_else(|| std::env::var_os("PATH"))
+        .unwrap_or_default();
+    let mut paths = prepend;
+    paths.extend(std::env::split_paths(&inherited));
+    let path =
+        std::env::join_paths(paths).map_err(|error| format!("拼接 sanitizer PATH：{error}"))?;
+    environment.retain(|(key, _)| !key.to_string_lossy().eq_ignore_ascii_case("PATH"));
+    environment.push((std::ffi::OsString::from("PATH"), path));
+    if !cfg!(windows) {
+        let suppressions = repository_root()?.join("tests/lsan-suppressions.txt");
+        environment.push((
+            std::ffi::OsString::from("ASAN_OPTIONS"),
+            std::ffi::OsString::from("detect_leaks=1"),
+        ));
+        environment.push((
+            std::ffi::OsString::from("LSAN_OPTIONS"),
+            std::ffi::OsString::from(format!(
+                "suppressions={}",
+                suppressions.to_str().ok_or("抑制清单路径不是 UTF-8")?
+            )),
+        ));
+    }
+    Ok(environment)
+}
+
+/// Miri 解释执行纯 Rust crate 测试：工具链是固定日期 nightly（rustup 组件），
+/// 产物走独立 target/miri，不污染常规构建缓存。路径/日志类测试按设计使用
+/// 真实文件系统夹具，因此关闭隔离放行宿主文件操作；UB 与数据竞争检查不受
+/// 隔离开关影响。
+fn miri() -> Result<(), Box<dyn Error>> {
+    let mut install = Command::new("rustup");
+    install.args(["toolchain", "install", MIRI_NIGHTLY]).args([
+        "--profile",
+        "minimal",
+        "--component",
+        "miri",
+        "--no-self-update",
+    ]);
+    run("安装 Miri 工具链", install)?;
+    let mut test = Command::new("cargo");
+    test.arg(format!("+{MIRI_NIGHTLY}"))
+        .args(["miri", "test", "--locked"]);
+    for package in MIRI_PACKAGES {
+        test.args(["-p", package]);
+    }
+    test.env("MIRIFLAGS", "-Zmiri-disable-isolation")
+        .env("CARGO_TARGET_DIR", target_root().join("miri"))
+        .current_dir(repository_root()?);
+    run("cargo miri test", test)
 }
 
 fn lint(tool: Option<&str>, check: bool) -> Result<(), Box<dyn Error>> {

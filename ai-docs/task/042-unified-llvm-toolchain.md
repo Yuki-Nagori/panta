@@ -7,6 +7,17 @@
 - 负责人：待分配
 - 创建 / 更新：2026-09-18 / 2026-09-19
 
+## sanitizer 支持矩阵增量（2026-09-21，实施步骤 6）
+
+维护者确认用 LLVM 自带 sanitizer 落地内存/UB 动态检测，不引入独立工具：`PANTA_SANITIZER` CMake 选项（逗号分隔 `address`/`undefined`/`thread`）经 launcher build.rs 的 `PANTA_NATIVE_SANITIZER` 驱动，每个组合独立构建树（`target/native/debug-sanitizer-<组合>`），runner 新增 `cargo sanitize` 按平台固定矩阵执行。矩阵口径（官方文档 2026-09-21 核对，落地版本 LLVM 22.1.7）：
+
+| 组合 | Linux x86_64 | macOS arm64 | Windows x64 | 依据/说明 |
+|---|---|---|---|---|
+| ASan+UBSan | 验证 | 验证（LSan 显式 `ASAN_OPTIONS=detect_leaks=1`，官方默认关闭） | 仅 ASan | ASan 官方支持 Linux/macOS/Windows 8.1+（Windows 移植"functional"但支持较弱）；clang-cl 仅支持部分 UBSan 检查，Windows 不入 UBSan 矩阵 |
+| TSan | 验证 | 验证 | 不适用 | ThreadSanitizer 官方支持平台含 Darwin arm64、Linux x86_64，不含 Windows；TSan 与其他 sanitizer 运行库互斥，只能独立构建 |
+
+不满足的组合在 configure 期 FATAL_ERROR（未知值、TSan 混用、Windows 请求 TSan/UBSan、与覆盖率插桩同开），不隐式降级。LLVM `slim_llvm` 白名单本就保留 `lib/clang` 资源目录（含 sanitizer 运行库），无需新增供给。Cargo CXX 侧（panta-ffi）的 C++ 不插桩，与覆盖率同口径；Qt/SDK 预编译库不插桩，检测边界为自有 C++。UBSan 用 `-fno-sanitize-recover=undefined` 保证错误即非零退出。macOS 实证要点：LSan 对 OCCT/Netgen SDK 与 macOS 系统运行时的噪声按 `tests/lsan-suppressions.txt` 抑制（不得登记分配器必经帧，自有泄漏仍阻断）；TSan 运行时初始化使 gtest POST_BUILD discovery 超过默认 5s，各 `gtest_discover_tests` 显式 `DISCOVERY_TIMEOUT 120`。Linux/Windows 证据由新增 CI `sanitize` job（三平台矩阵）补齐。
+
 ## 本轮修复范围（2026-09-19）
 
 按维护者要求修复复审列出的全部基础设施缺口：提取公共构建支持 crate，供给采用文件锁、摘要隔离和原子发布；统一 Ninja 与 Windows SDK 环境；runner 按命令准备工具；固定并托管 uv/Python/Cppcheck；覆盖自有 CXX 编译命令；native coverage 使用 C++ LLVM 配套工具；工具核验读取实际编译数据库与 CMakeCache。工具选择收敛和验证证据随实施回填，不用本机旁路冒充三平台通过。
@@ -82,6 +93,9 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 
 | 2026-09-19 | ABI 元数据夹具：改前 configure 失败；改后 `check-abi.cmake` 的 valid/runtime/iterator 三场景 | 通过；隔离供给检查后正例成功、两种错误覆盖均被拒绝；使用 Apple Clang，仅验证 CMake 元数据策略 |
 | 2026-09-19 | `gh run list --limit 5`，核对最近远程 CI | 最新可见 run 35356240701 为旧提交 6ae8ed3，结论 failure；不能将旧绿灯或本机系统旁路用作当前 LLVM 实现的三平台证据 |
+| 2026-09-21 | macOS arm64；`cargo sanitize`（托管 LLVM 22.1.7，asan-ubsan 与 tsan 两棵独立插桩树，完整 CTest） | 通过：两树各 49/49（asan-ubsan 约 20s，tsan 约 66s，TSan 初始化显著变慢）；LeakSanitizer 按官方文档显式 `detect_leaks=1`，第三方噪声按抑制清单处理 |
+| 2026-09-21 | 受控失败实证：托管 clang 分别构造 signed-overflow、heap-buffer-overflow、自有代码泄漏样本 | 均非零退出：UBSan 报 `signed integer overflow` exit 134（`-fno-sanitize-recover=undefined` 生效）；ASan 报 `heap-buffer-overflow` exit 134；LSan 在抑制清单生效下仍报自有泄漏 exit 1，证明清单不掩盖自有代码 |
+| 2026-09-21 | Linux x86_64 / Windows x64 sanitizer 与 CI `sanitize` 矩阵 | 未在本机运行；job 已接线（Windows 仅 ASan），等待当前提交的三平台 CI 证据，不宣称三平台等价 |
 
 ## 2026-09-19 复审时发现的问题（修复记录见下）
 
@@ -100,6 +114,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 
 - 2026-09-18：从 Windows clang-cl 规划开始评审；维护者明确要求三平台统一 LLVM。
 - 2026-09-19：任务文件重命名为 `042-unified-llvm-toolchain.md`；固定 LLVM 22.1.7，macOS/Linux 使用 clang++，Windows 使用 clang-cl；Cargo provision、CXX、CMake、CI、质量工具与文档同步实现，无兼容层。
+- 2026-09-21：维护者确认实施步骤 6 的选型为 LLVM 自带 sanitizer（ASan+UBSan 主组合三平台、TSan 仅官方支持平台），工具矩阵由 runner `cargo sanitize` 固化，Windows 的 UBSan 子集与 TSan 缺口按官方文档注明理由；不引入 Valgrind 等独立检测工具。
 
 ## 完成摘要
 

@@ -35,7 +35,10 @@ if(BUILD_TESTING)
             PANTA_TEST_EXPECT_PATCH=${PROJECT_VERSION_PATCH})
   # 在构建后生成稳定的 CTest 用例清单；避免依赖仅由新 CMake/CTest 提供的
   # PRE_TEST discover_tests 命令，保证托管 CMake 与 runner ctest 可互操作。
-  gtest_discover_tests(panta_foundation_version_test DISCOVERY_MODE POST_BUILD)
+  # DISCOVERY_TIMEOUT：sanitizer（TSan）运行时初始化数秒，默认 5s 会在并行
+  # discovery 时超时。
+  gtest_discover_tests(panta_foundation_version_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT
+                       120)
 endif()
 
 install(

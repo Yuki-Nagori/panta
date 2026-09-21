@@ -5,3 +5,7 @@ lint = "run -q --locked --package panta-tests -- lint"
 format = "run -q --locked --package panta-tests -- format"
 audit = "run -q --locked --package panta-tests -- audit"
 coverage = "run -q --locked --package panta-tests -- coverage"
+sanitize = "run -q --locked --package panta-tests -- sanitize"
+# 不叫 miri：别名会遮蔽真正的 cargo-miri 外部子命令（cargo #10049，
+# runner 内部 `cargo +nightly miri test` 需要解析到真身）。
+ub-check = "run -q --locked --package panta-tests -- ub-check"

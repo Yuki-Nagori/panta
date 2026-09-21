@@ -23,4 +23,4 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 
 ## 验证
 
-`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 是 Rust-only 质量入口；跨语言项目验证使用根 `cargo format`、`cargo lint` 和 `cargo test`。领域测试覆盖输入修订、取消、错误转换，随首个业务 crate 建立。涉及 FFI 时同时运行 native 侧测试。
+`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 是 Rust-only 质量入口；跨语言项目验证使用根 `cargo format`、`cargo lint` 和 `cargo test`。领域测试覆盖输入修订、取消、错误转换，随首个业务 crate 建立。涉及 FFI 时同时运行 native 侧测试。`cargo ub-check` 以固定 nightly 解释执行纯 Rust crate 测试，作为 UB/数据竞争的补充动态检测；CXX FFI 与进程类 crate 不在其语义内，边界见[质量工具链](../modules/quality-tooling.md)与任务 032。

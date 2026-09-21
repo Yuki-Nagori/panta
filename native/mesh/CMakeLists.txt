@@ -72,6 +72,8 @@ if(BUILD_TESTING)
   target_compile_definitions(panta_mesh_netgen_test
                              PRIVATE PANTA_MESH_FIXTURE_DIR=${_panta_mesh_fixture_dir})
   # 在构建后生成稳定的 CTest 用例清单（与 foundation 同型，见 native/CMakeLists.txt）。
-  gtest_discover_tests(panta_mesh_ir_test DISCOVERY_MODE POST_BUILD)
-  gtest_discover_tests(panta_mesh_netgen_test DISCOVERY_MODE POST_BUILD)
+  # DISCOVERY_TIMEOUT：sanitizer（TSan）运行时初始化数秒，默认 5s 会在并行
+  # discovery 时超时。
+  gtest_discover_tests(panta_mesh_ir_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
+  gtest_discover_tests(panta_mesh_netgen_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
 endif()

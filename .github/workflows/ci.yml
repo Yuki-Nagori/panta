@@ -7,7 +7,11 @@
 # - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位，按域触发；
 # - format：Ubuntu 上通过 cargo format --check 检查 Rust、C++/CXX、CMake、QML；
 # - dependency-audit：仅在依赖清单/审计配置变更时运行；
-# - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++ 插桩报告与 QML 行为测试。
+# - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++ 插桩报告与 QML 行为测试；
+# - sanitize：三平台 sanitizer 矩阵（ASan+UBSan 主组合；TSan 仅官方支持平台，
+#   任务 042）；
+# - miri：Ubuntu 上以固定 nightly 解释执行纯 Rust crate 测试（任务 032），
+#   入口为 cargo ub-check（别名不叫 miri，避免遮蔽 cargo-miri）。
 name: CI
 
 on:
@@ -218,6 +222,53 @@ jobs:
           name: native-coverage
           path: target/native-coverage/summary.txt
           if-no-files-found: error
+
+  # sanitizer 矩阵（任务 042）：runner 按平台固定组合——Linux/macOS 跑
+  # ASan+UBSan 与 TSan 独立构建树，Windows 仅 ASan（TSan 官方不支持、
+  # clang-cl 的 UBSan 仅部分检查）。插桩树独立于 check 的普通构建。
+  sanitize:
+    name: sanitizer matrix (${{ matrix.os }})
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    # 冷启动含 LLVM 供给与两棵插桩树的全量自有源编译（Windows 上限对齐 check）。
+    timeout-minutes: 90
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Build and test with sanitizers
+        shell: bash
+        run: cargo sanitize
+
+  # Miri 解释执行纯 Rust crate 测试（任务 032）：固定 nightly 由 runner
+  # 自行安装，无 native 构建与 GL 依赖，按 rust 域触发。
+  miri:
+    name: rust miri UB checks (ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - name: Run Miri on pure Rust crates
+        shell: bash
+        run: cargo ub-check
 
   check:
     name: cargo check and build (${{ matrix.os }})

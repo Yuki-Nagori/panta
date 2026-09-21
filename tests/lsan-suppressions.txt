@@ -1,0 +1,22 @@
+# LeakSanitizer 抑制清单（sanitizer 矩阵，任务 042）：仅登记第三方预编译
+# SDK 与平台系统运行时的已知泄漏；自有 C++ 泄漏仍然阻断。模式按符号化栈帧
+# 的函数名或模块名做子串匹配（LLVM LeakSanitizer suppressions 语法），栈中
+# 任一帧命中即抑制。不得登记分配器必经帧（libclang_rt、libsystem_malloc、
+# libc.so 等通用 malloc/free 路径），否则泄漏检测整体失效。升级 OCCT/Netgen
+# 或新增 SDK 消费时复查条目；CI 平台发现新噪声模块按同规则补充登记。
+# OCCT 预编译 SDK（libTK*，Linux 为同名 .so 前缀）
+leak:libTK
+# Netgen 预编译 SDK
+leak:libnglib
+leak:libngcore
+# macOS 系统运行时：Objective-C 类注册、libdispatch、XPC、字体与文本渲染
+# 服务（Qt Quick 字形缓存经 CoreText/CoreGraphics 分配）
+leak:libobjc
+leak:libdispatch
+leak:libxpc
+leak:CoreFoundation
+leak:CoreGraphics
+leak:CoreText
+leak:libFontParser
+leak:libFontRegistry
+leak:libCGInterfaces

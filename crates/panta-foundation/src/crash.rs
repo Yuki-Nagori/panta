@@ -328,7 +328,9 @@ pub fn crash_log_path() -> Option<PathBuf> {
     LOG_PATH.lock().ok().and_then(|current| current.clone())
 }
 
-#[cfg(test)]
+// Miri 不支持 fork/信号与 Win32 FFI 等进程边界调用；这些测试只在真实平台
+// 执行（032 Miri 边界登记），Miri 下仍编译 crash 模块本体。
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
 

@@ -238,7 +238,11 @@ fn source_prefix_prefers_longest_source_match() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// 两个容量压力用例的输入必须超过固定阈值（2^20 字节 / 16384 条声明）才能
+// 触发拒绝诊断，无法在 Miri 解释执行下按可行时间完成；容量维度由常规
+// cargo test 覆盖（任务 032 Miri 边界登记）。
 #[test]
+#[cfg_attr(miri, ignore)]
 fn oversized_source_is_rejected() -> Result<(), Box<dyn Error>> {
     let oversized = format!("version: 1\nkind: language\n{}", "x".repeat(1_048_577));
     assert!(matches!(
@@ -249,6 +253,7 @@ fn oversized_source_is_rejected() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn declaration_overflow_is_rejected() -> Result<(), Box<dyn Error>> {
     let mut source = String::from("version: 1\nkind: variables\n\nvalues:\n");
     for index in 0..16_400 {

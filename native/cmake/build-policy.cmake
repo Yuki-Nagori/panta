@@ -55,6 +55,47 @@ if(PANTA_ENABLE_COVERAGE)
   add_link_options(-fprofile-instr-generate)
 endif()
 
+# sanitizer 矩阵（任务 042）：值为逗号分隔的 address/undefined/thread 组合，
+# 空关闭。ASan+UBSan 是三平台主组合；TSan 与其他 sanitizer 运行库互斥，
+# 只能独立构建。三平台不等价：TSan 官方支持平台不含 Windows，clang-cl 仅
+# 支持部分 UBSan 检查，Windows 矩阵只验证 ASan；不满足的组合在 configure
+# 期失败，不隐式降级。官方依据见任务 042 矩阵表。
+set(PANTA_SANITIZER
+    ""
+    CACHE STRING "逗号分隔的 sanitizer：address、undefined、thread；空关闭")
+string(REPLACE "," ";" _panta_sanitizers "${PANTA_SANITIZER}")
+list(REMOVE_ITEM _panta_sanitizers "")
+if(_panta_sanitizers)
+  if(PANTA_ENABLE_COVERAGE)
+    message(FATAL_ERROR "PANTA_SANITIZER 与 PANTA_ENABLE_COVERAGE 不组合验证")
+  endif()
+  foreach(_panta_sanitizer IN LISTS _panta_sanitizers)
+    if(NOT _panta_sanitizer MATCHES "^(address|undefined|thread)$")
+      message(FATAL_ERROR "未知 sanitizer '${_panta_sanitizer}'；支持 address、undefined、thread")
+    endif()
+  endforeach()
+  list(FIND _panta_sanitizers "thread" _panta_tsan_index)
+  list(FIND _panta_sanitizers "undefined" _panta_ubsan_index)
+  if(NOT _panta_tsan_index EQUAL -1)
+    if(NOT _panta_sanitizers STREQUAL "thread")
+      message(FATAL_ERROR "TSan 与其他 sanitizer 运行库互斥，只能单独启用：${PANTA_SANITIZER}")
+    endif()
+    if(MSVC)
+      message(FATAL_ERROR "TSan 官方支持平台不含 Windows，见 clang ThreadSanitizer 支持平台列表")
+    endif()
+  endif()
+  if(MSVC AND NOT _panta_ubsan_index EQUAL -1)
+    message(FATAL_ERROR "clang-cl 仅支持部分 UBSan 检查，Windows 矩阵只验证 ASan")
+  endif()
+  string(REPLACE ";" "," _panta_sanitizer_flags "${_panta_sanitizers}")
+  add_compile_options(-fno-omit-frame-pointer -fsanitize=${_panta_sanitizer_flags})
+  add_link_options(-fsanitize=${_panta_sanitizer_flags})
+  if(NOT _panta_ubsan_index EQUAL -1)
+    # UBSan 缺省只报告不失败；测试门禁要求错误即非零退出。
+    add_compile_options(-fno-sanitize-recover=undefined)
+  endif()
+endif()
+
 if(MSVC)
   # 当前 Rust/CXX staticlib 使用 /MD；Debug 保留调试符号及未优化代码，
   # 但整个 native 图统一使用 release CRT/STL ABI，包括 Qt 生成目标。
@@ -82,14 +123,19 @@ endfunction()
 # Windows 无控制台时 QtTest 默认写调试输出；强制 stderr 使 CTest 能展示断言。
 # TIMEOUT 兜底：这些测试正常亚秒完成；平台挂起（Windows 上链接 VTK/Dawn
 # 静态库的消费方二进制曾整轮挂起，见任务 007 验证表）时快速失败并保留
-# 诊断输出，不拖垮整个 CI。20s 对亚秒级测试已留足 20 倍余量。
+# 诊断输出，不拖垮整个 CI。20s 对亚秒级测试已留足 20 倍余量；sanitizer
+# 构建（尤其 TSan）启动与运行显著变慢，余量改按 120s。
 function(panta_add_qml_test name target)
+  set(_panta_qml_timeout 20)
+  if(_panta_sanitizers)
+    set(_panta_qml_timeout 120)
+  endif()
   add_test(NAME ${name} COMMAND ${target})
   set_tests_properties(
     ${name}
     PROPERTIES
       TIMEOUT
-      20
+      ${_panta_qml_timeout}
       ENVIRONMENT
       "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QML_IMPORT_PATH=${QT_STAGING}/qml"
   )

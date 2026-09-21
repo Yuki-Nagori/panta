@@ -14,9 +14,11 @@
 |---|---|---|
 | Rust | rustfmt、Clippy、deny、machete、测试、覆盖率 | 全局阶段下限不保证逐模块或逐提交不下降 |
 | C++ / CXX | 托管 LLVM、clang-tidy、include-cleaner、Cppcheck、GTest/QtTest | 合并 CMake/CXX 编译命令，分析自有翻译单元；仍需三平台冷构建证据 |
+| C++ 动态检测 | sanitizer 矩阵：ASan+UBSan 三平台、TSan 仅 Linux/macOS；`cargo sanitize` 每组合独立插桩树并完整执行 CTest | Qt/SDK 预编译库与 Cargo CXX adapter 不插桩，检测边界为自有 C++；错误经非零退出阻断，矩阵依据见任务 042 |
+| Rust 动态检测 | Miri（固定日期 nightly）解释纯 Rust crate 测试：`cargo ub-check`；关闭隔离放行文件系统夹具 | CXX FFI 与进程/构建类 crate 不可解释；crash 模块进程测试在 Miri 下跳过，真实平台照常执行 |
 | QML / CMake | qmlformat、qmllint、行为测试、cmake-format/lint | QML 源码级覆盖率未实现 |
 | 工具供给 | 固定 LLVM/CMake/Ninja/uv/Python/Cargo 工具；锁文件固定 Python wheels | 工具缓存加锁、版本隔离、临时安装后发布；平台 SDK 仍是开发者前置 |
-| CI | 三平台 Ninja check/build/test 与实际编译器核验；Ubuntu 独立 lint/format/audit/coverage | 本机验证不能代替当前提交的 Linux/Windows CI |
+| CI | 三平台 Ninja check/build/test 与实际编译器核验；Ubuntu 独立 lint/format/audit/coverage；三平台 sanitizer 与 Ubuntu Miri 按路径域触发 | 本机验证不能代替当前提交的 Linux/Windows CI |
 
 ## 工具版本与来源（任务 032/042/043）
 
@@ -25,7 +27,8 @@
 | cargo-deny | 0.20.2 | `cargo audit`；`target/panta-tools/cargo-deny/<version>` | RustSec、许可证、重复/通配依赖 |
 | cargo-machete | 0.9.2 | `cargo lint machete`；同类版本目录 | 扫描仓库根 workspace 的未使用 Rust 依赖 |
 | cargo-llvm-cov | 0.9.1 | `cargo coverage`；同类版本目录 | 使用 rustup 配套工具测量 Rust 业务代码 |
-| LLVM | 22.1.7 | 官方资产及 SHA256：`crates/panta-build/src/lib.rs` | clang/clang++/clang-cl 编译；clang-format 格式；clang-tidy 分析；llvm-cov/profdata 解析 native 覆盖率 |
+| LLVM | 22.1.7 | 官方资产及 SHA256：`crates/panta-build/src/lib.rs` | clang/clang++/clang-cl 编译；clang-format 格式；clang-tidy 分析；llvm-cov/profdata 解析 native 覆盖率；sanitizer 编译开关与运行库（compiler-rt，随 `lib/clang` 资源目录保留） |
+| Miri | nightly-2026-09-15（rustc 1.100.0-nightly 574ff7d98） | `cargo ub-check`；rustup 组件，日期固定于 runner 常量，升级同步回填 032 | 解释执行纯 Rust crate 测试，检出越界、悬垂引用、数据竞争等 UB |
 | include-cleaner | 随 LLVM 22.1.7 | `cargo lint includes`，仅启用 `misc-include-cleaner` | 缺失/多余 include 建议变为错误；取代独立 IWYU |
 | Cppcheck | 2.17.1（wheel 1.5.1） | `cargo lint cppcheck`；`pyproject.toml`/`uv.lock` | 补充 `unusedFunction`，`--error-exitcode=1` 阻断 |
 | qmlformat / qmllint | Qt 6.11.2 | Cargo/CMake 供给 Qt | 应用及测试 QML 格式、类型检查 |
@@ -50,6 +53,7 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 - `cargo format` 就地修复 Rust、C++/CXX、CMake、应用及测试 QML 的格式；`cargo format --check` 只验证不改动。Qt 格式工具直接供给，不配置或编译 native 工程。
 - `cargo lint clippy|machete|cmake|qmllint|clang-tidy|includes|cppcheck` 按需准备工具；不带工具名顺序执行全部。缺省为修复模式（clippy/clang-tidy 应用可自动修复项后回落检查，其余工具只报告），`--check` 只验证不改动；CI 与 pre-commit 一律使用 `--check`。audit/machete 编译 runner 时不下载 LLVM/CMake。
 - `cargo audit`、`cargo coverage`、`cargo coverage native` 分别负责依赖审计、Rust 门禁和 native 覆盖率报告。`cargo quality` 聚合格式、lint、审计、测试，不包含 coverage。
+- `cargo sanitize` 按平台固定 sanitizer 矩阵（Linux/macOS：ASan+UBSan 与 TSan 独立树；Windows：ASan），每组合一个 `target/native/debug-sanitizer-<组合>` 插桩树并完整执行 CTest；组合合法性在 configure 期校验，TSan 互斥与平台缺口按官方文档注明，矩阵与依据见任务 042。`cargo ub-check` 以固定 nightly 解释执行 panta-core、panta-dsl-core、panta-foundation 测试，产物在 `target/miri`；CXX FFI 与进程类 crate 不在其语义内。
 - `cargo run --locked -p panta-tests -- toolchain` 检查托管工具版本、Qt/GoogleTest 文件、CMakeCache 的 C/C++ 编译器/CMake/Ninja 路径，以及合并编译数据库中包括手写 CXX adapter 在内的实际编译器。系统旁路不能作为该检查的通过证据。
 - runner、FFI 与 launcher 共用 `panta-build`，无需通过 `#[path]` 导入其他 crate 私有文件或整体关闭 dead-code 告警。质量数据库位于 `target/native/<profile>/quality/compile_commands.json`；只选自有翻译单元，头文件不单独伪造编译命令。
 - CI 三平台单 job 顺序执行 check、build、工具核验与完整测试套件；lint 按工具与变更路径域拆分触发（machete→rust、cmake→native、qmllint→qml/native），dependency-audit 仅随依赖清单触发，纯文档变更整场跳过。Cargo 工具缓存仅由 main push 的 check job 保存，其余 job 只恢复；缓存瘦身在供给代码完成——panta-build 安装归档发布即删并按白名单裁剪 LLVM，Qt/SDK CMake 供给发布即删归档，三平台条目合计控制在仓库 10 GB 配额内。CI 不单独安装非 Rust 质量工具。Cargo aliases 和内部 Cargo 调用默认 `--locked`，直接 `cargo build/test/check` 按原生 Cargo 语义由调用者选择 `--locked`。
@@ -105,4 +109,4 @@ Cargo 统一用户入口、CMake 管理 native 图、CXX 管理 Rust/C++ 边界�
 
 当前 CAE 依赖仍由 031/038 逐步交付，VTK/OCCT/Netgen 的全平台供给和消费验证不能因 CMake 接口已存在就标完成。cargo-deny 只审计 Cargo 依赖图，Qt 和 native SDK 的许可证、漏洞与制品来源仍需独立清单和更新机制。
 
-本轮已实现共享安装互斥、原子发布、按命令准备工具、Windows Ninja/SDK 环境、CXX 数据库合并和实际工具路径核验。043 的三平台证据已由 run 35425146629 补齐并关闭；042 保持 in-progress，等待 sanitizer 与平台运行库矩阵证据；032 继续补按模块覆盖率、CXX/QML 测量缺口与 native 百分比基线。每个排除与工具限制须可追溯，实际验证结果以任务记录为准。
+本轮已实现共享安装互斥、原子发布、按命令准备工具、Windows Ninja/SDK 环境、CXX 数据库合并和实际工具路径核验。043 的三平台证据已由 run 35425146629 补齐并关闭；sanitizer 矩阵（`cargo sanitize`）与 Rust Miri 入口（`cargo ub-check`）已接线并完成 macOS 本机实证与受控失败验证，042 保持 in-progress 等待三平台 CI 的 sanitizer 证据（Windows 仅 ASan），032 继续补按模块覆盖率、CXX/QML 测量缺口与 native 百分比基线。每个排除与工具限制须可追溯，实际验证结果以任务记录为准。
