@@ -5,5 +5,6 @@
 # Netgen 预编译 SDK
 called_from_lib:libnglib
 called_from_lib:libngcore
-# Qt 预编译 SDK（Linux QML 测试的已知报告，2026-09-21；macOS 同测试无报告）
-called_from_lib:libQt6Core
+# Qt 预编译 SDK（Linux QML 测试的已知报告：libQt6Core/libQt6Qml，2026-09-21；
+# macOS 同测试无报告）。libQt6 前缀覆盖 Core/Qml/Quick/Gui 全族。
+called_from_lib:libQt6

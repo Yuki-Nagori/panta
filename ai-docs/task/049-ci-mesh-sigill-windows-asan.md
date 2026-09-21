@@ -125,6 +125,7 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | main CI clippy | 零发现 | `(name == "tsan").then(||)` 触发 unnecessary-closure → `then_some`；本地补跑 `cargo clippy -p panta-tests --all-targets` 收口 |
 | 2026-09-21 | main CI tsan 组合（ubuntu）第三轮 | 全绿 | Qml 测试报 libQt6Core 内部竞态（第三方预编译，Linux 特有）→ suppressions 追加 `called_from_lib:libQt6Core` |
 | 2026-09-21 | main CI sanitizer（windows）第三轮 | 全绿 | Qml 测试 bad-free：未插桩 Qt DLL 走 ucrt/RTL 堆 vs ASan 自有分配器（abort 不可抑制）→ Windows asan 组合排除 `Qml.*`，边界登记 042 |
+| 2026-09-21 | push 再验（run 35576767423） | 全绿 | Windows asan 全绿（Qml 排除生效）、clippy 全绿；tsan 仅剩 Qml 三测试报 libQt6Qml 内部竞态 → 抑制收敛为 `called_from_lib:libQt6`（Core/Qml/Quick/Gui 全族） |
 | — | 修复后 push 再验 main CI | 全绿 | 待执行 |
 
 ## 风险与回退
