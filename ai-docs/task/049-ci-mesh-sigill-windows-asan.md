@@ -121,6 +121,10 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | main CI tsan 组合（ubuntu）第二轮 | 全绿 | TSan 报 TaskHost/VecDeque 竞态：Rust std Mutex 为 futex 实现、TSan 不可见（rust-lang/rust#110485），正确同步被确定性误报 → tsan 组合排除 TaskHost.*/Ffi.*（runner -E），边界登记 042 |
 | 2026-09-21 | main CI sanitizer（windows）第二轮 | 全绿 | lld-link failifmismatch：MSVC STL 容器注解 annotate_*=1（插桩对象）vs =0（panta_ffi 未插桩 C++）→ sanitizer 树 `_DISABLE_STL_ANNOTATION` 统一关闭（STL 官方混链场景开关） |
 | 2026-09-21 | 本地（macOS arm64）：`cargo sanitize` 复验排除与抑制 | asan-ubsan 49/49 + tsan 42/42 | TaskHost/Ffi 共 7 项被 tsan 排除，其余全过 |
+| 2026-09-21 | push 再验（run 35575793937） | 全绿 | 上轮两项修复实证生效（Windows 完成链接并跑到测试、tsan 无 Rust 误报）；暴露第三轮见下两行 |
+| 2026-09-21 | main CI clippy | 零发现 | `(name == "tsan").then(||)` 触发 unnecessary-closure → `then_some`；本地补跑 `cargo clippy -p panta-tests --all-targets` 收口 |
+| 2026-09-21 | main CI tsan 组合（ubuntu）第三轮 | 全绿 | Qml 测试报 libQt6Core 内部竞态（第三方预编译，Linux 特有）→ suppressions 追加 `called_from_lib:libQt6Core` |
+| 2026-09-21 | main CI sanitizer（windows）第三轮 | 全绿 | Qml 测试 bad-free：未插桩 Qt DLL 走 ucrt/RTL 堆 vs ASan 自有分配器（abort 不可抑制）→ Windows asan 组合排除 `Qml.*`，边界登记 042 |
 | — | 修复后 push 再验 main CI | 全绿 | 待执行 |
 
 ## 风险与回退

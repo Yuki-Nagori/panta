@@ -5,3 +5,5 @@
 # Netgen 预编译 SDK
 called_from_lib:libnglib
 called_from_lib:libngcore
+# Qt 预编译 SDK（Linux QML 测试的已知报告，2026-09-21；macOS 同测试无报告）
+called_from_lib:libQt6Core
