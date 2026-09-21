@@ -571,6 +571,26 @@ pub fn windows_sdk_env(
         .ok_or_else(|| "未找到 MSVC Build Tools / Windows SDK；请安装平台 SDK 后重试".to_owned())
 }
 
+/// 将目录前置到环境变量列表的 PATH（大小写不敏感识别既有 PATH；列表缺失
+/// 时回退进程 PATH），整体替换后下发。测试子进程与构建脚本共用。
+pub fn prepend_path(
+    mut environment: Vec<(std::ffi::OsString, std::ffi::OsString)>,
+    directories: Vec<PathBuf>,
+) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, String> {
+    let inherited = environment
+        .iter()
+        .find(|(key, _)| env_key_eq(key, "PATH"))
+        .map(|(_, value)| value.clone())
+        .or_else(|| std::env::var_os("PATH"))
+        .unwrap_or_default();
+    let mut paths = directories;
+    paths.extend(std::env::split_paths(&inherited));
+    let path = std::env::join_paths(paths).map_err(|error| format!("拼接 PATH：{error}"))?;
+    environment.retain(|(key, _)| !env_key_eq(key, "PATH"));
+    environment.push((std::ffi::OsString::from("PATH"), path));
+    Ok(environment)
+}
+
 /// 为 native 测试子进程补齐托管运行库的搜索路径；消费方包括 ctest/测试
 /// 运行器，以及构建脚本自身——Windows 下 POST_BUILD gtest discovery 在
 /// 链接后立即启动测试可执行文件，构建子进程必须能解析这些 DLL。
@@ -582,7 +602,7 @@ pub fn native_test_env(
     target_root: &Path,
     target: &str,
 ) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, String> {
-    let mut environment = windows_sdk_env(target)?;
+    let environment = windows_sdk_env(target)?;
     if !cfg!(windows) {
         return Ok(environment);
     }
@@ -592,20 +612,9 @@ pub fn native_test_env(
     if !qt_bin.is_dir() {
         return Err(format!("托管 Qt 运行库目录不存在：{}", qt_bin.display()));
     }
-    let inherited = environment
-        .iter()
-        .find(|(key, _)| env_key_eq(key, "PATH"))
-        .map(|(_, value)| value.clone())
-        .or_else(|| std::env::var_os("PATH"))
-        .unwrap_or_default();
     let mut paths = vec![qt_bin];
     paths.extend(windows_sdk_dll_dirs(&deps));
-    paths.extend(std::env::split_paths(&inherited));
-    let path =
-        std::env::join_paths(paths).map_err(|error| format!("拼接 native 测试 PATH：{error}"))?;
-    environment.retain(|(key, _)| !env_key_eq(key, "PATH"));
-    environment.push((std::ffi::OsString::from("PATH"), path));
-    Ok(environment)
+    prepend_path(environment, paths)
 }
 
 /// SDK 缓存（`<deps>/sdk/<name>/<version>/<triple>/`）里 Windows triple 的

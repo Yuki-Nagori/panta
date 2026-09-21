@@ -33,6 +33,8 @@ Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓�
 | `cargo test --workspace` | Cargo workspace 测试入口，并由根 `tests/` package 集成测试聚合 qmllint、完整 CTest/GTest/QtTest/QML 行为套件；裸 `cargo test` 只跑默认成员 `panta-launcher` |
 | `cargo format` | 根 `tests/` 入口检查 Rust、C++/CXX、CMake 和 QML 格式；只改 Rust 时使用官方 `cargo fmt --all -- --check` |
 | `cargo coverage` | 通过根 runner 按固定版本准备 cargo-llvm-cov 到 `target/panta-tools/<cargo-tool>/<version>`，执行 Rust 覆盖率门禁；`cargo coverage native` 生成 native C++ 覆盖率报告，两个 CI job 分开运行 |
+| `cargo sanitize` | sanitizer 矩阵：ASan+UBSan 插桩构建并执行完整 CTest（Windows 仅 ASan；Linux/macOS 另验证 TSan 独立树）；矩阵与官方依据见任务 042 |
+| `cargo ub-check` | Miri（固定 nightly）解释执行纯 Rust crate 测试，检出越界、悬垂引用与数据竞争类 UB；CXX FFI 与进程类 crate 不适用，见任务 032 |
 | `cargo quality` | 依次执行 `cargo format`、`cargo lint`、依赖审计、Rust 测试和 native/QML 测试 |
 | `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典 |
 | `cargo run -p panta-dslc -- format --check resources/i18n/panta-cn.pa` | 检查 `.pa` 是否为规范格式；写回使用 `format <file>` |
@@ -55,6 +57,8 @@ native 直接诊断构建（不经 Cargo）仍可用：在 `native/` 下执行 `
 ```sh
 git config core.hooksPath .githooks
 ```
+
+性能测试与剖析（Criterion、火焰图、QML Profiler、Massif 等）是开发侧工作台，不进 CI 门禁，见[性能模块](ai-docs/modules/performance.md)。
 
 国际化、跨平台路径与运行时、变量 DSL、C++/QML 模块和热重载的规划见[重要模块说明](ai-docs/modules/README.md)。
 

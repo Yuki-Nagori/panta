@@ -19,6 +19,7 @@
 | `.pa` 格式化与校验 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [035](../task/035-pa-formatter-and-validator.md) |
 | 打包后软件内增量更新、签名、回滚 | [软件内增量更新](incremental-updates.md) | [037](../task/037-incremental-update-foundation.md) |
 | VTK/OCCT/Netgen 预编译 SDK 与受信制品 | [Native 依赖供给](native-dependency-supply.md) | [031](../task/031-prebuilt-native-dependencies.md)、[038](../task/038-native-sdk-artifact-production.md) |
+| 性能基线、剖析与回归对比（开发侧，非 CI 门禁） | [性能测试与剖析](performance.md) | [048](../task/048-performance-testing.md) |
 
 优先推进 022、023、026；024 在路径与基础任务服务就绪后推进，025 建立在运行时之上，027 最后验证 UI 重载。它们不成为现有 M0 视口主线的额外前置条件。
 

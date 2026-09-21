@@ -126,16 +126,12 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
         .env("PANTA_NATIVE_COVERAGE", "1");
     run("native coverage build", build)?;
     let native = target.join("native/debug-coverage");
-    let cmake = panta_build::resolve_cmake(target)?;
-    let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
-    test.envs(panta_build::native_test_env(
-        target,
-        env!("PANTA_TEST_HOST"),
-    )?);
-    test.current_dir(&native)
-        .args(["--output-on-failure", "--no-tests=error"])
-        .env("LLVM_PROFILE_FILE", &profile_file);
-    run("native coverage tests", test)?;
+    let mut envs = panta_build::native_test_env(target, env!("PANTA_TEST_HOST"))?;
+    envs.push((
+        std::ffi::OsString::from("LLVM_PROFILE_FILE"),
+        profile_file.into_os_string(),
+    ));
+    run_ctest_in(&native, envs, "native coverage tests")?;
     let llvm = panta_build::resolve_llvm_compilers(target)?;
     let raw = fs::read_dir(&profiles)?
         .collect::<Result<Vec<_>, _>>()?
@@ -242,12 +238,11 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     if !native.is_dir() {
         return Err(format!("sanitizer 构建树不存在：{}", native.display()).into());
     }
-    let cmake = panta_build::resolve_cmake(target)?;
-    let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
-    test.envs(sanitizer_test_env(target)?);
-    test.current_dir(&native)
-        .args(["--output-on-failure", "--no-tests=error"]);
-    run(&format!("sanitizer {name} ctest"), test)
+    run_ctest_in(
+        &native,
+        sanitizer_test_env(target)?,
+        &format!("sanitizer {name} ctest"),
+    )
 }
 
 /// sanitizer 测试环境：托管 LLVM bin 前置到 PATH，让运行时报告用配套
@@ -258,7 +253,7 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
 fn sanitizer_test_env(
     target: &Path,
 ) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, Box<dyn Error>> {
-    let mut environment = panta_build::native_test_env(target, env!("PANTA_TEST_HOST"))?;
+    let environment = panta_build::native_test_env(target, env!("PANTA_TEST_HOST"))?;
     let llvm = panta_build::resolve_llvm_compilers(target)?;
     let mut prepend = vec![llvm.root.join("bin")];
     if cfg!(windows) {
@@ -275,20 +270,7 @@ fn sanitizer_test_env(
         }
         prepend.push(runtime);
     }
-    let inherited = environment
-        .iter()
-        .find(|(key, _)| key.to_string_lossy().eq_ignore_ascii_case("PATH"))
-        .map(|(_, value)| value.clone())
-        // 非 Windows 的 SDK 环境不含 PATH；保留进程 PATH，ctest 的脚本类
-        // 测试仍需要系统工具（cmake/sh/tar）可解析。
-        .or_else(|| std::env::var_os("PATH"))
-        .unwrap_or_default();
-    let mut paths = prepend;
-    paths.extend(std::env::split_paths(&inherited));
-    let path =
-        std::env::join_paths(paths).map_err(|error| format!("拼接 sanitizer PATH：{error}"))?;
-    environment.retain(|(key, _)| !key.to_string_lossy().eq_ignore_ascii_case("PATH"));
-    environment.push((std::ffi::OsString::from("PATH"), path));
+    let mut environment = panta_build::prepend_path(environment, prepend)?;
     if !cfg!(windows) {
         let suppressions = repository_root()?.join("tests/lsan-suppressions.txt");
         environment.push((
@@ -683,6 +665,21 @@ fn build_launcher() -> Result<(), Box<dyn Error>> {
 fn run_qmllint_and_ctest() -> Result<(), Box<dyn Error>> {
     run_qmllint()?;
     run_ctest(None)
+}
+
+/// 在指定 CMake 树执行完整 CTest；环境由调用方准备（常规树、覆盖率或
+/// sanitizer 各有差异），参数与 `cargo coverage native` 保持一致。
+fn run_ctest_in(
+    native_dir: &Path,
+    envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
+    description: &str,
+) -> Result<(), Box<dyn Error>> {
+    let cmake = panta_build::resolve_cmake(target_root())?;
+    let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
+    test.envs(envs);
+    test.current_dir(native_dir)
+        .args(["--output-on-failure", "--no-tests=error"]);
+    run(description, test)
 }
 
 fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {

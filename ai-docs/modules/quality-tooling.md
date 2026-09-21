@@ -1,6 +1,6 @@
 # 跨语言质量工具链
 
-[模块导航](README.md) · [实施任务 032](../task/032-cross-language-quality-gates.md) · [统一测试入口 011](../task/011-test-quality-entrypoints.md)
+[模块导航](README.md) · [实施任务 032](../task/032-cross-language-quality-gates.md) · [统一测试入口 011](../task/011-test-quality-entrypoints.md) · [性能测试 048](../task/048-performance-testing.md)
 
 ## 目标与范围
 
@@ -110,3 +110,5 @@ Cargo 统一用户入口、CMake 管理 native 图、CXX 管理 Rust/C++ 边界�
 当前 CAE 依赖仍由 031/038 逐步交付，VTK/OCCT/Netgen 的全平台供给和消费验证不能因 CMake 接口已存在就标完成。cargo-deny 只审计 Cargo 依赖图，Qt 和 native SDK 的许可证、漏洞与制品来源仍需独立清单和更新机制。
 
 本轮已实现共享安装互斥、原子发布、按命令准备工具、Windows Ninja/SDK 环境、CXX 数据库合并和实际工具路径核验。043 的三平台证据已由 run 35425146629 补齐并关闭；sanitizer 矩阵（`cargo sanitize`）与 Rust Miri 入口（`cargo ub-check`）已接线并完成 macOS 本机实证与受控失败验证，042 保持 in-progress 等待三平台 CI 的 sanitizer 证据（Windows 仅 ASan），032 继续补按模块覆盖率、CXX/QML 测量缺口与 native 百分比基线。每个排除与工具限制须可追溯，实际验证结果以任务记录为准。
+
+性能测试（Criterion、火焰图、QML Profiler、Massif 等）按维护者决策不纳入本工具链的 CI 门禁，属于开发侧工作台；工具矩阵与命令见[性能测试与剖析](performance.md)与任务 048。
