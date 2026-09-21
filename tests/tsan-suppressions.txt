@@ -6,9 +6,12 @@
 called_from_lib:libnglib
 called_from_lib:libngcore
 # Qt 预编译 SDK（Linux QML 测试的已知报告：libQt6Core/libQt6Qml，2026-09-21；
-# macOS 同测试无报告）。called_from_lib 要求单一库精确匹配，命中多个库会被
-# TSan 拒绝并中止测试进程，必须逐库登记。
-called_from_lib:libQt6Core
-called_from_lib:libQt6Gui
-called_from_lib:libQt6Qml
-called_from_lib:libQt6Quick
+# macOS 同测试无报告，.so.6 条目在 macOS 零命中且零命中被容忍）。匹配串是
+# 库路径子串、命中多个库即致命，故用 soname 精确匹配（排除 libQt6QmlMeta
+# 等同前缀库）并逐库登记；QML 插件运行时 dlopen 的库也要列出。
+called_from_lib:libQt6Core.so.6
+called_from_lib:libQt6Gui.so.6
+called_from_lib:libQt6Qml.so.6
+called_from_lib:libQt6QmlMeta.so.6
+called_from_lib:libQt6QmlWorkerScript.so.6
+called_from_lib:libQt6Quick.so.6

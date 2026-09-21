@@ -127,6 +127,7 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | main CI sanitizer（windows）第三轮 | 全绿 | Qml 测试 bad-free：未插桩 Qt DLL 走 ucrt/RTL 堆 vs ASan 自有分配器（abort 不可抑制）→ Windows asan 组合排除 `Qml.*`，边界登记 042 |
 | 2026-09-21 | push 再验（run 35576767423） | 全绿 | Windows asan 全绿（Qml 排除生效）、clippy 全绿；tsan 仅剩 Qml 三测试报 libQt6Qml 内部竞态 → 抑制收敛为 `called_from_lib:libQt6`（Core/Qml/Quick/Gui 全族） |
 | 2026-09-21 | push 再验（run 35578093936） | 全绿 | `libQt6` 前缀误用：called_from_lib 要求单库匹配，命中多个库即拒绝并中止测试进程，18 个 Qt 加载类测试全灭 → 改逐库枚举 Core/Gui/Qml/Quick |
+| 2026-09-21 | push 再验（run 35578093936 / 维护者回贴日志） | 全绿 | 裸名 `libQt6Qml` 子串命中 Qml 与 QmlMeta 两库（QtQuick 运行时 dlopen）即致命，18 个 Qt 加载类测试全灭 → 按官方 wiki 语义改 soname 精确匹配（`.so.6` 后缀排除同前缀库），补 QmlMeta/QmlWorkerScript 等运行时 dlopen 库 |
 | — | 修复后 push 再验 main CI | 全绿 | 待执行 |
 
 ## 风险与回退
