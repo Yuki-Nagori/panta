@@ -24,7 +24,7 @@
 
 - **Windows ASan × 未插桩 CXX**：MSVC STL 的容器注解经 `detect_mismatch`（annotate_string/vector/optional）固化进目标文件，插桩对象 =1 与 panta_ffi 未插桩 C++ 对象 =0 在链接期 failifmismatch。按 STL 官方开关 `_DISABLE_STL_ANNOTATION` 在 sanitizer 树统一关闭注解（其文档场景即静态库混链），代价是 Windows 矩阵失去 STL 容器溢出检测；Rust 侧 C++ 维持不插桩口径。
 - **Windows ASan × 未插桩 Qt DLL**：clang ASan 在 Windows 用自有分配器，未插桩 Qt DLL 走 ucrt/RTL 堆，QML 引擎跨模块对象生命周期释放到错误堆触发 bad-free（abort，非报告，不可抑制）。Windows asan 组合经 runner 排除 `Qml.*`；纯自有 C++ 与 FFI 测试不受影响。
-- **TSan × Rust std 同步**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报。tsan 组合经 runner 排除经 FFI 驱动 Rust 线程的测试（`TaskHost.*`、`Ffi.*`，`tests/tsan-suppressions.txt` 另按 `called_from_lib` 抑制预编译 Netgen/Qt（Linux）内部竞态）；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++/Qt 线程的覆盖不变。
+- **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。tsan 组合经 runner 排除 `TaskHost.*`/`Ffi.*`（FFI 驱动 Rust 线程）与 `Qml.*`（第三方栈噪声），`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。
 
 ## 本轮修复范围（2026-09-19）
 

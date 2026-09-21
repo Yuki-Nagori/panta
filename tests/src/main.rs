@@ -240,10 +240,11 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     }
     // 组合级排除（边界登记 042）：tsan 下 Rust std 的 futex 锁不可见
     // （rust-lang/rust#110485），经 FFI 驱动 Rust 线程的测试只会确定性误报；
+    // QML 测试栈（Qt/glib/系统库）连续三轮仅产出第三方噪声，无自有信号。
     // Windows asan 下未插桩 Qt DLL 走 ucrt/RTL 堆而 ASan 用自有分配器，
     // QML 引擎跨模块对象生命周期触发 bad-free。
     let exclude = match (name, cfg!(windows)) {
-        ("tsan", _) => Some("^(TaskHost|Ffi)\\."),
+        ("tsan", _) => Some("^(TaskHost|Ffi|Qml)\\."),
         ("asan", true) => Some("^Qml\\."),
         _ => None,
     };

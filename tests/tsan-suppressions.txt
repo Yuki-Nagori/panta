@@ -2,16 +2,6 @@
 # 预编译库内部的数据竞态（无符号制品无法在消费侧定位修复）；自有 C++ 帧
 # 的竞态仍然阻断。called_from_lib 按"栈中任一帧属于该库"匹配，与该库并发
 # 交互产生的竞态会被一并抑制；升级 Netgen 或新增并发消费路径时复查条目。
-# Netgen 预编译 SDK
+# Netgen 预编译 SDK（NetgenMesher 测试仍在 tsan 下运行）
 called_from_lib:libnglib
 called_from_lib:libngcore
-# Qt 预编译 SDK（Linux QML 测试的已知报告：libQt6Core/libQt6Qml，2026-09-21；
-# macOS 同测试无报告，.so.6 条目在 macOS 零命中且零命中被容忍）。匹配串是
-# 库路径子串、命中多个库即致命，故用 soname 精确匹配（排除 libQt6QmlMeta
-# 等同前缀库）并逐库登记；QML 插件运行时 dlopen 的库也要列出。
-called_from_lib:libQt6Core.so.6
-called_from_lib:libQt6Gui.so.6
-called_from_lib:libQt6Qml.so.6
-called_from_lib:libQt6QmlMeta.so.6
-called_from_lib:libQt6QmlWorkerScript.so.6
-called_from_lib:libQt6Quick.so.6

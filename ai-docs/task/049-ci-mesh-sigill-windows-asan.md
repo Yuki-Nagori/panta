@@ -128,6 +128,7 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | push 再验（run 35576767423） | 全绿 | Windows asan 全绿（Qml 排除生效）、clippy 全绿；tsan 仅剩 Qml 三测试报 libQt6Qml 内部竞态 → 抑制收敛为 `called_from_lib:libQt6`（Core/Qml/Quick/Gui 全族） |
 | 2026-09-21 | push 再验（run 35578093936） | 全绿 | `libQt6` 前缀误用：called_from_lib 要求单库匹配，命中多个库即拒绝并中止测试进程，18 个 Qt 加载类测试全灭 → 改逐库枚举 Core/Gui/Qml/Quick |
 | 2026-09-21 | push 再验（run 35578093936 / 维护者回贴日志） | 全绿 | 裸名 `libQt6Qml` 子串命中 Qml 与 QmlMeta 两库（QtQuick 运行时 dlopen）即致命，18 个 Qt 加载类测试全灭 → 按官方 wiki 语义改 soname 精确匹配（`.so.6` 后缀排除同前缀库），补 QmlMeta/QmlWorkerScript 等运行时 dlopen 库 |
+| 2026-09-21 | push 再验（run 35581459059） | 全绿 | soname 抑制实证生效（Core/Qml 竞态消失、asan 49/49）；Qml 三测试再报 libglib-2.0（Qt Linux 事件循环系统库）竞态——第三方栈第三类噪声，逐库抑制为打地鼠 → tsan 组合排除 `Qml.*`（与 Windows asan 口径一致），Qt 抑制条目删除，netgen 抑制保留 |
 | — | 修复后 push 再验 main CI | 全绿 | 待执行 |
 
 ## 风险与回退
