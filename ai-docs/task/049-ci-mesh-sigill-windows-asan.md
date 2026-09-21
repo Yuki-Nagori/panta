@@ -1,6 +1,6 @@
 # 049 — CI 修复：Netgen Linux 制品 ISA 基线与 Windows ASan 链接
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[038](038-native-sdk-artifact-production.md)、[042](042-unified-llvm-toolchain.md)、[010](010-netgen-adapter-smoke.md)
 - 优先级：P0
@@ -95,13 +95,13 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 
 ## 验收标准
 
-- [ ] 覆盖发布的 `netgen-6.2.2604-linux-x86_64.tar.gz` 可在无 AVX-512 的
+- [x] 覆盖发布的 `netgen-6.2.2604-linux-x86_64.tar.gz` 可在无 AVX-512 的
       Linux runner 上正常加载（main CI mesh 测试全过）。
-- [ ] Windows sanitizer 构建能链接全部测试可执行（无 `__asan_*` 未定义），
+- [x] Windows sanitizer 构建能链接全部测试可执行（无 `__asan_*` 未定义），
       构建期 discovery 与 ctest 均可加载 ASan 动态运行库（main CI 实测）。
 - [x] `sdk-provision.cmake` occt/netgen/vtk 九项 SHA256 与覆盖后 Release
       sidecar 一致；marker 哈希失配触发本地与 CI 旧 staging 自动重建。
-- [ ] push 后 main CI 全绿。
+- [x] push 后 main CI 全绿（run 35582195805）。
 
 ## 验证计划与结果
 
@@ -129,7 +129,7 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | push 再验（run 35578093936） | 全绿 | `libQt6` 前缀误用：called_from_lib 要求单库匹配，命中多个库即拒绝并中止测试进程，18 个 Qt 加载类测试全灭 → 改逐库枚举 Core/Gui/Qml/Quick |
 | 2026-09-21 | push 再验（run 35578093936 / 维护者回贴日志） | 全绿 | 裸名 `libQt6Qml` 子串命中 Qml 与 QmlMeta 两库（QtQuick 运行时 dlopen）即致命，18 个 Qt 加载类测试全灭 → 按官方 wiki 语义改 soname 精确匹配（`.so.6` 后缀排除同前缀库），补 QmlMeta/QmlWorkerScript 等运行时 dlopen 库 |
 | 2026-09-21 | push 再验（run 35581459059） | 全绿 | soname 抑制实证生效（Core/Qml 竞态消失、asan 49/49）；Qml 三测试再报 libglib-2.0（Qt Linux 事件循环系统库）竞态——第三方栈第三类噪声，逐库抑制为打地鼠 → tsan 组合排除 `Qml.*`（与 Windows asan 口径一致），Qt 抑制条目删除，netgen 抑制保留 |
-| — | 修复后 push 再验 main CI | 全绿 | 待执行 |
+| 2026-09-21 | push 再验（run 35582195805） | 全绿 | **main CI 18 job 全绿**：三平台 check/build、sanitizer 矩阵（asan-ubsan+tsan / asan）、七项 lint、coverage、QML 测试、miri、audit 全过 |
 
 ## 风险与回退
 
@@ -161,4 +161,24 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 
 ## 完成摘要
 
-未完成。
+main CI 全绿（run 35582195805，18 job），任务完成。交付四层：
+
+1. **Netgen 制品可移植**：`netgen.cmake` 显式 `USE_NATIVE_ARCH=OFF`，三平台
+   制品经 SDK 管线重产、按单一 tag 覆盖发布（收口 job 先清空旧资产再重传），
+   manifest 九项哈希按 Release sidecar 实测回填；Linux mesh 测试恢复正常。
+2. **Windows ASan 落地**：clang-cl 树按 clang 驱动器 `/MD` 注入序列显式链接
+   compiler-rt 动态运行库（正斜杠路径 + 引号规避 lld-link rsp 转义），构建期
+   discovery 与 ctest 共享 `panta-build::compiler_rt_dll_dir` 解析 DLL；
+   `_DISABLE_STL_ANNOTATION` 统一 STL 容器注解口径。
+3. **TSan 边界**：tsan 组合排除经 FFI 驱动 Rust 线程的测试（futex 锁不可见）
+   与 QML 测试（Qt/glib 第三方栈噪声），NetgenMesher 保留并以
+   `called_from_lib` soname 抑制 netgen 内部竞态；纯自有 C++ 帧竞态仍阻断。
+4. **SDK 发布语义**：两条 SDK 管线新增收口 publish job（单一 tag 覆盖、
+   清空旧资产后重传），取代手动删资产。
+
+限制：Windows asan 无 STL 容器溢出检测、不覆盖 QML 层；tsan 不覆盖 Rust
+FFI 线程与 QML 层——均为预编译第三方 × 插桩自有代码的既定工具边界，登记于
+042 矩阵节，待上游（Rust TSan 支持、Qt 插桩方案）成熟后另立任务复查。
+
+未覆盖：制品 ISA 可移植性未做反汇编级复检（按维护者决策以 CI 实测替代）；
+glib 之外的系统库噪声未出现，无需登记。
