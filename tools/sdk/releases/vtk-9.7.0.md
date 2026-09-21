@@ -30,6 +30,12 @@ VTK SDK，提供 `RenderingWebGPU` 与平台 hardware window（Linux 为 Wayland
 - 每个归档内的 `panta-sdk.json` 记录 triple、源码 pin、构建开关与许可证
   入口（机器可读 provenance）。
 
+## 覆盖重产记录
+
+本 Release 维持单一 tag：管线重产时清空旧资产后全量重传（sdk-vtk.yml
+`publish` job），归档字节随重产变化，消费侧以 `sdk-provision.cmake` 登记的
+SHA256 为准（任务 049 起另有记录）。
+
 ## 许可证
 
 - VTK 按 **BSD-3-Clause** 再分发；许可证文件随每个归档的

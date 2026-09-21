@@ -617,6 +617,26 @@ pub fn native_test_env(
     prepend_path(environment, paths)
 }
 
+/// Windows sanitizer 的 compiler-rt 运行库目录（`<资源目录>/lib/windows`）：
+/// 动态 ASan 的 DLL 在此，测试环境必须能解析；链接期导入库由 CMake 侧按
+/// clang 驱动器的注入序列显式消费（native/cmake/build-policy.cmake）。
+/// 非 Windows 的 sanitizer 运行库随驱动器静态注入，无此目录需求。
+pub fn compiler_rt_dll_dir(llvm: &LlvmCompilers) -> Result<PathBuf, String> {
+    let output = Command::new(&llvm.clangxx)
+        .arg("-print-resource-dir")
+        .output()
+        .map_err(|error| format!("执行 clang -print-resource-dir：{error}"))?;
+    if !output.status.success() {
+        return Err("clang -print-resource-dir 失败".into());
+    }
+    let resource = String::from_utf8_lossy(&output.stdout);
+    let runtime = PathBuf::from(resource.trim()).join("lib").join("windows");
+    if !runtime.is_dir() {
+        return Err(format!("ASan 运行库目录不存在：{}", runtime.display()));
+    }
+    Ok(runtime)
+}
+
 /// SDK 缓存（`<deps>/sdk/<name>/<version>/<triple>/`）里 Windows triple 的
 /// 运行库目录：顶层 `bin/` 与嵌套布局（OCCT 8 为 `win64/vc14/bin/`）都收集；
 /// triple 目录不存在或无 bin 时跳过，保持幂等。

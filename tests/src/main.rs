@@ -257,18 +257,7 @@ fn sanitizer_test_env(
     let llvm = panta_build::resolve_llvm_compilers(target)?;
     let mut prepend = vec![llvm.root.join("bin")];
     if cfg!(windows) {
-        let output = Command::new(&llvm.clangxx)
-            .arg("-print-resource-dir")
-            .output()?;
-        if !output.status.success() {
-            return Err("clang -print-resource-dir 失败".into());
-        }
-        let resource = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
-        let runtime = resource.join("lib").join("windows");
-        if !runtime.is_dir() {
-            return Err(format!("ASan 运行库目录不存在：{}", runtime.display()).into());
-        }
-        prepend.push(runtime);
+        prepend.push(panta_build::compiler_rt_dll_dir(&llvm)?);
     }
     let mut environment = panta_build::prepend_path(environment, prepend)?;
     if !cfg!(windows) {

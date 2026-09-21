@@ -3,10 +3,11 @@
 # Netgen 与 OCCT 是硬 ABI 锁定（USE_OCC 链接其构建时的 OCCT），因此合并
 # 为一个管线、一个 Release（tag sdk-occt-netgen-8.0.1-6.2.2604，资产
 # 3 平台 × 2 依赖）。生产顺序 occt → netgen（Netgen 链接同工具链 OCCT）；
-# 自检通过后上传构建产物；`publish` 输入为 true 时发布，发布说明取自
-# tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md（源码 pin、LGPL、
-# SHA256/provenance 与配对约束）。开发者与普通 CI 经 031 的 sdk-provision
-# 消费发布归档，不编译第三方源码。
+# 自检通过后上传构建产物；`publish` 输入为 true 时由收口 job 发布：
+# 单一 tag 语义——不存在则创建，已存在则刷新说明并清空全部旧资产后重传
+# （维护者 2026-09-21 决策：重产即全量覆盖，改名/停产的旧文件不残留），
+# 发布说明取自 tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md。开发者与
+# 普通 CI 经 031 的 sdk-provision 消费发布归档，不编译第三方源码。
 #
 # runner 工具链：cmake/ninja 为 runner 镜像预装组件（受信生产环境，不是
 # 开发者基线）；本管线不消费 Qt（GUI 全关），VTK 管线独立（sdk-vtk.yml）。
@@ -95,16 +96,43 @@ jobs:
           path: sdk-build/dist/*
           if-no-files-found: error
 
+  # 发布收口：等三平台制品齐备后在单一 job 执行。清空再上传不能放在矩阵
+  # job 里并发执行——删除循环会撞上其他平台的上传窗口。
+  publish:
+    name: publish release assets (single tag)
+    if: inputs.publish
+    needs: [occt-netgen]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: occt-netgen-*
+          merge-multiple: true
+          path: sdk-build/dist
+
       - name: Publish release assets
-        if: inputs.publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view sdk-occt-netgen-8.0.1-6.2.2604 --repo "$GITHUB_REPOSITORY" \
-            || gh release create sdk-occt-netgen-8.0.1-6.2.2604 \
-                 --repo "$GITHUB_REPOSITORY" \
-                 --title "OCCT 8.0.1 + Netgen v6.2.2604 prebuilt SDKs" \
-                 --notes-file tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md
+          if gh release view sdk-occt-netgen-8.0.1-6.2.2604 --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit sdk-occt-netgen-8.0.1-6.2.2604 \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "OCCT 8.0.1 + Netgen v6.2.2604 prebuilt SDKs" \
+              --notes-file tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md
+            gh release view sdk-occt-netgen-8.0.1-6.2.2604 --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' | while IFS= read -r asset; do
+                gh release delete-asset sdk-occt-netgen-8.0.1-6.2.2604 "$asset" \
+                  --repo "$GITHUB_REPOSITORY" --yes
+              done
+          else
+            gh release create sdk-occt-netgen-8.0.1-6.2.2604 \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "OCCT 8.0.1 + Netgen v6.2.2604 prebuilt SDKs" \
+              --notes-file tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md
+          fi
           gh release upload sdk-occt-netgen-8.0.1-6.2.2604 sdk-build/dist/* --clobber \
             --repo "$GITHUB_REPOSITORY"

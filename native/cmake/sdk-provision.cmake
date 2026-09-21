@@ -535,11 +535,13 @@ panta_sdk_declare_asset(
 
 panta_sdk_declare_version(netgen 6.2.2604)
 # Netgen v6.2.2604 制品（038 同管线生产，与 OCCT 成对发布——USE_OCC 链接
-# 其构建时的 OCCT，硬 ABI 锁定，升级必须成对；2026-09-18 登记）。源码 tag
-# v6.2.2604 → commit 3ee489c7d58fdbc2a6708cca3cbaefaae506dc17（unmodified）；
-# GUI/Python/MPI 关闭。包配置文件名为 NetgenConfig.cmake（大写 N）：
-# find_package 须用 `Netgen`。运行期依赖同平台 OCCT 资产（消费侧处理加载
-# 路径，009/010）。
+# 其构建时的 OCCT，硬 ABI 锁定，升级必须成对；2026-09-18 登记，2026-09-21
+# 按任务 049 覆盖重产）。源码 tag v6.2.2604 → commit
+# 3ee489c7d58fdbc2a6708cca3cbaefaae506dc17（unmodified）；GUI/Python/MPI
+# 关闭；USE_NATIVE_ARCH=OFF（上游默认 ON 会使制品绑定生产机 ISA，linux
+# 首版因此内含 AVX-512，无 AVX-512 消费机加载即 SIGILL）。包配置文件名为
+# NetgenConfig.cmake（大写 N）：find_package 须用 `Netgen`。运行期依赖同
+# 平台 OCCT 资产（消费侧处理加载路径，009/010）。
 panta_sdk_declare_asset(
   netgen
   macos-arm64

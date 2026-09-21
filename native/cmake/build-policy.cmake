@@ -94,6 +94,42 @@ if(_panta_sanitizers)
     # UBSan 缺省只报告不失败；测试门禁要求错误即非零退出。
     add_compile_options(-fno-sanitize-recover=undefined)
   endif()
+  if(MSVC)
+    # CMake 对 clang-cl 直接以 lld-link 链接，绕过编译器驱动器的运行库注入，
+    # 上面的 -fsanitize=address 对 lld-link 不生效，测试可执行在链接期报
+    # __asan_* 未定义（任务 049）。按 clang 驱动器 /MD 下的注入序列显式复刻
+    # （clang/lib/Driver/ToolChains/MSVC.cpp，2026-09-21 核对）：asan_dynamic
+    # 导入库、SEH 拦截符号保活、wholearchive 进 dynamic_runtime_thunk，
+    # -debug 与 -incremental:no 亦为驱动器同款约束。运行期 DLL 由测试环境把
+    # 编译器资源目录加入 PATH 解析（panta-build::compiler_rt_dll_dir，构建期
+    # discovery 与 ctest 同源），链接期只消费导入库。
+    execute_process(
+      COMMAND "${CMAKE_CXX_COMPILER}" "-print-resource-dir"
+      OUTPUT_VARIABLE _panta_asan_resource
+      RESULT_VARIABLE _panta_asan_resource_result
+      OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(NOT _panta_asan_resource_result EQUAL 0 OR NOT IS_DIRECTORY "${_panta_asan_resource}")
+      message(FATAL_ERROR "clang-cl -print-resource-dir 失败，无法定位 Windows ASan "
+                          "运行库：${CMAKE_CXX_COMPILER}")
+    endif()
+    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+      message(FATAL_ERROR "Windows ASan 矩阵只登记 x64（任务 042），未知架构 " "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    set(_panta_asan_rt_dir "${_panta_asan_resource}/lib/windows")
+    foreach(_panta_asan_rt_lib asan_dynamic asan_dynamic_runtime_thunk)
+      if(NOT EXISTS "${_panta_asan_rt_dir}/clang_rt.${_panta_asan_rt_lib}-x86_64.lib")
+        message(
+          FATAL_ERROR "LLVM 发行包缺少 compiler-rt 运行库 " "clang_rt.${_panta_asan_rt_lib}-x86_64.lib"
+                      "（${_panta_asan_rt_dir}）；lib/clang 资源目录不得裁剪")
+      endif()
+    endforeach()
+    add_link_options("-debug" "-incremental:no")
+    add_link_options("SHELL:\"${_panta_asan_rt_dir}/clang_rt.asan_dynamic-x86_64.lib\"")
+    add_link_options("-include:__asan_seh_interceptor")
+    add_link_options(
+      "SHELL:-wholearchive:\"${_panta_asan_rt_dir}/clang_rt.asan_dynamic_runtime_thunk-x86_64.lib\""
+    )
+  endif()
 endif()
 
 if(MSVC)

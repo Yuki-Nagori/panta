@@ -101,6 +101,7 @@ ai-docs/
 | 046 | [CI 触发拆分与缓存预算](task/046-ci-trigger-split-cache-budget.md) | 验证基础 | 018, 012 | done |
 | 047 | [崩溃信号处理与日志落地](task/047-crash-signal-logging.md) | 验证基础 | 008 | in-progress |
 | 048 | [性能基线与性能测试体系](task/048-performance-testing.md) | 验证基础 | 011, 032 | in-progress |
+| 049 | [CI 修复：Netgen Linux 制品 ISA 基线与 Windows ASan 链接](task/049-ci-mesh-sigill-windows-asan.md) | 验证基础 | 038, 042, 010 | in-progress |
 
 ## 仓库与文档维护
 
