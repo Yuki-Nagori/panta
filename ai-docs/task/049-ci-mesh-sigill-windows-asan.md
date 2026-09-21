@@ -54,12 +54,14 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 ## 前置条件与待决策
 
 - 已决策（维护者 2026-09-21）：保持单一 tag `sdk-occt-netgen-8.0.1-6.2.2604`，
-  重产资产按管线既有 `--clobber` 语义覆盖；本次仅覆盖三个 netgen 资产（缺陷源），
-  OCCT 资产不动、哈希继续有效。Netgen 仍链接 038 管线同次生产的 OCCT 8.0.1
-  （同源码 pin、同配置，ABI 同构），覆盖理由在 release notes 中显式说明。
-  （与 042"不覆盖已有发布资产"的差异由维护者本次决策覆盖。）
-- SDK 管线（sdk-occt-netgen.yml）以含本修复的分支 ref 触发 `publish=false`，
-  制品经本地反汇编验证后按维护者决策覆盖发布。
+  重产资产由管线 `publish=true` 收口 job 覆盖发布（清空旧资产后全量重传）；
+  VTK 管线同口径。本次 occt/netgen/vtk 三个 SDK 全部重产，manifest 哈希按
+  Release 实测 sidecar 回填。Netgen 仍链接 038 管线同次生产的 OCCT 8.0.1
+  （同源码 pin、同配置，ABI 同构）。（与 042"不覆盖已有发布资产"的差异由
+  维护者本次决策覆盖。）
+- 已决策（维护者 2026-09-21）：不在本地下载制品做反汇编验证；ISA 可移植性
+  由管线 selfcheck + PR 三平台 CI（Linux mesh 测试真实加载 netgen）实测，
+  Windows ASan 链接由 PR CI sanitizer job 实测。
 
 ## 实施步骤
 
@@ -71,9 +73,10 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 3. `panta-build` 抽出 compiler-rt 运行库目录解析；launcher build.rs 在
    sanitizer 构建期把该目录注入测试环境（Windows）；`tests/src/main.rs` 的
    `sanitizer_test_env` 改用同一实现，删除内联副本。
-4. 触发 SDK 管线，验证三平台制品（Linux 反汇编确认无 AVX-512），实测 SHA256
-   后更新 `sdk-provision.cmake` 与 release notes，按单一 tag 覆盖发布 netgen 资产。
-5. 三平台 CI 复验（本仓库唯一可执行三平台门禁的场所）。
+4. 以分支 ref 触发两条管线重产（publish=false 先行验证管线与自检），代码
+   review 通过后以 `publish=true` 重产并覆盖发布；manifest 从 Release 的
+   `.sha256` sidecar 实测回填。
+5. 三平台 CI 复验（PR CI 即最终验证场所）。
 
 ## 预计改动
 
@@ -92,30 +95,32 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 
 ## 验收标准
 
-- [ ] 覆盖发布的 `netgen-6.2.2604-linux-x86_64.tar.gz` 的 `libnglib.so`/
-      `libngcore.so` 反汇编无 zmm/AVX-512 指令；三平台 `panta-sdk.json` 记录
-      `USE_NATIVE_ARCH: false`。
+- [ ] 覆盖发布的 `netgen-6.2.2604-linux-x86_64.tar.gz` 可在无 AVX-512 的
+      Linux runner 上正常加载（PR CI mesh 测试全过）；三平台
+      `panta-sdk.json` 记录 `USE_NATIVE_ARCH: false`。
 - [ ] Windows sanitizer 构建能链接全部测试可执行（无 `__asan_*` 未定义），
-      构建期 discovery 与 ctest 均可加载 ASan 动态运行库。
-- [ ] `sdk-provision.cmake` 三平台 netgen SHA256 与 Release 覆盖后的实测一致；
-      marker 哈希失配触发旧 staging 自动重建。
-- [ ] main 分支 CI 全绿。
+      构建期 discovery 与 ctest 均可加载 ASan 动态运行库（PR CI 实测）。
+- [ ] `sdk-provision.cmake` occt/netgen/vtk 九项 SHA256 与覆盖后 Release
+      sidecar 一致；marker 哈希失配触发本地与 CI 旧 staging 自动重建。
+- [ ] PR CI 全绿。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-21 | 本地（macOS arm64）：旧制品 `llvm-objdump -d libnglib.so` grep zmm | 大量 AVX-512 指令 | 4170 处 zmm、97 处 vpermt2d（根因实证） |
-| — | r2 制品同口径反汇编 | 零命中 | 待执行 |
-| — | macOS：`cargo build --locked --workspace` + `cargo test --locked --workspace` | 全通过（netgen staging 哈希不变则不重下） | 待执行 |
-| — | macOS：`cargo sanitize`、`cargo lint`、`cargo format --check` | 全通过 | 待执行 |
-| — | 三平台 CI（push 后 run） | 全绿 | 待执行 |
+| 2026-09-21 | 本地（macOS arm64，clang++/LLVM 22.1.7）：`cargo format --check`、`cargo check --locked --workspace --all-targets`、`cargo test --locked --workspace` | 全通过 | 全通过（含 launcher build.rs 改动后的强制重编译） |
+| 2026-09-21 | 本地（macOS arm64）：`cargo lint`（clippy/clang-tidy/includes/cppcheck/cmake/qmllint/machete） | 零发现 | 退出码 0 |
+| 2026-09-21 | 本地（macOS arm64）：`cargo sanitize`（asan-ubsan + tsan 双树） | 49/49 ×2 | 100% passed（两棵插桩树 ctest 全过） |
+| 2026-09-21 | 分支 dispatch sdk-occt-netgen.yml / sdk-vtk.yml（publish=false） | 三平台生产 + selfcheck 全绿 | run 35559174921（49m/24m/26m）、35559176795（70m/22m/40m）全 ✓ |
+| — | `publish=true` 覆盖发布后，Release 资产集合与 manifest 哈希 | 九项 sidecar 与登记一致 | 待执行 |
+| — | PR CI：Linux mesh 测试 / Windows sanitizer / 全矩阵 | 全绿 | 待执行 |
 
 ## 风险与回退
 
-- r2 制品若仍不可移植（验证步骤漏网）：CI 会以同形态 SIGILL 复现，回退为
-  manifest 指回旧制品无意义（旧制品即缺陷源）；需在构建描述层面进一步收紧
-  （显式 `-march` 基线）后再次覆盖重产。
+- 重产制品若仍不可移植：PR CI 会以同形态 SIGILL 复现，回退为 manifest 指回
+  旧制品无意义（旧制品即缺陷源）；需在构建描述层面进一步收紧（显式 `-march`
+  基线）后再次覆盖重产。
 - Windows ASan 显式链接如与 lld-link 版本行为不符：CI Windows sanitizer job
   直接暴露链接错误，回退点在 `build-policy.cmake` 单一位置。
 - 旧 Release 与旧 manifest 哈希保留在 git 历史中，可随时回退登记。
