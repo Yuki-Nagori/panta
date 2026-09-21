@@ -117,6 +117,10 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | push 后 main CI（run 35572104870） | 全绿 | netgen 修复实证：clippy/clang-tidy/cppcheck（全新重建 + mesh discovery）、native-coverage、三平台 check 全 ✓，asan-ubsan 组合 49/49；遗留见下两行 |
 | 2026-09-21 | main CI tsan 组合（ubuntu） | 全绿 | TSan 报 libnglib 内部数据竞态（无符号第三方帧），NetgenMesher 5 测试连坐失败 → 新增 tests/tsan-suppressions.txt（called_from_lib）注入 TSAN_OPTIONS |
 | 2026-09-21 | main CI sanitizer（windows） | 全绿 | lld-link rsp 词法消费 `\x`，compiler-rt 路径反斜杠被吞 → 转正斜杠 + 引号 |
+| 2026-09-21 | push 再验（run 35573633750） | 全绿 | 上两项修复实证生效（netgen 竞态不再报告、路径正常）；暴露第二轮问题见下两行 |
+| 2026-09-21 | main CI tsan 组合（ubuntu）第二轮 | 全绿 | TSan 报 TaskHost/VecDeque 竞态：Rust std Mutex 为 futex 实现、TSan 不可见（rust-lang/rust#110485），正确同步被确定性误报 → tsan 组合排除 TaskHost.*/Ffi.*（runner -E），边界登记 042 |
+| 2026-09-21 | main CI sanitizer（windows）第二轮 | 全绿 | lld-link failifmismatch：MSVC STL 容器注解 annotate_*=1（插桩对象）vs =0（panta_ffi 未插桩 C++）→ sanitizer 树 `_DISABLE_STL_ANNOTATION` 统一关闭（STL 官方混链场景开关） |
+| 2026-09-21 | 本地（macOS arm64）：`cargo sanitize` 复验排除与抑制 | asan-ubsan 49/49 + tsan 42/42 | TaskHost/Ffi 共 7 项被 tsan 排除，其余全过 |
 | — | 修复后 push 再验 main CI | 全绿 | 待执行 |
 
 ## 风险与回退

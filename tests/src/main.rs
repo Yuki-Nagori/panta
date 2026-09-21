@@ -131,7 +131,7 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
         std::ffi::OsString::from("LLVM_PROFILE_FILE"),
         profile_file.into_os_string(),
     ));
-    run_ctest_in(&native, envs, "native coverage tests")?;
+    run_ctest_in(&native, envs, "native coverage tests", None)?;
     let llvm = panta_build::resolve_llvm_compilers(target)?;
     let raw = fs::read_dir(&profiles)?
         .collect::<Result<Vec<_>, _>>()?
@@ -238,19 +238,24 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     if !native.is_dir() {
         return Err(format!("sanitizer 构建树不存在：{}", native.display()).into());
     }
+    // Rust std 的 futex 锁对 TSan 不可见（rust-lang/rust#110485），经 FFI
+    // 驱动 Rust 线程的测试在 tsan 下只会确定性误报，排除之；纯 C++/Qt
+    // 线程场景仍全覆盖。
+    let exclude = (name == "tsan").then(|| "^(TaskHost|Ffi)\\.");
     run_ctest_in(
         &native,
         sanitizer_test_env(target, name)?,
         &format!("sanitizer {name} ctest"),
+        exclude,
     )
 }
 
 /// sanitizer 测试环境：托管 LLVM bin 前置到 PATH，让运行时报告用配套
 /// llvm-symbolizer 符号化；Windows 的 ASan 动态运行库 DLL 由编译器资源
-/// 目录解析。LeakSanitizer 在 macOS 默认关闭，按官方文档显式开启；第三方
-/// SDK 与系统运行时的已知泄漏按 `tests/lsan-suppressions.txt` 抑制，tsan
-/// 组合对第三方库内部竞态按 `tests/tsan-suppressions.txt` 抑制（called_from_lib），
-/// 自有代码的问题报告仍然阻断。
+/// 目录解析。LeakSanitizer 在 macOS 默认关闭，显式开启；第三方 SDK/系统
+/// 运行时的已知问题按 `tests/lsan-suppressions.txt`（泄漏）与
+/// `tests/tsan-suppressions.txt`（竞态，仅 tsan 组合）抑制，自有代码的
+/// 问题报告仍然阻断。
 fn sanitizer_test_env(
     target: &Path,
     profile: &str,
@@ -674,12 +679,16 @@ fn run_ctest_in(
     native_dir: &Path,
     envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
     description: &str,
+    exclude: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     let cmake = panta_build::resolve_cmake(target_root())?;
     let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
     test.envs(envs);
     test.current_dir(native_dir)
         .args(["--output-on-failure", "--no-tests=error"]);
+    if let Some(exclude) = exclude {
+        test.args(["-E", exclude]);
+    }
     run(description, test)
 }
 

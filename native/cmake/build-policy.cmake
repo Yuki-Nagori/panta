@@ -95,14 +95,9 @@ if(_panta_sanitizers)
     add_compile_options(-fno-sanitize-recover=undefined)
   endif()
   if(MSVC)
-    # CMake 对 clang-cl 直接以 lld-link 链接，绕过编译器驱动器的运行库注入，
-    # 上面的 -fsanitize=address 对 lld-link 不生效，测试可执行在链接期报
-    # __asan_* 未定义（任务 049）。按 clang 驱动器 /MD 下的注入序列显式复刻
-    # （clang/lib/Driver/ToolChains/MSVC.cpp，2026-09-21 核对）：asan_dynamic
-    # 导入库、SEH 拦截符号保活、wholearchive 进 dynamic_runtime_thunk，
-    # -debug 与 -incremental:no 亦为驱动器同款约束。运行期 DLL 由测试环境把
-    # 编译器资源目录加入 PATH 解析（panta-build::compiler_rt_dll_dir，构建期
-    # discovery 与 ctest 同源），链接期只消费导入库。
+    # CMake 对 clang-cl 直接以 lld-link 链接，驱动器不会注入 compiler-rt，
+    # 按其 /MD 下的注入序列显式复刻；运行期 DLL 由测试环境把编译器资源
+    # 目录加入 PATH 解析（panta-build::compiler_rt_dll_dir）。
     execute_process(
       COMMAND "${CMAKE_CXX_COMPILER}" "-print-resource-dir"
       OUTPUT_VARIABLE _panta_asan_resource
@@ -115,11 +110,8 @@ if(_panta_sanitizers)
     if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
       message(FATAL_ERROR "Windows ASan 矩阵只登记 x64（任务 042），未知架构 " "${CMAKE_SYSTEM_PROCESSOR}")
     endif()
-    set(_panta_asan_rt_dir "${_panta_asan_resource}/lib/windows")
-    # clang-cl 输出反斜杠路径，而 lld-link 的响应文件词法把 `\x` 当转义
-    # 序列消费（main CI 实证路径变成 `D:apantapanta...`）；库路径统一转
-    # 正斜杠（lld-link 接受），整项加引号防空格拆分。
-    string(REPLACE "\\" "/" _panta_asan_rt_dir "${_panta_asan_rt_dir}")
+    # lld-link 的响应文件词法把 `\x` 当转义消费，路径统一正斜杠并加引号。
+    string(REPLACE "\\" "/" _panta_asan_rt_dir "${_panta_asan_resource}/lib/windows")
     foreach(_panta_asan_rt_lib asan_dynamic asan_dynamic_runtime_thunk)
       if(NOT EXISTS "${_panta_asan_rt_dir}/clang_rt.${_panta_asan_rt_lib}-x86_64.lib")
         message(
@@ -127,6 +119,10 @@ if(_panta_sanitizers)
                       "（${_panta_asan_rt_dir}）；lib/clang 资源目录不得裁剪")
       endif()
     endforeach()
+    # STL 容器注解经 detect_mismatch 固化进目标文件，与未插桩的 CXX 侧
+    # C++（panta_ffi）混链即 failifmismatch；按 STL 官方混链场景开关统一
+    # 关闭，Windows 矩阵失去容器溢出检测。
+    add_compile_definitions(_DISABLE_STL_ANNOTATION)
     add_link_options("-debug" "-incremental:no")
     add_link_options("SHELL:\"${_panta_asan_rt_dir}/clang_rt.asan_dynamic-x86_64.lib\"")
     add_link_options("-include:__asan_seh_interceptor")

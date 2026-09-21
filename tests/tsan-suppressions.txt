@@ -1,8 +1,7 @@
 # ThreadSanitizer 抑制清单（sanitizer 矩阵，任务 042/049）：仅登记第三方
-# 预编译 SDK 内部的数据竞态——无符号制品既无法定位也无法在消费侧修复；
-# 纯自有 C++ 帧的竞态仍然阻断。called_from_lib 按“栈中任一帧属于该库”
-# 匹配，自有代码与该库并发交互产生的竞态也会被一并抑制，这是预编译第三
-# 方的既有限制；升级 Netgen 或新增并发消费路径时复查条目。
-# Netgen 预编译 SDK（NetgenMesher 测试在 TSan 下的已知报告，2026-09-21）
+# 预编译库内部的数据竞态（无符号制品无法在消费侧定位修复）；自有 C++ 帧
+# 的竞态仍然阻断。called_from_lib 按"栈中任一帧属于该库"匹配，与该库并发
+# 交互产生的竞态会被一并抑制；升级 Netgen 或新增并发消费路径时复查条目。
+# Netgen 预编译 SDK
 called_from_lib:libnglib
 called_from_lib:libngcore
