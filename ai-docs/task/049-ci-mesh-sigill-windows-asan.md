@@ -114,7 +114,10 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | 分支 dispatch sdk-occt-netgen.yml / sdk-vtk.yml（publish=false） | 三平台生产 + selfcheck 全绿 | run 35559174921（49m/24m/26m）、35559176795（70m/22m/40m）全 ✓ |
 | 2026-09-21 | publish=true 重产覆盖发布 | 单一 tag 清空旧资产后重传，收口 job 正常 | run 35566443162（22m/50m/38m + publish 20s）、35566444816（32m/36m/70m + publish 20s）全 ✓ |
 | 2026-09-21 | 九项 SHA256 回填 sdk-provision | 与 Release sidecar 逐一对应 | occt/netgen/vtk ×三平台已按 sidecar 实测替换（本 commit） |
-| — | push 后 main CI：Linux mesh 测试 / Windows sanitizer / 全矩阵 | 全绿 | 待执行（维护者自行 push） |
+| 2026-09-21 | push 后 main CI（run 35572104870） | 全绿 | netgen 修复实证：clippy/clang-tidy/cppcheck（全新重建 + mesh discovery）、native-coverage、三平台 check 全 ✓，asan-ubsan 组合 49/49；遗留见下两行 |
+| 2026-09-21 | main CI tsan 组合（ubuntu） | 全绿 | TSan 报 libnglib 内部数据竞态（无符号第三方帧），NetgenMesher 5 测试连坐失败 → 新增 tests/tsan-suppressions.txt（called_from_lib）注入 TSAN_OPTIONS |
+| 2026-09-21 | main CI sanitizer（windows） | 全绿 | lld-link rsp 词法消费 `\x`，compiler-rt 路径反斜杠被吞 → 转正斜杠 + 引号 |
+| — | 修复后 push 再验 main CI | 全绿 | 待执行 |
 
 ## 风险与回退
 
@@ -137,6 +140,12 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 - 2026-09-21：流程调整——PR #3 被维护者 squash 合入 main（d5c0955）后，
   维护者决策改为 main 直接推进、哈希回填单独成 commit、push 由维护者
   自行执行；制品反汇编验证按维护者决策跳过，由 main CI 实测替代。
+- 2026-09-21：哈希回填后的 main CI（run 35572104870）首次让 sanitizer
+  矩阵完整跑到测试阶段，暴露两个后续问题并同任务修复：TSan 对预编译
+  Netgen 内部竞态的报告（第三方无符号，消费侧不可修复）按 LSan 同口径
+  建立 `tests/tsan-suppressions.txt`（called_from_lib，纯自有帧仍阻断）；
+  Windows ASan 导入库路径被 lld-link 响应文件转义规则吞掉反斜杠，统一
+  转正斜杠。
 
 ## 完成摘要
 

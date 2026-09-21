@@ -116,6 +116,10 @@ if(_panta_sanitizers)
       message(FATAL_ERROR "Windows ASan 矩阵只登记 x64（任务 042），未知架构 " "${CMAKE_SYSTEM_PROCESSOR}")
     endif()
     set(_panta_asan_rt_dir "${_panta_asan_resource}/lib/windows")
+    # clang-cl 输出反斜杠路径，而 lld-link 的响应文件词法把 `\x` 当转义
+    # 序列消费（main CI 实证路径变成 `D:apantapanta...`）；库路径统一转
+    # 正斜杠（lld-link 接受），整项加引号防空格拆分。
+    string(REPLACE "\\" "/" _panta_asan_rt_dir "${_panta_asan_rt_dir}")
     foreach(_panta_asan_rt_lib asan_dynamic asan_dynamic_runtime_thunk)
       if(NOT EXISTS "${_panta_asan_rt_dir}/clang_rt.${_panta_asan_rt_lib}-x86_64.lib")
         message(

@@ -240,7 +240,7 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     }
     run_ctest_in(
         &native,
-        sanitizer_test_env(target)?,
+        sanitizer_test_env(target, name)?,
         &format!("sanitizer {name} ctest"),
     )
 }
@@ -248,10 +248,12 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
 /// sanitizer 测试环境：托管 LLVM bin 前置到 PATH，让运行时报告用配套
 /// llvm-symbolizer 符号化；Windows 的 ASan 动态运行库 DLL 由编译器资源
 /// 目录解析。LeakSanitizer 在 macOS 默认关闭，按官方文档显式开启；第三方
-/// SDK 与系统运行时的已知泄漏按 `tests/lsan-suppressions.txt` 抑制，自有
-/// 代码泄漏仍然阻断。
+/// SDK 与系统运行时的已知泄漏按 `tests/lsan-suppressions.txt` 抑制，tsan
+/// 组合对第三方库内部竞态按 `tests/tsan-suppressions.txt` 抑制（called_from_lib），
+/// 自有代码的问题报告仍然阻断。
 fn sanitizer_test_env(
     target: &Path,
+    profile: &str,
 ) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, Box<dyn Error>> {
     let environment = panta_build::native_test_env(target, env!("PANTA_TEST_HOST"))?;
     let llvm = panta_build::resolve_llvm_compilers(target)?;
@@ -268,6 +270,16 @@ fn sanitizer_test_env(
         ));
         environment.push((
             std::ffi::OsString::from("LSAN_OPTIONS"),
+            std::ffi::OsString::from(format!(
+                "suppressions={}",
+                suppressions.to_str().ok_or("抑制清单路径不是 UTF-8")?
+            )),
+        ));
+    }
+    if profile == "tsan" {
+        let suppressions = repository_root()?.join("tests/tsan-suppressions.txt");
+        environment.push((
+            std::ffi::OsString::from("TSAN_OPTIONS"),
             std::ffi::OsString::from(format!(
                 "suppressions={}",
                 suppressions.to_str().ok_or("抑制清单路径不是 UTF-8")?
