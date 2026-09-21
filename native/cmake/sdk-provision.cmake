@@ -385,8 +385,9 @@ endfunction()
 
 panta_sdk_declare_version(vtk 9.7.0)
 # VTK 9.7.0 WebGPU 制品（038 受信 CI 生产，Release sdk-vtk-9.7.0-webgpu，
-# 2026-09-20 三平台 production/selfcheck/package success；发布说明与合规元数据见
-# tools/sdk/releases/vtk-9.7.0.md）。源码 tag
+# 2026-09-20 三平台 production/selfcheck/package success；2026-09-21 随任务
+# 049 单一 tag 重产覆盖，哈希按 Release sidecar 实测回填；发布说明与合规
+# 元数据见 tools/sdk/releases/vtk-9.7.0.md）。源码 tag
 # v9.7.0 → commit 23f0a095621e91bbdbeace8451e22b950c8e5f46（unmodified）；
 # Release/共享库/C++20/WebGPU hardware-window，不链接 Qt；Dawn 与 VTK 同包，
 # 三平台 REQUIRED_TARGETS 以真实归档内的 imported targets 为准。
@@ -398,7 +399,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-macos-arm64.tar.gz
   SHA256
-  191f93371d6129780ff7c1363faf860c5e2bb279989ebe1d66e3ed0b5b932114
+  ca761877a559dc463ad4c902e981550dc8eb42caa62403d78408feb77e0a28a7
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -422,7 +423,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-linux-x86_64.tar.gz
   SHA256
-  01a84e97d35b0a0f1ae443bea7215e18ed0617e7e186277f384cc139a4011602
+  627a4ce6a752ffc6051bd942c928a2dc03beb6d8ebfb729abb0ce42e9396e932
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -446,7 +447,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-windows-x86_64.tar.gz
   SHA256
-  771877f2c8cb170131d863c7791b450ab7c8f09306eaf1f328445dcd5fad3c78
+  c09ebefa8854cb803f493f86f8f218074ab8923dfb9fe1f4ebf3fc3f55b75f4c
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -467,18 +468,20 @@ panta_sdk_declare_asset(
 
 panta_sdk_declare_version(occt 8.0.1)
 # OCCT 8.0.1 制品（038 受信 CI 生产，Release sdk-occt-netgen-8.0.1-6.2.2604，
-# 2026-09-18 登记；与 Netgen 成对发布，见 tools/sdk/releases/occt-netgen-
-# 8.0.1-6.2.2604.md）。维护者决策：三平台统一自托管，官方 Windows SDK 不再
-# 消费（仅 Windows 有归档、跨平台工具链不一致）。源码 tag V8.0.1 → commit
-# b8f597c677811d1f9f4d8a97f5ae2825c0353a42（unmodified）；Release/Shared，
-# Draw/Visualization/DETools 与 USE_FREETYPE/USE_XLIB 关闭（渲染归 VTK）。
+# 2026-09-18 登记；2026-09-21 随任务 049 单一 tag 重产覆盖，与 Netgen 同管线
+# 成对生产，哈希按 Release sidecar 实测回填，见 tools/sdk/releases/
+# occt-netgen-8.0.1-6.2.2604.md）。维护者决策：三平台统一自托管，官方
+# Windows SDK 不再消费（仅 Windows 有归档、跨平台工具链不一致）。源码 tag
+# V8.0.1 → commit b8f597c677811d1f9f4d8a97f5ae2825c0353a42（unmodified）；
+# Release/Shared，Draw/Visualization/DETools 与 USE_FREETYPE/USE_XLIB 关闭
+# （渲染归 VTK）。
 panta_sdk_declare_asset(
   occt
   macos-arm64
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
   SHA256
-  db6d4a878cc3f1c4ccf693e2d1408c35b10fa844b9793a02c38379bcbc157161
+  5cfb84d870d4306ca9dfb6daaaa56c90ce112ffca89f15ed1c9ee764a1f630c0
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -498,7 +501,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
   SHA256
-  04a33d7a5aa1c122da8fb0ec775fffb5f8872a90db717b800e7561d52a7cf563
+  575f46b3531e894324fe7b077710b7f68797aca83f449dfc9c7818f61133623f
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -518,7 +521,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
   SHA256
-  d0162ff98100741f63d6f4103e8c98d6b7e4c7fa32c6ff4ba9ad570c66634751
+  4e12fd32673a7b54b848f90dd2212fab04c9a62f6e8b278eb4be498f106eaa03
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -548,7 +551,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
   SHA256
-  51d067f057143044fb8feb8501f47973832c92a359281833ff7be996018f384e
+  90f3d92711eafaed74d8820c15f8dcfade631da4a14dd50325220f8552ad4d3e
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -572,7 +575,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
   SHA256
-  9be1ac3a2d8f16bc86c2c52d51c7aab821aaeee9848e2c3b85d55bea6eb4079a
+  683bb6f3b54d42cddbbc9068f1e396aac537027b8755bd339540a2c93564347e
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -596,7 +599,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
   SHA256
-  3e8c5204fc1977c4ce4ff53e66cb32c4a2092e408b45ad7b5da173922ce9fd1d
+  9bb6c2c91f650206a79e4b46c137e4c2873a187ae42a77a40387acb620034b1a
   PACKAGE
   Netgen
   REQUIRED_TARGETS

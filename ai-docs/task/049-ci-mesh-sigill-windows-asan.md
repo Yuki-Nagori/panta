@@ -96,13 +96,12 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 ## 验收标准
 
 - [ ] 覆盖发布的 `netgen-6.2.2604-linux-x86_64.tar.gz` 可在无 AVX-512 的
-      Linux runner 上正常加载（PR CI mesh 测试全过）；三平台
-      `panta-sdk.json` 记录 `USE_NATIVE_ARCH: false`。
+      Linux runner 上正常加载（main CI mesh 测试全过）。
 - [ ] Windows sanitizer 构建能链接全部测试可执行（无 `__asan_*` 未定义），
-      构建期 discovery 与 ctest 均可加载 ASan 动态运行库（PR CI 实测）。
-- [ ] `sdk-provision.cmake` occt/netgen/vtk 九项 SHA256 与覆盖后 Release
+      构建期 discovery 与 ctest 均可加载 ASan 动态运行库（main CI 实测）。
+- [x] `sdk-provision.cmake` occt/netgen/vtk 九项 SHA256 与覆盖后 Release
       sidecar 一致；marker 哈希失配触发本地与 CI 旧 staging 自动重建。
-- [ ] PR CI 全绿。
+- [ ] push 后 main CI 全绿。
 
 ## 验证计划与结果
 
@@ -113,8 +112,9 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 | 2026-09-21 | 本地（macOS arm64）：`cargo lint`（clippy/clang-tidy/includes/cppcheck/cmake/qmllint/machete） | 零发现 | 退出码 0 |
 | 2026-09-21 | 本地（macOS arm64）：`cargo sanitize`（asan-ubsan + tsan 双树） | 49/49 ×2 | 100% passed（两棵插桩树 ctest 全过） |
 | 2026-09-21 | 分支 dispatch sdk-occt-netgen.yml / sdk-vtk.yml（publish=false） | 三平台生产 + selfcheck 全绿 | run 35559174921（49m/24m/26m）、35559176795（70m/22m/40m）全 ✓ |
-| — | `publish=true` 覆盖发布后，Release 资产集合与 manifest 哈希 | 九项 sidecar 与登记一致 | 待执行 |
-| — | PR CI：Linux mesh 测试 / Windows sanitizer / 全矩阵 | 全绿 | 待执行 |
+| 2026-09-21 | publish=true 重产覆盖发布 | 单一 tag 清空旧资产后重传，收口 job 正常 | run 35566443162（22m/50m/38m + publish 20s）、35566444816（32m/36m/70m + publish 20s）全 ✓ |
+| 2026-09-21 | 九项 SHA256 回填 sdk-provision | 与 Release sidecar 逐一对应 | occt/netgen/vtk ×三平台已按 sidecar 实测替换（本 commit） |
+| — | push 后 main CI：Linux mesh 测试 / Windows sanitizer / 全矩阵 | 全绿 | 待执行（维护者自行 push） |
 
 ## 风险与回退
 
@@ -130,9 +130,13 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 - 2026-09-21：创建任务。根因实证记录于上表；方案依据：Netgen 上游
   CMakeLists `USE_NATIVE_ARCH` option（tag v6.2.2604 commit 3ee489c）、LLVM 22
   `MSVC.cpp` asan 链接注入序列。
-- 2026-09-21：维护者决策单一 tag 覆盖发布（取代初稿的新 tag 方案）；为避免
-  OCCT 哈希无谓漂移，覆盖动作只针对三个 netgen 资产，管线 `publish=true`
-  的全量覆盖路径保留给未来整对重产场景。
+- 2026-09-21：维护者决策单一 tag 覆盖发布（取代初稿的新 tag 方案）；
+  为避免 OCCT 哈希无谓漂移的初版方案随后由维护者扩展为 occt/netgen/vtk
+  三 SDK 全部重产覆盖。管线 publish=true 收口 job 全绿，单一 tag 覆盖语义
+  （清空旧资产后重传）获 CI 实证。
+- 2026-09-21：流程调整——PR #3 被维护者 squash 合入 main（d5c0955）后，
+  维护者决策改为 main 直接推进、哈希回填单独成 commit、push 由维护者
+  自行执行；制品反汇编验证按维护者决策跳过，由 main CI 实测替代。
 
 ## 完成摘要
 
