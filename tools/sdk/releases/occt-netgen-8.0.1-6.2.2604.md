@@ -26,9 +26,18 @@ Netgen 以 `USE_OCC=ON` 构建时在 C++ 层直接链接 OCCT（`ngcore`/`nglib`
   关闭，`USE_FREETYPE`/`USE_XLIB` 关闭（渲染归 VTK；制品不依赖系统第三方
   库）；其余默认启用（含 STEP 所需 DataExchange）。
 - Netgen 构建配置：Release、共享库；`USE_OCC=ON`、`USE_GUI/USE_PYTHON/
-  USE_MPI/USE_JPEG/USE_MPEG` 关闭。
+  USE_MPI/USE_JPEG/USE_MPEG` 关闭；`USE_NATIVE_ARCH=OFF`（任务 049）——上游
+  默认 `ON` 会给 Linux 传播 `-march=native`、在 Windows 探测 `/arch:AVX…`，
+  制品绑定生产机 ISA（v6.2.2604 首版 linux 制品内含 AVX-512，在无 AVX-512
+  的消费机加载即 SIGILL）；预编译 SDK 一律按上游 generic 基线出包。
 - 每个归档内的 `panta-sdk.json` 记录 triple、源码 pin、构建开关、依赖与
   许可证入口（机器可读 provenance）。
+
+## 覆盖重产记录
+
+本 Release 维持单一 tag：管线重产时清空旧资产后全量重传（sdk-occt-netgen.yml
+`publish` job），归档字节随重产变化，消费侧以 `sdk-provision.cmake` 登记的
+SHA256 为准（登记更新与重产同任务完成，任务 049 起另有记录）。
 
 ## 许可证
 

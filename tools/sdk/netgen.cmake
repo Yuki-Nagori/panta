@@ -5,6 +5,11 @@
 # 配置冻结：USE_OCC=ON 且链接本 superbuild 生产的 OCCT（ABI 同源，满足
 # dependency-acquisition 的 Netgen↔OCCT 匹配约束）；GUI/Python/MPI/多媒体
 # 关闭——网格生成内核经 nglib 消费，交互式 GUI 与 Python 绑定非本项目范围。
+# USE_NATIVE_ARCH 必须显式关闭：上游默认 ON，Linux 给 ngcore 传播
+# -march=native（Windows 探测 /arch:AVX…），制品绑定生产机 ISA——v6.2.2604
+# 首版 linux 制品因此内含 AVX-512，在无 AVX-512 的消费机加载即 SIGILL
+# （任务 049）。预编译 SDK 必须全机可移植，一律按上游 generic 基线出包；
+# 性能调优口径归任务 048 的性能基线，不在制品层混入 host 相关开关。
 # 许可证：LGPL-2.1（随源码树 LICENSE 文件收集）。
 
 set(PANTA_NETGEN_VERSION 6.2.2604)
@@ -24,6 +29,7 @@ ExternalProject_Add(
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
              -DBUILD_SHARED_LIBS=ON
              -DBUILD_FOR_CONVERSION=OFF
+             -DUSE_NATIVE_ARCH=OFF
              -DUSE_GUI=OFF
              -DUSE_PYTHON=OFF
              -DUSE_MPI=OFF
@@ -68,7 +74,7 @@ file(
   },
   "build_type": "Release",
   "shared": true,
-  "options": {"USE_OCC": true, "USE_GUI": false, "USE_PYTHON": false, "USE_MPI": false},
+  "options": {"USE_OCC": true, "USE_NATIVE_ARCH": false, "USE_GUI": false, "USE_PYTHON": false, "USE_MPI": false},
   "dependencies": ["occt 8.0.1 (same sdk-occt-netgen pipeline/release, same triple, paired upgrade)"],
   "cmake_package": "lib/cmake/netgen/NetgenConfig.cmake",
   "license": "share/licenses/Netgen/LICENSE (LGPL-2.1)"

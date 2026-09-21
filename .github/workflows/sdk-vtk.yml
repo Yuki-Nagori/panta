@@ -1,9 +1,11 @@
 # VTK 预编译 SDK 生产管线（任务 038；workflow_dispatch 手动触发）。
 #
 # 受信 CI 语义：按 tools/sdk/ 冻结的构建描述生产制品，自检通过后上传
-# 构建产物；`publish` 输入为 true 时把归档与 .sha256 发布到 GitHub
-# Release（tag = sdk-vtk-9.7.0-webgpu），发布说明含源码 pin 与许可证出处
-# （tools/sdk/releases/vtk-9.7.0.md）。开发者与普通 CI 经 031 的
+# 构建产物；`publish` 输入为 true 时由收口 job 把归档与 .sha256 发布到
+# GitHub Release（tag = sdk-vtk-9.7.0-webgpu），单一 tag 语义——不存在则
+# 创建，已存在则刷新说明并清空全部旧资产后重传（维护者 2026-09-21 决策：
+# 重产即全量覆盖，改名/停产的旧文件不残留），发布说明含源码 pin 与许可证
+# 出处（tools/sdk/releases/vtk-9.7.0.md）。开发者与普通 CI 经 031 的
 # sdk-provision 消费发布归档，不在本地编译 VTK 源码。
 #
 # runner 工具链：cmake/ninja 为 runner 镜像预装组件（生产管线的受信
@@ -92,18 +94,43 @@ jobs:
           path: sdk-build/dist/*
           if-no-files-found: error
 
+  # 发布收口：等三平台制品齐备后在单一 job 执行。清空再上传不能放在矩阵
+  # job 里并发执行——删除循环会撞上其他平台的上传窗口。
+  publish:
+    name: publish release assets (single tag)
+    if: inputs.publish
+    needs: [vtk]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: vtk-*
+          merge-multiple: true
+          path: sdk-build/dist
+
       - name: Publish release assets
-        if: inputs.publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 矩阵各平台并发：Release 不存在则创建（发布说明含许可证/源码
-          # 出处），资产以 --clobber 重复上传幂等。
-          gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" \
-            || gh release create sdk-vtk-9.7.0-webgpu \
-                 --repo "$GITHUB_REPOSITORY" \
-                 --title "VTK 9.7.0 WebGPU hardware-window SDKs" \
-                 --notes-file tools/sdk/releases/vtk-9.7.0.md
+          if gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit sdk-vtk-9.7.0-webgpu \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "VTK 9.7.0 WebGPU hardware-window SDKs" \
+              --notes-file tools/sdk/releases/vtk-9.7.0.md
+            gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' | while IFS= read -r asset; do
+                gh release delete-asset sdk-vtk-9.7.0-webgpu "$asset" \
+                  --repo "$GITHUB_REPOSITORY" --yes
+              done
+          else
+            gh release create sdk-vtk-9.7.0-webgpu \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "VTK 9.7.0 WebGPU hardware-window SDKs" \
+              --notes-file tools/sdk/releases/vtk-9.7.0.md
+          fi
           gh release upload sdk-vtk-9.7.0-webgpu sdk-build/dist/* --clobber \
             --repo "$GITHUB_REPOSITORY"

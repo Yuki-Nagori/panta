@@ -208,11 +208,19 @@ fn orchestrate() -> Result<PathBuf, String> {
     run_step("configure", &mut configure)?;
 
     let mut build = Command::new(&cmake);
+    let mut test_env = provision::native_test_env(&target_root, &target_triple)?;
+    if cfg!(windows) && !sanitizer.is_empty() {
+        // sanitizer 树链接动态 ASan；构建期 POST_BUILD gtest discovery 在
+        // 链接后立即启动测试可执行文件，必须能解析编译器资源目录下的
+        // 运行库 DLL，与 ctest 侧的 sanitizer_test_env 同源（任务 049）。
+        let runtime = provision::compiler_rt_dll_dir(&llvm)?;
+        test_env = provision::prepend_path(test_env, vec![runtime])?;
+    }
     build
         // 构建期 gtest discovery（POST_BUILD）会在链接后立即启动测试可执行
         // 文件；Windows 子进程必须能解析托管 Qt runtime（native_test_env 注
         // 入 PATH，非 Windows 仅透传 SDK 环境）。
-        .envs(provision::native_test_env(&target_root, &target_triple)?)
+        .envs(test_env)
         .arg("--build")
         .arg(&binary_dir)
         .arg("--config")
