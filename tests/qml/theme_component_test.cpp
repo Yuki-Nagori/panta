@@ -155,14 +155,20 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
         QCOMPARE(newRequested.count(), 1);
         QCOMPARE(openRequested.count(), 1);
-        ribbon->setProperty("projectOpen", true);
+        ribbon->setProperty("activeRibbonTab", QStringLiteral("home"));
         auto* importButton = visual_item(ribbonItem, QStringLiteral("ribbon-import"));
         QVERIFY(importButton != nullptr);
         QVERIFY(QMetaObject::invokeMethod(importButton, "clicked"));
         QCOMPARE(newRequested.count(), 1);
         QCOMPARE(openRequested.count(), 1);
-        ribbon->setProperty("projectOpen", false);
-        QVERIFY(visual_item(ribbonItem, QStringLiteral("ribbon-open-project")) != nullptr);
+        ribbon->setProperty("activeRibbonTab", QStringLiteral("start-learn"));
+        newButton = visual_item(ribbonItem, QStringLiteral("ribbon-new-project"));
+        openButton = visual_item(ribbonItem, QStringLiteral("ribbon-open-project"));
+        QVERIFY(newButton && openButton);
+        QVERIFY(QMetaObject::invokeMethod(newButton, "clicked"));
+        QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
+        QCOMPARE(newRequested.count(), 2);
+        QCOMPARE(openRequested.count(), 2);
     }
 
     void button_font_size_reaches_its_label() {

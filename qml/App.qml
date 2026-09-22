@@ -15,6 +15,14 @@ ApplicationWindow {
     title: qsTr("panta")
     color: Theme.colorPanel
     readonly property bool projectOpen: projectModel.currentPath.length > 0
+    // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
+    property string activeRibbonTab: "start-learn"
+
+    function selectRibbonTab(tab) {
+        // 页面统一校验可达状态；未接入的菜单不能产生空白或无工程的 Home。
+        if (tab === "start-learn" || (tab === "home" && projectOpen))
+            activeRibbonTab = tab;
+    }
 
     ShellViewModel {
         id: viewModel
@@ -23,6 +31,9 @@ ApplicationWindow {
     ProjectViewModel {
         id: projectModel
         objectName: "projectModel"
+        // 仅成功创建 / 打开时导航；改名、保存和失败不打断当前页签。
+        onProjectCreated: shellWindow.selectRibbonTab("home")
+        onProjectOpened: shellWindow.selectRibbonTab("home")
     }
 
     NewProjectDialog {
@@ -50,11 +61,13 @@ ApplicationWindow {
             Layout.fillWidth: true
             caption: shellWindow.projectOpen ? "panta 2027 · " + projectModel.currentName : viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
             projectOpen: shellWindow.projectOpen
+            activeRibbonTab: shellWindow.activeRibbonTab
+            onMenuRequested: key => shellWindow.selectRibbonTab(key)
         }
 
         RibbonPanel {
             Layout.fillWidth: true
-            projectOpen: shellWindow.projectOpen
+            activeRibbonTab: shellWindow.activeRibbonTab
             onOpenProjectRequested: openProjectFileDialog.open()
             onNewProjectRequested: newProjectDialog.open()
         }

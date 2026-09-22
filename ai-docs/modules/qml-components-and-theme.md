@@ -46,9 +46,9 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 图标遵循 [SVG 图标设计规范](../standards/icons.md)：模块内 `qml/icons/` 保存统一 24 网格的 Mono 几何，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。Shell 引擎安装 `panta-icons` provider，以 qtsvg 渲染资源并按 `ThemedIcon.color` 着色，颜色来自 Theme/宿主；不依赖 SVG 自动继承 QML 颜色。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
 
-App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入三个面板。新建或打开成功后，TasksPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单，RibbonPanel 显示项目工具；失败保留上一有效快照。首页 Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；其他 Ribbon 工具仍是设计入口，不表示求解、网格或导入业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
+App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入 TasksPanel 和 TopChromePanel。新建或打开成功后，TasksPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单；失败保留上一有效快照。Start & Learn Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；其他 Ribbon 工具仍是设计入口，不表示求解、网格或导入业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
 
-顶部菜单目前仅展示工程状态对应的条目，首项固定高亮；`Home` / `Start & Learn` 的点击切换尚未实现。维护者已确认该交互留待后续，不包含在 060 的布局交付内。
+061 将活动工具栏与工程状态分离：App 的 `activeRibbonTab` 默认 `start-learn`，菜单 key 和 `projectCreated` / `projectOpened` 成功信号均经 `selectRibbonTab()` 统一校验；只有开始页和已打开工程的 Home 可达。创建 / 打开成功时选择 `home`，改名、保存及失败不改变选中态。TopChromePanel 和 RibbonPanel 显式接收同一页签值，实现 `Home` 的 18 个工具与 `Start & Learn` 的 7 个工具切换，鼠标和空格键激活共用按钮点击逻辑。切换不清空工程、不写文件、不重建 Tasks 或 VTK 视口；未接入的其他菜单不改变活动页签。未打开工程时不显示 Home，沿用开始页布局。
 
 RibbonTile 将图标、至少两行的文字区和下拉指示区分开；没有下拉的工具仍保留指示区高度。单行 / 双行文案不再改变图标纵向位置，图标顶边与文字首行分别对齐。HTML 的公共 CSS 使用相同三行网格，防止两份设计基准漂移。
 
@@ -56,7 +56,7 @@ RibbonTile 将图标、至少两行的文字区和下拉指示区分开；没有
 `PANTA_SHELL_CAPTURE_PATH` 指向目标 PNG 时保存 Shell 首帧渲染，
 `PANTA_SHELL_DUMP_GEOMETRY` 置非空时打印组件内容树几何；ctest 默认不设置、
 无副作用。`PANTA_PROJECT_CAPTURE_DIR` 指定目录时，工程状态测试额外保存
-created.png / opened.png，工程数据只写测试临时目录。排查布局时的示例如下
+created.png / opened.png，以及保留已打开工程的 start-learn.png，工程数据只写测试临时目录。排查布局时的示例如下
 （仓库根目录，先 `cargo build --locked`；
 `QT_SCALE_FACTOR` 可模拟不同 DPR）：
 

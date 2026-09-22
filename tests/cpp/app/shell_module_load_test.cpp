@@ -21,12 +21,16 @@
 #include <QImage>
 #include <QPoint>
 #include <QPointF>
+#include <QPointer>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QVariant>
 #include <QtCore/qnamespace.h>
 #include <QtQml/qqmlextensionplugin.h>
+#include <QtTest/qtestkeyboard.h>
 #include <project_view_model.hpp>
 // App.qml 引入 Panta.Visualization（CaeViewport）：静态模块的消费方二进制
 // 必须同时导入并链接其 plugin，否则运行时报 "module not installed"。
@@ -72,6 +76,54 @@ class ShellModuleLoadTest final : public QObject {
             for (auto* item : items)
                 QCOMPARE(item->mapToItem(ribbon, QPointF()).y(), top);
         }
+    }
+
+    void activate_menu(QQuickWindow* window, const char* key, bool keyboard) {
+        auto* menu = visual_item(window->contentItem(), QStringLiteral("menu-") + key);
+        auto* strip = window->findChild<QQuickItem*>(QStringLiteral("menuStrip"));
+        QVERIFY(menu && strip);
+        // 新 delegate 的 Row 布局延迟到 polish；先完成定位再计算鼠标命中点。
+        QVERIFY(menu->parentItem() != nullptr);
+        menu->parentItem()->ensurePolished();
+        // 模态新建窗口关闭后，先恢复宿主激活，再发送键盘事件。
+        window->requestActivate();
+        QTRY_COMPARE(QGuiApplication::focusWindow(), window);
+        menu->forceActiveFocus(Qt::TabFocusReason);
+        QTRY_COMPARE(window->activeFocusItem(), menu);
+        QTRY_VERIFY(menu->mapToItem(strip, QPointF()).x() >= -1);
+        QTRY_VERIFY(menu->mapToItem(strip, QPointF()).x() + menu->width() <= strip->width() + 1);
+        QSignalSpy clicked(menu, SIGNAL(clicked()));
+        QVERIFY(clicked.isValid());
+        if (keyboard) {
+            QTest::keyClick(window, Qt::Key_Space);
+        } else {
+            QTest::mouseClick(
+                window, Qt::LeftButton, Qt::NoModifier,
+                menu->mapToScene(QPointF(menu->width() / 2, menu->height() / 2)).toPoint());
+        }
+        QVERIFY2(clicked.count() == 1, qPrintable(menu->objectName()));
+        QTRY_VERIFY(menu->mapToItem(strip, QPointF()).x() >= -1);
+        QTRY_VERIFY(menu->mapToItem(strip, QPointF()).x() + menu->width() <= strip->width() + 1);
+    }
+
+    void verify_ribbon_tab(QQuickWindow* window, const char* key, int toolCount) {
+        auto* ribbon = window->findChild<QQuickItem*>(QStringLiteral("ribbonPanel"));
+        QVERIFY(ribbon != nullptr);
+        QTRY_COMPARE(ribbon->property("activeRibbonTab").toString(), QString::fromLatin1(key));
+        QTRY_COMPARE(visual_items(ribbon, QStringLiteral("ribbonTileContent")).size(), toolCount);
+        auto* strip = window->findChild<QQuickItem*>(QStringLiteral("menuStrip"));
+        QVERIFY(strip != nullptr);
+        auto* menuContent = strip->property("contentRoot").value<QQuickItem*>();
+        QVERIFY(menuContent != nullptr);
+        int highlighted = 0;
+        for (auto* item : menuContent->childItems()) {
+            if (item->objectName().startsWith(QStringLiteral("menu-")) &&
+                item->property("highlighted").toBool()) {
+                QCOMPARE(item->objectName(), QStringLiteral("menu-") + key);
+                ++highlighted;
+            }
+        }
+        QCOMPARE(highlighted, 1);
     }
 #endif
 
@@ -278,6 +330,124 @@ class ShellModuleLoadTest final : public QObject {
     }
 
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
+    void ribbon_navigation_preserves_workspace_data() {
+        QTest::addColumn<int>("windowWidth");
+        QTest::addColumn<bool>("keyboard");
+        QTest::newRow("wide-mouse") << 1440 << false;
+        QTest::newRow("narrow-mouse") << 640 << false;
+        QTest::newRow("wide-keyboard") << 1440 << true;
+        QTest::newRow("narrow-keyboard") << 640 << true;
+    }
+
+    void ribbon_navigation_preserves_workspace() {
+        QFETCH(int, windowWidth);
+        QFETCH(bool, keyboard);
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
+        QVERIFY(window != nullptr);
+        auto* project =
+            window->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        auto* ribbon = window->findChild<QQuickItem*>(QStringLiteral("ribbonPanel"));
+        QPointer<QQuickItem> projectItem =
+            window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem"));
+        QPointer<QQuickItem> viewport =
+            window->findChild<QQuickItem*>(QStringLiteral("caeViewport"));
+        QVERIFY(project && ribbon && projectItem && viewport);
+        window->showNormal();
+        window->resize(windowWidth, 900);
+        QTest::qWait(50);
+        verify_ribbon_tab(window, "start-learn", 7);
+        QVERIFY(visual_item(window->contentItem(), QStringLiteral("menu-home")) == nullptr);
+        QVERIFY(QMetaObject::invokeMethod(window, "selectRibbonTab",
+                                          Q_ARG(QVariant, QStringLiteral("home"))));
+        verify_ribbon_tab(window, "start-learn", 7);
+        activate_menu(window, "start-learn", keyboard);
+        activate_menu(window, "tools", keyboard);
+        verify_ribbon_tab(window, "start-learn", 7);
+        QVERIFY(project->currentPath().isEmpty());
+
+        QVERIFY(project->createProject(QStringLiteral("Navigation"), fixture.path()));
+        verify_ribbon_tab(window, "home", 18);
+        QVERIFY(project->renameProject(QStringLiteral("Unsaved navigation project")));
+        const QString path = project->currentPath();
+        const QString name = project->currentName();
+        QVERIFY(project->dirty());
+        QSignalSpy projectChanged(project, &panta::bridge::ProjectViewModel::projectChanged);
+        QVERIFY(projectChanged.isValid());
+
+        // 导航只替换 Ribbon delegate，不修改快照或重建工作区，即使工程有未保存变更。
+        for (int round = 0; round < 2; ++round) {
+            for (const char* tab : {"start-learn", "home"}) {
+                activate_menu(window, tab, keyboard);
+                verify_ribbon_tab(window, tab,
+                                  QString::fromLatin1(tab) == QStringLiteral("home") ? 18 : 7);
+                activate_menu(window, tab, keyboard);
+                QCOMPARE(project->currentPath(), path);
+                QCOMPARE(project->currentName(), name);
+                QVERIFY(project->dirty());
+                QVERIFY(projectItem && viewport);
+                QVERIFY(projectItem->isVisible());
+                QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),
+                         projectItem.data());
+                QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("caeViewport")),
+                         viewport.data());
+            }
+        }
+        QCOMPARE(projectChanged.count(), 0);
+        activate_menu(window, "start-learn", keyboard);
+        activate_menu(window, "community", keyboard);
+        verify_ribbon_tab(window, "start-learn", 7);
+        QVERIFY(!project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
+        QVERIFY(!project->createProject(QStringLiteral("Navigation"), fixture.path()));
+        verify_ribbon_tab(window, "start-learn", 7);
+        QCOMPARE(project->currentPath(), path);
+        QCOMPARE(project->currentName(), name);
+        QVERIFY(project->dirty());
+        QVERIFY(project->renameProject(QStringLiteral("Renamed on start page")));
+        verify_ribbon_tab(window, "start-learn", 7);
+        QVERIFY(project->saveProject());
+        verify_ribbon_tab(window, "start-learn", 7);
+
+        const QString captureDir = qEnvironmentVariable("PANTA_PROJECT_CAPTURE_DIR");
+        if (!captureDir.isEmpty() && windowWidth == 1440 && !keyboard) {
+            window->contentItem()->forceActiveFocus();
+            auto* menuStrip = window->findChild<QQuickItem*>(QStringLiteral("menuStrip"));
+            QVERIFY(menuStrip != nullptr);
+            menuStrip->setProperty("contentX", 0);
+            QTest::qWait(100);
+            verify_ribbon_alignment(ribbon);
+            const QImage frame = window->grabWindow();
+            QVERIFY(!frame.isNull());
+            QDir().mkpath(captureDir);
+            QVERIFY(frame.save(QDir(captureDir).filePath(QStringLiteral("start-learn.png"))));
+        }
+
+        // 切回开始页的新建按钮仍连接对话框；取消不改变工程或页签。
+        auto* newButton = visual_item(ribbon, QStringLiteral("ribbon-new-project"));
+        auto* dialog = window->findChild<QQuickWindow*>(QStringLiteral("newProjectDialog"));
+        QVERIFY(newButton && dialog);
+        QVERIFY(QMetaObject::invokeMethod(newButton, "clicked"));
+        QTRY_VERIFY(dialog->isVisible());
+        QTRY_COMPARE(QGuiApplication::focusWindow(), dialog);
+        dialog->close();
+        window->requestActivate();
+        QTRY_COMPARE(QGuiApplication::focusWindow(), window);
+        verify_ribbon_tab(window, "start-learn", 7);
+        QCOMPARE(project->currentPath(), path);
+
+        // 同一路径重开也应选中 Home，不能只依赖 currentPath 的值变化。
+        QVERIFY(project->openProject(path));
+        verify_ribbon_tab(window, "home", 18);
+        activate_menu(window, "start-learn", keyboard);
+        QVERIFY(project->createProject(QStringLiteral("Second"), fixture.path()));
+        verify_ribbon_tab(window, "home", 18);
+    }
+
     void project_workspace_tracks_service_data() {
         QTest::addColumn<bool>("openExisting");
         QTest::newRow("created") << false;
@@ -300,7 +470,7 @@ class ShellModuleLoadTest final : public QObject {
         auto* ribbon = root->findChild<QQuickItem*>(QStringLiteral("ribbonPanel"));
         auto* projectItem = root->findChild<QQuickItem*>(QStringLiteral("projectTaskItem"));
         QVERIFY(window && project && ribbon && projectItem);
-        QVERIFY(!ribbon->property("projectOpen").toBool());
+        QCOMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("start-learn"));
         QVERIFY(!projectItem->isVisible());
         QCOMPARE(visual_items(ribbon, QStringLiteral("ribbonTileContent")).size(), 7);
 
@@ -311,7 +481,7 @@ class ShellModuleLoadTest final : public QObject {
         } else {
             QVERIFY(project->createProject(QStringLiteral("Created"), fixture.path()));
         }
-        QTRY_VERIFY(ribbon->property("projectOpen").toBool());
+        QTRY_COMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("home"));
         QTRY_VERIFY(projectItem->isVisible());
         QTRY_COMPARE(visual_items(ribbon, QStringLiteral("ribbonTileContent")).size(), 18);
         QCOMPARE(projectItem->property("iconName").toString(), QStringLiteral("project-file"));
@@ -322,7 +492,7 @@ class ShellModuleLoadTest final : public QObject {
 
         // 失败不能把当前工程视图退回首页，名称变更则必须更新可见任务项和标题。
         QVERIFY(!project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
-        QVERIFY(ribbon->property("projectOpen").toBool());
+        QCOMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("home"));
         const QString renamed = QStringLiteral("Renamed project with a longer name");
         QVERIFY(project->renameProject(renamed));
         QCOMPARE(projectItem->property("text").toString(),

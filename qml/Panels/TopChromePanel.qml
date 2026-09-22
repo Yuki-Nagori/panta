@@ -1,4 +1,4 @@
-// 品牌、快捷工具、标题、搜索和菜单；caption 由宿主注入，动作尚未接业务服务。
+// 品牌、快捷工具、标题、搜索和菜单；宿主注入标题与页签状态，导航只发语义请求。
 // 原生窗口控制仍由系统标题栏承接。
 pragma ComponentBehavior: Bound
 
@@ -11,6 +11,10 @@ Rectangle {
 
     property string caption: ""
     property bool projectOpen: false
+    property string activeRibbonTab: "start-learn"
+
+    // 面板仅报告稳定菜单 key，由宿主决定哪些入口可导航。
+    signal menuRequested(string key)
 
     implicitWidth: 800
     implicitHeight: Theme.titlebarHeight + Theme.menubarHeight + Theme.borderWidth
@@ -255,17 +259,17 @@ Rectangle {
                                 }
                             ]
                             delegate: ThemedToolButton {
-                                required property int index
                                 required property var modelData
                                 objectName: "menu-" + modelData.key
                                 text: modelData.label
                                 controlHeight: Theme.menubarHeight
                                 cornerRadius: 0
-                                highlighted: index === 0
+                                highlighted: modelData.key === chrome.activeRibbonTab
                                 contentColor: highlighted ? Theme.colorText : Theme.colorMenubarText
                                 hoverColor: Theme.colorMenubarHover
                                 contentPadding: Theme.spacingLarge
                                 font.weight: highlighted ? Font.DemiBold : Font.Normal
+                                onClicked: chrome.menuRequested(modelData.key)
                             }
                         }
                         ThemedToolButton {

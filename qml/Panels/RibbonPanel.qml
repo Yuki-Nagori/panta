@@ -1,4 +1,4 @@
-// 两种工程状态共用 Ribbon 结构；仅新建 / 打开接现有命令，其余入口为视觉参考。
+// 按宿主选择的页签展示 Ribbon；仅新建 / 打开接现有命令，其余入口为视觉参考。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -7,11 +7,11 @@ Rectangle {
     id: panel
     objectName: "ribbonPanel"
 
-    property bool projectOpen: false
+    property string activeRibbonTab: "start-learn"
     signal newProjectRequested
     signal openProjectRequested
 
-    readonly property var groups: projectOpen ? [
+    readonly property var groups: activeRibbonTab === "home" ? [
         {
             title: qsTranslate("RibbonGroupImport", "Import"),
             caret: false,
