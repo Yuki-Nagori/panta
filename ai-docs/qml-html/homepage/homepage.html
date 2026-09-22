@@ -1,586 +1,73 @@
 <!DOCTYPE html>
-<!-- panta 桌面主窗口 GUI 框架 · HTML 先行复刻（任务 050）。
-     设计参考件，不进 QML 构建图；布局/间距/配色即后续 QML 迁移的
-     anchors/Layout 与 Theme token 映射底稿。
-     中央 VTK 显示区域按需求留空（底部页签可切换视图），迁移时映射为
-     VTK 视图元素（任务 007）；图标为内联 SVG 占位，替换真实图标时
-     映射为图标资源。 -->
-<html lang="zh-CN">
+<!-- 启动 / 学习首页；公共壳层由上一级目录提供，任务 059。 -->
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>panta 2027</title>
-<style>
-  :root {
-    /* 色彩 token */
-    --color-chrome-bg: #e9e9e9;
-    --color-chrome-line: #d0d0d0;
-    --color-panel-bg: #fff;
-    --color-panel-line: #c9c9c9;
-    --color-text: #1c1c1c;
-    --color-text-muted: #5a5a5a;
-    --color-hover-bg: #e5f1fb;
-    --color-selected-bg: #e8f3fd;
-    --color-status-bg: #efefef;
-    --color-brand: #c8322b;
-    --color-menubar-bg: #2b2b2b;
-    --color-menubar-text: #f2f2f2;
-    --color-menubar-hover: #454545;
-    --color-menubar-selected-text: #1c1c1c;
-    /* 字号 token */
-    --font-size-title: 13px;
-    --font-size-panel: 13px;
-    --font-size-small: 12px;
-    /* 间距与尺寸 token */
-    --space-strip-x: 10px;
-    --space-panel-x: 12px;
-    --size-titlebar-height: 30px;
-    --size-menubar-height: 24px;
-    --size-ribbon-height: 84px;
-    --size-statusbar-height: 26px;
-    --size-left-col: 26%;
-    --size-output-panel: 42%;
-    --radius-ribbon-tile: 4px;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  html, body { height: 100%; }
-
-  a { color: inherit; text-decoration: none; }
-
-  body {
-    display: flex;
-    flex-direction: column;
-    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
-    font-size: var(--font-size-panel);
-    color: var(--color-text);
-    background: var(--color-panel-bg);
-    overflow: hidden;
-  }
-
-  svg { display: block; }
-
-  button {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: default;
-  }
-
-  /* ── 顶部两行（logo 列跨两行 + 标题条 + 菜单栏） ───────── */
-
-  .top-chrome {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: var(--size-titlebar-height) var(--size-menubar-height);
-    border-bottom: 1px solid var(--color-chrome-line);
-  }
-
-  .logo-cell {
-    grid-row: 1 / 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .logo-cell .mark {
-    width: 46px;
-    height: 54px;
-    display: grid;
-    place-items: center;
-    background: var(--color-brand);
-    color: #fff;
-    font-weight: 700;
-  }
-
-  .titlebar {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 12px;
-  }
-
-  .quick-icons { display: flex; align-items: center; gap: 3px; }
-
-  .quick-icons button {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    height: 24px;
-    padding: 0 5px;
-    border-radius: 3px;
-    color: #4a4a4a;
-  }
-
-  .caret { color: var(--color-text); }
-
-  .quick-icons button:hover { background: var(--color-selected-bg); }
-
-  .activate {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 8px;
-    border: 1px solid #b5b5b5;
-    border-radius: 3px;
-    background: var(--color-panel-bg);
-  }
-
-  .activate:hover { background: var(--color-selected-bg); }
-
-  .activate .split {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    margin-left: 2px;
-    padding-left: 6px;
-    border-left: 1px solid #b5b5b5;
-  }
-
-  .caption {
-    flex: 1;
-    text-align: center;
-    font-size: var(--font-size-title);
-    font-weight: 600;
-    color: var(--color-text);
-    white-space: nowrap;
-  }
-
-  .tool-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 6px;
-    border: 1px solid var(--color-panel-line);
-    background: linear-gradient(to bottom, #b0b0b0 0%, #666666 100%);
-  }
-
-  .caption-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 200px;
-    height: 22px;
-    padding: 0 6px;
-    color: var(--color-text);
-  }
-
-  .caption-search input {
-    flex: 1;
-    border: 0;
-    background: #fff;
-    padding: 5px 2px;
-    color: var(--color-text);
-    font-size: var(--font-size-small);
-    outline: none;
-  }
-
-  .caption-extra {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .caption-extra button {
-    height: 24px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 6px;
-    border-radius: 3px;
-    color: #4a4a4a;
-    white-space: nowrap;
-  }
-
-  .caption-extra button:hover { background: var(--color-selected-bg); }
-
-  .titlebar-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .window-controls { display: flex; gap: 2px; margin-left: 4px; }
-
-  .window-controls button {
-    width: 28px;
-    height: 24px;
-    display: grid;
-    place-items: center;
-    color: var(--color-text);
-  }
-
-  .window-controls button.close:hover { background: #e81123; color: #fff; }
-
-  /* ── 菜单栏（整体灰色，选中项白底高亮） ────────────────── */
-
-  .menubar {
-    display: flex;
-    align-items: stretch;
-    gap: 2px;
-    background: var(--color-menubar-bg);
-  }
-
-  .menubar button {
-    padding: 0 14px;
-    display: flex;
-    align-items: center;
-    color: var(--color-menubar-text);
-  }
-
-  .menubar button:hover { background: var(--color-menubar-hover); }
-
-  .menubar button.selected {
-    background: #fff;
-    color: var(--color-menubar-selected-text);
-    font-weight: 600;
-  }
-
-  .menubar .tail {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 0 10px;
-    margin-left: 8px;
-    color: var(--color-menubar-text);
-  }
-
-  .menubar .tail:hover { background: var(--color-menubar-hover); }
-
-  /* ── Ribbon 启动区 ─────────────────────────────────────── */
-
-  .ribbon {
-    display: flex;
-    gap: 2px;
-    align-items: stretch;
-    padding: 2px 2px;
-    background: linear-gradient(to bottom, #e1e1e1 0%, #919191 100%);
-    border-bottom: 1px solid var(--color-chrome-line);
-  }
-
-  .ribbon-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 6px 14px;
-    border: 1px solid var(--color-panel-line);
-    border-radius: var(--radius-ribbon-tile);
-    background: #fff;
-    color: var(--color-text);
-  }
-
-  .ribbon-tile:hover { background: var(--color-hover-bg); }
-
-  .ribbon-tile .label { font-size: var(--font-size-small); }
-
-  /* 区块右上角关闭按钮（任务面板 / VTK 区 / 输出面板） */
-  .tasks-panel,
-  .vtk-pane,
-  .output-panel {
-    position: relative;
-  }
-
-  .pane-close {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    z-index: 2;
-    width: 20px;
-    height: 20px;
-    display: grid;
-    place-items: center;
-    border-radius: 3px;
-    color: var(--color-text-muted);
-  }
-
-  .pane-close:hover { background: #e81123; color: #fff; }
-
-  /* ── 工作区 ────────────────────────────────────────────── */
-
-  .workspace {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-  }
-
-  .left-col {
-    display: flex;
-    flex-direction: column;
-    width: var(--size-left-col);
-    min-width: 320px;
-    border-right: 1px solid var(--color-panel-line);
-  }
-
-  .tasks-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    background: var(--color-panel-bg);
-  }
-
-  /* 页签条：左面板与 VTK 底部视图页签共用同一套样式 */
-  .panel-tabs,
-  .pane-tabs {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    background: var(--color-chrome-bg);
-    border-bottom: 1px solid var(--color-panel-line);
-  }
-
-  .panel-tabs .tab,
-  .pane-tabs button {
-    padding: 5px 12px;
-    border: 1px solid var(--color-panel-line);
-    border-bottom: 0;
-    border-radius: 4px 4px 0 0;
-    background: var(--color-chrome-bg);
-    color: var(--color-text-muted);
-    transform: translateY(1px);
-  }
-
-  .panel-tabs .tab.active,
-  .pane-tabs button.active {
-    background: var(--color-panel-bg);
-    color: var(--color-text);
-    font-weight: 600;
-  }
-
-  .task-list { flex: 1; overflow: auto; padding: 8px 0; }
-
-  .task-list .item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px var(--space-panel-x);
-  }
-
-  .task-list .item:hover { background: var(--color-hover-bg); }
-
-  .task-list .item .dim { color: var(--color-text-muted); }
-
-  .output-panel {
-    height: var(--size-output-panel);
-    display: flex;
-    flex-direction: column;
-    border-top: 1px solid var(--color-panel-line);
-    background: var(--color-panel-bg);
-  }
-
-  .output-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    height: 30.5px;
-    padding: 1px 0;
-    background: var(--color-chrome-bg);
-    border-bottom: 1px solid var(--color-panel-line);
-  }
-
-  .output-toolbar button {
-    width: 24px;
-    height: 22px;
-    display: grid;
-    place-items: center;
-    border-radius: 3px;
-    color: #4a4a4a;
-  }
-
-  .output-toolbar button:hover { background: var(--color-selected-bg); }
-
-  .output-body { flex: 1; }
-
-  /* 中央 VTK 显示区域：按需求留空，迁移时映射为 VTK 视图（任务 007） */
-  .vtk-pane {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    border-left: 1px solid var(--color-panel-line);
-    background: var(--color-panel-bg);
-  }
-
-  .vtk-content { flex: 1; background: var(--color-panel-bg); }
-
-  /* 底部视图页签：分隔线在上方，页签开口朝上连接 VTK 内容区 */
-  .pane-tabs {
-    border-top: 1px solid var(--color-chrome-line);
-    border-bottom: 0;
-  }
-
-  .pane-tabs button {
-    transform: translateY(-1px);
-  }
-
-  /* ── 状态栏 ────────────────────────────────────────────── */
-
-  .statusbar {
-    display: flex;
-    align-items: center;
-    height: var(--size-statusbar-height);
-    padding: 0 var(--space-strip-x);
-    background: var(--color-status-bg);
-    border-top: 1px solid var(--color-chrome-line);
-    color: var(--color-text-muted);
-    font-size: var(--font-size-small);
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>panta 2027</title>
+  <link rel="stylesheet" href="../shell.css">
+  <script src="../shell.js" defer></script>
 </head>
 <body>
+<template id="page-menu">
+  <button type="button" aria-current="page">Start &amp; Learn</button>
+  <button type="button">Community</button>
+  <button type="button">Tools</button>
+  <button type="button">View</button>
+</template>
 
-<!-- ▼ 下拉箭头统一定义，全页经 <use> 引用 -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-caret" viewBox="0 0 7 5"><path d="M0 0h7L3.5 5z" fill="currentColor"/></symbol>
-  <symbol id="i-close" viewBox="0 0 11 11"><path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="currentColor" stroke-width="1.2"/></symbol>
-</svg>
-
-<header class="top-chrome">
-  <div class="logo-cell">
-    <span class="mark">P</span>
-  </div>
-<div class="titlebar">
-  <div class="tool-group">
-    <span class="quick-icons">
-      <button aria-label="新建"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 1.5h6l3 3v9H3z" stroke="#4a4a4a" stroke-width="1.2"/><path d="M7.5 6v4M5.5 8h4" stroke="#2e7ce0" stroke-width="1.4"/></svg><svg class="caret" width="7" height="5"><use href="#i-caret"/></svg></button>
-      <button aria-label="打开"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M1.5 3.5h4l1.5 2h6.5v7h-12z" fill="#f0d491" stroke="#8a6d2f" stroke-width="1.1"/><path d="M1.5 5.5h13" stroke="#8a6d2f" stroke-width="1.1"/></svg></button>
-      <button aria-label="保存"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2h9l2 2v9H2z" fill="#3d5a80" stroke="#2c3e50" stroke-width="1.1"/><path d="M4.5 2v4h5V2" stroke="#cfd8e3" stroke-width="1.1"/><rect x="4.5" y="8.5" width="6" height="4.5" fill="#cfd8e3"/></svg><svg class="caret" width="7" height="5"><use href="#i-caret"/></svg></button>
-      <button aria-label="撤销"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M6 3L2.5 6.5 6 10" stroke="#4a4a4a" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 6.5h5a4 4 0 0 1 4 4v1" stroke="#4a4a4a" stroke-width="1.4" stroke-linecap="round"/></svg></button>
-      <button aria-label="重做"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9 3l3.5 3.5L9 10" stroke="#4a4a4a" stroke-width="1.4" stroke-linecap="round"/><path d="M12.5 6.5h-5a4 4 0 0 0-4 4v1" stroke="#4a4a4a" stroke-width="1.4" stroke-linecap="round"/></svg></button>
-      <button aria-label="打印"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M4 5V2h7v3M2 5h11v5h-2M4 8h7v5H4z" stroke="#4a4a4a" stroke-width="1.2"/></svg></button>
-      <button aria-label="激活动图预览"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="2.5" width="12" height="10" stroke="#4a4a4a" stroke-width="1.2"/><path d="M1.5 5.5h12M5.5 5.5v7" stroke="#4a4a4a" stroke-width="1.2"/></svg><svg class="caret" width="7" height="5"><use href="#i-caret"/></svg></button>
-    </span>
-  <button class="activate">激活动图(A)
-    <svg class="caret" width="8" height="5"><use href="#i-caret"/></svg>
-  </button>
-<span class="split">
-  <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
-    <path d="M1 1.5h8" stroke="currentColor" stroke-width="1.3"/>
-    <path d="M2.5 5.5L5 8.8 7.5 5.5z" fill="currentColor"/>
-  </svg>
-</span>
-</div>
-<span class="caption">panta 2027</span>
-<div class="tool-group">
-<span class="caption-search">
-<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-<circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
-<path d="M11 11l3.4 3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-</svg>
-<input type="search" placeholder="请输入关键字或短语" aria-label="搜索">
-</span>
-<span class="caption-extra">
-<button aria-label="账户"><svg width="14" height="14" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.6" r="2.9" stroke="currentColor" stroke-width="1.3"/><path d="M2.8 14.6c.8-3 3-4.5 5.7-4.5s4.9 1.5 5.7 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
-<button class="signin" aria-label="登录">
-<svg width="14" height="14" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.6" r="2.9" stroke="currentColor" stroke-width="1.3"/><path d="M2.8 14.6c.8-3 3-4.5 5.7-4.5s4.9 1.5 5.7 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>登录<svg class="caret" width="7" height="5"><use href="#i-caret"/></svg>
-</button>
-<button aria-label="购物车"><svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M2 3h2l1.6 8.4a1 1 0 0 0 1 .8h6.9a1 1 0 0 0 1-.8L15.8 6H4.6" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="15" r="1" fill="currentColor"/><circle cx="13" cy="15" r="1" fill="currentColor"/></svg></button>
-<button aria-label="帮助"><svg width="14" height="14" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="7" stroke="currentColor" stroke-width="1.2"/><path d="M6.6 6.6a2 2 0 1 1 2.7 1.9c-.5.2-.8.6-.8 1.1v.3" stroke="currentColor" stroke-width="1.2"/><circle cx="8.5" cy="12.2" r=".9" fill="currentColor"/></svg><svg class="caret" width="7" height="5"><use href="#i-caret"/></svg></button>
-</span>
-</div>
-<span class="window-controls">
-<button aria-label="最小化"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 5.5h9" stroke="currentColor" stroke-width="1.1"/></svg></button>
-<button aria-label="最大化"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" stroke-width="1.1"/></svg></button>
-<button class="close" aria-label="关闭"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="currentColor" stroke-width="1.1"/></svg></button>
-</span>
-</div>
-  <nav class="menubar">
-    <button class="selected">开始并学习</button>
-    <button>社区</button>
-    <button>工具</button>
-    <button>查看</button>
-    <span class="tail">
-      <svg width="12" height="12" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.4" stroke="currentColor" stroke-width="1.3"/><ellipse cx="8.5" cy="8.5" rx="2.9" ry="6.4" stroke="currentColor" stroke-width="1.3"/><path d="M2.4 8.5h12.2" stroke="currentColor" stroke-width="1.3"/></svg>
-      <svg width="9" height="6" viewBox="0 0 9 6" fill="none"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.3"/></svg>
-    </span>
-  </nav>
-</header>
-
-<section class="ribbon">
-  <button class="ribbon-tile">
-    <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="4" y="4" width="20" height="20" rx="5" fill="#d9d9d9" stroke="#8f8f8f" stroke-width="1"/><circle cx="14" cy="14" r="4.5" fill="#c8322b"/></svg>
-    <span class="label">启动</span>
-  </button>
-  <button class="ribbon-tile">
-    <svg width="30" height="30" viewBox="0 0 26 26" fill="none"><path d="M13 3a7 7 0 0 1 4 12.7c-.8.6-1 1.4-1 2.3h-6c0-.9-.2-1.7-1-2.3A7 7 0 0 1 13 3z" fill="#f5c518" stroke="#4a4a4a" stroke-width="1.2" stroke-linejoin="round"/><path d="M13 1v1.5M4.5 4.5l1 1M21.5 4.5l-1 1" stroke="#f5a623" stroke-width="1.3" stroke-linecap="round"/><path d="M10.5 21h5M11.5 23.5h3" stroke="#4a4a4a" stroke-width="1.4" stroke-linecap="round"/></svg>
-    <span class="label">新功能</span>
-  </button>
-  <button class="ribbon-tile">
-    <svg width="30" height="30" viewBox="0 0 26 26" fill="none"><path d="M3 9l10-5 10 5-10 5z" fill="#2e4d3a" stroke="#1c1c1c" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 11.5V17c0 1.6 2.7 3 6 3s6-1.4 6-3v-5.5" stroke="#1c1c1c" stroke-width="1.4"/><path d="M23 9v6" stroke="#c8322b" stroke-width="1.6" stroke-linecap="round"/></svg>
-    <span class="label">学习</span>
-  </button>
-</section>
-
-<div class="workspace">
-  <div class="left-col">
-    <section class="tasks-panel">
-    <button class="pane-close" aria-label="关闭"><svg width="10" height="10"><use href="#i-close"/></svg></button>
-      <div class="panel-tabs">
-        <span class="tab active">任务</span>
-        <span class="tab">工具</span>
-        <span class="tab">共享视图</span>
+<template id="page-ribbon">
+  <section class="ribbon" aria-label="Start and Learn tools">
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="New Project">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-project"/></svg>
+          <span class="label">New<br>Project</span>
+        </button>
+        <button type="button" class="ribbon-button" aria-label="Open Project">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-open-project"/></svg>
+          <span class="label">Open<br>Project</span>
+        </button>
       </div>
-      <div class="task-list">
-        <a class="item" href="#">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M1.5 3.5h4l1.5 2h6.5v7h-12z" stroke="#4a4a4a" stroke-width="1.2"/></svg>
-          打开工程<span class="dim">...</span>
-        </a>
-        <a class="item" href="#">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 1.5h6l3 3v9H3z" stroke="#4a4a4a" stroke-width="1.2"/><path d="M7.5 6v4M5.5 8h4" stroke="#4a4a4a" stroke-width="1.2"/></svg>
-          新建工程<span class="dim">...</span>
-        </a>
+      <span class="ribbon-label">Start <svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="New Features">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-new-features"/></svg>
+          <span class="label">New<br>Features</span>
+        </button>
       </div>
-    </section>
-    <section class="output-panel">
-    <button class="pane-close" aria-label="关闭"><svg width="10" height="10"><use href="#i-close"/></svg></button>
-      <div class="output-toolbar">
-        <button aria-label="新建输出"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M3 1.5h6l3 3v9H3z" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="打开输出"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M1.5 3.5h4l1.5 2h6.5v7h-12z" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="保存输出"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M2 2h9l2 2v9H2z" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 2v4h5V2M4.5 13V9h6v4" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="检查"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M2.5 8l3 3 7-7.5" stroke="currentColor" stroke-width="1.4"/></svg></button>
-        <button aria-label="向导"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M8 1.5l1.4 3.6L13 6.5l-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4z" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="清除"><svg width="13" height="13" viewBox="0 0 11 11"><path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="复制"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.2"/><rect x="5" y="5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="图像"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="2.5" width="12" height="10" stroke="currentColor" stroke-width="1.2"/><circle cx="5" cy="6" r="1.2" fill="currentColor"/><path d="M3 11l3.5-3.5 2.5 2 2-2 3 3.5" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <button aria-label="导出"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3"/><path d="M2 12.5h11" stroke="currentColor" stroke-width="1.3"/></svg></button>
-        <button aria-label="删除"><svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M2.5 4h10M5.5 4V2.5h4V4M4 4l1 9h5l1-9" stroke="currentColor" stroke-width="1.2"/></svg></button>
+      <span class="ribbon-label">New Features</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Start Here">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-start-here"/></svg>
+          <span class="label">Start Here</span>
+        </button>
+        <button type="button" class="ribbon-button" aria-label="Tutorials">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-tutorials"/></svg>
+          <span class="label">Tutorials</span>
+        </button>
+        <button type="button" class="ribbon-button" aria-label="Videos">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-videos"/></svg>
+          <span class="label">Videos</span>
+        </button>
+        <button type="button" class="ribbon-button" aria-label="Help">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-help"/></svg>
+          <span class="label">Help</span>
+        </button>
       </div>
-      <div class="output-body"></div>
-    </section>
-  </div>
-
-  <section class="vtk-pane">
-  <button class="pane-close" aria-label="关闭"><svg width="10" height="10"><use href="#i-close"/></svg></button>
-    <div class="vtk-content"></div>
-    <div class="pane-tabs" role="tablist">
-      <button class="active" role="tab" aria-selected="true">模型</button>
-      <button role="tab" aria-selected="false">网格</button>
-      <button role="tab" aria-selected="false">结果</button>
+      <span class="ribbon-label">Learn</span>
     </div>
   </section>
-</div>
+</template>
 
-<footer class="statusbar">就绪</footer>
-
-<script>
-  // 视图页签切换：设计参考件的最小交互演示，迁移 QML 时由 TabBar 承接。
-  const viewTabs = document.querySelectorAll(".pane-tabs [role='tab']");
-  viewTabs.forEach((tab) =>
-    tab.addEventListener("click", () => {
-      viewTabs.forEach((other) => {
-        const active = other === tab;
-        other.classList.toggle("active", active);
-        other.setAttribute("aria-selected", active ? "true" : "false");
-      });
-    }),
-  );
-</script>
-
+<template id="page-tasks">
+  <button type="button" class="task-item"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>Open Project<span class="suffix">…</span></button>
+  <button type="button" class="task-item"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg>New Project<span class="suffix">…</span></button>
+</template>
+<noscript>This design reference requires JavaScript to display the shared layout.</noscript>
 </body>
 </html>

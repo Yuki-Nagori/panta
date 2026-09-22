@@ -1,0 +1,290 @@
+/* 两页共用的设计 token、壳层与 Ribbon 样式；homepage 为视觉基准。 */
+:root {
+  --color-chrome: #e9e9e9;
+  --color-chrome-line: #d0d0d0;
+  --color-panel: #fff;
+  --color-panel-line: #c9c9c9;
+  --color-text: #1c1c1c;
+  --color-muted: #5a5a5a;
+  --color-icon: #4a4a4a;
+  --color-hover: #e5f1fb;
+  --color-status: #efefef;
+  --color-brand: #c8322b;
+  --color-menu: #2b2b2b;
+  --color-menu-text: #f2f2f2;
+  --color-menu-hover: #454545;
+  --color-close-hover: #e81123;
+  --gradient-tools: linear-gradient(#b0b0b0, #666);
+  --gradient-ribbon: linear-gradient(#e1e1e1, #919191);
+  --font-body: 13px;
+  --font-small: 12px;
+  --font-ribbon: 10px;
+  --titlebar-height: 30px;
+  --menubar-height: 24px;
+  --logo-width: 46px;
+  --control-height: 24px;
+  --icon-size: 15px;
+  --ribbon-height: 96px;
+  --ribbon-tool-width: 56px;
+  --ribbon-tool-height: 68px;
+  --ribbon-icon-size: 26px;
+  --ribbon-label-height: 22px;
+  --toolbar-height: 32px;
+  --tab-width: 96px;
+  --tab-slide-duration: 120ms;
+  --close-size: 20px;
+  --left-width: 26%;
+  --left-min-width: 320px;
+  --output-height: 42%;
+  --statusbar-height: 26px;
+  --radius: 3px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: var(--font-body) "Segoe UI", "PingFang SC", sans-serif;
+}
+button, input { font: inherit; color: inherit; }
+button { border: 0; padding: 0; background: transparent; cursor: default; }
+button:enabled:hover { background: var(--color-hover); }
+button:focus-visible, input:focus-visible {
+  outline: 1px solid var(--color-icon);
+  outline-offset: -1px;
+}
+button:disabled { opacity: 0.42; }
+.icon { display: block; flex: none; width: var(--icon-size); height: var(--icon-size); }
+.icon.caret { width: 7px; height: 5px; }
+.icon-symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* 两页壳层及样式保持一致，菜单、Ribbon 和任务项由页面内容区分。 */
+.top-chrome {
+  flex: none;
+  display: grid;
+  grid-template-columns: var(--logo-width) minmax(0, 1fr);
+  grid-template-rows: var(--titlebar-height) var(--menubar-height);
+  border-bottom: 1px solid var(--color-chrome-line);
+}
+.brand {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 700;
+}
+.titlebar, .menubar, .ribbon { overflow-x: auto; scrollbar-width: none; }
+.titlebar::-webkit-scrollbar, .menubar::-webkit-scrollbar, .ribbon::-webkit-scrollbar { display: none; }
+.titlebar-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max(100%, 1100px);
+  height: 100%;
+}
+.tool-group, .window-controls, .tool-button, .search-field, .menubar {
+  display: flex;
+  align-items: center;
+}
+.tool-group {
+  flex: none;
+  gap: 4px;
+  height: 100%;
+  padding: 0 6px;
+  border: 1px solid var(--color-panel-line);
+  background: var(--gradient-tools);
+}
+.tool-button {
+  flex: none;
+  justify-content: center;
+  gap: 4px;
+  height: var(--control-height);
+  padding: 0 4px;
+  border-radius: var(--radius);
+  color: var(--color-icon);
+  white-space: nowrap;
+}
+.activate {
+  padding: 0 8px;
+  border: 1px solid var(--color-panel-line);
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+.caption {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 600;
+}
+.search-field { gap: 4px; }
+.search-field input {
+  width: 200px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--color-panel-line);
+  border-radius: 0;
+  background: var(--color-panel);
+  font-size: var(--font-small);
+}
+.window-controls { flex: none; gap: 2px; margin: 0 4px; }
+.window-controls .tool-button { width: 28px; color: var(--color-text); }
+.menubar { background: var(--color-menu); align-items: stretch; }
+.menubar button { flex: none; padding: 0 12px; color: var(--color-menu-text); white-space: nowrap; }
+.menubar button:enabled:hover { background: var(--color-menu-hover); }
+.menubar button[aria-current="page"] { background: var(--color-panel); color: var(--color-text); font-weight: 600; }
+.menubar .language { display: flex; align-items: center; gap: 6px; }
+
+/* 工具分组覆盖白底，剩余空间沿用 Ribbon 渐变；只维护一个尺寸基准。 */
+.ribbon {
+  flex: 0 0 var(--ribbon-height);
+  display: flex;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--color-chrome-line);
+  background: var(--gradient-ribbon);
+}
+.ribbon::after { content: ""; flex: 1 0 64px; }
+.ribbon-group {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-width: calc(var(--ribbon-tool-width) + 6px);
+  background: var(--color-panel);
+  border-right: 1px solid var(--color-panel-line);
+}
+.ribbon-tools {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+}
+.ribbon-button {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: var(--ribbon-tool-width);
+  height: var(--ribbon-tool-height);
+  padding: 3px;
+  border-radius: var(--radius);
+  font-size: var(--font-ribbon);
+}
+.ribbon-button > .icon { width: var(--ribbon-icon-size); height: var(--ribbon-icon-size); }
+.ribbon-button > .caret { width: 7px; height: 5px; }
+.ribbon-button .label { line-height: 12px; text-align: center; white-space: nowrap; }
+.ribbon-label {
+  flex: 0 0 var(--ribbon-label-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-top: 1px solid var(--color-panel-line);
+  color: var(--color-muted);
+  font-size: var(--font-ribbon);
+  white-space: nowrap;
+}
+
+.workspace { flex: 1; display: flex; min-height: 0; }
+.left-column {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: max(var(--left-width), var(--left-min-width));
+  border-right: 1px solid var(--color-panel-line);
+}
+.panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tasks-panel, .viewport { flex: 1; }
+.output-panel { flex: 0 0 var(--output-height); border-top: 1px solid var(--color-panel-line); }
+.panel-content { flex: 1; min-height: 0; overflow: auto; }
+.pane-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: var(--close-size);
+  height: var(--close-size);
+  border-radius: var(--radius);
+  color: var(--color-muted);
+}
+.pane-close > .icon { width: 10px; height: 10px; }
+.pane-close:enabled:hover, .window-close:enabled:hover { background: var(--color-close-hover); color: #fff; }
+.tabs, .output-toolbar {
+  flex: 0 0 var(--toolbar-height);
+  display: flex;
+  align-items: center;
+  background: var(--color-chrome);
+  border-bottom: 1px solid var(--color-panel-line);
+}
+.tabs { padding: 2px; }
+.tabs-bottom { border-top: 1px solid var(--color-panel-line); border-bottom: 0; }
+.tabs-closable, .output-toolbar { padding-right: calc(var(--close-size) + 8px); }
+.tab-strip {
+  --tab-index: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: calc(3 * var(--tab-width));
+  max-width: 100%;
+  height: 100%;
+}
+.tab-strip::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: calc(var(--tab-index) * 100% / 3 + 2px);
+  width: calc(100% / 3 - 4px);
+  border-radius: 999px;
+  background: var(--color-panel);
+  transition: left var(--tab-slide-duration) ease;
+}
+.tab-strip button {
+  position: relative;
+  margin: 2px;
+  padding: 0 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  font-size: var(--font-small);
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-strip button[aria-selected="true"] { background: transparent; color: var(--color-text); font-weight: 600; }
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 4px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+.task-item .suffix { color: var(--color-muted); }
+.output-toolbar { gap: 2px; }
+.output-toolbar .tool-button { width: 24px; height: 22px; padding: 0; }
+.statusbar {
+  flex: 0 0 var(--statusbar-height);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--color-status);
+  border-top: 1px solid var(--color-chrome-line);
+  color: var(--color-muted);
+  font-size: var(--font-small);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-strip::before { transition: none; }
+}
