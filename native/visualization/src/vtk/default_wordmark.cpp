@@ -23,6 +23,11 @@ using Triangle = std::array<vtkIdType, 3>;
 using Edge = std::pair<vtkIdType, vtkIdType>;
 using Point = std::array<double, 3>;
 
+struct EdgeUse {
+    Edge direction;
+    int count = 0;
+};
+
 // 欢迎图形的装饰色带，借用注塑云图的冷暖顺序；不映射物理量。
 std::array<unsigned char, 3> wordmark_color(double x, double y) {
     constexpr std::array<Point, 6> palette{{{24, 42, 146},
@@ -59,6 +64,7 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
     const double width = bounds[1] - bounds[0];
     const double height = bounds[3] - bounds[2];
     std::vector<Point> vertices;
+    vertices.reserve(flat->GetNumberOfPoints());
     for (vtkIdType i = 0; i < flat->GetNumberOfPoints(); ++i) {
         Point point{};
         flat->GetPoint(i, point.data());
@@ -67,6 +73,7 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
         vertices.push_back(point);
     }
     std::vector<Triangle> triangles;
+    triangles.reserve(flat->GetNumberOfPolys());
     vtkIdType count = 0;
     const vtkIdType* ids = nullptr;
     flat->GetPolys()->InitTraversal();
@@ -98,6 +105,7 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
             return id;
         };
         std::vector<Triangle> refined;
+        refined.reserve(4 * triangles.size());
         for (const auto& triangle : triangles) {
             const auto a = triangle[0], b = triangle[1], c = triangle[2];
             const auto ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
@@ -110,17 +118,21 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
     vtkNew<vtkUnsignedCharArray> colors;
     colors->SetName("WelcomeColor");
     colors->SetNumberOfComponents(3);
-    constexpr double half_depth = 0.16;
-    for (const double z : {-half_depth, half_depth}) {
-        for (const auto& vertex : vertices) {
-            points->InsertNextPoint(vertex[0], vertex[1], z);
-            const auto color = wordmark_color(vertex[0] / width + 0.5, vertex[1] / height + 0.5);
-            colors->InsertNextTypedTuple(color.data());
-        }
-    }
     const auto offset = static_cast<vtkIdType>(vertices.size());
+    points->SetNumberOfPoints(2 * offset);
+    colors->SetNumberOfTuples(2 * offset);
+    constexpr double half_depth = 0.16;
+    for (vtkIdType i = 0; i < offset; ++i) {
+        const auto& vertex = vertices[i];
+        points->SetPoint(i, vertex[0], vertex[1], -half_depth);
+        points->SetPoint(i + offset, vertex[0], vertex[1], half_depth);
+        const auto color = wordmark_color(vertex[0] / width + 0.5, vertex[1] / height + 0.5);
+        colors->SetTypedTuple(i, color.data());
+        colors->SetTypedTuple(i + offset, color.data());
+    }
     vtkNew<vtkCellArray> faces;
-    std::map<Edge, std::vector<Edge>> edges;
+    // 每条边只需计数与方向，不为内部三角边分配动态列表。
+    std::map<Edge, EdgeUse> edges;
     for (const auto& triangle : triangles) {
         const auto a = triangle[0], b = triangle[1], c = triangle[2];
         const Triangle back{c, b, a};
@@ -128,15 +140,17 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
         faces->InsertNextCell(3, back.data());
         faces->InsertNextCell(3, front.data());
         for (const Edge edge : {Edge{a, b}, Edge{b, c}, Edge{c, a}}) {
-            edges[std::minmax(edge.first, edge.second)].push_back(edge);
+            auto& use = edges[std::minmax(edge.first, edge.second)];
+            use.direction = edge;
+            ++use.count;
         }
     }
     // 只封闭轮廓边，字孔的内壁自然保留；内部三角边不能挤出成墙。
-    for (const auto& [key, uses] : edges) {
-        if (uses.size() != 1) {
+    for (const auto& [key, use] : edges) {
+        if (use.count != 1) {
             continue;
         }
-        const auto [a, b] = uses.front();
+        const auto [a, b] = use.direction;
         const Triangle side_a{a, b, b + offset};
         const Triangle side_b{a, b + offset, a + offset};
         faces->InsertNextCell(3, side_a.data());

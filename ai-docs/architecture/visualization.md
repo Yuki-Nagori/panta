@@ -10,6 +10,8 @@ VTK 采用 WebGPU render window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCoco
 
 当前临时欢迎图形为带厚度的小写 `panta` 网格，采用注塑云图风格的装饰顶点色；颜色没有物理量、单位或求解结果含义，不显示结果色标。几何生成、法线、材质和视口适配相机均封装在 VTK 适配器内。[053](../task/053-default-panta-wordmark.md) 已退回 planned，原方案不作为最终交付，后续重新设计实现；现阶段保留当前展示，圆环 STL 不接入应用。
 
+当前适配器在 GUI 事件循环中合并状态和几何刷新，只在可见状态变化、像素尺寸变化或恢复显示时提交帧；重复提交相同外观不渲染，也不设置常驻帧定时器。祖先平移只同步原生区域位置。跨窗口时释放旧 surface/GPU 资源后按最新 CPU 状态重建；析构先断开条目自身的窗口回调，避免基类析构信号访问已释放状态。原生区域当前仍按轴对齐矩形映射，不支持任意 QML 旋转/裁剪叠加。
+
 ## RenderScene 契约
 
 建议定义 `RenderScene` 抽象，提供添加/移除网格、设置可见性、显示标量、设置裁剪面、切换时间步、拾取和相机控制等语义。示意接口包括 `addMesh`、`showScalar`、`setClipPlane`、`setTimeStep`、`pick`，尚未形成实际头文件。

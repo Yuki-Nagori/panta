@@ -7,6 +7,8 @@
 #include "default_wordmark.hpp"
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
+#include <QList>
+#include <QLoggingCategory>
 #include <QMetaObject>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -38,6 +40,8 @@ namespace panta::visualization {
 
 namespace {
 
+Q_LOGGING_CATEGORY(viewport_log, "panta.viewport", QtWarningMsg)
+
 // 字样保持透视深度；按实际宽高比留出 25% 边距，窄窗口也不裁字。
 void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect) {
     double bounds[6];
@@ -68,36 +72,46 @@ struct VtkViewport::Impl {
     vtkSmartPointer<vtkWebGPURenderer> renderer;
     vtkSmartPointer<vtkActor> primitive_actor;
     QMetaObject::Connection window_visibility_connection;
-    QMetaObject::Connection window_visible_connection;
     QMetaObject::Connection scene_graph_initialized_connection;
+    QList<QMetaObject::Connection> ancestor_connections;
     /// 最近一次提交给 render window 的像素尺寸；空值表示尚无有效提交。
     QSize applied_pixel_size;
     bool refresh_scheduled = false;
+    bool scene_dirty = true;
     bool creation_warning_emitted = false;
 };
 
 VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
     setFlag(ItemHasContents, false);
-    QObject::connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow* new_window) {
-        QObject::disconnect(impl_->window_visibility_connection);
-        QObject::disconnect(impl_->window_visible_connection);
-        QObject::disconnect(impl_->scene_graph_initialized_connection);
-        if (new_window == nullptr) {
-            return;
-        }
-        impl_->window_visibility_connection =
-            QObject::connect(new_window, &QWindow::visibilityChanged, this,
-                             [this](QWindow::Visibility) { schedule_refresh(); });
-        impl_->window_visible_connection = QObject::connect(
-            new_window, &QWindow::visibleChanged, this, [this](bool) { schedule_refresh(); });
-        impl_->scene_graph_initialized_connection =
-            QObject::connect(new_window, &QQuickWindow::sceneGraphInitialized, this,
-                             [this]() { schedule_refresh(); });
-        schedule_refresh();
-    });
+    connect(this, &QQuickItem::windowChanged, this, &VtkViewport::bind_window);
+    bind_window(window());
+    watch_ancestors();
 }
 
-VtkViewport::~VtkViewport() { destroy_render_window(); }
+void VtkViewport::bind_window(QQuickWindow* new_window) {
+    QObject::disconnect(impl_->window_visibility_connection);
+    QObject::disconnect(impl_->scene_graph_initialized_connection);
+    // 原生 surface 绑定具体窗口，换宿主或脱离窗口时必须释放旧资源。
+    destroy_render_window();
+    impl_->creation_warning_emitted = false;
+    if (new_window == nullptr) {
+        return;
+    }
+    impl_->window_visibility_connection = QObject::connect(
+        new_window, &QWindow::visibilityChanged, this, [this](QWindow::Visibility visibility) {
+            impl_->scene_dirty |= visibility != QWindow::Hidden && visibility != QWindow::Minimized;
+            schedule_refresh();
+        });
+    impl_->scene_graph_initialized_connection = QObject::connect(
+        new_window, &QQuickWindow::sceneGraphInitialized, this, [this]() { schedule_refresh(); });
+    schedule_refresh();
+}
+
+VtkViewport::~VtkViewport() {
+    // QQuickItem 基类析构会发 windowChanged，此时 impl_ 已被销毁；先断开自回调。
+    QObject::disconnect(this, nullptr, this, nullptr);
+    destroy_render_window();
+}
 
 QQuickItem* VtkViewport::item() { return this; }
 
@@ -105,48 +119,50 @@ void VtkViewport::apply_state(const RenderScene& state) {
     if (state.revision < impl_->pending.revision) {
         return;
     }
+    impl_->scene_dirty |= state.background != impl_->pending.background ||
+                          state.primitive_visible != impl_->pending.primitive_visible;
     impl_->pending = state;
-    ensure_render_window();
-    if (impl_->renderer == nullptr || impl_->render_window == nullptr ||
-        impl_->primitive_actor == nullptr) {
-        return;
-    }
-
-    impl_->renderer->SetBackground(impl_->pending.background.redF(),
-                                   impl_->pending.background.greenF(),
-                                   impl_->pending.background.blueF());
-    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
-    // 隐藏期间跳过 Render，帧由重新显示时的强制提交补上。
-    if (isVisible()) {
-        impl_->render_window->Render();
-    }
+    schedule_refresh();
 }
 
 void VtkViewport::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
     QQuickItem::geometryChange(new_geometry, old_geometry);
-    ensure_render_window();
-    sync_native_surface();
+    // 零尺寸时 surface 被隐藏；恢复到相同像素尺寸也需要重新提交 buffer。
+    impl_->scene_dirty |= old_geometry.isEmpty();
+    schedule_refresh();
 }
 
 void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
     QQuickItem::itemChange(change, value);
-    if (change == ItemSceneChange) {
-        // ItemSceneChange 的文档化载荷是 value.window；window() 何时切换为
-        // 新窗口不属于契约，延后到事件循环读取已就绪的 window()。
-        schedule_refresh();
+    if (change == ItemParentHasChanged) {
+        watch_ancestors();
     } else if (change == ItemVisibleHasChanged) {
-        ensure_render_window();
-        // 显示时强制补一帧（隐藏期间的状态变更没有渲染）；隐藏时下面的
-        // 提交策略会跳过 Render。
-        sync_native_surface(isVisible());
-        if (impl_->native_surface.view != nullptr) {
-            set_native_surface_visible(impl_->native_surface, isVisible());
+        // 隐藏立即撤下 surface；恢复显示时补帧，Wayland 据此重新映射 buffer。
+        if (!isVisible()) {
+            set_native_surface_visible(impl_->native_surface, false);
         }
+        impl_->scene_dirty = true;
+        schedule_refresh();
     } else if (change == ItemDevicePixelRatioHasChanged) {
-        // 窗口跨显示器或系统缩放变化后，按旧 DPR 推导的像素尺寸失效。
-        ensure_render_window();
-        sync_native_surface();
+        schedule_refresh();
     }
+}
+
+void VtkViewport::watch_ancestors() {
+    for (const auto& connection : impl_->ancestor_connections) {
+        QObject::disconnect(connection);
+    }
+    impl_->ancestor_connections.clear();
+    // 原生 surface 使用 scene 坐标；祖先平移不会触发本条目的 geometryChange。
+    for (auto* ancestor = parentItem(); ancestor != nullptr; ancestor = ancestor->parentItem()) {
+        impl_->ancestor_connections.append(
+            connect(ancestor, &QQuickItem::xChanged, this, &VtkViewport::schedule_refresh));
+        impl_->ancestor_connections.append(
+            connect(ancestor, &QQuickItem::yChanged, this, &VtkViewport::schedule_refresh));
+        impl_->ancestor_connections.append(
+            connect(ancestor, &QQuickItem::parentChanged, this, &VtkViewport::watch_ancestors));
+    }
+    schedule_refresh();
 }
 
 void VtkViewport::ensure_render_window() {
@@ -158,7 +174,7 @@ void VtkViewport::ensure_render_window() {
     }
     // QML 几何在原生窗口显示前就可用；在该阶段创建平台 surface 会让它
     // 铺满宿主视图，或对接到不完整的 Cocoa/Wayland 窗口层级。
-    if (!window()->isVisible()) {
+    if (!window()->isVisible() || !isVisible()) {
         return;
     }
     if (width() <= 0 || height() <= 0) {
@@ -224,10 +240,6 @@ void VtkViewport::ensure_render_window() {
     material->SetSpecular(0.32);
     material->SetSpecularPower(36.0);
     impl_->renderer->AddActor(impl_->primitive_actor);
-    impl_->renderer->SetBackground(impl_->pending.background.redF(),
-                                   impl_->pending.background.greenF(),
-                                   impl_->pending.background.blueF());
-    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
     impl_->render_window->AddRenderer(impl_->renderer);
     impl_->render_window->Initialize();
 
@@ -237,12 +249,11 @@ void VtkViewport::ensure_render_window() {
         return;
     }
 
-    sync_native_surface();
     Q_EMIT sceneInitialized();
 }
 
 void VtkViewport::schedule_refresh() {
-    // QWindow::visibleChanged 在 Qt 尚未完成原生窗口切换时发出，窗口级
+    // QWindow 状态信号在 Qt 尚未完成原生窗口切换时发出，窗口级
     // 信号在同一次切换里也可能多次触发；排队一次延迟尝试，既等切换回到
     // 事件循环，又把重复信号折叠成一次。
     if (impl_->refresh_scheduled) {
@@ -258,34 +269,43 @@ void VtkViewport::schedule_refresh() {
     });
 }
 
-void VtkViewport::sync_native_surface(bool force_render) {
+void VtkViewport::sync_native_surface() {
     if (impl_->hardware_window == nullptr || window() == nullptr ||
         impl_->native_surface.view == nullptr) {
         return;
     }
+    const bool visible = isVisible() && width() > 0 && height() > 0;
+    set_native_surface_visible(impl_->native_surface, visible);
+    if (!visible || impl_->render_window == nullptr) {
+        return;
+    }
     ::panta::visualization::sync_native_surface(window(), this, impl_->hardware_window.get(),
                                                 impl_->native_surface);
-    if (impl_->render_window == nullptr) {
-        return;
-    }
+    qCDebug(viewport_log) << "surface synchronized";
     const qreal scale = window()->devicePixelRatio();
     const QSize pixel_size(qMax(1, qRound(width() * scale)), qMax(1, qRound(height() * scale)));
-    if (!force_render && pixel_size == impl_->applied_pixel_size) {
+    const bool resized = pixel_size != impl_->applied_pixel_size;
+    if (!impl_->scene_dirty && !resized) {
         return;
     }
-    // 隐藏的原生 surface 不做渲染提交；重新显示时由可见分支强制补帧。
-    if (!isVisible()) {
-        return;
+    if (resized) {
+        impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
+        configure_default_camera(impl_->renderer, impl_->primitive_actor,
+                                 static_cast<double>(pixel_size.width()) / pixel_size.height());
     }
-    impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
-    configure_default_camera(impl_->renderer, impl_->primitive_actor,
-                             static_cast<double>(pixel_size.width()) / pixel_size.height());
+    impl_->renderer->SetBackground(impl_->pending.background.redF(),
+                                   impl_->pending.background.greenF(),
+                                   impl_->pending.background.blueF());
+    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
     impl_->render_window->Render();
+    qCDebug(viewport_log) << "frame submitted" << pixel_size;
     impl_->applied_pixel_size = pixel_size;
+    impl_->scene_dirty = false;
 }
 
 void VtkViewport::destroy_render_window() {
-    impl_->applied_pixel_size = QSize();
+    impl_->applied_pixel_size = {};
+    impl_->scene_dirty = true;
     if (impl_->render_window != nullptr) {
         impl_->render_window->Finalize();
         impl_->render_window = nullptr;

@@ -8,11 +8,11 @@
 #include <QObject>
 #include <QSignalSpy>
 #include <QTimer>
-#include <QtCore/qtpreprocessorsupport.h>
 #include <QtCore/qtypes.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <gtest/gtest.h>
+#include <qtestsupport_core.h>
 
 namespace {
 
@@ -67,6 +67,49 @@ TEST(TaskHost, InvalidSubmitRecordsStructuredError) {
     QTRY_COMPARE(host.runningTasks(), quint32{0});
 }
 
+TEST(TaskHost, IdlePollingStopsAndRestartsWithoutLosingFastCompletions) {
+    TaskHost host;
+    auto* timer = host.findChild<QTimer*>();
+    ASSERT_NE(timer, nullptr);
+    QSignalSpy polls(timer, &QTimer::timeout);
+    QSignalSpy succeeded(&host, &TaskHost::taskSucceeded);
+    QSignalSpy failed(&host, &TaskHost::taskFailed);
+
+    EXPECT_FALSE(timer->isActive());
+    EXPECT_EQ(host.submitTask(QString(), 0, false), -1);
+    QTest::qWait(60);
+    EXPECT_EQ(polls.count(), 0);
+
+    // 工作线程可在首次轮询前完成，终态仍必须被转发；空闲后可以再次启动。
+    for (int round = 0; round < 2; ++round) {
+        ASSERT_GE(host.submitTask(QStringLiteral("fast-success"), 0, false), 0);
+        ASSERT_GE(host.submitTask(QStringLiteral("fast-failure"), 0, true), 0);
+        QTRY_COMPARE(succeeded.count(), round + 1);
+        QTRY_COMPARE(failed.count(), round + 1);
+        QTRY_VERIFY(!timer->isActive());
+        EXPECT_EQ(host.runningTasks(), 0U);
+        const auto count = polls.count();
+        QTest::qWait(60);
+        EXPECT_EQ(polls.count(), count);
+    }
+}
+
+TEST(TaskHost, TerminalSignalCanSubmitTheNextTask) {
+    TaskHost host;
+    QSignalSpy succeeded(&host, &TaskHost::taskSucceeded);
+    qint64 next = -1;
+    QObject::connect(&host, &TaskHost::taskSucceeded, &host, [&](quint64) {
+        if (succeeded.count() == 1) {
+            next = host.submitTask(QStringLiteral("follow-up"), 0, false);
+        }
+    });
+    ASSERT_GE(host.submitTask(QStringLiteral("first"), 0, false), 0);
+    QTRY_COMPARE(succeeded.count(), 2);
+    EXPECT_GE(next, 0);
+    EXPECT_EQ(succeeded.at(1).at(0).toLongLong(), next);
+    QTRY_COMPARE(host.runningTasks(), 0U);
+}
+
 TEST(TaskHost, ProgressSignalsAreBoundedMonotonic) {
     TaskHost host;
     QSignalSpy progressSpy(&host, &TaskHost::taskProgress);
@@ -108,7 +151,6 @@ TEST(TaskHost, GuiThreadStaysResponsiveDuringSlowTask) {
 
     EXPECT_GE(heartbeats, 20);
     QTRY_COMPARE(host.runningTasks(), quint32{0});
-    Q_UNUSED(id);
 }
 
 } // namespace

@@ -30,11 +30,12 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     void itemChange(ItemChange change, const ItemChangeData& value) override;
 
   private:
+    void bind_window(QQuickWindow* window);
     void ensure_render_window();
     void schedule_refresh();
-    /// 平台 surface 位置/尺寸同步 + 渲染提交；尺寸未变时跳过 Render，
-    /// force_render 在重新显示等场景强制补一帧。
-    void sync_native_surface(bool force_render = false);
+    void watch_ancestors();
+    /// 排队刷新时同步原生区域，仅状态/像素尺寸改变或恢复显示时提交帧。
+    void sync_native_surface();
     void destroy_render_window();
 
     struct Impl;

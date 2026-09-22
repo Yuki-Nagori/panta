@@ -48,10 +48,11 @@ if(BUILD_TESTING)
   panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test)
 
   if(PANTA_ENABLE_BRIDGE_MODULE)
-    # 视口模块加载测试（任务 007）：只验证 QML 注册与类型可创建，渲染线程
-    # 管线不在无头环境触发（VTK 对软件 scenegraph 会显式报错，见 vtk.md）。
+    # 默认验证模块加载与条目析构；真实 GPU 生命周期用例需显式启用，
+    # 不在 offscreen 环境触发（见性能模块说明）。
     add_executable(panta_qml_viewport_module_test ../../tests/cpp/app/viewport_module_load_test.cpp)
     panta_native_defaults(panta_qml_viewport_module_test)
+    target_include_directories(panta_qml_viewport_module_test PRIVATE ../visualization/src/vtk)
     target_link_libraries(
       panta_qml_viewport_module_test PRIVATE panta::visualization panta_visualizationplugin
                                              Qt6::Gui Qt6::Qml Qt6::Test)

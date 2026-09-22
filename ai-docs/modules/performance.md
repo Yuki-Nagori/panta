@@ -21,6 +21,19 @@
 
 各工具的可复现命令、基线数字与结果解读在实施任务 048 各步骤完成时回填到本节；登记口径：命令、机器环境、构建配置（Debug/Release）、数字与日期。命令尚未落地前不在此占位假命令。
 
+## 当前 QML / 原生视口诊断
+
+任务 [056](../task/056-qml-native-review.md) 已提供按需诊断：`QT_LOGGING_RULES='panta.viewport.debug=true'` 输出原生区域同步与实际提交帧；默认关闭。`PANTA_TEST_NATIVE_VIEWPORT=1` 启用既有 `panta_qml_viewport_module_test` 中的真实窗口用例，覆盖连续更新合帧、相同外观不重绘、祖先移动、隐藏/零尺寸恢复及跨窗口重建。必须在实际桌面和正确平台插件下运行，不设 `offscreen`；默认无头测试明确跳过该用例，另行验证带窗口归属的条目析构。
+
+macOS 示例（仓库根目录，先 `cargo build --locked`）：
+
+```sh
+PANTA_TEST_NATIVE_VIEWPORT=1 QT_QPA_PLATFORM=cocoa \
+  target/native/debug/app/panta_qml_viewport_module_test
+```
+
+056 的 CPU 字样生成对比是开发侧 Release 微基准，检查生成前后的顶点、颜色及面索引完全相同；原始脚本与数据放在忽略的 `artifacts/056/`，结果及环境登记在任务中，不进入 CI 时间门禁，不用于推断应用启动时间或帧率。
+
 ## 与质量门禁的关系
 
 `cargo quality` / CI 不运行本模块任何工具；`cargo sanitize`（内存错误）与覆盖率（执行面）回答"对不对、测没测到"，本模块回答"快不快、内存峰值在哪"。启动耗时的构建侧测量（入口耗时表）登记在任务 048 验证表，不进入 CI。

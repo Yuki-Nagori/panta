@@ -90,6 +90,7 @@ ai-docs/
 | 053 | [默认视口立体 panta 字样](task/053-default-panta-wordmark.md) | 应用平台扩展 | 007 | planned |
 | 054 | [顶部折叠图标与搜索框引导](task/054-titlebar-search-details.md) | 应用平台扩展 | 052 | done |
 | 055 | [QML 组件评审与整理](task/055-qml-review-and-cleanup.md) | 应用平台扩展 | 052, 054 | done |
+| 056 | [QML 周边 C++ 简化与性能评审](task/056-qml-native-review.md) | 应用平台扩展 | 055, 007 | done |
 
 ## 验证与质量扩展队列
 

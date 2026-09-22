@@ -21,10 +21,10 @@ using panta::ffi::task_service_running;
 using panta::ffi::task_service_submit;
 } // namespace
 
-TaskHost::TaskHost(QObject* parent) : QObject(parent), m_service(task_service_new()) {
+TaskHost::TaskHost(QObject* parent)
+    : QObject(parent), m_service(task_service_new()), m_pollTimer(this) {
     m_pollTimer.setInterval(kPollIntervalMs);
     connect(&m_pollTimer, &QTimer::timeout, this, &TaskHost::poll);
-    m_pollTimer.start();
 }
 
 TaskHost::~TaskHost() = default;
@@ -37,6 +37,10 @@ qint64 TaskHost::submitTask(const QString& label, qint64 durationMs, bool fail) 
     try {
         const auto id = task_service_submit(*m_service, label.toStdString(),
                                             static_cast<std::uint64_t>(durationMs), fail);
+        m_pendingTasks.insert(id);
+        if (!m_pollTimer.isActive()) {
+            m_pollTimer.start();
+        }
         return static_cast<qint64>(id);
     } catch (const rust::Error& error) {
         const QString code = QString::fromUtf8(error.what());
@@ -60,15 +64,18 @@ void TaskHost::poll() {
             emit taskProgress(event.task_id, event.percent);
             break;
         case panta::ffi::TaskEventKind::Succeeded:
+            m_pendingTasks.remove(event.task_id);
             emit taskSucceeded(event.task_id);
             break;
         case panta::ffi::TaskEventKind::Failed:
+            m_pendingTasks.remove(event.task_id);
             emit taskFailed(
                 event.task_id,
                 QString::fromUtf8(std::string_view(event.code.data(), event.code.size())),
                 QString::fromUtf8(std::string_view(event.detail.data(), event.detail.size())));
             break;
         case panta::ffi::TaskEventKind::Cancelled:
+            m_pendingTasks.remove(event.task_id);
             emit taskCancelled(event.task_id, QString::fromUtf8(std::string_view(
                                                   event.code.data(), event.code.size())));
             break;
@@ -78,6 +85,10 @@ void TaskHost::poll() {
     if (running != m_runningTasks) {
         m_runningTasks = running;
         emit runningTasksChanged();
+    }
+    // 信号处理器可能同步提交新任务，因此必须在全部信号转发后判断。
+    if (m_pendingTasks.isEmpty()) {
+        m_pollTimer.stop();
     }
 }
 

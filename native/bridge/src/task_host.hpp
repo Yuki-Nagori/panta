@@ -4,14 +4,15 @@
 /// 契约（ui-and-bridge.md / application-and-storage.md）：
 /// - 对象归属 GUI 线程；Rust 工作线程不触碰任何 Qt 对象，事件只经
 ///   QTimer 轮询在 GUI 线程取回并发射；
-/// - 轮询定时器常开（10ms）：若按"运行为零"停表，需要在停表前证明
-///   没有事件落在运行数读取之后；常开换取无事件丢失的简单正确性；
+/// - 成功提交后以 10ms 轮询；所有已提交任务的终态均被转发后停表。
+///   不以 runningTasks == 0 停表，避免漏掉刚入队但尚未拉取的终态；
 /// - lastError 保存最近一次提交失败的结构化错误码，用户可读摘要的
 ///   本地化由 022 的语言字典承接。
 #pragma once
 
 #include "panta_ffi.h"
 #include <QObject>
+#include <QSet>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
@@ -55,6 +56,7 @@ class TaskHost : public QObject {
 
     rust::Box<panta::ffi::TaskService> m_service;
     QTimer m_pollTimer;
+    QSet<quint64> m_pendingTasks;
     quint32 m_runningTasks = 0;
     QString m_lastError;
 };

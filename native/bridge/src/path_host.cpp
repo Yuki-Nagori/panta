@@ -66,11 +66,7 @@ std::unique_ptr<PathHost> PathHost::createWithStandardRoots(const std::vector<St
         }
 
         std::string utf8;
-        QString conversionError;
-        if (!toBoundaryUtf8(root.directory, &utf8, &conversionError)) {
-            if (error != nullptr) {
-                *error = conversionError;
-            }
+        if (!toBoundaryUtf8(root.directory, &utf8, error)) {
             return nullptr;
         }
         try {
@@ -87,11 +83,7 @@ std::unique_ptr<PathHost> PathHost::createWithStandardRoots(const std::vector<St
 
 bool PathHost::setProjectRoot(const QString& root, QString* error) {
     std::string utf8;
-    QString conversionError;
-    if (!toBoundaryUtf8(root, &utf8, &conversionError)) {
-        if (error != nullptr) {
-            *error = conversionError;
-        }
+    if (!toBoundaryUtf8(root, &utf8, error)) {
         return false;
     }
     try {
@@ -109,11 +101,7 @@ QString PathHost::callResolve(const QString& reference,
                               const std::function<QString(const panta::ffi::PathRef&)>& resolver,
                               QString* error) const {
     std::string utf8;
-    QString conversionError;
-    if (!toBoundaryUtf8(reference, &utf8, &conversionError)) {
-        if (error != nullptr) {
-            *error = conversionError;
-        }
+    if (!toBoundaryUtf8(reference, &utf8, error)) {
         return {};
     }
     try {

@@ -14,6 +14,7 @@
 #include "panta_ffi.h"
 #include <QString>
 #include <QUrl>
+#include <functional>
 #include <memory>
 #include <vector>
 

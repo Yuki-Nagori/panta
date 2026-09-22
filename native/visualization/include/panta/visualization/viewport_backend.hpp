@@ -24,7 +24,7 @@ class ViewportBackend {
     /// 承载渲染的场景图条目（后端自有 QQuickItem 实现）。
     virtual QQuickItem* item() = 0;
 
-    /// GUI 线程：提交最新场景状态（含修订号）。
+    /// GUI 线程：提交最新场景状态（含修订号），同一事件轮的更新可合并为一帧。
     virtual void apply_state(const RenderScene& state) = 0;
 };
 
