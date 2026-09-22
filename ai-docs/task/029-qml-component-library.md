@@ -77,7 +77,7 @@
 - 2026-09-16：组件测试以 C++ QtTest 加载模块内 QML 资源，避免 qmltestrunner 未链接 `panta_shell` 时无法解析模块资源；测试纳入 CTest。
 - 2026-09-22：维护者指示以 050 复刻件 `homepage.html` 为设计底稿完成本任务；`:root` 设计值整体迁入 Theme 作为权威默认。
 - 2026-09-22：维护者决策图标走 SVG 资源而非 QtQuick.Shapes 逐个绘制（性能与资源化映射），为此扩展 Qt 供给三平台 qtsvg 归档（SHA256 经官方 .meta4 交叉核对，见 [dependency-acquisition](../standards/dependency-acquisition.md)）；ThemedIcon/ThemedToolButton 经模块内相对 qrc 路径取图。
-- 2026-09-22：维护者决策窗口控制不自绘、交系统标题栏（复刻件中的最小化/最大化/关闭按钮不迁移）；经查供给 Qt 6.11.2 头文件无 `QWindow::setTitleBar`，后续版本提供时由主窗口任务评估。
+- 2026-09-22：本任务交付时维护者决策窗口控制不自绘、交系统标题栏（复刻件中的最小化/最大化/关闭按钮不迁移）；经查供给 Qt 6.11.2 头文件无 `QWindow::setTitleBar`。后续无边框外观与标题栏融合由 [051](051-integrated-window-titlebar.md) 承接，评估已存在的扩展客户区 API，不以未来新增该接口为前提。
 - 2026-09-22：Shell 自绘控件要求非原生样式，主入口 `QQuickStyle::setStyle("Basic")` 固定，与 ctest 既有 `QT_QUICK_CONTROLS_STYLE=Basic` 同源。
 - 2026-09-22：工作区（左栏/分隔线/VTK 列）用 anchors 直接锚定：嵌套 Layout 默认最大尺寸为自身隐式尺寸，fillWidth 列展不开且剩余空间分派不可预期（有几何 dump 证据）。
 - 2026-09-22：维护者决定删除 `revisionCount` 标签；同步取消 shell 加载测试中该断言，修订计数行为由 bridge ViewModel 测试继续覆盖。
