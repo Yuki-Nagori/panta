@@ -11,34 +11,43 @@ ToolButton {
     property int contentPadding: Theme.spacingXSmall
     property color contentColor: Theme.colorIcon
     property color hoverColor: Theme.colorSelected
-    property url iconSource: ""
+    property color borderColor: "transparent"
+    property string iconName: ""
     property int iconSize: Theme.iconSizeDefault
     property bool showCaret: false
     // 追加在主文案后的弱化后缀（复刻件任务列表的 “...” 项）。
     property string dimText: ""
+    // 宽按钮（列表条目）内容靠左；默认在按钮内水平居中。
+    property bool contentAlignLeft: false
 
     implicitHeight: controlHeight
     leftPadding: contentPadding
     rightPadding: contentPadding
     spacing: Theme.spacingXSmall
+    // 禁用态整体弱化，配合 ToolButton 拒绝点击，让禁用原因可理解。
+    opacity: enabled ? 1 : Theme.disabledOpacity
 
     background: Rectangle {
         implicitWidth: Theme.controlHeight
-        color: button.enabled && button.hovered ? button.hoverColor : "transparent"
+        // highlighted 用 AbstractButton 内建选中态（菜单栏当前项）：白底，
+        // 不再响应悬停高亮；visualFocus 使键盘 Tab 焦点获得与悬停一致的反馈。
+        color: button.highlighted ? Theme.colorPanel : button.enabled && (button.hovered || button.visualFocus) ? button.hoverColor : "transparent"
+        border.width: button.borderColor.a > 0 ? Theme.borderWidth : 0
+        border.color: button.borderColor
         radius: Theme.radiusSmall
     }
 
     contentItem: Row {
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: button.contentAlignLeft ? parent.left : undefined
+        anchors.horizontalCenter: button.contentAlignLeft ? undefined : parent.horizontalCenter
         spacing: button.spacing
 
-        Image {
+        ThemedIcon {
             anchors.verticalCenter: parent.verticalCenter
-            visible: button.iconSource !== ""
-            source: button.iconSource
-            sourceSize: Qt.size(button.iconSize, button.iconSize)
-            width: button.iconSize
-            height: button.iconSize
-            fillMode: Image.PreserveAspectFit
+            visible: button.iconName !== ""
+            name: button.iconName
+            iconSize: button.iconSize
         }
         ThemedLabel {
             anchors.verticalCenter: parent.verticalCenter

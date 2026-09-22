@@ -14,6 +14,14 @@ set(PANTA_SHELL_QML_FILES
     Components/Atoms/ThemedToolButton.qml
     Components/Atoms/ThemedIcon.qml
     Components/Atoms/PanelSurface.qml
+    Components/Composites/ToolGroup.qml
+    Components/Composites/RibbonTile.qml
+    Components/Composites/PanelTabBar.qml
+    Components/Composites/PaneCloseButton.qml
+    Panels/TopChromePanel.qml
+    Panels/RibbonPanel.qml
+    Panels/TasksPanel.qml
+    Panels/OutputPanel.qml
     Panels/PlaceholderPanel.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)

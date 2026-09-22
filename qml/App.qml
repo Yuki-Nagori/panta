@@ -1,4 +1,8 @@
 // Shell 主窗口（qml.md：组件 PascalCase，id/属性 camelCase；状态用绑定表达）。
+// 按 050 复刻件 ai-docs/qml-html/homepage/homepage.html 拼装桌面框架：顶部
+// chrome、ribbon 启动区、左侧任务/输出面板、中央 VTK 视口与底部视图页签、
+// 状态栏。029 只装配静态骨架：caption/推进修订/错误展示保持既有 ViewModel
+// 冒烟链路，其余按钮与页签为视觉参考；窗口控制由系统标题栏承接。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -13,7 +17,7 @@ ApplicationWindow {
     visible: true
     visibility: Window.Maximized
     title: qsTr("panta")
-    color: Theme.colorBackground
+    color: Theme.colorPanel
 
     ShellViewModel {
         id: viewModel
@@ -21,43 +25,129 @@ ApplicationWindow {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Theme.spacingLarge
-        spacing: Theme.spacingMedium
+        spacing: 0
 
-        ThemedLabel {
-            objectName: "shellCaption"
+        TopChromePanel {
             Layout.fillWidth: true
-            text: viewModel.caption.length > 0 ? viewModel.caption : "panta — Desktop Skeleton (Task 005)"
-            textSize: Theme.fontTitle
+            // 重复写入同一 caption 不产生新通知（ShellViewModel 去重，测试覆盖）。
+            caption: viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
         }
 
-        ThemedToolButton {
-            objectName: "advanceRevisionButton"
-            text: "Advance Revision"
-            onClicked: viewModel.tick()
+        RibbonPanel {
+            Layout.fillWidth: true
         }
 
-        ThemedLabel {
-            objectName: "revisionCount"
-            // 重复写入同一 caption 时不产生新通知（ShellViewModel 去重，测试覆盖）。
-            text: "Revision count: " + viewModel.count
-            textColor: Theme.colorTextMuted
-        }
+        // 工作区用 anchors 直接锚定而非嵌套 Layout：嵌套 Layout 的默认最大
+        // 尺寸是自身隐式尺寸，fillWidth 列展不开，剩余空间的分派不可预期。
+        Item {
+            id: workspace
 
-        // 任务 007：VTK WebGPU 原生 surface 宿主；VTK 不进入 Qt Quick scenegraph。
-        CaeViewport {
-            objectName: "caeViewport"
             Layout.fillWidth: true
             Layout.fillHeight: true
+
+            ColumnLayout {
+                id: leftColumn
+
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                // 栏宽取工作区宽的比例，下限 leftPanelMinimumWidth；锚定工作区
+                // 宽而非自身宽，避免首选宽与分配宽互相依赖成绑定环。
+                width: Math.max(workspace.width * Theme.leftPanelRatio, Theme.leftPanelMinimumWidth)
+                spacing: 0
+
+                TasksPanel {
+                    id: tasksPanel
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    onCloseRequested: tasksPanel.visible = false
+                    onAdvanceRevisionTriggered: viewModel.tick()
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.borderWidth
+                    color: Theme.colorPanelLine
+                }
+
+                OutputPanel {
+                    id: outputPanel
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: leftColumn.height * Theme.outputPanelRatio
+                    errorText: viewModel.error
+                    onCloseRequested: outputPanel.visible = false
+                }
+            }
+
+            Rectangle {
+                id: workspaceSplit
+
+                anchors.left: leftColumn.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: Theme.borderWidth
+                color: Theme.colorPanelLine
+            }
+
+            ColumnLayout {
+                anchors.left: workspaceSplit.right
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                spacing: 0
+
+                // 中央 VTK 显示区：任务 007 的原生 surface 宿主；VTK 不进入
+                // Qt Quick scenegraph。视图切换页签暂为视觉参考。
+                Item {
+                    id: vtkPane
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    CaeViewport {
+                        objectName: "caeViewport"
+                        anchors.fill: parent
+                    }
+
+                    PaneCloseButton {
+                        onCloseRequested: vtkPane.visible = false
+                    }
+                }
+
+                PanelTabBar {
+                    Layout.fillWidth: true
+                    edge: Qt.BottomEdge
+                    tabs: [qsTr("模型"), qsTr("网格"), qsTr("结果")]
+                }
+            }
         }
 
-        // 错误展示入口：ViewModel 的用户可读摘要（详细诊断走日志，qt.md）。
-        ThemedLabel {
+        // 状态栏（复刻件 .statusbar）：就绪状态与冒烟命令的修订计数。
+        Rectangle {
             Layout.fillWidth: true
-            visible: viewModel.error.length > 0
-            text: viewModel.error
-            textColor: Theme.colorError
-            wrapMode: Text.Wrap
+            Layout.preferredHeight: Theme.statusbarHeight
+            color: Theme.colorStatus
+
+            Rectangle {
+                anchors.top: parent.top
+                width: parent.width
+                height: Theme.borderWidth
+                color: Theme.colorChromeLine
+            }
+
+            Row {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Theme.spacingStrip
+
+                ThemedLabel {
+                    text: qsTr("就绪")
+                    textSize: Theme.fontSmall
+                    textColor: Theme.colorTextMuted
+                }
+            }
         }
     }
 }

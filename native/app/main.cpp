@@ -11,6 +11,7 @@
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QtCore/qnamespace.h>
+#include <QtQuickControls2/qquickstyle.h>
 #include <panta/foundation/version.hpp>
 #include <rust/cxx.h>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
@@ -65,6 +66,10 @@ int main(int argc, char* argv[]) {
     }
 
     const QGuiApplication app(argc, argv);
+
+    // Shell 自绘控件（ThemedToolButton 背景等）依赖非原生样式（qml.md：
+    // 定制需 Basic/Fusion 等）；固定 Basic 保证三平台观感一致，测试同源。
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     QQmlApplicationEngine engine;
     QObject::connect(

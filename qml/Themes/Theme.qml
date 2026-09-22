@@ -25,6 +25,8 @@ QtObject {
     readonly property color colorMenubarHover: "#454545"
     readonly property color colorToolGroupTop: "#b0b0b0"
     readonly property color colorToolGroupBottom: "#666666"
+    readonly property color colorRibbonTop: "#e1e1e1"
+    readonly property color colorRibbonBottom: "#919191"
     readonly property color colorCloseHover: "#e81123"
 
     // 字号 token（--font-size-*，逻辑像素）
@@ -47,6 +49,7 @@ QtObject {
     readonly property int statusbarHeight: 26
     readonly property int controlHeight: 24
     readonly property int searchHeight: 22
+    readonly property int searchFieldWidth: 200
     readonly property int toolbarButtonWidth: 24
     readonly property int toolbarButtonHeight: 22
     readonly property int iconSizeSmall: 13
@@ -64,6 +67,8 @@ QtObject {
     readonly property int radiusSmall: 3
     readonly property int radiusLarge: 4
     readonly property int borderWidth: 1
+    // 禁用态整体弱化透明度（qml.md：禁用原因可理解）
+    readonly property real disabledOpacity: 0.4
 
     readonly property int windowMinimumWidth: 640
     readonly property int windowMinimumHeight: 480

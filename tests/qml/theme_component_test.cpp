@@ -80,6 +80,18 @@ class ThemeComponentTest final : public QObject {
                  QColor(QStringLiteral("#4a4a4a")));
     }
 
+    void disabled_state_is_visibly_weakened() {
+        QQmlEngine engine;
+        QObject owner;
+        QObject* button = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedToolButton.qml"),
+            owner);
+        QVERIFY(button != nullptr);
+        QCOMPARE(button->property("opacity").toDouble(), 1.0);
+        button->setProperty("enabled", false);
+        QCOMPARE(button->property("opacity").toDouble(), 0.4);
+    }
+
     void icon_resolves_module_resource() {
         QQmlEngine engine;
         QObject owner;
