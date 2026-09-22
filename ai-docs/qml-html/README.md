@@ -23,4 +23,7 @@ QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每�
   区域），迁移时映射为对应 QML 元素。
 
 样例：[homepage/homepage.html](homepage/homepage.html)（panta 桌面主窗口 GUI
-框架：标题工具条/菜单栏/ribbon/左面板/内嵌网页区留空/状态栏）。
+框架：标题工具条/菜单栏/ribbon/左面板/内嵌网页区留空/状态栏）。该样例已于
+任务 029 按 `:root` 设计值迁移为 QML（`qml/App.qml` 与面板组件，见
+[组件库与主题 DSL](../modules/qml-components-and-theme.md)），复刻件保留为
+设计档案。

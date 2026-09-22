@@ -1,12 +1,12 @@
-# 原子组件库、Theme 与主题 DSL（规划）
+# 原子组件库、Theme 与主题 DSL（029 已落地组件层；DSL 为 030 规划）
 
 [模块导航](README.md) · [QML 规范](../standards/qml.md) · [029 组件库](../task/029-qml-component-library.md) · [030 主题切换](../task/030-theme-dsl.md)
 
 ## 当前状态与目标
 
-现存 `qml/Themes/Theme.qml` 是颜色、间距和字号的唯一 QML 门面；当前尺寸默认值仍内置在这个单例中，完整的 `.pa` 供给与运行期切换尚未实现。沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定；用户所说的 theme.qml 即此统一入口，不再新增第二份同名不同大小写的文件。
+`qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认值即 050 复刻件 homepage.html 的 `:root` 设计 token（029 迁入）；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，运行期默认值迁 `.pa` 与切换由 030 的 C++ ThemeViewModel 发布，Theme 属性名即稳定契约。
 
-目标是把 UI 拆成职责单一、可独立展示的原子组件，再组合成控件组、业务面板和页面。所有可配置视觉尺寸经变量传递，QML 侧只从 Theme 获取默认值；默认值迁移到 `.pa` 后，Theme.qml 仍保留稳定属性名，作为 QML 唯一入口。
+029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。
 
 ## 页面设计工作流：HTML 先行复刻
 
@@ -17,27 +17,48 @@
 token，占位图映射 Image 元素。这样把视觉迭代与 QML 实现解耦，效率最高。复刻件
 是文档参考资产，不进 QML 构建图；约定与边界见
 [`../qml-html/README.md`](../qml-html/README.md)，首个样例为
-panta 仿真社区门户首页（任务 050）。
+panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 ## 组件分层与输入输出
 
-| 层次 | 规划位置 | 职责 |
+| 层次 | 位置 | 组件 |
 |---|---|---|
-| 主题契约 | 现存 `qml/Themes/Theme.qml` | 唯一 QML token 门面，提供颜色、尺寸、字号等只读绑定 |
-| 原子组件 | `qml/Components/Atoms/`（规划） | 按钮、文本、图标、分隔线等基础能力，无业务服务依赖 |
-| 组合组件 | `qml/Components/Composites/`（规划） | 拼装属性行、工具栏组等，通过属性与信号协作 |
-| 业务面板 | 现存 `qml/Panels/` | 注入 ViewModel，把语义事件转为命令 |
-| 页面与外壳 | 现存 `qml/App.qml`，按需新增页面 | 布局、导航、面板装配与主题选择入口 |
+| 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
+| 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedIcon`（模块内 SVG）、`PanelSurface` |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`PanelTabBar`（顶/底两态页签）、`PaneCloseButton` |
+| 业务面板 | `qml/Panels/` | `TopChromePanel`、`RibbonPanel`、`TasksPanel`、`OutputPanel`、`PlaceholderPanel`（无 Bridge 变体用） |
+| 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |
 
 组件可以封装 Qt Quick Controls，保留其焦点、键盘、禁用与可访问性行为；不为了“原子化”重新实现所有底层控件。避免为单次无独立职责的布局建立空壳组件。只提取当前界面实际使用的组件，不预建无用途库。
 
-原子/组合组件公开语义清楚的属性与信号，例如 label、iconSource、controlHeight、horizontalPadding、activated。尺寸属性默认绑定 Theme token，调用方可通过属性覆盖；组合组件向内部原子组件显式传入参数，不依赖父级 id、parent 链或隐式全局业务状态。不用 imperative 赋值覆盖 token 绑定，保证换主题后未覆盖值能继续更新。
+原子/组合组件公开语义清楚的属性与信号，例如 label、iconName、controlHeight、contentPadding、advanceRevisionTriggered。尺寸属性默认绑定 Theme token，调用方可通过属性覆盖；组合组件向内部原子组件显式传入参数，不依赖父级 id、parent 链或隐式全局业务状态。不用 imperative 赋值覆盖 token 绑定，保证换主题后未覆盖值能继续更新。
 
-组件默认宽高通过内容及输入参数计算 implicit size，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。点击仅发语义信号，面板再调用 ViewModel。
+组件默认宽高通过内容及输入参数计算 implicit size，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。跨区块的工作区框架（左栏/分隔线/VTK 列）用 anchors 直接锚定：嵌套 Layout 的默认最大尺寸是自身隐式尺寸，fillWidth 列展不开且剩余空间分派不可预期（029 有几何 dump 证据）。点击仅发语义信号，面板再调用 ViewModel。
+
+Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
+
+图标为模块内 SVG 资源（`qml/icons/`，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`），由 Qt 供给的 qtsvg（qsvg 图像格式插件）渲染；颜色固定在资源内，主题化图标资源待 030 后评估。
+
+布局取证（`tests/cpp/app/shell_module_load_test.cpp`，029 起常驻）：环境变量
+`PANTA_SHELL_CAPTURE_PATH` 指向目标 PNG 时保存 Shell 首帧渲染，
+`PANTA_SHELL_DUMP_GEOMETRY` 置非空时打印内容树前三层几何；ctest 默认不设置、
+无副作用。排查布局时的示例如下（仓库根目录，先 `cargo build --locked`；
+`QT_SCALE_FACTOR` 可模拟不同 DPR）：
+
+```sh
+STAGING=target/panta-deps/qt/staging
+QT_QPA_PLATFORM=offscreen \
+QT_PLUGIN_PATH="$PWD/$STAGING/plugins" \
+QML_IMPORT_PATH="$PWD/$STAGING/qml" \
+PANTA_SHELL_CAPTURE_PATH=/tmp/panta-shell.png \
+PANTA_SHELL_DUMP_GEOMETRY=1 \
+QT_SCALE_FACTOR=1.5 \
+  target/native/debug/app/panta_qml_shell_module_test
+```
 
 ## 尺寸集中化规则
 
-Theme 集中管理 spacing、padding、margin、radius、borderWidth、iconSize、fontSize、controlHeight、panelMinimumWidth、windowMinimumSize 等可配置视觉值。采用语义 token，例如 `controlHeight`，而不是在各组件重复相同数值；当前 spacingSmall 等已有名称可以在 029 统一梳理。
+Theme 集中管理 spacing、padding、radius、borderWidth、iconSize、fontSize、controlHeight、条带高度（titlebar/menubar/ribbon/statusbar）、leftPanelRatio/MinimumWidth、outputPanelRatio、windowMinimumSize 等可配置视觉值。采用语义 token，例如 `controlHeight`，而不是在各组件重复相同数值。
 
 所有视觉尺寸默认值只在 Theme 的权威默认配置中定义；组件声明输入属性绑定 token，面板若覆盖也应传 Theme token 或根据可用空间计算的值，不另写视觉魔法数字。`0`（无间距）、比例/计数等纯算法常量可以保留，但有视觉设计含义的非零偏移也必须使用 token。width/height 的父布局绑定和内容测量不应改成固定主题尺寸。
 
