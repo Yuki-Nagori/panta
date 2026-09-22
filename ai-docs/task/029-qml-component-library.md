@@ -66,6 +66,7 @@
 | 2026-09-22 | `PANTA_SHELL_CAPTURE_PATH=…` 离屏抓帧，QT_SCALE_FACTOR=1.0 与 1.5 各一帧 | 两帧与 050 复刻件区块结构一致（顶部 chrome/ribbon/任务与输出面板/VTK 视口与底部页签/状态栏）；1.5 缩放图标清晰、无布局错乱；800px 窄窗口下居中标题按 elide 收敛不与搜索框重叠 |
 | 2026-09-22 | 布局诊断（`PANTA_SHELL_DUMP_GEOMETRY=1`） | 发现嵌套 Layout 默认最大宽为隐式宽导致 fillWidth 列展不开、剩余空间错派给左栏；工作区改 anchors 锚定后左栏恢复 `max(26%, 320px)` |
 | 2026-09-22 | 文案英文化 + 字典同步后 `cargo build`、ctest、离屏抓帧 | `.pa` 解析与 TS/QM 生成通过；`I18n.CompiledQmLoads` 更新为按组件上下文断言（App/TopChromePanel/RibbonPanel/ViewportPane）；49/49 通过；抓帧确认全部显示文本为英文，zh-CN 译文经 QM 查找断言 |
+| 2026-09-22 | 维护者微调：ToolGroup 去除左右留白，激活动图与 split 箭头移入 ToolGroup 并加结构包裹（分隔线），`cargo build` + ctest 49/49 + 离屏抓帧确认 |
 
 ## 风险与回退
 

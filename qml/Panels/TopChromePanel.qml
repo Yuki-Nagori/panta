@@ -72,19 +72,32 @@ Rectangle {
                         iconName: "animation-preview"
                         showCaret: true
                     }
-                }
 
-                ThemedToolButton {
-                    text: qsTr("Activate Animation (A)")
-                    showCaret: true
-                    contentColor: Theme.colorText
-                    contentPadding: Theme.spacingSmall
-                    borderColor: Theme.colorPanelLine
-                }
+                    // 激活动图与分屏箭头的结构包裹（复刻件 .activate + .split，
+                    // split 前有细分隔线）。
+                    Row {
+                        spacing: Theme.spacingXSmall
 
-                ThemedIcon {
-                    name: "activate-split"
-                    iconSize: Theme.iconSizeSmall
+                        ThemedToolButton {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: qsTr("Activate Animation (A)")
+                            showCaret: true
+                            contentColor: Theme.colorText
+                            contentPadding: Theme.spacingSmall
+                            borderColor: Theme.colorPanelLine
+                        }
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Theme.borderWidth
+                            height: Theme.iconSizeSmall
+                            color: Theme.colorPanelLine
+                        }
+                        ThemedIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "activate-split"
+                            iconSize: Theme.iconSizeSmall
+                        }
+                    }
                 }
 
                 ThemedLabel {

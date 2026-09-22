@@ -8,7 +8,7 @@ Rectangle {
     default property alias content: row.data
 
     implicitHeight: Theme.titlebarHeight
-    implicitWidth: row.implicitWidth + 2 * Theme.spacingSmall
+    implicitWidth: row.implicitWidth
     radius: Theme.radiusLarge
     border.width: Theme.borderWidth
     border.color: Theme.colorPanelLine
@@ -26,7 +26,8 @@ Rectangle {
     Row {
         id: row
 
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.spacingSmall
     }
 }
