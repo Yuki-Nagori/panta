@@ -8,8 +8,13 @@ set_source_files_properties(Themes/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TR
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
 
 set(PANTA_SHELL_QML_FILES
-    App.qml Themes/Theme.qml Components/Atoms/ThemedLabel.qml Components/Atoms/ThemedButton.qml
-    Components/Atoms/PanelSurface.qml Panels/PlaceholderPanel.qml)
+    App.qml
+    Themes/Theme.qml
+    Components/Atoms/ThemedLabel.qml
+    Components/Atoms/ThemedToolButton.qml
+    Components/Atoms/ThemedIcon.qml
+    Components/Atoms/PanelSurface.qml
+    Panels/PlaceholderPanel.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)
@@ -45,6 +50,16 @@ qt_add_qml_module(
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
 panta_native_defaults(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
+
+# 029 图标占位资源：ThemedIcon/ThemedToolButton 以模块内相对 qrc 路径解析
+# （/qt/qml/Panta/Shell/icons/）；SVG 渲染由 qtsvg 供给的 qsvg 图像格式
+# 插件承担（qt-provision.cmake）。CONFIGURE_DEPENDS 使新增图标免于手动登记。
+file(
+  GLOB PANTA_SHELL_ICON_FILES CONFIGURE_DEPENDS
+  RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/icons/*.svg")
+qt_add_resources(panta_shell "panta_shell_icons" PREFIX "/qt/qml/Panta/Shell" FILES
+                 ${PANTA_SHELL_ICON_FILES})
 
 if(BUILD_TESTING)
   add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)

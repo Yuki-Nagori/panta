@@ -31,7 +31,7 @@ ApplicationWindow {
             textSize: Theme.fontTitle
         }
 
-        ThemedButton {
+        ThemedToolButton {
             objectName: "advanceRevisionButton"
             text: "Advance Revision"
             onClicked: viewModel.tick()
