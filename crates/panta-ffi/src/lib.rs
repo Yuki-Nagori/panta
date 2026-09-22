@@ -528,10 +528,14 @@ mod tests {
     use super::{
         FfiRequest, FfiResponse, MAX_LABEL_BYTES, bridge, panic_probe, path_ref_parse,
         path_service_new, path_service_resolve, path_service_resolve_existing,
-        path_service_resolve_write_target, path_service_set_root, process, session_close,
-        session_create, session_label, session_live_count, task_service_cancel, task_service_drain,
-        task_service_new, task_service_recent_logs, task_service_running, task_service_submit,
+        path_service_resolve_write_target, path_service_set_root, process, project_service_create,
+        project_service_current, project_service_execute, project_service_new,
+        project_service_open, project_service_save, session_close, session_create, session_label,
+        session_live_count, task_service_cancel, task_service_drain, task_service_new,
+        task_service_recent_logs, task_service_running, task_service_submit,
     };
+    use std::fs;
+    use std::path::PathBuf;
     use std::sync::{Mutex, MutexGuard};
 
     /// 存活计数是进程级共享状态；触碰它的测试先取锁串行化，避免并行互扰。
@@ -850,6 +854,88 @@ mod tests {
         std::fs::write(&target, b"pa")?;
         path_service_resolve_existing(&service, &reference)?;
         let _ = std::fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn project_service_bridge_maps_snapshots_and_errors() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let root = std::env::temp_dir().join(format!("panta-ffi-project-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+
+        let mut service = project_service_new();
+        let no_project = match project_service_current(&service) {
+            Ok(snapshot) => panic!("empty service returned {}", snapshot.name),
+            Err(error) => error,
+        };
+        assert_eq!(no_project, "project.no_project");
+
+        let create_error =
+            match project_service_create(&mut service, "relative".to_owned(), "Demo".to_owned()) {
+                Ok(snapshot) => panic!("relative project created at {}", snapshot.path),
+                Err(error) => error,
+            };
+        assert_eq!(create_error, "project.location_not_absolute: relative");
+        let save_error = match project_service_save(&mut service) {
+            Ok(snapshot) => panic!("empty service saved {}", snapshot.name),
+            Err(error) => error,
+        };
+        assert_eq!(save_error, "project.no_project");
+
+        let created =
+            project_service_create(&mut service, root.display().to_string(), "Demo".to_owned())?;
+        assert_eq!(created.name, "Demo");
+        assert!(!created.dirty);
+        let current = project_service_current(&service)?;
+        assert_eq!(current.path, created.path);
+        assert_eq!(current.name, "Demo");
+
+        let changed = project_service_execute(
+            &mut service,
+            bridge::ProjectCommand {
+                kind: bridge::ProjectCommandKind::Rename,
+                value: "Renamed".to_owned(),
+            },
+        )?;
+        assert_eq!(changed.name, "Renamed");
+        assert!(changed.dirty);
+
+        let saved = project_service_save(&mut service)?;
+        assert_eq!(saved.revision, 1);
+        assert!(!saved.dirty);
+        let unchanged = match project_service_execute(
+            &mut service,
+            bridge::ProjectCommand {
+                kind: bridge::ProjectCommandKind::Rename,
+                value: "Renamed".to_owned(),
+            },
+        ) {
+            Ok(snapshot) => panic!(
+                "unchanged rename succeeded at revision {}",
+                snapshot.revision
+            ),
+            Err(error) => error,
+        };
+        assert_eq!(unchanged, "project.command_invalid: name is unchanged");
+
+        let mut reopened = project_service_new();
+        let opened = project_service_open(&mut reopened, created.path.clone())?;
+        assert_eq!(opened.name, "Renamed");
+        assert_eq!(opened.revision, 1);
+        let invalid_file = PathBuf::from(&created.path).with_extension("json");
+        fs::write(&invalid_file, br#"{}"#)?;
+        let invalid_file_error =
+            match project_service_open(&mut reopened, invalid_file.display().to_string()) {
+                Ok(snapshot) => panic!("non-panta file opened as {}", snapshot.name),
+                Err(error) => error,
+            };
+        assert_eq!(
+            invalid_file_error,
+            format!("project.invalid_file: {}", invalid_file.display())
+        );
+
+        let _ = fs::remove_dir_all(&root);
         Ok(())
     }
 }

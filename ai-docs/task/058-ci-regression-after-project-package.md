@@ -20,7 +20,7 @@
 
 ## 范围与非目标
 
-范围：补齐项目 service 的可达行为测试以满足现有 Rust 覆盖率门槛；修正标题栏在布局内容增长和窗口收窄时的焦点可见性/几何保证；格式化新增 C++ 测试文件并复跑相关门禁。
+范围：补齐项目 service 的可达行为测试以满足现有 Rust 覆盖率门槛；修正标题栏在布局内容增长和窗口收窄时的焦点可见性/几何保证；格式化新增 C++ 测试文件、CMake 和 QML，并复跑相关门禁。
 
 非目标：不降低覆盖率阈值，不排除项目 service 源文件，不改变项目包协议、用户可见命令或 sanitizer 矩阵，不顺手重构无关 QML。
 
@@ -34,8 +34,10 @@
 ## 预计改动
 
 - `crates/panta-core/src/project.rs`：补充项目服务行为测试。
+- `crates/panta-ffi/src/lib.rs`：补充项目 service FFI 桥接快照、错误和保存/打开路径测试。
 - `qml/Panels/TopChromePanel.qml` 或对应 shell 布局：修复搜索焦点可见性。
 - `tests/cpp/bridge/project_view_model_test.cpp`：clang-format 排版。
+- `tests/cpp/i18n/qm_load_test.cpp`、`native/CMakeLists.txt`、`native/app/CMakeLists.txt`：按仓库使用的格式工具修正排版。
 - 本任务与索引：记录根因、验证和最终状态。
 
 ## 清理与兼容例外
@@ -55,15 +57,19 @@
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
 | 2026-09-22 | GitHub Actions run `35709245866`（提交 `cd032d2`） | format、macOS sanitizer、Rust coverage 失败；其余 job 通过。 |
-| 2026-09-22 | `cargo fmt --all`、`git diff --check` | 通过；C++ 格式、QML 焦点滚动和 Rust 覆盖率测试改动已整理。 |
+| 2026-09-22 | `cargo format --check`、`git diff --check` | 通过；Rust、C++、CMake、QML 聚合格式检查通过。 |
 | 2026-09-22 | `cargo build --locked --jobs 1 --verbose` | 阻塞于本机 `proc-macro2` build script 的 macOS 动态加载阶段，未进入项目测试；已停止进程并重建 Cargo global cache。 |
-| — | Rust 项目测试、覆盖率、native/sanitizer 相关入口 | 待本地环境恢复后验证 |
-| — | 修复提交后的 main CI | 待 push 后回填 |
+| 2026-09-22 | `cargo coverage` | 通过；functions `89.46%`、lines `94.21%`，高于 `89%` / `92%` 门禁。 |
+| 2026-09-22 | `cargo check --locked --workspace --all-targets`、`cargo build --locked --workspace`、`cargo run --locked --package panta-tests -- toolchain` | 通过；复用现有 `target/` 中的 LLVM、CMake、Ninja 和 Qt 工具链。 |
+| 2026-09-22 | `cargo test --locked --workspace` | 通过；native 54/54、QML 格式和模块加载测试，以及 Rust/doc tests 全部通过。首次运行的 `Visualization.DefaultWordmark` 超时在重跑中通过，未修改超时配置。 |
+| 2026-09-22 | GitHub Actions run `35712220845` | 该次仍对应修复提交前状态，失败项为 QML/C++/CMake 格式和覆盖率；上述本地修复已覆盖这些失败原因，待新提交触发 CI 后回填。 |
 
 ## 决策与工作记录
 
 - 2026-09-22：创建任务。CI 失败根因已由真实日志固定：`project_view_model_test.cpp:30` clang-format；`project.rs` 将 Rust coverage 降至 functions 84.06% / lines 90.28%；macOS `Qml.ShellModuleLoads` 的搜索框右边界断言失败。
 - 2026-09-22：补齐 `ProjectService` 错误路径和清单边界测试，延迟两轮标题栏焦点可见性计算，并修正 C++ 测试格式；本地构建阻塞点确认在 `proc-macro2` build script 启动，而非项目代码或 Qt 依赖。
+- 2026-09-22：补充 `panta-ffi` 项目 service 桥接测试，使覆盖率恢复至门禁以上；按仓库实际 formatter 修正 QML、CMake 和 C++ 排版。
+- 2026-09-22：本地完整验证通过；覆盖率使用已有 `target/llvm-cov-target`，未新增 LLVM target 目录。
 
 ## 完成摘要
 

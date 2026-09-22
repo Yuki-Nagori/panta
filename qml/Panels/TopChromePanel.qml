@@ -71,7 +71,9 @@ Rectangle {
                 // second pass so a newly wider quick-action group cannot leave a focused search
                 // field beyond the visible strip.
                 function scheduleEnsureFocusedVisible() {
-                    Qt.callLater(function() { Qt.callLater(ensureFocusedVisible); });
+                    Qt.callLater(function () {
+                        Qt.callLater(ensureFocusedVisible);
+                    });
                 }
                 onWidthChanged: scheduleEnsureFocusedVisible()
                 onContentWidthChanged: scheduleEnsureFocusedVisible()

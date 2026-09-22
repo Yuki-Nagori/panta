@@ -39,8 +39,14 @@ if(BUILD_TESTING)
   add_executable(panta_qml_shell_module_test ../../tests/cpp/app/shell_module_load_test.cpp)
   panta_native_defaults(panta_qml_shell_module_test)
   target_link_libraries(
-    panta_qml_shell_module_test PRIVATE panta::shell Qt6::Gui Qt6::Qml Qt6::Quick
-                                        Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Test)
+    panta_qml_shell_module_test
+    PRIVATE panta::shell
+            Qt6::Gui
+            Qt6::Qml
+            Qt6::Quick
+            Qt6::QuickControls2
+            Qt6::QuickDialogs2
+            Qt6::Test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
     target_link_libraries(panta_qml_shell_module_test
                           PRIVATE panta::visualization panta_bridgeplugin panta_visualizationplugin)

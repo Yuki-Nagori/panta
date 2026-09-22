@@ -29,7 +29,8 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QCOMPARE(translator.translate("NewProjectDialog", "Create New Project"),
              QStringLiteral("新建工程"));
     QCOMPARE(translator.translate("NewProjectDialog", "Browse"), QStringLiteral("浏览"));
-    QCOMPARE(translator.translate("IconActionOpenProject", "Open Project"), QStringLiteral("打开工程"));
+    QCOMPARE(translator.translate("IconActionOpenProject", "Open Project"),
+             QStringLiteral("打开工程"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {
