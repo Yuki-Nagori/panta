@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQml
 
 Rectangle {
     id: chrome
@@ -66,12 +67,18 @@ Rectangle {
                     const desired = point.x < contentX ? point.x : Math.max(contentX, point.x + focused.width - width);
                     contentX = Math.max(0, Math.min(desired, contentWidth - width));
                 }
-                onWidthChanged: Qt.callLater(ensureFocusedVisible)
-                onContentWidthChanged: Qt.callLater(ensureFocusedVisible)
+                // RowLayout updates child positions after its width binding settles. Queue a
+                // second pass so a newly wider quick-action group cannot leave a focused search
+                // field beyond the visible strip.
+                function scheduleEnsureFocusedVisible() {
+                    Qt.callLater(function() { Qt.callLater(ensureFocusedVisible); });
+                }
+                onWidthChanged: scheduleEnsureFocusedVisible()
+                onContentWidthChanged: scheduleEnsureFocusedVisible()
                 Connections {
                     target: chrome.Window.window
                     function onActiveFocusItemChanged() {
-                        Qt.callLater(titleStrip.ensureFocusedVisible);
+                        titleStrip.scheduleEnsureFocusedVisible();
                     }
                 }
 

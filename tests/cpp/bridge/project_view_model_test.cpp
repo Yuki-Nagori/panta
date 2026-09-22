@@ -27,7 +27,8 @@ TEST(ProjectViewModelTest, CreatesOpensRenamesAndSavesThroughRustService) {
     EXPECT_FALSE(view_model.dirty());
 
     const QString project_path = view_model.currentPath();
-    EXPECT_TRUE(QDir::fromNativeSeparators(project_path).endsWith(QStringLiteral("/Demo/Demo.panta")));
+    EXPECT_TRUE(
+        QDir::fromNativeSeparators(project_path).endsWith(QStringLiteral("/Demo/Demo.panta")));
     EXPECT_TRUE(QFile::exists(project_path));
     EXPECT_TRUE(view_model.renameProject(QStringLiteral("Renamed")));
     EXPECT_TRUE(view_model.dirty());

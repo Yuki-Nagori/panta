@@ -317,7 +317,7 @@ fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
 mod tests {
     use super::{PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError, ProjectService};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct Fixture {
@@ -433,5 +433,208 @@ mod tests {
         };
         assert!(matches!(error, ProjectError::InvalidFile(_)));
         Ok(())
+    }
+
+    #[test]
+    fn reports_empty_or_relative_locations_and_missing_project_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut service = ProjectService::new();
+        assert!(matches!(service.current(), Err(ProjectError::NoProject)));
+        assert!(matches!(service.save(), Err(ProjectError::NoProject)));
+        assert!(matches!(
+            service.execute(ProjectCommand::Rename {
+                name: "Demo".to_owned(),
+            }),
+            Err(ProjectError::NoProject)
+        ));
+
+        assert!(matches!(
+            service.create(Path::new(""), "Demo"),
+            Err(ProjectError::LocationEmpty)
+        ));
+        assert!(matches!(
+            service.create(Path::new("relative"), "Demo"),
+            Err(ProjectError::LocationNotAbsolute(_))
+        ));
+
+        let fixture = Fixture::new()?;
+        let file_location = fixture.root.join("location-file");
+        fs::write(&file_location, b"not a directory")?;
+        assert!(matches!(
+            service.create(&file_location, "Demo"),
+            Err(ProjectError::LocationCreateFailed(_))
+        ));
+        assert!(matches!(
+            service.create(&file_location.join("child"), "Demo"),
+            Err(ProjectError::LocationCreateFailed(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn validates_platform_names_and_command_failures() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = Fixture::new()?;
+        let mut service = ProjectService::new();
+        let mut invalid_names = vec![
+            ".".to_owned(),
+            "..".to_owned(),
+            "bad/child".to_owned(),
+            r"bad\child".to_owned(),
+            "bad:child".to_owned(),
+            "trailing.".to_owned(),
+            "trailing ".to_owned(),
+            "Demo.PANTA".to_owned(),
+            "CON.txt".to_owned(),
+            "LPT9.log".to_owned(),
+            "line\nfeed".to_owned(),
+        ];
+        invalid_names.push("x".repeat(256));
+        for name in invalid_names {
+            assert!(matches!(
+                service.create(&fixture.root, &name),
+                Err(ProjectError::InvalidName(_))
+            ));
+        }
+
+        let created = service.create(&fixture.root, "Demo.v1")?;
+        assert_eq!(service.current()?, created);
+        assert!(matches!(
+            service.execute(ProjectCommand::Rename {
+                name: "Demo.v1".to_owned(),
+            }),
+            Err(ProjectError::CommandInvalid(_))
+        ));
+        assert!(matches!(
+            service.execute(ProjectCommand::Rename {
+                name: "bad/name".to_owned(),
+            }),
+            Err(ProjectError::InvalidName(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn opens_invalid_manifests_and_accepts_case_insensitive_extension()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = Fixture::new()?;
+        let project = fixture.root.join("Demo");
+        fs::create_dir_all(&project)?;
+
+        let mut service = ProjectService::new();
+        assert!(matches!(
+            service.open(Path::new("relative.panta")),
+            Err(ProjectError::FileMissing(_))
+        ));
+        assert!(matches!(
+            service.open(&fixture.root.join("missing.panta")),
+            Err(ProjectError::FileMissing(_))
+        ));
+        let directory_with_extension = project.join("directory.panta");
+        fs::create_dir(&directory_with_extension)?;
+        assert!(matches!(
+            service.open(&directory_with_extension),
+            Err(ProjectError::FileMissing(_))
+        ));
+
+        let malformed = project.join("malformed.panta");
+        fs::write(&malformed, b"not json")?;
+        assert!(matches!(
+            service.open(&malformed),
+            Err(ProjectError::ManifestInvalid(_))
+        ));
+
+        let invalid_name = project.join("invalid-name.panta");
+        fs::write(
+            &invalid_name,
+            br#"{"schema":1,"name":"bad/name","revision":0}"#,
+        )?;
+        assert!(matches!(
+            service.open(&invalid_name),
+            Err(ProjectError::InvalidName(_))
+        ));
+
+        let uppercase = project.join("Upper.PANTA");
+        fs::write(&uppercase, br#"{"schema":1,"name":"Upper","revision":2}"#)?;
+        let opened = service.open(&uppercase)?;
+        assert_eq!(opened.name, "Upper");
+        assert_eq!(opened.revision, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn handles_manifest_revision_limits_and_save_io_failures()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = Fixture::new()?;
+        let project = fixture.root.join("Max");
+        fs::create_dir_all(&project)?;
+        let project_file = project.join("Max.panta");
+        fs::write(
+            &project_file,
+            format!(
+                r#"{{"schema":{},"name":"Max","revision":{}}}"#,
+                PROJECT_SCHEMA_VERSION,
+                u64::MAX
+            ),
+        )?;
+        let mut service = ProjectService::new();
+        service.open(&project_file)?;
+        let snapshot = service.execute(ProjectCommand::Rename {
+            name: "MaxRenamed".to_owned(),
+        })?;
+        assert_eq!(snapshot.revision, u64::MAX);
+
+        fs::remove_file(&project_file)?;
+        fs::create_dir(&project_file)?;
+        assert!(matches!(service.save(), Err(ProjectError::Io(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn error_display_uses_stable_codes_and_details() {
+        let errors = [
+            (ProjectError::EmptyName, "project.empty_name"),
+            (
+                ProjectError::InvalidName("bad".to_owned()),
+                "project.invalid_name: bad",
+            ),
+            (ProjectError::LocationEmpty, "project.location_empty"),
+            (
+                ProjectError::LocationNotAbsolute("relative".to_owned()),
+                "project.location_not_absolute: relative",
+            ),
+            (
+                ProjectError::LocationCreateFailed("location".to_owned()),
+                "project.location_create_failed: location",
+            ),
+            (
+                ProjectError::FileMissing("missing".to_owned()),
+                "project.file_missing: missing",
+            ),
+            (
+                ProjectError::InvalidFile("file".to_owned()),
+                "project.invalid_file: file",
+            ),
+            (
+                ProjectError::AlreadyExists("existing".to_owned()),
+                "project.already_exists: existing",
+            ),
+            (
+                ProjectError::ManifestInvalid("manifest".to_owned()),
+                "project.manifest_invalid: manifest",
+            ),
+            (
+                ProjectError::UnsupportedSchema(7),
+                "project.unsupported_schema: 7",
+            ),
+            (ProjectError::NoProject, "project.no_project"),
+            (
+                ProjectError::CommandInvalid("unchanged".to_owned()),
+                "project.command_invalid: unchanged",
+            ),
+            (ProjectError::Io("disk".to_owned()), "project.io: disk"),
+        ];
+        for (error, expected) in errors {
+            assert_eq!(error.to_string(), expected);
+        }
     }
 }
