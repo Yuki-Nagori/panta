@@ -926,7 +926,11 @@ fn emit_message(
     locale: &str,
 ) -> Result<(), Diagnostics> {
     let mut node = BytesStart::new("message");
-    node.push_attribute(("id", message.id.as_str()));
+    // Qt requires message IDs to be unique across the complete TS catalog,
+    // while `.pa` IDs are only unique within a context. Keep the public
+    // context+source lookup intact and namespace the optional ID for `qtTrId`.
+    let qualified_id = format!("{}.{}", message.context, message.id);
+    node.push_attribute(("id", qualified_id.as_str()));
     if message.numerus {
         node.push_attribute(("numerus", "yes"));
     }
@@ -1407,6 +1411,7 @@ mod tests {
         let ts = emit_ts(&document, "cn").expect("TS");
         assert!(ts.contains("language=\"zh_CN\""));
         assert!(ts.contains("<name>FileMenu</name>"));
+        assert!(ts.contains("id=\"FileMenu.ok\""));
         assert!(ts.contains("<source>ok ok</source>"));
         assert!(!ts.contains("<numerusform>好的</numerusform>"));
     }

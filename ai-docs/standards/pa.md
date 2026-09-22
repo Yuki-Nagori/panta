@@ -71,7 +71,7 @@ values:
 
 `[Context]` 后的短 ID 是条目键，`src` 是 English 基线；双引号只在 ID 或值包含结构字符时使用。每个语言 `.pa` 文件只声明一个 `language`，其中 `tr:` 就是该文件 locale 的译文；Artifact 引擎负责聚合多个语言文件。`cn` 是 `.pa` 的简写，编译器归一化为 `zh-CN` 并在 TS 中输出 `zh_CN`。`st: unfinished`、`st: vanished`、`oldsrc`、`comment`、`extra`、`numerus` 和数组译文分别承接 Qt TS 的状态、旧 source、注释、复数元数据和 plural forms。每个 context 内 ID 必须唯一，每个 locale 最多一个 translation；变量/Theme 的 `type = expression` 是受限表达式，不把 `=` 后的数字或资源路径当成 YAML 的隐式 bool/number。多行文本、复杂集合、函数和脚本不在 V1；换行和保留行尾空白使用反斜杠转义。
 
-Qt 运行时按 context + ID 或 source 精确查 QM，不做隐式全局字符串替换。需要兼容 source-text 查找时，在同一 context 中采用最长 `src` 优先：`ok ok` 覆盖 `ok`，同长度候选必须报错；单词边界和是否允许子串匹配由调用方明确选择，不能由 formatter 猜测。
+Qt 运行时按 context + ID 或 source 精确查 QM，不做隐式全局字符串替换。生成 TS 时将 `.pa` 的 context 与条目 ID 组合成全局唯一的 `context.id`，避免 Qt `lrelease` 因不同 context 重复 ID 丢弃消息；source-text 查找仍使用 context + `src`。需要兼容 source-text 查找时，在同一 context 中采用最长 `src` 优先：`ok ok` 覆盖 `ok`，同长度候选必须报错；单词边界和是否允许子串匹配由调用方明确选择，不能由 formatter 猜测。
 
 ## 规范化与校验
 

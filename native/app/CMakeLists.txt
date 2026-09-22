@@ -11,7 +11,8 @@ target_link_libraries(
           Qt6::Gui
           Qt6::Qml
           Qt6::Quick
-          Qt6::QuickControls2)
+          Qt6::QuickControls2
+          Qt6::QuickDialogs2)
 target_include_directories(
   panta_native_app PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
                            "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
@@ -39,7 +40,7 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qml_shell_module_test)
   target_link_libraries(
     panta_qml_shell_module_test PRIVATE panta::shell Qt6::Gui Qt6::Qml Qt6::Quick
-                                        Qt6::QuickControls2 Qt6::Test)
+                                        Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
     target_link_libraries(panta_qml_shell_module_test
                           PRIVATE panta::visualization panta_bridgeplugin panta_visualizationplugin)

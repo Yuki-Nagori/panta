@@ -12,18 +12,21 @@ set(PANTA_SHELL_QML_FILES
     Themes/Theme.qml
     Components/Atoms/ThemedLabel.qml
     Components/Atoms/ThemedToolButton.qml
+    Components/Atoms/ThemedTextField.qml
     Components/Atoms/ThemedIcon.qml
     Components/Atoms/PanelSurface.qml
     Components/Composites/ToolGroup.qml
     Components/Composites/RibbonTile.qml
     Components/Composites/PanelTabBar.qml
     Components/Composites/PaneCloseButton.qml
+    Components/Composites/DialogTitleBar.qml
     Panels/TopChromePanel.qml
     Panels/RibbonPanel.qml
     Panels/TasksPanel.qml
     Panels/OutputPanel.qml
     Panels/ViewportPane.qml
-    Panels/PlaceholderPanel.qml)
+    Panels/PlaceholderPanel.qml
+    Dialogs/NewProjectDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)
@@ -31,7 +34,8 @@ endif()
 if(NOT PANTA_ENABLE_BRIDGE_MODULE)
   # 提供无 Bridge 的最小 Shell，避免关闭可选模块后残留 Panta.Bridge import；
   # ViewportPane 依赖 Panta.Visualization（CaeViewport），一并剔除。
-  list(REMOVE_ITEM PANTA_SHELL_QML_FILES App.qml Panels/ViewportPane.qml)
+  list(REMOVE_ITEM PANTA_SHELL_QML_FILES App.qml Panels/ViewportPane.qml
+       Dialogs/NewProjectDialog.qml)
   list(APPEND PANTA_SHELL_QML_FILES AppNoBridge.qml)
 endif()
 
@@ -62,7 +66,7 @@ panta_native_defaults(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
 target_sources(panta_shell PRIVATE ../native/app/icon_provider.cpp ../native/app/icon_provider.hpp)
 target_include_directories(panta_shell PUBLIC ../native/app)
-target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick)
+target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick Qt6::QuickDialogs2)
 
 # ThemedIcon 使用 image://panta-icons；provider 读取下列 qrc 资源并着色。
 # CONFIGURE_DEPENDS 收集资源，图标清单在 icons.md 登记。

@@ -84,7 +84,7 @@
 - 2026-09-22：维护者决定删除 `revisionCount` 标签；同步取消 shell 加载测试中该断言，修订计数行为由 bridge ViewModel 测试继续覆盖。
 - 2026-09-22：维护者决策显示文案全部使用英文源 + `qsTr()`，中文译文登记进
   `resources/i18n/panta-{en,cn}.pa`（上下文按 QML 组件命名；`.pa` 解析器要求
-  同上下文源文本长度互异，个别措辞据此调整为 Task List/Open a Project/Learning）。
+  同上下文源文本长度互异，个别措辞据此调整为 Task List/Open Project/Learning）。
 - 2026-09-22：维护者决定删去“推进修订”任务项；tick 命令不再有 UI 触发，行为由
   bridge ViewModel 测试继续覆盖，shell 加载断言与字典词条同步移除。
 - 2026-09-22：shell 加载测试常驻布局取证能力（`PANTA_SHELL_CAPTURE_PATH` / `PANTA_SHELL_DUMP_GEOMETRY` 环境变量门控），供后续布局优化对照。

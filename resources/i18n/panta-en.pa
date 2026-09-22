@@ -48,9 +48,92 @@ new-project:
   src: New Project
   tr: New Project
 
-open-project:
-  src: Open a Project
-  tr: Open a Project
+[NewProjectDialog]
+title:
+  src: Create New Project
+  tr: Create New Project
+
+description:
+  src: Create a project directory and start with an empty workspace.
+  tr: Create a project directory and start with an empty workspace.
+
+project-name:
+  src: Project name
+  tr: Project name
+
+placeholder-name:
+  src: My Project
+  tr: My Project
+
+create-in:
+  src: Create in
+  tr: Create in
+
+placeholder-folder:
+  src: Choose a folder
+  tr: Choose a folder
+
+project-location:
+  src: Project location
+  tr: Project location
+
+browse:
+  src: Browse
+  tr: Browse
+
+folder-note:
+  src: The project folder and .panta file will be created if they do not already exist.
+  tr: The project folder and .panta file will be created if they do not already exist.
+
+choose-location:
+  src: Choose Project Location
+  tr: Choose Project Location
+
+error-name:
+  src: Enter a valid project name.
+  tr: Enter a valid project name.
+
+error-location:
+  src: Choose an absolute project location.
+  tr: Choose an absolute project location.
+
+error-location-create:
+  src: The project location could not be created.
+  tr: The project location could not be created.
+
+error-root:
+  src: The selected project cannot be found.
+  tr: The selected project cannot be found.
+
+error-exists:
+  src: A project with this name already exists.
+  tr: A project with this name already exists.
+
+error-manifest:
+  src: The selected folder is not a supported panta project.
+  tr: The selected folder is not a supported panta project.
+
+error-no-project:
+  src: Open or create a project first.
+  tr: Open or create a project first.
+
+error-command:
+  src: The project change is not valid.
+  tr: The project change is not valid.
+
+error-generic:
+  src: The project operation could not be completed.
+  tr: The project operation could not be completed.
+
+[IconActionOpenProject]
+label:
+  src: Open Project
+  tr: Open Project
+
+[ProjectFileDialog]
+filter:
+  src: Panta project files (*.panta)
+  tr: Panta project files (*.panta)
 
 [TopChromePanel]
 menu-view:
@@ -148,6 +231,11 @@ label:
 label:
   src: Close panel
   tr: Close panel
+
+[IconActionCloseDialog]
+label:
+  src: Close dialog
+  tr: Close dialog
 
 [IconActionNewOutput]
 label:

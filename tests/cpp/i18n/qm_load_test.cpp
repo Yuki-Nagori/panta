@@ -26,6 +26,10 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QCOMPARE(translator.translate("TopChromePanel", "Sign in"), QStringLiteral("登录"));
     QCOMPARE(translator.translate("RibbonPanel", "Start"), QStringLiteral("启动"));
     QCOMPARE(translator.translate("ViewportPane", "Mesh"), QStringLiteral("网格"));
+    QCOMPARE(translator.translate("NewProjectDialog", "Create New Project"),
+             QStringLiteral("新建工程"));
+    QCOMPARE(translator.translate("NewProjectDialog", "Browse"), QStringLiteral("浏览"));
+    QCOMPARE(translator.translate("IconActionOpenProject", "Open Project"), QStringLiteral("打开工程"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {
@@ -35,6 +39,8 @@ void QmLoadTest::enBaselineDictionaryLoads() {
     QVERIFY(translator.load(QStringLiteral(":/i18n/panta_en.qm")));
     QCOMPARE(translator.translate("App", "Ready"), QStringLiteral("Ready"));
     QCOMPARE(translator.translate("TasksPanel", "New Project"), QStringLiteral("New Project"));
+    QCOMPARE(translator.translate("NewProjectDialog", "Create New Project"),
+             QStringLiteral("Create New Project"));
 }
 
 QTEST_GUILESS_MAIN(QmLoadTest)

@@ -26,7 +26,9 @@ qt_add_qml_module(
   src/task_host.hpp
   src/task_host.cpp
   src/path_host.hpp
-  src/path_host.cpp)
+  src/path_host.cpp
+  src/project_view_model.hpp
+  src/project_view_model.cpp)
 panta_native_defaults(panta_bridge)
 # 测试和 C++ 消费者按 <shell_view_model.hpp> 引用头文件。
 target_include_directories(panta_bridge PUBLIC src)
@@ -71,4 +73,12 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_bridge_path_host_test)
   target_link_libraries(panta_bridge_path_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
   gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
+
+  add_executable(panta_bridge_project_view_model_test
+                 ../../tests/cpp/bridge/project_view_model_test.cpp)
+  panta_native_defaults(panta_bridge_project_view_model_test)
+  target_link_libraries(panta_bridge_project_view_model_test PRIVATE panta::bridge GTest::gtest
+                                                                     Qt6::Test)
+  gtest_discover_tests(panta_bridge_project_view_model_test DISCOVERY_MODE POST_BUILD
+                       DISCOVERY_TIMEOUT 120)
 endif()

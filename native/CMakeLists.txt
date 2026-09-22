@@ -40,7 +40,7 @@ endif()
 # Qt 预编译产物供给（任务 005）：缓存于构建树，首次 configure 需联网。
 # QT_STAGING 暴露路径供 find_package 和诊断使用。
 include(cmake/qt-provision.cmake)
-set(_panta_qt_components Core Gui Qml Quick QuickControls2 Svg)
+set(_panta_qt_components Core Gui Qml Quick QuickControls2 QuickDialogs2 Svg)
 if(BUILD_TESTING)
   list(APPEND _panta_qt_components Test)
 endif()

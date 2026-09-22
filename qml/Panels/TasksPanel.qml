@@ -1,4 +1,4 @@
-// 任务页签和工程入口；业务命令尚未接入，关闭信号交由页面处理。
+// 任务页签和工程入口；面板只发语义信号，工程命令由页面注入 ViewModel。
 import QtQuick
 import QtQuick.Layouts
 
@@ -6,6 +6,8 @@ PanelSurface {
     id: panel
 
     signal closeRequested
+    signal openProjectRequested
+    signal newProjectRequested
 
     implicitWidth: Theme.leftPanelMinimumWidth
 
@@ -29,13 +31,14 @@ PanelSurface {
 
             ThemedToolButton {
                 Layout.fillWidth: true
-                text: qsTr("Open a Project")
+                text: qsTranslate("IconActionOpenProject", "Open Project")
                 dimText: "…"
                 iconName: "document-open"
                 contentAlignLeft: true
                 contentColor: Theme.colorText
                 contentPadding: Theme.spacingLarge
                 hoverColor: Theme.colorHover
+                onClicked: panel.openProjectRequested()
             }
             ThemedToolButton {
                 Layout.fillWidth: true
@@ -46,6 +49,7 @@ PanelSurface {
                 contentColor: Theme.colorText
                 contentPadding: Theme.spacingLarge
                 hoverColor: Theme.colorHover
+                onClicked: panel.newProjectRequested()
             }
         }
 

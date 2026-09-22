@@ -1,11 +1,13 @@
-// Shell 页面装配；标题和错误由 ViewModel 提供，面板关闭状态由页面持有。
-// 顶部动作与视图页签尚未接业务命令，窗口控制由系统标题栏承接。
+// Shell 页面装配；页面持有 ViewModel 和对话框，面板只发语义命令信号。
+// 窗口控制由系统标题栏承接。
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import Panta.Bridge
 
 ApplicationWindow {
+    id: shellWindow
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
     visible: true
@@ -15,6 +17,27 @@ ApplicationWindow {
 
     ShellViewModel {
         id: viewModel
+    }
+
+    ProjectViewModel {
+        id: projectModel
+    }
+
+    NewProjectDialog {
+        id: newProjectDialog
+        ownerWindow: shellWindow
+        projectModel: projectModel
+    }
+
+    FileDialog {
+        id: openProjectFileDialog
+        title: qsTranslate("IconActionOpenProject", "Open Project")
+        currentFolder: projectModel.defaultLocationUrl
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTranslate("ProjectFileDialog", "Panta project files (*.panta)")]
+        onAccepted: {
+            projectModel.openProjectUrl(selectedFile);
+        }
     }
 
     ColumnLayout {
@@ -54,6 +77,8 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     onCloseRequested: tasksPanel.visible = false
+                    onOpenProjectRequested: openProjectFileDialog.open()
+                    onNewProjectRequested: newProjectDialog.open()
                 }
 
                 Rectangle {
@@ -67,7 +92,7 @@ ApplicationWindow {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: leftColumn.height * Theme.outputPanelRatio
-                    errorText: viewModel.error
+                    errorText: projectModel.error.length > 0 ? projectModel.error : viewModel.error
                     onCloseRequested: outputPanel.visible = false
                 }
             }

@@ -14,7 +14,7 @@ QML 负责布局、主题、控件和状态绑定。`CaeViewport` 是嵌入 QML 
 
 ## ViewModel 契约
 
-计划以 `QObject` 派生 ViewModel 暴露可观察属性、命令和事件。例如 `ProjectViewModel` 可提供 `name`、`dirty`、`busy`、`progress`，以及 `importGeometry(url)`、`generateMesh()`、`save()`。这些名称是设计示意，尚未注册为 QML 类型。
+`QObject` 派生 ViewModel 暴露可观察属性、命令和事件。任务 057 已注册 `ProjectViewModel`，提供工程默认目录、创建/打开/保存、重命名命令、dirty 状态和结构化错误；它只做 Qt 字符串/URL 与 Rust application service 的适配。几何导入、网格生成等长任务仍按后续 ViewModel 契约接入。
 
 属性变化通过 NOTIFY 信号通知，错误以结构化错误加用户可读摘要呈现。长任务返回任务标识或提供可追踪的任务状态，不能仅用一个全局 busy 布尔值掩盖多个并发操作。按钮启用条件来自模型状态，例如没有有效几何时禁用网格生成。
 

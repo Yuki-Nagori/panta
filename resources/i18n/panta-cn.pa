@@ -48,9 +48,92 @@ new-project:
   src: New Project
   tr: 新建工程
 
-open-project:
-  src: Open a Project
+[NewProjectDialog]
+title:
+  src: Create New Project
+  tr: 新建工程
+
+description:
+  src: Create a project directory and start with an empty workspace.
+  tr: 创建工程目录并开始一个空工作区。
+
+project-name:
+  src: Project name
+  tr: 工程名称
+
+placeholder-name:
+  src: My Project
+  tr: 我的工程
+
+create-in:
+  src: Create in
+  tr: 创建位置
+
+placeholder-folder:
+  src: Choose a folder
+  tr: 选择文件夹
+
+project-location:
+  src: Project location
+  tr: 工程位置
+
+browse:
+  src: Browse
+  tr: 浏览
+
+folder-note:
+  src: The project folder and .panta file will be created if they do not already exist.
+  tr: 如果工程文件夹和 .panta 文件不存在，将自动创建。
+
+choose-location:
+  src: Choose Project Location
+  tr: 选择工程位置
+
+error-name:
+  src: Enter a valid project name.
+  tr: 请输入有效的工程名称。
+
+error-location:
+  src: Choose an absolute project location.
+  tr: 请选择绝对工程路径。
+
+error-location-create:
+  src: The project location could not be created.
+  tr: 无法创建工程位置。
+
+error-root:
+  src: The selected project cannot be found.
+  tr: 找不到所选工程。
+
+error-exists:
+  src: A project with this name already exists.
+  tr: 同名工程已经存在。
+
+error-manifest:
+  src: The selected folder is not a supported panta project.
+  tr: 所选文件夹不是受支持的 panta 工程。
+
+error-no-project:
+  src: Open or create a project first.
+  tr: 请先打开或创建工程。
+
+error-command:
+  src: The project change is not valid.
+  tr: 工程修改无效。
+
+error-generic:
+  src: The project operation could not be completed.
+  tr: 工程操作无法完成。
+
+[IconActionOpenProject]
+label:
+  src: Open Project
   tr: 打开工程
+
+[ProjectFileDialog]
+filter:
+  src: Panta project files (*.panta)
+  tr: Panta 工程文件 (*.panta)
 
 [TopChromePanel]
 menu-view:
@@ -148,6 +231,11 @@ label:
 label:
   src: Close panel
   tr: 关闭面板
+
+[IconActionCloseDialog]
+label:
+  src: Close dialog
+  tr: 关闭对话框
 
 [IconActionNewOutput]
 label:

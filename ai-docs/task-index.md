@@ -91,6 +91,7 @@ ai-docs/
 | 054 | [顶部折叠图标与搜索框引导](task/054-titlebar-search-details.md) | 应用平台扩展 | 052 | done |
 | 055 | [QML 组件评审与整理](task/055-qml-review-and-cleanup.md) | 应用平台扩展 | 052, 054 | done |
 | 056 | [QML 周边 C++ 简化与性能评审](task/056-qml-native-review.md) | 应用平台扩展 | 055, 007 | done |
+| 057 | [新建项目对话框与工程命令边界](task/057-new-project-dialog.md) | 应用平台扩展 | 023, 029, 055 | done |
 
 ## 验证与质量扩展队列
 

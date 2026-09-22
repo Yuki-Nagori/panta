@@ -1,5 +1,6 @@
 //! 最小 CXX 双向边界：验证 DTO、opaque 句柄所有权、错误转换、C++ 实现
-//! 调用，以及 Rust 拥有的任务生命周期（任务 008）与路径服务（任务 023）。
+//! 调用，以及 Rust 拥有的任务生命周期（任务 008）、路径服务（任务 023）
+//! 与工程 application service（任务 057）。
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -74,6 +75,26 @@ pub mod bridge {
         pub relative: String,
     }
 
+    /// Rust 工程服务返回的稳定状态快照；path/name 均为可往返 UTF-8。
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct ProjectSnapshot {
+        pub path: String,
+        pub name: String,
+        pub revision: u64,
+        pub dirty: bool,
+    }
+
+    /// 工程模型命令种类；新增值必须同步 Rust 映射与失败测试。
+    pub enum ProjectCommandKind {
+        Rename = 0,
+    }
+
+    /// 工程模型命令 DTO；value 的语义由 kind 决定。
+    pub struct ProjectCommand {
+        pub kind: ProjectCommandKind,
+        pub value: String,
+    }
+
     unsafe extern "C++" {
         include!("panta/ffi.hpp");
 
@@ -134,6 +155,27 @@ pub mod bridge {
             service: &PathService,
             reference: &PathRef,
         ) -> Result<String>;
+
+        /// Rust 拥有的工程 application service：目录、清单和模型状态不由
+        /// QML/C++ 持有；C++ 只负责 Qt 字符串/URL 适配和 ViewModel 通知。
+        type ProjectService;
+
+        fn project_service_new() -> Box<ProjectService>;
+        fn project_service_create(
+            service: &mut ProjectService,
+            location: String,
+            name: String,
+        ) -> Result<ProjectSnapshot>;
+        fn project_service_open(
+            service: &mut ProjectService,
+            path: String,
+        ) -> Result<ProjectSnapshot>;
+        fn project_service_save(service: &mut ProjectService) -> Result<ProjectSnapshot>;
+        fn project_service_execute(
+            service: &mut ProjectService,
+            command: ProjectCommand,
+        ) -> Result<ProjectSnapshot>;
+        fn project_service_current(service: &ProjectService) -> Result<ProjectSnapshot>;
 
         /// 崩溃信号处理器安装（任务 047，panta_foundation::crash 的 FFI 面）：
         /// 返回日志路径；log_dir 为空时用系统临时目录。
@@ -376,6 +418,85 @@ fn resolve_with(
     resolver(&service.service, &core_ref)
         .map(|path| path.display().to_string())
         .map_err(|error| error.to_string())
+}
+
+/// Rust 工程 application service 的 CXX 适配器：只负责字符串 DTO 和错误文本，
+/// 工程校验、清单事务及模型状态均保留在 panta-core。
+pub struct ProjectService {
+    service: panta_core::project::ProjectService,
+}
+
+fn project_service_new() -> Box<ProjectService> {
+    Box::new(ProjectService {
+        service: panta_core::project::ProjectService::new(),
+    })
+}
+
+fn project_service_create(
+    service: &mut ProjectService,
+    location: String,
+    name: String,
+) -> Result<bridge::ProjectSnapshot, String> {
+    service
+        .service
+        .create(std::path::Path::new(&location), &name)
+        .map(project_snapshot)
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_open(
+    service: &mut ProjectService,
+    path: String,
+) -> Result<bridge::ProjectSnapshot, String> {
+    service
+        .service
+        .open(std::path::Path::new(&path))
+        .map(project_snapshot)
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_save(service: &mut ProjectService) -> Result<bridge::ProjectSnapshot, String> {
+    service
+        .service
+        .save()
+        .map(project_snapshot)
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_execute(
+    service: &mut ProjectService,
+    command: bridge::ProjectCommand,
+) -> Result<bridge::ProjectSnapshot, String> {
+    let command = match command.kind {
+        bridge::ProjectCommandKind::Rename => panta_core::project::ProjectCommand::Rename {
+            name: command.value,
+        },
+        _ => {
+            return Err("project.command_invalid: unknown command".to_owned());
+        }
+    };
+    service
+        .service
+        .execute(command)
+        .map(project_snapshot)
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_current(service: &ProjectService) -> Result<bridge::ProjectSnapshot, String> {
+    service
+        .service
+        .current()
+        .map(project_snapshot)
+        .map_err(|error| error.to_string())
+}
+
+fn project_snapshot(snapshot: panta_core::project::ProjectSnapshot) -> bridge::ProjectSnapshot {
+    bridge::ProjectSnapshot {
+        path: snapshot.path.display().to_string(),
+        name: snapshot.name,
+        revision: snapshot.revision,
+        dirty: snapshot.dirty,
+    }
 }
 
 /// CXX 枚举跨边界可能携带越界表示；未知取值按稳定错误码拒绝，不猜测。
