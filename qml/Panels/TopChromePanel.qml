@@ -125,7 +125,8 @@ Rectangle {
                         ThemedIcon {
                             anchors.verticalCenter: parent.verticalCenter
                             name: "activate-split"
-                            color: Theme.colorText
+                            iconSize: Theme.iconSizeSmall
+                            color: Theme.colorIcon
                         }
                     }
                     ThemedLabel {
@@ -142,8 +143,17 @@ Rectangle {
                     ToolGroup {
                         objectName: "titleSearchGroup"
                         Row {
-                            leftPadding: Theme.spacingTiny
                             spacing: Theme.spacingXSmall
+                            Item {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Theme.iconSizeDefault
+                                height: Theme.searchHeight
+                                ThemedIcon {
+                                    anchors.centerIn: parent
+                                    name: "caret-right"
+                                    iconSize: Theme.iconSizeCaret
+                                }
+                            }
                             TextField {
                                 id: searchField
                                 anchors.verticalCenter: parent.verticalCenter

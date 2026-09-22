@@ -49,6 +49,7 @@ Qt 官方依据（2026-09-22，6.11.2）：[Image 与 sourceSize](https://doc.qt
 | `help-browser.svg` | Mono | 帮助 |
 | `menubar-globe.svg` | Mono | 语言 / 在线内容 |
 | `caret-down.svg` | Mono | 下拉指示 |
+| `caret-right.svg` | Mono | 搜索框左侧引导 |
 | `pane-close.svg` | Mono | 关闭 / 清空 |
 | `output-new.svg` | Mono | 新建输出 |
 | `output-check.svg` | Mono | 检查输出 |
