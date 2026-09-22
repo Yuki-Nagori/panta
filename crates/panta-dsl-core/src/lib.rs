@@ -1167,17 +1167,17 @@ fn typed_entry(
 }
 
 fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Diagnostic>) {
-    let mut source_lengths: BTreeMap<(String, usize), String> = BTreeMap::new();
+    let mut sources: BTreeMap<(String, String), String> = BTreeMap::new();
     for message in document.messages.values() {
-        let length_key = (message.context.clone(), message.source.chars().count());
-        if let Some(previous_id) = source_lengths.insert(length_key, message.id.clone())
+        let source_key = (message.context.clone(), message.source.clone());
+        if let Some(previous_id) = sources.insert(source_key, message.id.clone())
             && previous_id != message.id
         {
             push_diagnostic(
                 diagnostics,
-                "pa.source_length_conflict",
+                "pa.duplicate_source",
                 format!(
-                    "context '{}' contains messages '{}' and '{}' with the same source length",
+                    "context '{}' contains messages '{}' and '{}' with the same source text",
                     message.context, previous_id, message.id
                 ),
                 0,
@@ -1417,11 +1417,11 @@ mod tests {
     }
 
     #[test]
-    fn rejects_source_length_conflicts_and_invalid_locale() {
+    fn rejects_duplicate_sources_and_invalid_locale() {
         let error = parse(
-            "version: 1\nkind: language\nlanguage: en--US\n\n[Menu]\na:\n  src: One\n  tr: Uno\nb:\n  src: Two\n  tr: Dos\n",
+            "version: 1\nkind: language\nlanguage: en--US\n\n[Menu]\na:\n  src: One\n  tr: Uno\nb:\n  src: One\n  tr: Dos\n",
         )
-        .expect_err("invalid locale and equal source lengths");
+        .expect_err("invalid locale and duplicate source");
         assert!(
             error
                 .diagnostics
@@ -1432,8 +1432,17 @@ mod tests {
             error
                 .diagnostics
                 .iter()
-                .any(|item| item.code == "pa.source_length_conflict")
+                .any(|item| item.code == "pa.duplicate_source")
         );
+    }
+
+    #[test]
+    fn accepts_distinct_equal_length_sources() {
+        let document = parse(
+            "version: 1\nkind: language\nlanguage: en\n\n[Menu]\na:\n  src: One\n  tr: Uno\nb:\n  src: Two\n  tr: Dos\n",
+        )
+        .expect("distinct equal-length sources are valid");
+        assert_eq!(document.messages.len(), 2);
     }
 
     #[test]

@@ -9,7 +9,11 @@
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
 
+class vtkRenderWindowInteractor;
+
 namespace panta::visualization {
+
+class ViewportInteractionCommand;
 
 class VtkViewport final : public QQuickItem, public ViewportBackend {
     Q_OBJECT
@@ -30,11 +34,14 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     void itemChange(ItemChange change, const ItemChangeData& value) override;
 
   private:
+    friend class ViewportInteractionCommand;
+
     void bind_window(QQuickWindow* window);
     void ensure_render_window();
     void schedule_refresh();
     void watch_ancestors();
     void update_mesh_actor();
+    void handle_interaction_event(unsigned long event_id, vtkRenderWindowInteractor* interactor);
     /// 排队刷新时同步原生区域，仅状态/像素尺寸改变或恢复显示时提交帧。
     void sync_native_surface();
     void destroy_render_window();

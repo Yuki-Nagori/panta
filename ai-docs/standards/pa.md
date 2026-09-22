@@ -10,7 +10,7 @@
 - 语法借鉴 YAML 的层级和 `key: value` 可读性，但不是通用 YAML。不得出现 `---`/`...` 多文档、anchor、alias、tag、flow collection、隐式类型推断或任意 YAML 扩展。
 - 值默认是不带引号的行尾标量。首个结构分隔符只解释当前声明的 `:`；值中的 `:`、`#` 和 URL 保持字面意义。注释使用 `//`，不使用 `#`。
 - 关键字、kind、locale、变量名和 Theme key 使用 ASCII；变量/Theme 业务标识统一采用 kebab-case（短横线 `-`）。语言条目使用短 ID 作为键，`src` 保存 English 基线，允许点号、短横线和下划线以承接 Qt 现有条目。locale 按标准允许 `zh-CN` 或 `en_US`，并支持 `.pa` 内的 `cn` 简写；文法关键字永远不随 UI 语言切换。
-- 语言 catalog 使用 `[Context]` 分组；Context 是 Qt 调用上下文，不是注释，注释使用条目内的 `comment`/`extra` 字段。每个 `.pa` 文件只对应一个目标 locale，同一 context 内 ID 唯一，`src` 是 Qt 的 source 节点。源文本兼容索引按 `src` 构建，不把人工 ID 当作用户可见文案；相同 context 的同长度 source 冲突必须报错。
+- 语言 catalog 使用 `[Context]` 分组；Context 是 Qt 调用上下文，不是注释，注释使用条目内的 `comment`/`extra` 字段。每个 `.pa` 文件只对应一个目标 locale，同一 context 内 ID 唯一，`src` 是 Qt 的 source 节点。源文本兼容索引按 `src` 构建，不把人工 ID 当作用户可见文案；同一 context 的重复 source 必须报错，不同且等长的 source 可以共存。
 - 解析、格式化和校验共享 034 的 Rust AST；不能用正则或第二套 YAML parser 在任务模块里旁路处理。
 
 ## 推荐形状
@@ -71,7 +71,7 @@ values:
 
 `[Context]` 后的短 ID 是条目键，`src` 是 English 基线；双引号只在 ID 或值包含结构字符时使用。每个语言 `.pa` 文件只声明一个 `language`，其中 `tr:` 就是该文件 locale 的译文；Artifact 引擎负责聚合多个语言文件。`cn` 是 `.pa` 的简写，编译器归一化为 `zh-CN` 并在 TS 中输出 `zh_CN`。`st: unfinished`、`st: vanished`、`oldsrc`、`comment`、`extra`、`numerus` 和数组译文分别承接 Qt TS 的状态、旧 source、注释、复数元数据和 plural forms。每个 context 内 ID 必须唯一，每个 locale 最多一个 translation；变量/Theme 的 `type = expression` 是受限表达式，不把 `=` 后的数字或资源路径当成 YAML 的隐式 bool/number。多行文本、复杂集合、函数和脚本不在 V1；换行和保留行尾空白使用反斜杠转义。
 
-Qt 运行时按 context + ID 或 source 精确查 QM，不做隐式全局字符串替换。生成 TS 时将 `.pa` 的 context 与条目 ID 组合成全局唯一的 `context.id`，避免 Qt `lrelease` 因不同 context 重复 ID 丢弃消息；source-text 查找仍使用 context + `src`。需要兼容 source-text 查找时，在同一 context 中采用最长 `src` 优先：`ok ok` 覆盖 `ok`，同长度候选必须报错；单词边界和是否允许子串匹配由调用方明确选择，不能由 formatter 猜测。
+Qt 运行时按 context + ID 或 source 精确查 QM，不做隐式全局字符串替换。生成 TS 时将 `.pa` 的 context 与条目 ID 组合成全局唯一的 `context.id`，避免 Qt `lrelease` 因不同 context 重复 ID 丢弃消息；source-text 查找仍使用 context + `src`。需要兼容 source-text 查找时，在同一 context 中采用最长 `src` 优先：`ok ok` 覆盖 `ok`，重复 source 在校验阶段失败；不同且等长的 source 不会同时匹配同一个输入。单词边界和是否允许子串匹配由调用方明确选择，不能由 formatter 猜测。
 
 ## 规范化与校验
 

@@ -6,6 +6,7 @@
 
 #include "default_wordmark.hpp"
 #include "stl_mesh.hpp"
+#include "viewport_orientation.hpp"
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
 #include <QList>
@@ -28,11 +29,18 @@
 #include <panta/visualization/viewport_backend.hpp>
 #include <vtkActor.h>
 #include <vtkCamera.h>
+#include <vtkCommand.h>
 #include <vtkHardwareWindow.h>
 #include <vtkNew.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkProperty.h>
+#if defined(Q_OS_MACOS)
+#include <vtkCocoaRenderWindowInteractor.h>
+#else
+#include <vtkGenericRenderWindowInteractor.h>
+#endif
+#include <vtkRenderWindowInteractor.h>
 #include <vtkSmartPointer.h>
 #include <vtkWebGPURenderWindow.h>
 #include <vtkWebGPURenderer.h>
@@ -66,13 +74,32 @@ void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, doub
 
 } // namespace
 
+class ViewportInteractionCommand final : public vtkCommand {
+  public:
+    static ViewportInteractionCommand* New() { return new ViewportInteractionCommand; }
+
+    void set_viewport(VtkViewport* viewport) { viewport_ = viewport; }
+
+    void Execute(vtkObject* caller, unsigned long event_id, void*) override {
+        auto* interactor = vtkRenderWindowInteractor::SafeDownCast(caller);
+        if (viewport_ != nullptr && interactor != nullptr) {
+            viewport_->handle_interaction_event(event_id, interactor);
+        }
+    }
+
+  private:
+    VtkViewport* viewport_ = nullptr;
+};
+
 struct VtkViewport::Impl {
     RenderScene pending;
     NativeSurface native_surface;
     NativeHardwareWindow hardware_window;
     vtkSmartPointer<vtkWebGPURenderWindow> render_window;
     vtkSmartPointer<vtkWebGPURenderer> renderer;
+    vtkSmartPointer<vtkRenderWindowInteractor> interactor;
     vtkSmartPointer<vtkActor> primitive_actor;
+    ViewportOrientation orientation;
     QMetaObject::Connection window_visibility_connection;
     QMetaObject::Connection scene_graph_initialized_connection;
     QList<QMetaObject::Connection> ancestor_connections;
@@ -82,6 +109,10 @@ struct VtkViewport::Impl {
     bool scene_dirty = true;
     bool creation_warning_emitted = false;
     QString applied_mesh_path;
+    bool pointer_dragging = false;
+    bool cube_pressed = false;
+    int last_pointer_x = 0;
+    int last_pointer_y = 0;
 };
 
 VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
@@ -230,7 +261,24 @@ void VtkViewport::ensure_render_window() {
     impl_->applied_mesh_path = impl_->pending.mesh_path;
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
+    impl_->orientation.attach(impl_->render_window);
+
+#if defined(Q_OS_MACOS)
+    impl_->interactor = vtkSmartPointer<vtkCocoaRenderWindowInteractor>::New();
+#else
+    impl_->interactor = vtkSmartPointer<vtkGenericRenderWindowInteractor>::New();
+#endif
+    impl_->interactor->SetRenderWindow(impl_->render_window);
+    impl_->interactor->SetHardwareWindow(impl_->hardware_window.get());
+    impl_->interactor->SetEnableRender(false);
+    impl_->hardware_window->SetInteractor(impl_->interactor);
+    auto interaction_command = vtkSmartPointer<ViewportInteractionCommand>::New();
+    interaction_command->set_viewport(this);
+    impl_->interactor->AddObserver(vtkCommand::LeftButtonPressEvent, interaction_command);
+    impl_->interactor->AddObserver(vtkCommand::MouseMoveEvent, interaction_command);
+    impl_->interactor->AddObserver(vtkCommand::LeftButtonReleaseEvent, interaction_command);
     impl_->render_window->Initialize();
+    impl_->interactor->Initialize();
 
     if (impl_->render_window->GetGenericContext() == nullptr) {
         warn_once("VtkViewport: VTK WebGPU device 初始化失败");
@@ -308,6 +356,109 @@ void VtkViewport::update_mesh_actor() {
     }
 }
 
+void VtkViewport::handle_interaction_event(unsigned long event_id,
+                                           vtkRenderWindowInteractor* interactor) {
+    if (impl_->renderer == nullptr || impl_->primitive_actor == nullptr ||
+        impl_->render_window == nullptr || interactor == nullptr) {
+        return;
+    }
+
+    const int* event_position = interactor->GetEventPosition();
+    const int* render_size = impl_->render_window->GetSize();
+    if (event_position == nullptr || render_size == nullptr || render_size[0] <= 0 ||
+        render_size[1] <= 0) {
+        return;
+    }
+
+    const int x = event_position[0];
+    const int y = event_position[1];
+    const int width = render_size[0];
+    const int height = render_size[1];
+    if (event_id == vtkCommand::LeftButtonPressEvent) {
+        impl_->last_pointer_x = x;
+        impl_->last_pointer_y = y;
+        impl_->cube_pressed = impl_->orientation.contains_cube(x, y, width, height);
+        impl_->pointer_dragging = !impl_->cube_pressed;
+        return;
+    }
+
+    if (event_id == vtkCommand::MouseMoveEvent && impl_->pointer_dragging) {
+        const int delta_x = x - impl_->last_pointer_x;
+        const int delta_y = y - impl_->last_pointer_y;
+        if (delta_x != 0 || delta_y != 0) {
+            auto* camera = impl_->renderer->GetActiveCamera();
+            camera->Azimuth(-static_cast<double>(delta_x) * 0.5);
+            camera->Elevation(static_cast<double>(delta_y) * 0.5);
+            camera->OrthogonalizeViewUp();
+            impl_->orientation.update(camera);
+            impl_->scene_dirty = true;
+            impl_->last_pointer_x = x;
+            impl_->last_pointer_y = y;
+            schedule_refresh();
+        }
+        return;
+    }
+
+    if (event_id != vtkCommand::LeftButtonReleaseEvent) {
+        return;
+    }
+
+    if (impl_->cube_pressed) {
+        const auto direction = impl_->orientation.cube_direction(x, y, width, height);
+        if (direction.has_value()) {
+            double focal_point[3];
+            const double* center = impl_->primitive_actor->GetCenter();
+            focal_point[0] = center[0];
+            focal_point[1] = center[1];
+            focal_point[2] = center[2];
+            const double distance =
+                std::max(impl_->renderer->GetActiveCamera()->GetDistance(), 1.0);
+            double direction_vector[3] = {0.0, 0.0, 1.0};
+            double view_up[3] = {0.0, 0.0, 1.0};
+            switch (*direction) {
+            case CubeDirection::PositiveX:
+                direction_vector[0] = 1.0;
+                direction_vector[2] = 0.0;
+                break;
+            case CubeDirection::NegativeX:
+                direction_vector[0] = -1.0;
+                direction_vector[2] = 0.0;
+                break;
+            case CubeDirection::PositiveY:
+                direction_vector[1] = 1.0;
+                direction_vector[2] = 0.0;
+                break;
+            case CubeDirection::NegativeY:
+                direction_vector[1] = -1.0;
+                direction_vector[2] = 0.0;
+                break;
+            case CubeDirection::PositiveZ:
+                view_up[1] = 1.0;
+                view_up[2] = 0.0;
+                break;
+            case CubeDirection::NegativeZ:
+                direction_vector[2] = -1.0;
+                view_up[1] = 1.0;
+                view_up[2] = 0.0;
+                break;
+            }
+            auto* camera = impl_->renderer->GetActiveCamera();
+            camera->SetFocalPoint(focal_point);
+            camera->SetPosition(focal_point[0] + direction_vector[0] * distance,
+                                focal_point[1] + direction_vector[1] * distance,
+                                focal_point[2] + direction_vector[2] * distance);
+            camera->SetViewUp(view_up);
+            camera->OrthogonalizeViewUp();
+            impl_->renderer->ResetCameraClippingRange();
+            impl_->orientation.update(camera);
+            impl_->scene_dirty = true;
+            schedule_refresh();
+        }
+    }
+    impl_->pointer_dragging = false;
+    impl_->cube_pressed = false;
+}
+
 void VtkViewport::sync_native_surface() {
     if (impl_->hardware_window == nullptr || window() == nullptr ||
         impl_->native_surface.view == nullptr) {
@@ -334,9 +485,13 @@ void VtkViewport::sync_native_surface() {
     }
     if (resized) {
         impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
+        if (impl_->interactor != nullptr) {
+            impl_->interactor->UpdateSize(pixel_size.width(), pixel_size.height());
+        }
         configure_default_camera(impl_->renderer, impl_->primitive_actor,
                                  static_cast<double>(pixel_size.width()) / pixel_size.height());
     }
+    impl_->orientation.update(impl_->renderer->GetActiveCamera());
     impl_->renderer->SetBackground(impl_->pending.background.redF(),
                                    impl_->pending.background.greenF(),
                                    impl_->pending.background.blueF());
@@ -350,6 +505,16 @@ void VtkViewport::sync_native_surface() {
 void VtkViewport::destroy_render_window() {
     impl_->applied_pixel_size = {};
     impl_->scene_dirty = true;
+    impl_->pointer_dragging = false;
+    impl_->cube_pressed = false;
+    if (impl_->interactor != nullptr) {
+        impl_->interactor->Disable();
+        impl_->interactor->SetRenderWindow(nullptr);
+    }
+    if (impl_->hardware_window != nullptr) {
+        impl_->hardware_window->SetInteractor(nullptr);
+    }
+    impl_->orientation.detach();
     if (impl_->render_window != nullptr) {
         impl_->render_window->Finalize();
         impl_->render_window = nullptr;
@@ -358,6 +523,7 @@ void VtkViewport::destroy_render_window() {
         detach_native_surface(impl_->native_surface);
     }
     impl_->renderer = nullptr;
+    impl_->interactor = nullptr;
     impl_->primitive_actor = nullptr;
     impl_->applied_mesh_path.clear();
     if (impl_->hardware_window != nullptr) {

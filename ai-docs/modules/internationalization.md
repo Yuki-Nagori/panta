@@ -45,6 +45,6 @@ open-file:
 
 `.pa` 也用于主题和变量，由 `kind theme`、`kind variables` 区分域；所有域共用 025 的 lexer、parser、版本和诊断格式。国际化域由 Rust 生成 TS XML 以使用 Qt 的成熟工具和 QM 查找，不把 XML 解析放入运行时。
 
-同一 context 的 source-text 兼容查找采用最长 `src` 匹配：`ok ok` 先于 `ok`，同长度候选直接报错；正常 QML/C++ 路径始终用 context + ID 或完整 source 精确查找，避免在任意用户文本中替换短词。
+同一 context 的 source-text 兼容查找采用最长 `src` 匹配：`ok ok` 先于 `ok`，重复 source 直接报错；不同且等长的 source 可以共存，因为它们不会同时匹配同一输入。正常 QML/C++ 路径始终用 context + ID 或完整 source 精确查找，避免在任意用户文本中替换短词。
 
 022 验证界面、占位参数、缺项回退、加载失败和语言偏好；完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。

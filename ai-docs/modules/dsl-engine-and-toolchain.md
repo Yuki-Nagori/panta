@@ -43,7 +43,7 @@ open-file:
 
 临时 TS 和 QM 不作为源码提交；失败时不覆盖上一份有效 TS/QM。编译器限制输入字节、token、嵌套深度和 message/变量数，拒绝未知必需版本、重复 context/ID、非法 locale、占位符不一致和任意脚本/文件访问。
 
-catalog 的 source-text 兼容索引按 `src` 长度降序构建，`ok ok` 优先于 `ok`，同长度冲突在校验阶段失败；QML/C++ 不走这个索引而使用 context + ID 或完整 source 精确查找。
+catalog 的 source-text 兼容索引按 `src` 长度降序构建，`ok ok` 优先于 `ok`，重复 source 在校验阶段失败；不同且等长的 source 可以共存，QML/C++ 不走这个索引而使用 context + ID 或完整 source 精确查找。
 
 ## 诊断、快照与 FFI
 

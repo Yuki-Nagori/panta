@@ -43,7 +43,7 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 业务对话框使用 `DialogTitleBar` 组合组件时，窗口自身设置 `Qt.FramelessWindowHint`，标题栏通过 `QWindow::startSystemMove()` 发起平台移动，受限平台再使用逻辑坐标回退；关闭按钮只发组合组件信号。窗口的模态、居中和业务命令仍由对话框页面负责。
 
-显示文案使用英文源 + `qsTr()` / `qsTranslate()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`。`qsTr()` 使用组件同名上下文；同上下文源文本长度必须互异，等长的菜单 / 工具文案通过 `qsTranslate()` 分配独立语义上下文。Ribbon 的显式换行属于源文本，译文按目标语言排版分行；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
+显示文案使用英文源 + `qsTr()` / `qsTranslate()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`。`qsTr()` 使用组件同名上下文；需要独立语义时通过 `qsTranslate()` 分配 context。Ribbon 的显式换行属于源文本，译文按目标语言排版分行；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
 
 图标遵循 [SVG 图标设计规范](../standards/icons.md)：模块内 `qml/icons/` 保存统一 24 网格的 Mono 几何，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。Shell 引擎安装 `panta-icons` provider，以 qtsvg 渲染资源并按 `ThemedIcon.color` 着色，颜色来自 Theme/宿主；不依赖 SVG 自动继承 QML 颜色。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
 

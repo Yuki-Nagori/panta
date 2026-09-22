@@ -35,6 +35,8 @@ qt_add_qml_module(
   src/cae_viewport.cpp
   src/vtk/vtk_viewport.hpp
   src/vtk/vtk_viewport.cpp
+  src/vtk/viewport_orientation.cpp
+  src/vtk/viewport_orientation.hpp
   src/vtk/stl_mesh.cpp
   src/vtk/stl_mesh.hpp
   src/vtk/default_wordmark.cpp
@@ -54,14 +56,21 @@ if(UNIX AND NOT APPLE)
   pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
 endif()
 # WebGPU/hardware-window 路径不依赖 Qt VTK GUI 或 OpenGL scenegraph；
-# 字形生成与法线所需的 RenderingFreeType/FiltersCore 和 Dawn 运行时显式列出。公共头只有
+# 字形、法线和面内文本几何所需的 RenderingFreeType/FiltersCore/FiltersGeneral 与
+# FiltersSources，以及 Dawn 运行时显式列出。公共头只有
 # Qt 类型，VTK/Dawn 仅为模块内部消费——PRIVATE 链接避免第三方 include
 # 路径泄漏给消费方（静态库符号仍经 LINK_ONLY 传播给最终链接者）；
 # Qt6::Quick 对应公共头的 QQuickItem 基类，保持 PUBLIC。
 target_link_libraries(
   panta_visualization
-  PRIVATE VTK::RenderingWebGPU VTK::RenderingUI VTK::RenderingCore VTK::RenderingFreeType
-          VTK::FiltersCore dawn::webgpu_dawn
+  PRIVATE VTK::RenderingWebGPU
+          VTK::RenderingUI
+          VTK::RenderingCore
+          VTK::RenderingFreeType
+          VTK::FiltersCore
+          VTK::FiltersGeneral
+          VTK::FiltersSources
+          dawn::webgpu_dawn
   PUBLIC Qt6::Quick)
 if(UNIX AND NOT APPLE)
   target_link_libraries(panta_visualization PRIVATE PkgConfig::WAYLAND_CLIENT)
@@ -76,7 +85,9 @@ vtk_module_autoinit(
   VTK::RenderingUI
   VTK::RenderingCore
   VTK::RenderingFreeType
-  VTK::FiltersCore)
+  VTK::FiltersCore
+  VTK::FiltersGeneral
+  VTK::FiltersSources)
 
 if(BUILD_TESTING)
   add_executable(panta_default_wordmark_test
