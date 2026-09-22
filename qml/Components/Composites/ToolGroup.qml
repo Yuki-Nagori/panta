@@ -1,10 +1,7 @@
-// 标题条工具分组容器（复刻件 .tool-group）：深灰渐变底加 panel-line 包边，
-// 经 default 属性承接子按钮行；只负责分组外观，不依赖业务状态。
+// 标题工具分组：渐变底色与齐边内容行；默认属性接收调用方的按钮。
 import QtQuick
 
 Rectangle {
-    id: group
-
     default property alias content: row.data
 
     implicitHeight: Theme.titlebarHeight

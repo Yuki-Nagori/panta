@@ -1,5 +1,4 @@
-// 左侧任务面板（复刻件 .tasks-panel）：任务/工具/共享视图页签与任务列表；
-// 列表条目暂为视觉骨架，未接业务命令。
+// 任务页签和工程入口；业务命令尚未接入，关闭信号交由页面处理。
 import QtQuick
 import QtQuick.Layouts
 
@@ -24,7 +23,6 @@ PanelSurface {
             tabs: [qsTr("Task List"), qsTr("Tools"), qsTr("Shared Views")]
         }
 
-        // 任务列表（复刻件 .task-list）：条目悬停高亮，弱化后缀跟随主文案。
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 0

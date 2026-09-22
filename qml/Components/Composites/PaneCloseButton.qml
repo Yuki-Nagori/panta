@@ -1,5 +1,4 @@
-// 面板右上角关闭按钮（复刻件 .pane-close）：悬停红色高亮，输出
-// closeRequested 信号由宿主决定隐藏行为；图标随悬停/键盘焦点切换为白色。
+// 面板右上角关闭入口；悬停/键盘焦点时红底白图标，由宿主处理关闭信号。
 import QtQuick
 
 ThemedToolButton {

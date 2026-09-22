@@ -20,7 +20,7 @@ Qt 建议分离界面与业务逻辑，并使用资源系统组织应用资源�
 - 图标和内置 QML 通过模块资源定位；用户输入文件通过应用服务处理 URL/path 转换。避免当前工作目录相关的相对资源路径。
 - 主题、间距和色彩集中管理；文字通过翻译接口包裹；焦点、键盘操作与禁用原因可理解。布局统一使用 Qt 逻辑像素，不在 QML 里乘 `devicePixelRatio` 或缓存屏幕比例；跨屏和 framebuffer 转换集中由 C++/渲染边界处理。第一版只搭壳，不提前堆砌业务面板。
 - 自绘控件样式（自定义 background 等）不能运行于原生 Controls 样式；应用入口以 `QQuickStyle::setStyle("Basic")` 固定非原生样式，测试环境保持同源（029）。
-- 图标遵循 [图标设计规范](icons.md)，使用模块内 SVG 资源并经 `qt_add_resources` 登记，渲染依赖 Qt 供给中的 qtsvg（qsvg 图像格式插件）；不在 QML 里用 Shapes/Canvas 逐个绘制静态图标（029）。
+- 图标遵循 [图标设计规范](icons.md)，使用模块内 SVG 资源并经 `qt_add_resources` 登记；Mono 图标由 `panta-icons` provider 使用 QtSvg 渲染并着色，普通 SVG Image 解码使用 qsvg 插件。不在 QML 里用 Shapes/Canvas 逐个绘制静态图标。
 
 ## 原子组件与主题参数（项目约定）
 
@@ -31,10 +31,12 @@ Qt 建议分离界面与业务逻辑，并使用资源系统组织应用资源�
 - Theme 是 QML 的唯一主题入口；后续默认值与主题覆盖由 DSL 提供，经服务校验及 C++ ViewModel 发布。QML 不直接解析 DSL，不维护另一套默认主题值。
 - 主题切换靠属性绑定更新，与语言切换、QML 引擎重载分别处理。应用主题不属于工程变量，不影响工程 dirty 状态。
 
-详见[原子组件库与主题 DSL](../modules/qml-components-and-theme.md)。以上是后续实现约定，现有界面迁移由 029/030 验收，不宣称已经符合。
+详见[原子组件库与主题 DSL](../modules/qml-components-and-theme.md)。组件层已落地；运行期主题 DSL 与切换仍由 030 承接。
 
 ## 验证
 
 组件库需验证默认与覆盖参数、主题切换后的绑定更新、长文本及 1.0/1.25/1.5/2.0 DPR 下布局，禁止以隐藏溢出代替正确布局。
 
 使用所锁定 Qt 提供的 qmllint/格式工具检查实际模块；验证必需属性、导入、绑定循环、窗口缩放和键盘焦点。打包后的资源加载必须独立验证，不能只用源码目录启动成功作为证据。
+
+VS Code 的 Qt Qml 扩展通过 [工作区配置](../../.vscode/settings.json) 使用 Cargo 供给的 qmlls，并传入 `target/native/debug` 构建目录与 Qt staging 的 QML 导入路径。先执行 `cargo build --locked` 生成模块类型信息；编辑器不自行触发 CMake。若出现 `color was not found [import]` 等导入诊断，先对照 `cargo lint qmllint --check`，再检查 QML Language Server 日志中的工具路径和参数，必要时重启语言服务；不关闭 import 诊断。

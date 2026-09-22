@@ -1,6 +1,4 @@
-// 扁平工具按钮原子：标题条/工具条/菜单行共用的按钮形态，保留 ToolButton
-// 的键盘、焦点与禁用语义；样式默认绑定 Theme token，调用方可显式覆盖，
-// 未覆盖属性保持绑定，主题值更新（030）时随之刷新。
+// 共用工具按钮：图文、下拉指示、悬停和键盘焦点均由同一内容区域承载。
 import QtQuick
 import QtQuick.Controls
 
@@ -15,11 +13,11 @@ ToolButton {
     property color hoverColor: Theme.colorSelected
     property color borderColor: "transparent"
     property string iconName: ""
-    // 图标按钮由宿主提供英文源语义，用于读屏和悬停提示。
+    // 纯图标按钮由宿主提供已翻译的名称，供读屏与悬停提示使用。
     property string accessibleName: text
     property int iconSize: Theme.iconSizeDefault
     property bool showCaret: false
-    // 追加在主文案后的弱化后缀（复刻件任务列表的 “...” 项）。
+    // 主文案后的弱化后缀，例如工程入口的省略号。
     property string dimText: ""
     // 宽按钮（列表条目）内容靠左；默认在按钮内水平居中。
     property bool contentAlignLeft: false
@@ -29,18 +27,19 @@ ToolButton {
     ToolTip.text: accessibleName
     ToolTip.delay: Theme.toolTipDelay
 
+    font.pixelSize: Theme.fontBody
     implicitHeight: controlHeight
     leftPadding: contentPadding
     rightPadding: contentPadding
     topPadding: 0
     bottomPadding: 0
     spacing: Theme.spacingXSmall
-    // 禁用态整体弱化，配合 ToolButton 拒绝点击，让禁用原因可理解。
+    // 统一弱化整个内容；禁用事件拦截沿用 ToolButton。
     opacity: enabled ? 1 : Theme.disabledOpacity
 
     background: Rectangle {
         implicitWidth: Theme.controlHeight
-        // highlighted 用 AbstractButton 内建选中态（菜单栏当前项）：白底，
+        // highlighted 表示宿主指定的强调态（当前菜单白底），
         // 不再响应悬停高亮；visualFocus 使键盘 Tab 焦点获得与悬停一致的反馈。
         color: button.highlighted ? Theme.colorPanel : button.enabled && (button.hovered || button.visualFocus) ? button.hoverColor : "transparent"
         border.width: button.borderColor.a > 0 ? Theme.borderWidth : 0
@@ -71,12 +70,14 @@ ToolButton {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: button.text !== ""
                 text: button.text
+                textSize: button.font.pixelSize
                 textColor: button.contentColor
             }
             ThemedLabel {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: button.dimText !== ""
                 text: button.dimText
+                textSize: button.font.pixelSize
                 textColor: Theme.colorTextMuted
             }
             ThemedIcon {

@@ -4,6 +4,13 @@
     "cmake.configurePreset": "debug",
     "cmake.buildPreset": "debug",
     "cmake.configureOnOpen": false,
+    // QML 与 Cargo 使用同一 Qt；构建元数据由 cargo build 生成。
+    "qt-qml.qmlls.customExePath": "${workspaceFolder}/target/panta-deps/qt/staging/bin/qmlls",
+    "qt-qml.qmlls.customArgs": [
+        "--no-cmake-calls",
+        "-b", "${workspaceFolder}/target/native/debug",
+        "-I", "${workspaceFolder}/target/panta-deps/qt/staging/qml"
+    ],
     // Cargo 合并 CMake 与 CXX 实际编译参数，包含手写 FFI adapter。
     "C_Cpp.default.compileCommands": "${workspaceFolder}/target/native/debug/quality/compile_commands.json",
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",

@@ -171,6 +171,32 @@ class ShellModuleLoadTest final : public QObject {
                                .arg(strip->property("contentX").toDouble())
                                .arg(shellWindow->activeFocusItem() == search)));
         }
+        // 文案增长不应依赖窗口 resize 才扩大滚动范围或重新显露搜索焦点。
+        auto* quickActions = root->findChild<QQuickItem*>(QStringLiteral("titleQuickActions"));
+        auto* searchGroup = root->findChild<QQuickItem*>(QStringLiteral("titleSearchGroup"));
+        QVERIFY(quickActions != nullptr);
+        QVERIFY(searchGroup != nullptr);
+        QQuickItem* animationButton = nullptr;
+        for (auto* item : quickActions->findChildren<QQuickItem*>()) {
+            if (item->property("text").toString() == QStringLiteral("Activate Animation (A)") &&
+                item->property("contentPadding").isValid()) {
+                animationButton = item;
+                break;
+            }
+        }
+        QVERIFY(animationButton != nullptr);
+        const QString originalText = animationButton->property("text").toString();
+        animationButton->setProperty("text", QString(160, QChar('W')));
+        QTest::qWait(50);
+        QVERIFY(quickActions->width() >= quickActions->implicitWidth());
+        QVERIFY(searchGroup->mapToItem(quickActions->parentItem(), QPointF()).x() >=
+                quickActions->x() + quickActions->width());
+        const QPointF focusedPosition = search->mapToItem(strip, QPointF());
+        QVERIFY(focusedPosition.x() >= -1);
+        QVERIFY(focusedPosition.x() + search->width() <= strip->width() + 1);
+        animationButton->setProperty("text", originalText);
+        QTest::qWait(50);
+
         auto* searchButton = root->findChild<QQuickItem*>(QStringLiteral("searchButton"));
         QVERIFY(searchButton != nullptr);
         searchButton->forceActiveFocus();

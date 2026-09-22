@@ -1,10 +1,7 @@
-// Ribbon 启动区（复刻件 .ribbon）：灰渐变条带承载启动/新功能/学习磁贴；
-// 本任务为视觉骨架，磁贴暂未接业务命令。
+// 启动/新功能/学习磁贴所在条带；入口尚未接业务命令。
 import QtQuick
 
 Rectangle {
-    id: ribbon
-
     implicitWidth: 600
     implicitHeight: Theme.ribbonHeight
     gradient: Gradient {

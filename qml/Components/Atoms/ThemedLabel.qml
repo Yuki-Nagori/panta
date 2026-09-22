@@ -1,10 +1,8 @@
-// 可复用文本原子：保留 Qt Controls Label 的焦点/可访问性语义。
+// 主题文本；调用方可覆盖颜色与字号。
 import QtQuick
 import QtQuick.Controls
 
 Label {
-    id: label
-
     property color textColor: Theme.colorText
     property int textSize: Theme.fontBody
 

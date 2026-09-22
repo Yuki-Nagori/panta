@@ -1,6 +1,7 @@
 // QML 原子组件的默认 token 与显式覆盖测试（029）。
 #include <QColor>
 #include <QDir>
+#include <QFont>
 #include <QGuiApplication>
 #include <QImage>
 #include <QImageReader>
@@ -100,6 +101,29 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(button->property("opacity").toDouble(), 1.0);
         button->setProperty("enabled", false);
         QCOMPARE(button->property("opacity").toDouble(), 0.4);
+    }
+
+    void button_font_size_reaches_its_label() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        auto* button = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedToolButton.qml"),
+            owner);
+        QVERIFY(button != nullptr);
+        button->setProperty("text", QStringLiteral("Font override"));
+        QObject* label = nullptr;
+        for (auto* child : button->findChildren<QObject*>()) {
+            if (child->property("text").toString() == QStringLiteral("Font override")) {
+                label = child;
+                break;
+            }
+        }
+        QVERIFY(label != nullptr);
+        QFont font = button->property("font").value<QFont>();
+        font.setPixelSize(19);
+        button->setProperty("font", font);
+        QCOMPARE(label->property("font").value<QFont>().pixelSize(), 19);
     }
 
     void icon_resolves_module_resource() {

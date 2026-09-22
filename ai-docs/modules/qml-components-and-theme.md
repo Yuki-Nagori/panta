@@ -35,7 +35,9 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 原子/组合组件公开语义清楚的属性与信号，例如 label、iconName、controlHeight、contentPadding、closeRequested。尺寸属性默认绑定 Theme token，调用方可通过属性覆盖；组合组件向内部原子组件显式传入参数，不依赖父级 id、parent 链或隐式全局业务状态。不用 imperative 赋值覆盖 token 绑定，保证换主题后未覆盖值能继续更新。
 
-组件默认宽高通过内容及输入参数计算 implicit size，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。跨区块的工作区框架（左栏/分隔线/VTK 列）用 anchors 直接锚定：嵌套 Layout 的默认最大尺寸是自身隐式尺寸，fillWidth 列展不开且剩余空间分派不可预期（029 有几何 dump 证据）。点击仅发语义信号，面板再调用 ViewModel。
+组件默认宽高通过内容及输入参数计算 implicit size，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。工作区先按比例和最小值确定左栏宽度，再以 anchors 把余下空间分配给 VTK 列。点击仅发语义信号，面板再调用 ViewModel。
+
+`ThemedToolButton` 的正文与弱化后缀跟随按钮 `font.pixelSize`，默认使用 `Theme.fontBody`。输出工具条通过面板内的 `OutputAction` 统一按钮尺寸，具体动作仍显式声明图标与翻译上下文。标题工具分组保留内容所需宽度，中央标题可省略；分组变宽时同步扩展滚动范围，并在布局后重新显露当前焦点。
 
 显示文案统一英文源 + `qsTr()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`，上下文段与 QML 组件同名（`.pa` 同上下文源文本长度必须互异）；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
 

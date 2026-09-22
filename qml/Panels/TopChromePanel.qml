@@ -1,7 +1,5 @@
-// 顶部 chrome 面板（复刻件 .top-chrome）：品牌 logo 列、标题条（快捷图标、
-// 激活动图、居中标题、全局搜索与账户簇）与菜单栏。标题经 caption 属性注入；
-// 搜索与菜单本任务为视觉骨架，未接业务命令。窗口控制交由系统标题栏承接
-// （维护者决策），不复刻最小化/最大化/关闭按钮。
+// 品牌、快捷工具、标题、搜索和菜单；caption 由宿主注入，动作尚未接业务服务。
+// 原生窗口控制仍由系统标题栏承接。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -19,7 +17,7 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // 品牌 logo 列：跨标题条与菜单栏两行（复刻件 .logo-cell）。
+        // 品牌区域跨标题工具条与菜单栏。
         Rectangle {
             Layout.fillHeight: true
             Layout.preferredWidth: Theme.logoWidth
@@ -69,6 +67,7 @@ Rectangle {
                     contentX = Math.max(0, Math.min(desired, contentWidth - width));
                 }
                 onWidthChanged: Qt.callLater(ensureFocusedVisible)
+                onContentWidthChanged: Qt.callLater(ensureFocusedVisible)
                 Connections {
                     target: chrome.Window.window
                     function onActiveFocusItemChanged() {
@@ -78,12 +77,15 @@ Rectangle {
 
                 RowLayout {
                     id: titleContent
-                    width: Math.max(titleStrip.width, Theme.titlebarMinimumContentWidth)
+                    // 标题可省略，工具分组不可压缩；翻译或字号增长时扩展滚动范围。
+                    width: Math.max(titleStrip.width, Theme.titlebarMinimumContentWidth, quickActions.implicitWidth + searchActions.implicitWidth + Theme.spacingLarge + 2 * spacing)
                     height: titleStrip.height
                     spacing: Theme.spacingMedium
 
                     ToolGroup {
+                        id: quickActions
                         objectName: "titleQuickActions"
+                        Layout.minimumWidth: implicitWidth
                         ThemedToolButton {
                             iconName: "document-new"
                             accessibleName: qsTranslate("IconActionNewDocument", "New document")
@@ -141,7 +143,9 @@ Rectangle {
                         font.weight: Font.DemiBold
                     }
                     ToolGroup {
+                        id: searchActions
                         objectName: "titleSearchGroup"
+                        Layout.minimumWidth: implicitWidth
                         Row {
                             spacing: Theme.spacingXSmall
                             Item {
@@ -198,7 +202,6 @@ Rectangle {
                 }
             }
 
-            // 菜单栏行（复刻件 .menubar）：深灰底，选中项白底高亮。
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true

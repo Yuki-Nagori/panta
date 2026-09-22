@@ -64,9 +64,8 @@ target_sources(panta_shell PRIVATE ../native/app/icon_provider.cpp ../native/app
 target_include_directories(panta_shell PUBLIC ../native/app)
 target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick)
 
-# 052 统一图标资源：ThemedIcon/ThemedToolButton 以模块内相对 qrc 路径解析
-# （/qt/qml/Panta/Shell/icons/）；Mono 由 QtSvg provider 着色，qsvg 插件
-# 保留普通 SVG 解码。CONFIGURE_DEPENDS 收集资源，图标清单在 icons.md 登记。
+# ThemedIcon 使用 image://panta-icons；provider 读取下列 qrc 资源并着色。
+# CONFIGURE_DEPENDS 收集资源，图标清单在 icons.md 登记。
 file(
   GLOB PANTA_SHELL_ICON_FILES CONFIGURE_DEPENDS
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -94,5 +93,3 @@ if(BUILD_TESTING)
       "-DQML_DIR=${CMAKE_CURRENT_SOURCE_DIR}" -P
       "${CMAKE_CURRENT_SOURCE_DIR}/../native/cmake/tests/check-qml-format.cmake")
 endif()
-
-# 资源扩展点：未来图标/内置资源在此追加 qt_add_resources（资源入口，任务 005 决策）。

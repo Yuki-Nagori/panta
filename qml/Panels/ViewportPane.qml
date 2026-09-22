@@ -1,7 +1,5 @@
-// 中央视口面板（复刻件 .vtk-pane）：CaeViewport 宿主与底部视图页签。
-// 任务 007 的原生 surface 宿主，VTK 不进入 Qt Quick scenegraph；视图页签
-// 暂为视觉参考，未接业务命令。依赖 Panta.Visualization，仅进入启用 Bridge
-// 的模块变体（qml/CMakeLists.txt 剔除逻辑）。
+// CaeViewport 原生视口与视图页签；页签暂未接业务命令。
+// 仅进入启用 Bridge 的构建变体，QML 无法覆盖原生视口表面。
 import QtQuick
 import QtQuick.Layouts
 import Panta.Visualization
@@ -20,8 +18,6 @@ PanelSurface {
         spacing: 0
 
         Item {
-            id: viewportArea
-
             Layout.fillWidth: true
             Layout.fillHeight: true
 

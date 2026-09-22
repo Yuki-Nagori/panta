@@ -4,8 +4,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 ApplicationWindow {
-    id: root
-
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
     visible: true

@@ -1,16 +1,11 @@
-// Shell 主窗口（qml.md：组件 PascalCase，id/属性 camelCase；状态用绑定表达）。
-// 按 050 复刻件 ai-docs/qml-html/homepage/homepage.html 拼装桌面框架：顶部
-// chrome、ribbon 启动区、左侧任务/输出面板、中央 VTK 视口与底部视图页签、
-// 状态栏。029 只装配静态骨架：caption 与错误展示保持既有 ViewModel 绑定，
-// 其余按钮与页签为视觉参考；窗口控制由系统标题栏承接。
+// Shell 页面装配；标题和错误由 ViewModel 提供，面板关闭状态由页面持有。
+// 顶部动作与视图页签尚未接业务命令，窗口控制由系统标题栏承接。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Panta.Bridge
 
 ApplicationWindow {
-    id: root
-
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
     visible: true
@@ -28,7 +23,6 @@ ApplicationWindow {
 
         TopChromePanel {
             Layout.fillWidth: true
-            // 重复写入同一 caption 不产生新通知（ShellViewModel 去重，测试覆盖）。
             caption: viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
         }
 
@@ -36,8 +30,7 @@ ApplicationWindow {
             Layout.fillWidth: true
         }
 
-        // 工作区用 anchors 直接锚定而非嵌套 Layout：嵌套 Layout 的默认最大
-        // 尺寸是自身隐式尺寸，fillWidth 列展不开，剩余空间的分派不可预期。
+        // 先确定左栏比例宽度，再把剩余区域交给原生视口。
         Item {
             id: workspace
 
@@ -100,7 +93,6 @@ ApplicationWindow {
             }
         }
 
-        // 状态栏（复刻件 .statusbar）：就绪状态。
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.statusbarHeight

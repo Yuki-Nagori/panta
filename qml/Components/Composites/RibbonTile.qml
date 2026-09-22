@@ -1,5 +1,4 @@
-// Ribbon 启动区磁贴（复刻件 .ribbon-tile）：大图标加小字标签的纵向按钮，
-// 白底包边、悬停高亮；保留 ToolButton 的键盘焦点语义。
+// 固定宽度的启动磁贴，图标与文字整体居中，保留按钮的焦点和禁用语义。
 import QtQuick
 import QtQuick.Controls
 
