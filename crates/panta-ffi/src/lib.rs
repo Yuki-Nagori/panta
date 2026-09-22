@@ -84,6 +84,35 @@ pub mod bridge {
         pub dirty: bool,
     }
 
+    /// 已导入网格的持久化元数据。尺寸拆成标量，避免 CXX shared struct
+    /// 直接暴露 Rust 数组，便于 Qt 侧消费。
+    #[derive(Clone, PartialEq)]
+    pub struct ProjectImport {
+        pub record_version: u32,
+        pub parser_version: u32,
+        pub id: String,
+        pub source_name: String,
+        pub asset: String,
+        pub format: String,
+        pub mesh_type: String,
+        pub units: String,
+        pub show_import_log: bool,
+        pub triangle_count: u64,
+        pub size_x: f64,
+        pub size_y: f64,
+        pub size_z: f64,
+    }
+
+    /// STL metadata shown by the import dialog before the file is copied.
+    #[derive(Clone, PartialEq)]
+    pub struct StlImportPreview {
+        pub source_name: String,
+        pub triangle_count: u64,
+        pub size_x: f64,
+        pub size_y: f64,
+        pub size_z: f64,
+    }
+
     /// 工程模型命令种类；新增值必须同步 Rust 映射与失败测试。
     pub enum ProjectCommandKind {
         Rename = 0,
@@ -176,6 +205,18 @@ pub mod bridge {
             command: ProjectCommand,
         ) -> Result<ProjectSnapshot>;
         fn project_service_current(service: &ProjectService) -> Result<ProjectSnapshot>;
+        fn project_service_import_stl(
+            service: &mut ProjectService,
+            source: String,
+            mesh_type: String,
+            units: String,
+            show_import_log: bool,
+        ) -> Result<ProjectImport>;
+        fn project_service_imports(service: &ProjectService) -> Result<Vec<ProjectImport>>;
+        fn project_service_inspect_stl(
+            service: &ProjectService,
+            source: String,
+        ) -> Result<StlImportPreview>;
 
         /// 崩溃信号处理器安装（任务 047，panta_foundation::crash 的 FFI 面）：
         /// 返回日志路径；log_dir 为空时用系统临时目录。
@@ -490,12 +531,78 @@ fn project_service_current(service: &ProjectService) -> Result<bridge::ProjectSn
         .map_err(|error| error.to_string())
 }
 
+fn project_service_import_stl(
+    service: &mut ProjectService,
+    source: String,
+    mesh_type: String,
+    units: String,
+    show_import_log: bool,
+) -> Result<bridge::ProjectImport, String> {
+    service
+        .service
+        .import_stl(
+            std::path::Path::new(&source),
+            &mesh_type,
+            &units,
+            show_import_log,
+        )
+        .map(project_import)
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_imports(service: &ProjectService) -> Result<Vec<bridge::ProjectImport>, String> {
+    service
+        .service
+        .imports()
+        .map(|imports| imports.into_iter().map(project_import).collect())
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_inspect_stl(
+    service: &ProjectService,
+    source: String,
+) -> Result<bridge::StlImportPreview, String> {
+    service
+        .service
+        .inspect_stl(std::path::Path::new(&source))
+        .map(stl_import_preview)
+        .map_err(|error| error.to_string())
+}
+
 fn project_snapshot(snapshot: panta_core::project::ProjectSnapshot) -> bridge::ProjectSnapshot {
     bridge::ProjectSnapshot {
         path: snapshot.path.display().to_string(),
         name: snapshot.name,
         revision: snapshot.revision,
         dirty: snapshot.dirty,
+    }
+}
+
+fn project_import(import: panta_core::project::ImportRecord) -> bridge::ProjectImport {
+    bridge::ProjectImport {
+        record_version: import.record_version,
+        parser_version: import.parser_version,
+        id: import.id,
+        source_name: import.source_name,
+        asset: import.asset,
+        format: import.format,
+        mesh_type: import.mesh_type,
+        units: import.units,
+        show_import_log: import.show_import_log,
+        triangle_count: import.triangle_count,
+        size_x: import.dimensions[0],
+        size_y: import.dimensions[1],
+        size_z: import.dimensions[2],
+    }
+}
+
+fn stl_import_preview(preview: panta_core::project::StlImportPreview) -> bridge::StlImportPreview {
+    bridge::StlImportPreview {
+        source_name: preview.source_name,
+        triangle_count: preview.triangle_count,
+        size_x: preview.dimensions[0],
+        size_y: preview.dimensions[1],
+        size_z: preview.dimensions[2],
     }
 }
 

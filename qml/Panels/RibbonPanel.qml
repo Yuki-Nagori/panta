@@ -10,6 +10,7 @@ Rectangle {
     property string activeRibbonTab: "start-learn"
     signal newProjectRequested
     signal openProjectRequested
+    signal importRequested
 
     implicitHeight: Theme.ribbonHeight
     gradient: Gradient {
@@ -42,7 +43,9 @@ Rectangle {
 
     Component {
         id: homeComponent
-        HomeRibbon {}
+        HomeRibbon {
+            onImportRequested: panel.importRequested()
+        }
     }
 
     Component {

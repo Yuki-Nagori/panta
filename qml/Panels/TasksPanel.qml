@@ -7,6 +7,43 @@ PanelSurface {
 
     property bool projectOpen: false
     property string projectName: ""
+    property bool importedPartAvailable: false
+    property string importedPartName: ""
+    readonly property var importedTaskItems: [
+        {
+            text: qsTranslate("ImportTask", "Create Mesh..."),
+            icon: "mesh"
+        },
+        {
+            text: qsTranslate("ImportTask", "Fill"),
+            icon: "geometry"
+        },
+        {
+            text: qsTranslate("ImportTask", "Material Data"),
+            icon: "material"
+        },
+        {
+            text: qsTranslate("ImportTask", "Set Injection Locations..."),
+            icon: "injection-location"
+        },
+        {
+            text: qsTranslate("ProcessTask", "Process Settings (Default)"),
+            icon: "process-settings"
+        },
+        {
+            text: qsTranslate("ImportTask", "Optimization (None)"),
+            icon: "optimization"
+        },
+        {
+            text: qsTranslate("UiCommonAnalysis", "Analyze"),
+            icon: "analysis-run",
+            enabled: false
+        },
+        {
+            text: qsTranslate("ImportTask", "Logs*"),
+            icon: "output-copy"
+        }
+    ]
 
     signal closeRequested
     signal openProjectRequested
@@ -25,7 +62,7 @@ PanelSurface {
         PanelTabBar {
             Layout.fillWidth: true
             rightPadding: Theme.paneCloseSize + 2 * Theme.spacingXSmall
-            tabs: [qsTranslate("TaskPanelTitle", "Tasks"), qsTr("Tools"), qsTr("Shared Views")]
+            tabs: [qsTranslate("TaskPanelTitle", "Tasks"), qsTranslate("UiCommonNavigation", "Tools"), qsTranslate("UiCommonNavigation", "Shared Views")]
         }
 
         ColumnLayout {
@@ -46,7 +83,7 @@ PanelSurface {
             }
             ThemedToolButton {
                 Layout.fillWidth: true
-                text: qsTr("New Project")
+                text: qsTranslate("UiCommonNavigation", "New Project")
                 dimText: "…"
                 iconName: "document-new"
                 contentAlignLeft: true
@@ -80,6 +117,40 @@ PanelSurface {
                     text: projectEntry.text
                     textSize: projectEntry.font.pixelSize
                     elide: Text.ElideRight
+                }
+            }
+        }
+
+        ColumnLayout {
+            id: studyTasks
+            Layout.fillWidth: true
+            visible: panel.projectOpen && panel.importedPartAvailable
+            spacing: 0
+
+            ThemedToolButton {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spacingMedium
+                text: qsTranslate("ImportTask", "Part (%1)").arg(panel.importedPartName)
+                iconName: "project-file"
+                contentAlignLeft: true
+                contentColor: Theme.colorText
+                contentPadding: Theme.spacingSmall
+                hoverColor: Theme.colorHover
+            }
+            Repeater {
+                model: panel.importedTaskItems
+                delegate: ThemedToolButton {
+                    required property var modelData
+
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.spacingLarge
+                    text: modelData.text
+                    iconName: modelData.icon
+                    enabled: modelData.enabled !== false
+                    contentAlignLeft: true
+                    contentColor: Theme.colorText
+                    contentPadding: Theme.spacingSmall
+                    hoverColor: Theme.colorHover
                 }
             }
         }

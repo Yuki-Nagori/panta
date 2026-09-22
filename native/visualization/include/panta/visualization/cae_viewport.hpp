@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QQuickItem>
+#include <QString>
 #include <memory>
 
 namespace panta::visualization {
@@ -14,14 +15,19 @@ namespace panta::visualization {
 class CaeViewport : public QQuickItem {
     Q_OBJECT
     QML_NAMED_ELEMENT(CaeViewport)
+    Q_PROPERTY(QString meshPath READ meshPath WRITE setMeshPath NOTIFY meshPathChanged)
 
   public:
     explicit CaeViewport(QQuickItem* parent = nullptr);
     ~CaeViewport() override;
 
+    [[nodiscard]] const QString& meshPath() const;
+    void setMeshPath(const QString& path);
+
   signals:
     /// 后端完成场景构建后通知 GUI；渲染错误经 qWarning 上报，不静默。
     void sceneReady();
+    void meshPathChanged();
 
   protected:
     void componentComplete() override;

@@ -56,7 +56,7 @@ RibbonContent {
                 },
                 {
                     key: "help",
-                    label: qsTranslate("RibbonActionHelp", "Help"),
+                    label: qsTranslate("UiCommonHelp", "Help"),
                     icon: "help-browser"
                 }
             ]

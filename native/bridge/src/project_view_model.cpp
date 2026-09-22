@@ -3,6 +3,7 @@
 #include "panta_ffi.h"
 #include "path_host.hpp"
 #include <QDir>
+#include <QFileInfo>
 #include <QLatin1Char>
 #include <QObject>
 #include <QStandardPaths>
@@ -19,6 +20,13 @@ namespace {
 QString default_project_location() {
     const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     return documents.isEmpty() ? QString{} : QDir(documents).filePath(QStringLiteral("panta"));
+}
+
+QString format_dimensions(double sizeX, double sizeY, double sizeZ, const QString& unit = {}) {
+    const QString values = QStringLiteral("%1 × %2 × %3")
+                               .arg(QString::number(sizeX, 'f', 2), QString::number(sizeY, 'f', 2),
+                                    QString::number(sizeZ, 'f', 2));
+    return unit.isEmpty() ? values : values + QLatin1Char(' ') + unit;
 }
 
 } // namespace
@@ -45,6 +53,32 @@ const QString& ProjectViewModel::currentName() const { return m_currentName; }
 
 bool ProjectViewModel::dirty() const { return m_dirty; }
 
+bool ProjectViewModel::hasImportedPart() const { return m_hasImportedPart; }
+
+const QString& ProjectViewModel::importedPartName() const { return m_importedPartName; }
+
+const QString& ProjectViewModel::importedAssetPath() const { return m_importedAssetPath; }
+
+const QString& ProjectViewModel::importedMeshType() const { return m_importedMeshType; }
+
+const QString& ProjectViewModel::importedUnits() const { return m_importedUnits; }
+
+const QString& ProjectViewModel::importedDimensions() const { return m_importedDimensions; }
+
+quint64 ProjectViewModel::importedTriangleCount() const { return m_importedTriangleCount; }
+
+bool ProjectViewModel::importPreviewReady() const { return m_importPreviewReady; }
+
+const QString& ProjectViewModel::importPreviewName() const { return m_importPreviewName; }
+
+const QString& ProjectViewModel::importPreviewDimensions() const {
+    return m_importPreviewDimensions;
+}
+
+quint64 ProjectViewModel::importPreviewTriangleCount() const {
+    return m_importPreviewTriangleCount;
+}
+
 bool ProjectViewModel::createProject(const QString& rawName, const QString& rawLocation) {
     clearError();
     std::string name;
@@ -58,6 +92,9 @@ bool ProjectViewModel::createProject(const QString& rawName, const QString& rawL
     try {
         const auto snapshot = panta::ffi::project_service_create(*m_service, location, name);
         if (!applySnapshot(snapshot)) {
+            return false;
+        }
+        if (!refreshImports()) {
             return false;
         }
         m_lastCreatedPath = m_currentPath;
@@ -88,6 +125,9 @@ bool ProjectViewModel::openProject(const QString& path) {
     try {
         const auto snapshot = panta::ffi::project_service_open(*m_service, boundaryPath);
         if (!applySnapshot(snapshot)) {
+            return false;
+        }
+        if (!refreshImports()) {
             return false;
         }
         emit projectOpened(m_currentPath);
@@ -137,6 +177,61 @@ bool ProjectViewModel::renameProject(const QString& name) {
     }
 }
 
+bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshType,
+                                 const QString& rawUnits, bool showImportLog) {
+    clearError();
+    std::string path;
+    std::string meshType;
+    std::string units;
+    QString conversionError;
+    if (!toBoundaryText(QDir::cleanPath(QDir::fromNativeSeparators(rawPath.trimmed())), &path,
+                        &conversionError) ||
+        !toBoundaryText(rawMeshType.trimmed(), &meshType, &conversionError) ||
+        !toBoundaryText(rawUnits.trimmed(), &units, &conversionError)) {
+        return fail(conversionError);
+    }
+    try {
+        panta::ffi::project_service_import_stl(*m_service, path, meshType, units, showImportLog);
+        const auto snapshot = panta::ffi::project_service_current(*m_service);
+        if (!applySnapshot(snapshot) || !refreshImports()) {
+            return false;
+        }
+        emit projectImported(m_importedAssetPath);
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
+}
+
+bool ProjectViewModel::inspectStl(const QString& rawPath) {
+    clearError();
+    std::string path;
+    QString conversionError;
+    if (!toBoundaryText(QDir::cleanPath(QDir::fromNativeSeparators(rawPath.trimmed())), &path,
+                        &conversionError)) {
+        return fail(conversionError);
+    }
+    try {
+        const auto preview = panta::ffi::project_service_inspect_stl(*m_service, path);
+        const QString name = QString::fromUtf8(preview.source_name);
+        const QString dimensions =
+            format_dimensions(preview.size_x, preview.size_y, preview.size_z);
+        const bool changed = !m_importPreviewReady || m_importPreviewName != name ||
+                             m_importPreviewDimensions != dimensions ||
+                             m_importPreviewTriangleCount != preview.triangle_count;
+        m_importPreviewReady = true;
+        m_importPreviewName = name;
+        m_importPreviewDimensions = dimensions;
+        m_importPreviewTriangleCount = preview.triangle_count;
+        if (changed) {
+            emit importPreviewChanged();
+        }
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
+}
+
 bool ProjectViewModel::fail(const QString& boundaryError) {
     const auto separator = boundaryError.indexOf(QLatin1Char(':'));
     const QString code = separator < 0 ? boundaryError : boundaryError.left(separator);
@@ -161,6 +256,58 @@ bool ProjectViewModel::applySnapshot(const panta::ffi::ProjectSnapshot& snapshot
         emit projectChanged();
     }
     return true;
+}
+
+void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports) {
+    bool nextHasImportedPart = false;
+    QString nextPartName;
+    QString nextAssetPath;
+    QString nextMeshType;
+    QString nextUnits;
+    QString nextDimensions;
+    quint64 nextTriangleCount = 0;
+
+    if (imports.size() > 0) {
+        const auto& imported = imports[imports.size() - 1];
+        nextHasImportedPart = true;
+        nextPartName = QString::fromUtf8(imported.source_name);
+        const QDir projectDirectory(QFileInfo(m_currentPath).absolutePath());
+        nextAssetPath = projectDirectory.filePath(QString::fromUtf8(imported.asset));
+        nextMeshType = QString::fromUtf8(imported.mesh_type);
+        nextUnits = QString::fromUtf8(imported.units);
+        nextTriangleCount = imported.triangle_count;
+        const QString unitLabel = nextUnits == QStringLiteral("millimeters") ? QStringLiteral("mm")
+                                  : nextUnits == QStringLiteral("centimeters")
+                                      ? QStringLiteral("cm")
+                                      : QStringLiteral("in");
+        nextDimensions =
+            format_dimensions(imported.size_x, imported.size_y, imported.size_z, unitLabel);
+    }
+
+    const bool changed =
+        m_hasImportedPart != nextHasImportedPart || m_importedPartName != nextPartName ||
+        m_importedAssetPath != nextAssetPath || m_importedMeshType != nextMeshType ||
+        m_importedUnits != nextUnits || m_importedDimensions != nextDimensions ||
+        m_importedTriangleCount != nextTriangleCount;
+    m_hasImportedPart = nextHasImportedPart;
+    m_importedPartName = nextPartName;
+    m_importedAssetPath = nextAssetPath;
+    m_importedMeshType = nextMeshType;
+    m_importedUnits = nextUnits;
+    m_importedDimensions = nextDimensions;
+    m_importedTriangleCount = nextTriangleCount;
+    if (changed) {
+        emit importsChanged();
+    }
+}
+
+bool ProjectViewModel::refreshImports() {
+    try {
+        applyImports(panta::ffi::project_service_imports(*m_service));
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
 }
 
 QString ProjectViewModel::userMessageFor(const QString& errorCode) {
@@ -196,6 +343,22 @@ QString ProjectViewModel::userMessageFor(const QString& errorCode) {
     }
     if (errorCode == QStringLiteral("project.command_invalid")) {
         return QStringLiteral("The project change is not valid.");
+    }
+    if (errorCode == QStringLiteral("project.import_file_missing")) {
+        return QStringLiteral("The selected STL file does not exist.");
+    }
+    if (errorCode == QStringLiteral("project.import_invalid_file")) {
+        return QStringLiteral("Choose an STL file to import.");
+    }
+    if (errorCode == QStringLiteral("project.import_unsupported_mesh_type") ||
+        errorCode == QStringLiteral("project.import_unsupported_units")) {
+        return QStringLiteral("Choose a supported mesh type and unit.");
+    }
+    if (errorCode == QStringLiteral("project.import_parse_failed")) {
+        return QStringLiteral("The selected STL file could not be read.");
+    }
+    if (errorCode == QStringLiteral("project.import_asset_copy_failed")) {
+        return QStringLiteral("The STL file could not be copied into the project.");
     }
     return QStringLiteral("The project operation could not be completed.");
 }

@@ -34,6 +34,7 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     void ensure_render_window();
     void schedule_refresh();
     void watch_ancestors();
+    void update_mesh_actor();
     /// 排队刷新时同步原生区域，仅状态/像素尺寸改变或恢复显示时提交帧。
     void sync_native_surface();
     void destroy_render_window();

@@ -3,6 +3,84 @@ kind: language
 language: zh-CN
 sourcelanguage: en
 
+[UiCommon]
+file:
+  src: File
+  tr: 文件
+
+import:
+  src: Import
+  tr: 导入
+
+[UiCommonNavigation]
+home:
+  src: Home
+  tr: 主页
+
+tools:
+  src: Tools
+  tr: 工具
+
+shared-views:
+  src: Shared Views
+  tr: 共享视图
+
+browse:
+  src: Browse
+  tr: 浏览
+
+new-project:
+  src: New Project
+  tr: 新建工程
+
+[UiCommonModeling]
+mesh:
+  src: Mesh
+  tr: 网格
+
+geometry:
+  src: Geometry
+  tr: 几何
+
+optimization:
+  src: Optimization
+  tr: 优化
+
+[UiCommonAnalysis]
+analyze:
+  src: Analyze
+  tr: 分析
+
+[UiCommonResults]
+label:
+  src: Results
+  tr: 结果
+
+[UiCommonReports]
+label:
+  src: Reports
+  tr: 报告
+
+[UiCommonHelp]
+label:
+  src: Help
+  tr: 帮助
+
+[UiCommonUnitMillimeters]
+millimeters:
+  src: Millimeters
+  tr: 毫米
+
+[UiCommonUnitCentimeters]
+centimeters:
+  src: Centimeters
+  tr: 厘米
+
+[UiCommonUnitInches]
+inches:
+  src: Inches
+  tr: 英寸
+
 [App]
 ready:
   src: Ready
@@ -17,19 +95,6 @@ caption:
 placeholder:
   src: Panel placeholder: project tree / viewport / properties (upcoming tasks)
   tr: 面板占位：工程树 / 视口 / 属性区（后续任务）
-
-[TasksPanel]
-tab-tools:
-  src: Tools
-  tr: 工具
-
-tab-shared-views:
-  src: Shared Views
-  tr: 共享视图
-
-new-project:
-  src: New Project
-  tr: 新建工程
 
 [NewProjectDialog]
 title:
@@ -59,10 +124,6 @@ placeholder-folder:
 project-location:
   src: Project location
   tr: 工程位置
-
-browse:
-  src: Browse
-  tr: 浏览
 
 folder-note:
   src: The project folder and .panta file will be created if they do not already exist.
@@ -108,6 +169,133 @@ error-generic:
   src: The project operation could not be completed.
   tr: 工程操作无法完成。
 
+[ImportDialogForm]
+description:
+  src: Select a mesh type and units before importing the STL file.
+  tr: 导入 STL 文件前请选择网格类型和单位。
+
+choose-file:
+  src: Choose an STL file
+  tr: 选择 STL 文件
+
+stl-file:
+  src: STL file
+  tr: STL 文件
+
+mesh-type:
+  src: Mesh type
+  tr: 网格类型
+
+units:
+  src: Units
+  tr: 单位
+
+dimensions:
+  src: Approximate dimensions
+  tr: 近似尺寸
+
+show-log:
+  src: Show import log
+  tr: 显示导入日志
+
+[ImportDialogStatus]
+select-file:
+  src: Select an STL file
+  tr: 请选择 STL 文件
+
+[ImportDialogHelp]
+help-text:
+  src: The source file is copied into the project assets so the import can be reopened later.
+  tr: 源文件会复制到工程资产目录，以便稍后重新打开导入记录。
+
+[ImportDialogErrors]
+error-file-missing:
+  src: The selected STL file does not exist.
+  tr: 所选 STL 文件不存在。
+
+error-invalid-file:
+  src: Choose an STL file to import.
+  tr: 请选择要导入的 STL 文件。
+
+error-parse:
+  src: The selected STL file could not be read.
+  tr: 无法读取所选 STL 文件。
+
+error-copy:
+  src: The STL file could not be copied into the project.
+  tr: 无法将 STL 文件复制到工程中。
+
+error-generic:
+  src: The import operation could not be completed.
+  tr: 导入操作无法完成。
+
+[ImportDialogFile]
+choose-title:
+  src: Choose STL File
+  tr: 选择 STL 文件
+
+file-filter:
+  src: STL files (*.stl)
+  tr: STL 文件（*.stl）
+
+[ImportMeshMidplane]
+label:
+  src: Midplane
+  tr: 中面
+
+[ImportMeshDualDomain]
+label:
+  src: Dual Domain
+  tr: 双层面
+
+[ImportMeshSolid3D]
+label:
+  src: Solid 3D
+  tr: 实体 3D
+
+[DialogAction]
+ok:
+  src: OK
+  tr: 确定
+
+cancel:
+  src: Cancel
+  tr: 取消
+
+[ImportTask]
+part:
+  src: Part (%1)
+  tr: 部件（%1）
+
+create-mesh:
+  src: Create Mesh...
+  tr: 创建网格...
+
+fill:
+  src: Fill
+  tr: 填充
+
+material-data:
+  src: Material Data
+  tr: 材料数据
+
+injection-locations:
+  src: Set Injection Locations...
+  tr: 设置注射位置...
+
+optimization:
+  src: Optimization (None)
+  tr: 优化（无）
+
+logs:
+  src: Logs*
+  tr: 日志*
+
+[ProcessTask]
+process-settings:
+  src: Process Settings (Default)
+  tr: 工艺设置（默认）
+
 [IconActionOpenProject]
 label:
   src: Open Project
@@ -132,17 +320,9 @@ search-placeholder:
   tr: 请输入关键字或短语
 
 [ViewportPane]
-mesh:
-  src: Mesh
-  tr: 网格
-
 model:
   src: Model
   tr: 模型
-
-results:
-  src: Results
-  tr: 结果
 
 [IconActionNewDocument]
 label:
@@ -183,11 +363,6 @@ label:
 label:
   src: Shopping cart
   tr: 购物车
-
-[IconActionHelp]
-label:
-  src: Help
-  tr: 帮助
 
 [IconActionLanguage]
 label:
@@ -289,16 +464,6 @@ label:
   src: Videos
   tr: 视频
 
-[RibbonActionHelp]
-label:
-  src: Help
-  tr: 帮助
-
-[RibbonActionImport]
-label:
-  src: Import
-  tr: 导入
-
 [RibbonActionAdd]
 label:
   src: Add
@@ -308,16 +473,6 @@ label:
 label:
   src: "Dual\nDomain"
   tr: 双层面
-
-[RibbonActionGeometry]
-label:
-  src: Geometry
-  tr: 几何
-
-[RibbonActionMesh]
-label:
-  src: Mesh
-  tr: 网格
 
 [RibbonActionMolding]
 label:
@@ -344,20 +499,10 @@ label:
   src: "Process\nSettings"
   tr: "工艺\n设置"
 
-[RibbonActionOptimization]
-label:
-  src: Optimization
-  tr: 优化
-
 [RibbonActionBoundary]
 label:
   src: "Boundary\nConditions"
   tr: "边界\n条件"
-
-[RibbonActionAnalyze]
-label:
-  src: Analyze
-  tr: 分析
 
 [RibbonActionLogs]
 label:
@@ -368,16 +513,6 @@ label:
 label:
   src: "Job\nManager"
   tr: "作业\n管理器"
-
-[RibbonActionResults]
-label:
-  src: Results
-  tr: 结果
-
-[RibbonActionReports]
-label:
-  src: Reports
-  tr: 报告
 
 [RibbonActionSharedViews]
 label:
@@ -399,11 +534,6 @@ label:
   src: Learn
   tr: 学习
 
-[RibbonGroupImport]
-label:
-  src: Import
-  tr: 导入
-
 [RibbonGroupCreate]
 label:
   src: Create
@@ -413,11 +543,6 @@ label:
 label:
   src: Molding Process Setup
   tr: 成型工艺设置
-
-[RibbonGroupAnalysis]
-label:
-  src: Results
-  tr: 结果
 
 [RibbonGroupReporting]
 label:
@@ -429,50 +554,15 @@ label:
   src: Share
   tr: 共享
 
-[ShellMenuHome]
-label:
-  src: Home
-  tr: 主页
-
-[ShellMenuTools]
-label:
-  src: Tools
-  tr: 工具
-
 [ShellMenuView]
 label:
   src: View
   tr: 查看
 
-[ShellMenuGeometry]
-label:
-  src: Geometry
-  tr: 几何
-
-[ShellMenuMesh]
-label:
-  src: Mesh
-  tr: 网格
-
 [ShellMenuBoundary]
 label:
   src: Boundary Conditions
   tr: 边界条件
-
-[ShellMenuOptimization]
-label:
-  src: Optimization
-  tr: 优化
-
-[ShellMenuResults]
-label:
-  src: Results
-  tr: 结果
-
-[ShellMenuReports]
-label:
-  src: Reports
-  tr: 报告
 
 [ShellMenuStartLearn]
 label:

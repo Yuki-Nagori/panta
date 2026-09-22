@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QIODevice>
 #include <QSignalSpy>
 #include <QString>
 #include <QTemporaryDir>
@@ -61,6 +62,51 @@ TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
     ProjectViewModel empty;
     EXPECT_FALSE(empty.saveProject());
     EXPECT_EQ(empty.errorCode(), QStringLiteral("project.no_project"));
+}
+
+TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 1 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n"),
+              0);
+    source.close();
+
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(view_model.inspectStl(sourcePath));
+    EXPECT_TRUE(view_model.importPreviewReady());
+    EXPECT_EQ(view_model.importPreviewName(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(view_model.importPreviewDimensions(), QStringLiteral("1.00 × 1.00 × 0.00"));
+    EXPECT_EQ(view_model.importPreviewTriangleCount(), 1U);
+
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
+                                     QStringLiteral("millimeters"), true));
+    EXPECT_TRUE(view_model.hasImportedPart());
+    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(view_model.importedMeshType(), QStringLiteral("dual-domain"));
+    EXPECT_EQ(view_model.importedUnits(), QStringLiteral("millimeters"));
+    EXPECT_EQ(view_model.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
+    EXPECT_EQ(view_model.importedTriangleCount(), 1U);
+    EXPECT_TRUE(QFile::exists(view_model.importedAssetPath()));
+
+    ProjectViewModel reopened;
+    ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
+    EXPECT_TRUE(reopened.hasImportedPart());
+    EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(reopened.importedAssetPath(), view_model.importedAssetPath());
+    EXPECT_EQ(reopened.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
 }
 
 int main(int argc, char** argv) {

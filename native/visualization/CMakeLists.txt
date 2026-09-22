@@ -35,6 +35,8 @@ qt_add_qml_module(
   src/cae_viewport.cpp
   src/vtk/vtk_viewport.hpp
   src/vtk/vtk_viewport.cpp
+  src/vtk/stl_mesh.cpp
+  src/vtk/stl_mesh.hpp
   src/vtk/default_wordmark.cpp
   src/vtk/default_wordmark.hpp
   src/vtk/vtk_native_surface.hpp)

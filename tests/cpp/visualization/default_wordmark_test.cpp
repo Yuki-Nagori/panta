@@ -1,5 +1,9 @@
 // 欢迎字样的 CPU 几何验证：封闭实体、字孔拓扑和有效顶点色不依赖 GPU。
 #include "default_wordmark.hpp"
+#include "stl_mesh.hpp"
+#include <QFile>
+#include <QIODevice>
+#include <QTemporaryDir>
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
@@ -78,6 +82,30 @@ class DefaultWordmarkTest final : public QObject {
         QCOMPARE(mesh->GetNumberOfPoints() - static_cast<vtkIdType>(edges.size()) +
                      mesh->GetNumberOfPolys(),
                  4);
+    }
+
+    void reads_ascii_stl_as_triangle_poly_data() {
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        const QString path = fixture.filePath(QStringLiteral("sample.stl"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        QVERIFY(file.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 1 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n") > 0);
+        file.close();
+
+        QString error;
+        const auto mesh = panta::visualization::load_stl_mesh(path, &error);
+        QVERIFY2(mesh != nullptr, qPrintable(error));
+        QCOMPARE(mesh->GetNumberOfPoints(), vtkIdType(3));
+        QCOMPARE(mesh->GetNumberOfPolys(), vtkIdType(1));
     }
 };
 

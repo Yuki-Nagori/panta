@@ -5,6 +5,7 @@
 #include "vtk_viewport.hpp"
 
 #include "default_wordmark.hpp"
+#include "stl_mesh.hpp"
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
 #include <QList>
@@ -55,8 +56,9 @@ void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, doub
         1.25 * std::max(half_height, half_width / aspect) / std::tan(half_angle_radians) +
         half_depth;
     vtkCamera* camera = renderer->GetActiveCamera();
-    camera->SetPosition(0, 0, distance);
-    camera->SetFocalPoint(0, 0, 0);
+    const double* center = actor->GetCenter();
+    camera->SetPosition(center[0], center[1], center[2] + distance);
+    camera->SetFocalPoint(center);
     camera->SetViewUp(0, 1, 0);
     camera->SetViewAngle(view_angle);
     renderer->ResetCameraClippingRange();
@@ -79,6 +81,7 @@ struct VtkViewport::Impl {
     bool refresh_scheduled = false;
     bool scene_dirty = true;
     bool creation_warning_emitted = false;
+    QString applied_mesh_path;
 };
 
 VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
@@ -120,7 +123,8 @@ void VtkViewport::apply_state(const RenderScene& state) {
         return;
     }
     impl_->scene_dirty |= state.background != impl_->pending.background ||
-                          state.primitive_visible != impl_->pending.primitive_visible;
+                          state.primitive_visible != impl_->pending.primitive_visible ||
+                          state.mesh_path != impl_->pending.mesh_path;
     impl_->pending = state;
     schedule_refresh();
 }
@@ -222,23 +226,8 @@ void VtkViewport::ensure_render_window() {
     impl_->renderer = vtkSmartPointer<vtkWebGPURenderer>::New();
     impl_->primitive_actor = vtkSmartPointer<vtkActor>::New();
 
-    vtkNew<vtkPolyDataNormals> normals;
-    normals->SetInputData(create_default_wordmark());
-    normals->SetFeatureAngle(45.0);
-    normals->ConsistencyOn();
-    normals->SplittingOn();
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(normals->GetOutputPort());
-    mapper->SetColorModeToDirectScalars();
-    mapper->SetScalarModeToUsePointData();
-    impl_->primitive_actor->SetMapper(mapper);
-    impl_->primitive_actor->SetOrientation(16.0, -18.0, -4.0);
-    auto* material = impl_->primitive_actor->GetProperty();
-    material->SetInterpolationToPhong();
-    material->SetAmbient(0.25);
-    material->SetDiffuse(0.75);
-    material->SetSpecular(0.32);
-    material->SetSpecularPower(36.0);
+    update_mesh_actor();
+    impl_->applied_mesh_path = impl_->pending.mesh_path;
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
     impl_->render_window->Initialize();
@@ -269,6 +258,56 @@ void VtkViewport::schedule_refresh() {
     });
 }
 
+void VtkViewport::update_mesh_actor() {
+    if (impl_->primitive_actor == nullptr) {
+        return;
+    }
+
+    vtkSmartPointer<vtkPolyData> geometry;
+    const bool imported_mesh = !impl_->pending.mesh_path.isEmpty();
+    if (imported_mesh) {
+        QString error;
+        geometry = load_stl_mesh(impl_->pending.mesh_path, &error);
+        if (geometry == nullptr) {
+            qCWarning(viewport_log)
+                << "STL mesh could not be rendered:" << error << impl_->pending.mesh_path;
+        }
+    }
+    if (geometry == nullptr) {
+        geometry = create_default_wordmark();
+    }
+
+    vtkNew<vtkPolyDataNormals> normals;
+    normals->SetInputData(geometry);
+    normals->SetFeatureAngle(45.0);
+    normals->ConsistencyOn();
+    normals->SplittingOn();
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(normals->GetOutputPort());
+    if (imported_mesh) {
+        mapper->SetColorModeToDefault();
+        mapper->SetScalarModeToDefault();
+    } else {
+        mapper->SetColorModeToDirectScalars();
+        mapper->SetScalarModeToUsePointData();
+    }
+    impl_->primitive_actor->SetMapper(mapper);
+    if (imported_mesh) {
+        impl_->primitive_actor->SetOrientation(0.0, 0.0, 0.0);
+    } else {
+        impl_->primitive_actor->SetOrientation(16.0, -18.0, -4.0);
+    }
+    auto* material = impl_->primitive_actor->GetProperty();
+    material->SetInterpolationToPhong();
+    material->SetAmbient(0.25);
+    material->SetDiffuse(0.75);
+    material->SetSpecular(0.32);
+    material->SetSpecularPower(36.0);
+    if (imported_mesh) {
+        material->SetColor(0.72, 0.82, 0.94);
+    }
+}
+
 void VtkViewport::sync_native_surface() {
     if (impl_->hardware_window == nullptr || window() == nullptr ||
         impl_->native_surface.view == nullptr) {
@@ -284,7 +323,12 @@ void VtkViewport::sync_native_surface() {
     qCDebug(viewport_log) << "surface synchronized";
     const qreal scale = window()->devicePixelRatio();
     const QSize pixel_size(qMax(1, qRound(width() * scale)), qMax(1, qRound(height() * scale)));
-    const bool resized = pixel_size != impl_->applied_pixel_size;
+    bool resized = pixel_size != impl_->applied_pixel_size;
+    if (impl_->primitive_actor != nullptr && impl_->pending.mesh_path != impl_->applied_mesh_path) {
+        update_mesh_actor();
+        impl_->applied_mesh_path = impl_->pending.mesh_path;
+        resized = true;
+    }
     if (!impl_->scene_dirty && !resized) {
         return;
     }
@@ -315,6 +359,7 @@ void VtkViewport::destroy_render_window() {
     }
     impl_->renderer = nullptr;
     impl_->primitive_actor = nullptr;
+    impl_->applied_mesh_path.clear();
     if (impl_->hardware_window != nullptr) {
         impl_->hardware_window->Destroy();
         impl_->hardware_window.reset();

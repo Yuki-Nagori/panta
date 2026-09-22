@@ -172,7 +172,7 @@ Rectangle {
                         }
                         ThemedToolButton {
                             iconName: "help-browser"
-                            accessibleName: qsTranslate("IconActionHelp", "Help")
+                            accessibleName: qsTranslate("UiCommonHelp", "Help")
                             showCaret: true
                         }
                     }
@@ -198,11 +198,11 @@ Rectangle {
                             model: chrome.projectOpen ? [
                                 {
                                     key: "home",
-                                    label: qsTranslate("ShellMenuHome", "Home")
+                                    label: qsTranslate("UiCommonNavigation", "Home")
                                 },
                                 {
                                     key: "tools",
-                                    label: qsTranslate("ShellMenuTools", "Tools")
+                                    label: qsTranslate("UiCommonNavigation", "Tools")
                                 },
                                 {
                                     key: "view",
@@ -210,11 +210,11 @@ Rectangle {
                                 },
                                 {
                                     key: "geometry",
-                                    label: qsTranslate("ShellMenuGeometry", "Geometry")
+                                    label: qsTranslate("UiCommonModeling", "Geometry")
                                 },
                                 {
                                     key: "mesh",
-                                    label: qsTranslate("ShellMenuMesh", "Mesh")
+                                    label: qsTranslate("UiCommonModeling", "Mesh")
                                 },
                                 {
                                     key: "boundary",
@@ -222,15 +222,15 @@ Rectangle {
                                 },
                                 {
                                     key: "optimization",
-                                    label: qsTranslate("ShellMenuOptimization", "Optimization")
+                                    label: qsTranslate("UiCommonModeling", "Optimization")
                                 },
                                 {
                                     key: "results",
-                                    label: qsTranslate("ShellMenuResults", "Results")
+                                    label: qsTranslate("UiCommonResults", "Results")
                                 },
                                 {
                                     key: "reports",
-                                    label: qsTranslate("ShellMenuReports", "Reports")
+                                    label: qsTranslate("UiCommonReports", "Reports")
                                 },
                                 {
                                     key: "start-learn",
@@ -251,7 +251,7 @@ Rectangle {
                                 },
                                 {
                                     key: "tools",
-                                    label: qsTranslate("ShellMenuTools", "Tools")
+                                    label: qsTranslate("UiCommonNavigation", "Tools")
                                 },
                                 {
                                     key: "view",

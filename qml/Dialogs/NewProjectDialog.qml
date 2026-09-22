@@ -148,7 +148,7 @@ Window {
                         ThemedToolButton {
                             Layout.preferredWidth: 92
                             Layout.preferredHeight: Theme.controlHeight
-                            text: qsTranslate("NewProjectDialog", "Browse")
+                            text: qsTranslate("UiCommonNavigation", "Browse")
                             iconName: "document-open"
                             contentPadding: Theme.spacingSmall
                             hoverColor: Theme.colorHover
@@ -191,7 +191,7 @@ Window {
                     ThemedToolButton {
                         Layout.preferredWidth: 92
                         Layout.preferredHeight: Theme.controlHeight
-                        text: qsTr("OK")
+                        text: qsTranslate("DialogAction", "OK")
                         highlighted: true
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
@@ -201,7 +201,7 @@ Window {
                     ThemedToolButton {
                         Layout.preferredWidth: 92
                         Layout.preferredHeight: Theme.controlHeight
-                        text: qsTr("Cancel")
+                        text: qsTranslate("DialogAction", "Cancel")
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine

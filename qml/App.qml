@@ -42,6 +42,12 @@ ApplicationWindow {
         projectModel: projectModel
     }
 
+    ImportDialog {
+        id: importDialog
+        ownerWindow: shellWindow
+        projectModel: projectModel
+    }
+
     FileDialog {
         id: openProjectFileDialog
         title: qsTranslate("IconActionOpenProject", "Open Project")
@@ -70,6 +76,7 @@ ApplicationWindow {
             activeRibbonTab: shellWindow.activeRibbonTab
             onOpenProjectRequested: openProjectFileDialog.open()
             onNewProjectRequested: newProjectDialog.open()
+            onImportRequested: importDialog.open()
         }
 
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。
@@ -97,6 +104,8 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     projectOpen: shellWindow.projectOpen
                     projectName: projectModel.currentName
+                    importedPartAvailable: projectModel.hasImportedPart
+                    importedPartName: projectModel.importedPartName
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
                     onNewProjectRequested: newProjectDialog.open()
@@ -131,6 +140,7 @@ ApplicationWindow {
             ViewportPane {
                 id: viewportPane
 
+                meshPath: projectModel.hasImportedPart ? projectModel.importedAssetPath : ""
                 anchors.left: workspaceSplit.right
                 anchors.right: parent.right
                 anchors.top: parent.top

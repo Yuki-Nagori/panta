@@ -31,7 +31,8 @@ set(PANTA_SHELL_QML_FILES
     Panels/OutputPanel.qml
     Panels/ViewportPane.qml
     Panels/PlaceholderPanel.qml
-    Dialogs/NewProjectDialog.qml)
+    Dialogs/NewProjectDialog.qml
+    Dialogs/ImportDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)

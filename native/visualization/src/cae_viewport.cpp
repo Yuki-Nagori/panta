@@ -4,6 +4,9 @@
 #include <QObject>
 #include <QPointF>
 #include <QRectF>
+#include <QString>
+#include <QtCore/qtmetamacros.h>
+#include <algorithm>
 #include <memory>
 #include <panta/visualization/cae_viewport.hpp>
 #include <panta/visualization/render_scene.hpp>
@@ -33,11 +36,23 @@ CaeViewport::CaeViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::ma
 
 CaeViewport::~CaeViewport() = default;
 
+const QString& CaeViewport::meshPath() const { return impl_->scene.mesh_path; }
+
+void CaeViewport::setMeshPath(const QString& path) {
+    if (impl_->scene.mesh_path == path) {
+        return;
+    }
+    impl_->scene.mesh_path = path;
+    ++impl_->scene.revision;
+    impl_->backend->apply_state(impl_->scene);
+    emit meshPathChanged();
+}
+
 void CaeViewport::componentComplete() {
     QQuickItem::componentComplete();
     // 初次状态提交后，后端在 GUI 线程创建原生 surface 和 WebGPU 管线；
     // 构建完成经 sceneReady 通知 GUI（渲染错误走 qWarning，不静默）。
-    impl_->scene.revision = 1;
+    impl_->scene.revision = std::max<SceneRevision>(1, impl_->scene.revision + 1);
     impl_->backend->apply_state(impl_->scene);
 }
 

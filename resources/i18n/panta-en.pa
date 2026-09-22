@@ -3,6 +3,84 @@ kind: language
 language: en
 sourcelanguage: en
 
+[UiCommon]
+file:
+  src: File
+  tr: File
+
+import:
+  src: Import
+  tr: Import
+
+[UiCommonNavigation]
+home:
+  src: Home
+  tr: Home
+
+tools:
+  src: Tools
+  tr: Tools
+
+shared-views:
+  src: Shared Views
+  tr: Shared Views
+
+browse:
+  src: Browse
+  tr: Browse
+
+new-project:
+  src: New Project
+  tr: New Project
+
+[UiCommonModeling]
+mesh:
+  src: Mesh
+  tr: Mesh
+
+geometry:
+  src: Geometry
+  tr: Geometry
+
+optimization:
+  src: Optimization
+  tr: Optimization
+
+[UiCommonAnalysis]
+analyze:
+  src: Analyze
+  tr: Analyze
+
+[UiCommonResults]
+label:
+  src: Results
+  tr: Results
+
+[UiCommonReports]
+label:
+  src: Reports
+  tr: Reports
+
+[UiCommonHelp]
+label:
+  src: Help
+  tr: Help
+
+[UiCommonUnitMillimeters]
+millimeters:
+  src: Millimeters
+  tr: Millimeters
+
+[UiCommonUnitCentimeters]
+centimeters:
+  src: Centimeters
+  tr: Centimeters
+
+[UiCommonUnitInches]
+inches:
+  src: Inches
+  tr: Inches
+
 [App]
 ready:
   src: Ready
@@ -17,19 +95,6 @@ caption:
 placeholder:
   src: Panel placeholder: project tree / viewport / properties (upcoming tasks)
   tr: Panel placeholder: project tree / viewport / properties (upcoming tasks)
-
-[TasksPanel]
-tab-tools:
-  src: Tools
-  tr: Tools
-
-tab-shared-views:
-  src: Shared Views
-  tr: Shared Views
-
-new-project:
-  src: New Project
-  tr: New Project
 
 [NewProjectDialog]
 title:
@@ -59,10 +124,6 @@ placeholder-folder:
 project-location:
   src: Project location
   tr: Project location
-
-browse:
-  src: Browse
-  tr: Browse
 
 folder-note:
   src: The project folder and .panta file will be created if they do not already exist.
@@ -108,6 +169,133 @@ error-generic:
   src: The project operation could not be completed.
   tr: The project operation could not be completed.
 
+[ImportDialogForm]
+description:
+  src: Select a mesh type and units before importing the STL file.
+  tr: Select a mesh type and units before importing the STL file.
+
+choose-file:
+  src: Choose an STL file
+  tr: Choose an STL file
+
+stl-file:
+  src: STL file
+  tr: STL file
+
+mesh-type:
+  src: Mesh type
+  tr: Mesh type
+
+units:
+  src: Units
+  tr: Units
+
+dimensions:
+  src: Approximate dimensions
+  tr: Approximate dimensions
+
+show-log:
+  src: Show import log
+  tr: Show import log
+
+[ImportDialogStatus]
+select-file:
+  src: Select an STL file
+  tr: Select an STL file
+
+[ImportDialogHelp]
+help-text:
+  src: The source file is copied into the project assets so the import can be reopened later.
+  tr: The source file is copied into the project assets so the import can be reopened later.
+
+[ImportDialogErrors]
+error-file-missing:
+  src: The selected STL file does not exist.
+  tr: The selected STL file does not exist.
+
+error-invalid-file:
+  src: Choose an STL file to import.
+  tr: Choose an STL file to import.
+
+error-parse:
+  src: The selected STL file could not be read.
+  tr: The selected STL file could not be read.
+
+error-copy:
+  src: The STL file could not be copied into the project.
+  tr: The STL file could not be copied into the project.
+
+error-generic:
+  src: The import operation could not be completed.
+  tr: The import operation could not be completed.
+
+[ImportDialogFile]
+choose-title:
+  src: Choose STL File
+  tr: Choose STL File
+
+file-filter:
+  src: STL files (*.stl)
+  tr: STL files (*.stl)
+
+[ImportMeshMidplane]
+label:
+  src: Midplane
+  tr: Midplane
+
+[ImportMeshDualDomain]
+label:
+  src: Dual Domain
+  tr: Dual Domain
+
+[ImportMeshSolid3D]
+label:
+  src: Solid 3D
+  tr: Solid 3D
+
+[DialogAction]
+ok:
+  src: OK
+  tr: OK
+
+cancel:
+  src: Cancel
+  tr: Cancel
+
+[ImportTask]
+part:
+  src: Part (%1)
+  tr: Part (%1)
+
+create-mesh:
+  src: Create Mesh...
+  tr: Create Mesh...
+
+fill:
+  src: Fill
+  tr: Fill
+
+material-data:
+  src: Material Data
+  tr: Material Data
+
+injection-locations:
+  src: Set Injection Locations...
+  tr: Set Injection Locations...
+
+optimization:
+  src: Optimization (None)
+  tr: Optimization (None)
+
+logs:
+  src: Logs*
+  tr: Logs*
+
+[ProcessTask]
+process-settings:
+  src: Process Settings (Default)
+  tr: Process Settings (Default)
+
 [IconActionOpenProject]
 label:
   src: Open Project
@@ -132,17 +320,9 @@ search-placeholder:
   tr: Enter a keyword or phrase
 
 [ViewportPane]
-mesh:
-  src: Mesh
-  tr: Mesh
-
 model:
   src: Model
   tr: Model
-
-results:
-  src: Results
-  tr: Results
 
 [IconActionNewDocument]
 label:
@@ -183,11 +363,6 @@ label:
 label:
   src: Shopping cart
   tr: Shopping cart
-
-[IconActionHelp]
-label:
-  src: Help
-  tr: Help
 
 [IconActionLanguage]
 label:
@@ -289,16 +464,6 @@ label:
   src: Videos
   tr: Videos
 
-[RibbonActionHelp]
-label:
-  src: Help
-  tr: Help
-
-[RibbonActionImport]
-label:
-  src: Import
-  tr: Import
-
 [RibbonActionAdd]
 label:
   src: Add
@@ -308,16 +473,6 @@ label:
 label:
   src: "Dual\nDomain"
   tr: "Dual\nDomain"
-
-[RibbonActionGeometry]
-label:
-  src: Geometry
-  tr: Geometry
-
-[RibbonActionMesh]
-label:
-  src: Mesh
-  tr: Mesh
 
 [RibbonActionMolding]
 label:
@@ -344,20 +499,10 @@ label:
   src: "Process\nSettings"
   tr: "Process\nSettings"
 
-[RibbonActionOptimization]
-label:
-  src: Optimization
-  tr: Optimization
-
 [RibbonActionBoundary]
 label:
   src: "Boundary\nConditions"
   tr: "Boundary\nConditions"
-
-[RibbonActionAnalyze]
-label:
-  src: Analyze
-  tr: Analyze
 
 [RibbonActionLogs]
 label:
@@ -368,16 +513,6 @@ label:
 label:
   src: "Job\nManager"
   tr: "Job\nManager"
-
-[RibbonActionResults]
-label:
-  src: Results
-  tr: Results
-
-[RibbonActionReports]
-label:
-  src: Reports
-  tr: Reports
 
 [RibbonActionSharedViews]
 label:
@@ -399,11 +534,6 @@ label:
   src: Learn
   tr: Learn
 
-[RibbonGroupImport]
-label:
-  src: Import
-  tr: Import
-
 [RibbonGroupCreate]
 label:
   src: Create
@@ -413,11 +543,6 @@ label:
 label:
   src: Molding Process Setup
   tr: Molding Process Setup
-
-[RibbonGroupAnalysis]
-label:
-  src: Results
-  tr: Results
 
 [RibbonGroupReporting]
 label:
@@ -429,50 +554,15 @@ label:
   src: Share
   tr: Share
 
-[ShellMenuHome]
-label:
-  src: Home
-  tr: Home
-
-[ShellMenuTools]
-label:
-  src: Tools
-  tr: Tools
-
 [ShellMenuView]
 label:
   src: View
   tr: View
 
-[ShellMenuGeometry]
-label:
-  src: Geometry
-  tr: Geometry
-
-[ShellMenuMesh]
-label:
-  src: Mesh
-  tr: Mesh
-
 [ShellMenuBoundary]
 label:
   src: Boundary Conditions
   tr: Boundary Conditions
-
-[ShellMenuOptimization]
-label:
-  src: Optimization
-  tr: Optimization
-
-[ShellMenuResults]
-label:
-  src: Results
-  tr: Results
-
-[ShellMenuReports]
-label:
-  src: Reports
-  tr: Reports
 
 [ShellMenuStartLearn]
 label:

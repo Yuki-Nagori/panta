@@ -1,15 +1,19 @@
-// Home 页签的工程工具定义；当前入口仍为视觉参考，尚未接入业务命令。
+// Home 页签的工程工具定义；Import 发语义信号，业务操作由 App 注入的 ViewModel 承接。
 import QtQuick
 
 RibbonContent {
+    id: homeRibbon
+
+    signal importRequested
+
     groups: [
         {
-            title: qsTranslate("RibbonGroupImport", "Import"),
+            title: qsTranslate("UiCommon", "Import"),
             caret: false,
             tools: [
                 {
                     key: "import",
-                    label: qsTranslate("RibbonActionImport", "Import"),
+                    label: qsTranslate("UiCommon", "Import"),
                     icon: "project-import"
                 }
             ]
@@ -31,12 +35,12 @@ RibbonContent {
                 },
                 {
                     key: "geometry",
-                    label: qsTranslate("RibbonActionGeometry", "Geometry"),
+                    label: qsTranslate("UiCommonModeling", "Geometry"),
                     icon: "geometry"
                 },
                 {
                     key: "mesh",
-                    label: qsTranslate("RibbonActionMesh", "Mesh"),
+                    label: qsTranslate("UiCommonModeling", "Mesh"),
                     icon: "mesh"
                 }
             ]
@@ -73,12 +77,12 @@ RibbonContent {
             ]
         },
         {
-            title: qsTranslate("RibbonGroupAnalysis", "Results"),
+            title: qsTranslate("UiCommonResults", "Results"),
             caret: false,
             tools: [
                 {
                     key: "optimization",
-                    label: qsTranslate("RibbonActionOptimization", "Optimization"),
+                    label: qsTranslate("UiCommonModeling", "Optimization"),
                     icon: "optimization"
                 },
                 {
@@ -88,7 +92,7 @@ RibbonContent {
                 },
                 {
                     key: "analyze",
-                    label: qsTranslate("RibbonActionAnalyze", "Analyze"),
+                    label: qsTranslate("UiCommonAnalysis", "Analyze"),
                     icon: "analysis-run",
                     enabled: false
                 },
@@ -110,12 +114,12 @@ RibbonContent {
             tools: [
                 {
                     key: "results",
-                    label: qsTranslate("RibbonActionResults", "Results"),
+                    label: qsTranslate("UiCommonResults", "Results"),
                     icon: "analysis-results"
                 },
                 {
                     key: "reports",
-                    label: qsTranslate("RibbonActionReports", "Reports"),
+                    label: qsTranslate("UiCommonReports", "Reports"),
                     icon: "document-report"
                 }
             ]
@@ -132,4 +136,9 @@ RibbonContent {
             ]
         }
     ]
+
+    onActionRequested: key => {
+        if (key === "import")
+            homeRibbon.importRequested();
+    }
 }
