@@ -380,7 +380,7 @@ class ShellModuleLoadTest final : public QObject {
         QSignalSpy projectChanged(project, &panta::bridge::ProjectViewModel::projectChanged);
         QVERIFY(projectChanged.isValid());
 
-        // 导航只替换 Ribbon delegate，不修改快照或重建工作区，即使工程有未保存变更。
+        // 导航只替换 Ribbon 页签，不修改快照或重建工作区，即使工程有未保存变更。
         for (int round = 0; round < 2; ++round) {
             for (const char* tab : {"start-learn", "home"}) {
                 activate_menu(window, tab, keyboard);

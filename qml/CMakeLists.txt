@@ -18,12 +18,15 @@ set(PANTA_SHELL_QML_FILES
     Components/Composites/ToolGroup.qml
     Components/Composites/RibbonTile.qml
     Components/Composites/RibbonGroup.qml
+    Components/Composites/RibbonContent.qml
     Components/Composites/HorizontalToolStrip.qml
     Components/Composites/PanelTabBar.qml
     Components/Composites/PaneCloseButton.qml
     Components/Composites/DialogTitleBar.qml
     Panels/TopChromePanel.qml
     Panels/RibbonPanel.qml
+    Panels/Ribbon/HomeRibbon.qml
+    Panels/Ribbon/StartLearnRibbon.qml
     Panels/TasksPanel.qml
     Panels/OutputPanel.qml
     Panels/ViewportPane.qml

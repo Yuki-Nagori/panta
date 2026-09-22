@@ -1,4 +1,4 @@
-// QML 原子组件的默认 token 与显式覆盖测试（029）。
+// QML 组件的主题参数、资源解析及 Ribbon 页签组合边界回归。
 #include "quick_item_helpers.hpp"
 #include <QColor>
 #include <QDir>
@@ -7,6 +7,7 @@
 #include <QImage>
 #include <QImageReader>
 #include <QObject>
+#include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickImageProvider>
@@ -17,6 +18,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QtCore/qcontainerfwd.h>
+#include <QtCore/qnamespace.h>
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
@@ -133,6 +135,50 @@ class ThemeComponentTest final : public QObject {
         QTRY_VERIFY(tile->property("implicitHeight").toDouble() > 68.0);
     }
 
+    void ribbon_tabs_load_independently_data() {
+        QTest::addColumn<QString>("componentName");
+        QTest::addColumn<int>("groupCount");
+        QTest::addColumn<int>("toolCount");
+        QTest::addColumn<QString>("firstKey");
+        QTest::newRow("home") << QStringLiteral("HomeRibbon") << 6 << 18
+                              << QStringLiteral("import");
+        QTest::newRow("start-learn")
+            << QStringLiteral("StartLearnRibbon") << 3 << 7 << QStringLiteral("new-project");
+    }
+
+    void ribbon_tabs_load_independently() {
+        QFETCH(QString, componentName);
+        QFETCH(int, groupCount);
+        QFETCH(int, toolCount);
+        QFETCH(QString, firstKey);
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QQuickWindow window;
+        QObject owner;
+        auto* tab = qobject_cast<QQuickItem*>(
+            create_component(engine,
+                             QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/Ribbon/") +
+                                 componentName + QStringLiteral(".qml"),
+                             owner));
+        QVERIFY(tab != nullptr);
+        tab->setParentItem(window.contentItem());
+        window.show();
+        QTRY_COMPARE(visual_items(tab, QStringLiteral("ribbonTools")).size(), groupCount);
+        QTRY_COMPARE(visual_items(tab, QStringLiteral("ribbonTileContent")).size(), toolCount);
+        QTRY_VERIFY(tab->implicitWidth() > 0);
+        QTRY_COMPARE(tab->implicitHeight(), 95.0);
+        QCOMPARE(tab->width(), tab->implicitWidth());
+
+        // 页签单独加载也能通过公共渲染报告 key，不依赖 App 或外壳 id。
+        QSignalSpy actionRequested(tab, SIGNAL(actionRequested(QString)));
+        QVERIFY(actionRequested.isValid());
+        auto* button = visual_item(tab, QStringLiteral("ribbon-") + firstKey);
+        QVERIFY(button != nullptr);
+        QVERIFY(QMetaObject::invokeMethod(button, "clicked"));
+        QCOMPARE(actionRequested.count(), 1);
+        QCOMPARE(actionRequested.constFirst().constFirst().toString(), firstKey);
+    }
+
     void ribbon_routes_only_existing_project_commands() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);
@@ -148,6 +194,14 @@ class ThemeComponentTest final : public QObject {
         QSignalSpy openRequested(ribbon, SIGNAL(openProjectRequested()));
         QVERIFY(newRequested.isValid() && openRequested.isValid());
         auto* ribbonItem = qobject_cast<QQuickItem*>(ribbon);
+        auto* loader = visual_item(ribbonItem, QStringLiteral("ribbonLoader"));
+        QVERIFY(loader != nullptr);
+        QPointer<QQuickItem> previousTab = loader->property("item").value<QQuickItem*>();
+        QVERIFY(previousTab);
+        QVERIFY(loader->width() > 0);
+        QCOMPARE(loader->width(), previousTab->width());
+        ribbon->setProperty("activeRibbonTab", QStringLiteral("start-learn"));
+        QCOMPARE(loader->property("item").value<QQuickItem*>(), previousTab.data());
         auto* newButton = visual_item(ribbonItem, QStringLiteral("ribbon-new-project"));
         auto* openButton = visual_item(ribbonItem, QStringLiteral("ribbon-open-project"));
         QVERIFY(newButton && openButton);
@@ -155,13 +209,22 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
         QCOMPARE(newRequested.count(), 1);
         QCOMPARE(openRequested.count(), 1);
+        newButton->forceActiveFocus(Qt::TabFocusReason);
+        QTRY_COMPARE(window.activeFocusItem(), newButton);
         ribbon->setProperty("activeRibbonTab", QStringLiteral("home"));
+        QTRY_VERIFY(previousTab.isNull());
+        QVERIFY(visual_item(ribbonItem, QStringLiteral("ribbon-new-project")) == nullptr);
+        previousTab = loader->property("item").value<QQuickItem*>();
+        QVERIFY(previousTab);
+        QTRY_COMPARE(loader->width(), previousTab->width());
         auto* importButton = visual_item(ribbonItem, QStringLiteral("ribbon-import"));
         QVERIFY(importButton != nullptr);
         QVERIFY(QMetaObject::invokeMethod(importButton, "clicked"));
         QCOMPARE(newRequested.count(), 1);
         QCOMPARE(openRequested.count(), 1);
         ribbon->setProperty("activeRibbonTab", QStringLiteral("start-learn"));
+        QTRY_VERIFY(previousTab.isNull());
+        QVERIFY(visual_item(ribbonItem, QStringLiteral("ribbon-import")) == nullptr);
         newButton = visual_item(ribbonItem, QStringLiteral("ribbon-new-project"));
         openButton = visual_item(ribbonItem, QStringLiteral("ribbon-open-project"));
         QVERIFY(newButton && openButton);

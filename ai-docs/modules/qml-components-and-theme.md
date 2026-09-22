@@ -28,8 +28,9 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 |---|---|---|
 | 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
 | 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface` |
-| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
 | 业务面板 | `qml/Panels/` | `TopChromePanel`、`RibbonPanel`、`TasksPanel`、`OutputPanel`、`PlaceholderPanel`（无 Bridge 变体用） |
+| Ribbon 页签 | `qml/Panels/Ribbon/` | `HomeRibbon`、`StartLearnRibbon`：各自的工具定义、启用条件与命令映射 |
 | 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |
 
 组件可以封装 Qt Quick Controls，保留其焦点、键盘、禁用与可访问性行为；不为了“原子化”重新实现所有底层控件。避免为单次无独立职责的布局建立空壳组件。只提取当前界面实际使用的组件，不预建无用途库。
@@ -49,6 +50,10 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入 TasksPanel 和 TopChromePanel。新建或打开成功后，TasksPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单；失败保留上一有效快照。Start & Learn Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；其他 Ribbon 工具仍是设计入口，不表示求解、网格或导入业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
 
 061 将活动工具栏与工程状态分离：App 的 `activeRibbonTab` 默认 `start-learn`，菜单 key 和 `projectCreated` / `projectOpened` 成功信号均经 `selectRibbonTab()` 统一校验；只有开始页和已打开工程的 Home 可达。创建 / 打开成功时选择 `home`，改名、保存及失败不改变选中态。TopChromePanel 和 RibbonPanel 显式接收同一页签值，实现 `Home` 的 18 个工具与 `Start & Learn` 的 7 个工具切换，鼠标和空格键激活共用按钮点击逻辑。切换不清空工程、不写文件、不重建 Tasks 或 VTK 视口；未接入的其他菜单不改变活动页签。未打开工程时不显示 Home，沿用开始页布局。
+
+062 按页签拆分 Ribbon 内容。RibbonPanel 只保留公共背景、滚动和对宿主的信号接口，以静态 Component 引用交给 Loader 加载当前页签；切换销毁旧页签，避免隐藏工具参与焦点遍历。Loader 宽度跟随页签内容，继续复用 HorizontalToolStrip 的滚动 / 焦点显露规则。HomeRibbon 与 StartLearnRibbon 分别持有工具定义；StartLearnRibbon 将 new-project / open-project key 转为语义信号，经外壳交给 App，不访问工程服务。
+
+RibbonContent 接收 groups 并组合 RibbonGroup / RibbonTile，仅报告 actionRequested(key)，不解释页签或工程命令。组模型包含 title、可选 caret 和 tools；工具包含 key、label、icon，可选 caret 与 enabled（缺省启用）。新增同类页签复用该渲染器；布局不同的页签可使用独立内容组件，公共外壳不收集各页签的工具条件分支。现有翻译上下文、工具顺序与 Theme token 保持不变。
 
 RibbonTile 将图标、至少两行的文字区和下拉指示区分开；没有下拉的工具仍保留指示区高度。单行 / 双行文案不再改变图标纵向位置，图标顶边与文字首行分别对齐。HTML 的公共 CSS 使用相同三行网格，防止两份设计基准漂移。
 
