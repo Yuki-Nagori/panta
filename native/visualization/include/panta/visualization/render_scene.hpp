@@ -20,7 +20,7 @@ struct RenderScene {
     SceneRevision revision = 0;
     /// 视口背景色（演示阶段的可恢复状态之一）。
     QColor background{232, 238, 247};
-    /// 测试图元可见性（007 验收：空视口 + 默认测试球体）。
+    /// 欢迎图形可见性（053：默认立体 panta 字样）。
     bool primitive_visible = true;
 };
 

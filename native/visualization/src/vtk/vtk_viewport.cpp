@@ -4,6 +4,7 @@
 /// 直接绘制到平台 surface，避免把 OpenGL/WebGPU 资源混入 scenegraph。
 #include "vtk_viewport.hpp"
 
+#include "default_wordmark.hpp"
 #include "vtk_native_surface.hpp"
 #include <QGuiApplication>
 #include <QMetaObject>
@@ -17,6 +18,8 @@
 #include <QtCore/qtmetamacros.h>
 #include <QtGlobal>
 #include <QtLogging>
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
@@ -25,9 +28,9 @@
 #include <vtkHardwareWindow.h>
 #include <vtkNew.h>
 #include <vtkPolyDataMapper.h>
+#include <vtkPolyDataNormals.h>
 #include <vtkProperty.h>
 #include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
 #include <vtkWebGPURenderWindow.h>
 #include <vtkWebGPURenderer.h>
 
@@ -35,24 +38,24 @@ namespace panta::visualization {
 
 namespace {
 
-constexpr double kDefaultSphereRadius = 0.5;
-constexpr double kDefaultSphereRed = 0.18;
-constexpr double kDefaultSphereGreen = 0.58;
-constexpr double kDefaultSphereBlue = 0.95;
-constexpr double kDefaultCameraX = 0.0;
-constexpr double kDefaultCameraY = 0.0;
-constexpr double kDefaultCameraZ = 4.5;
-constexpr double kDefaultCameraNear = 0.1;
-constexpr double kDefaultCameraFar = 100.0;
-constexpr double kDefaultCameraViewAngle = 30.0;
-
-void configure_default_camera(vtkWebGPURenderer* renderer) {
+// 字样保持透视深度；按实际宽高比留出 25% 边距，窄窗口也不裁字。
+void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect) {
+    double bounds[6];
+    actor->GetBounds(bounds);
+    constexpr double view_angle = 30.0;
+    constexpr double half_angle_radians = 0.2617993877991494;
+    const double half_width = (bounds[1] - bounds[0]) / 2;
+    const double half_height = (bounds[3] - bounds[2]) / 2;
+    const double half_depth = (bounds[5] - bounds[4]) / 2;
+    const double distance =
+        1.25 * std::max(half_height, half_width / aspect) / std::tan(half_angle_radians) +
+        half_depth;
     vtkCamera* camera = renderer->GetActiveCamera();
-    camera->SetPosition(kDefaultCameraX, kDefaultCameraY, kDefaultCameraZ);
-    camera->SetFocalPoint(0.0, 0.0, 0.0);
-    camera->SetViewUp(0.0, 1.0, 0.0);
-    camera->SetViewAngle(kDefaultCameraViewAngle);
-    camera->SetClippingRange(kDefaultCameraNear, kDefaultCameraFar);
+    camera->SetPosition(0, 0, distance);
+    camera->SetFocalPoint(0, 0, 0);
+    camera->SetViewUp(0, 1, 0);
+    camera->SetViewAngle(view_angle);
+    renderer->ResetCameraClippingRange();
 }
 
 } // namespace
@@ -203,17 +206,24 @@ void VtkViewport::ensure_render_window() {
     impl_->renderer = vtkSmartPointer<vtkWebGPURenderer>::New();
     impl_->primitive_actor = vtkSmartPointer<vtkActor>::New();
 
-    vtkNew<vtkSphereSource> primitive;
-    primitive->SetRadius(kDefaultSphereRadius);
-    primitive->SetThetaResolution(24);
-    primitive->SetPhiResolution(16);
+    vtkNew<vtkPolyDataNormals> normals;
+    normals->SetInputData(create_default_wordmark());
+    normals->SetFeatureAngle(45.0);
+    normals->ConsistencyOn();
+    normals->SplittingOn();
     vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(primitive->GetOutputPort());
+    mapper->SetInputConnection(normals->GetOutputPort());
+    mapper->SetColorModeToDirectScalars();
+    mapper->SetScalarModeToUsePointData();
     impl_->primitive_actor->SetMapper(mapper);
-    impl_->primitive_actor->GetProperty()->SetColor(kDefaultSphereRed, kDefaultSphereGreen,
-                                                    kDefaultSphereBlue);
+    impl_->primitive_actor->SetOrientation(16.0, -18.0, -4.0);
+    auto* material = impl_->primitive_actor->GetProperty();
+    material->SetInterpolationToPhong();
+    material->SetAmbient(0.25);
+    material->SetDiffuse(0.75);
+    material->SetSpecular(0.32);
+    material->SetSpecularPower(36.0);
     impl_->renderer->AddActor(impl_->primitive_actor);
-    configure_default_camera(impl_->renderer);
     impl_->renderer->SetBackground(impl_->pending.background.redF(),
                                    impl_->pending.background.greenF(),
                                    impl_->pending.background.blueF());
@@ -268,6 +278,8 @@ void VtkViewport::sync_native_surface(bool force_render) {
         return;
     }
     impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
+    configure_default_camera(impl_->renderer, impl_->primitive_actor,
+                             static_cast<double>(pixel_size.width()) / pixel_size.height());
     impl_->render_window->Render();
     impl_->applied_pixel_size = pixel_size;
 }
