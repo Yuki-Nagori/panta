@@ -18,27 +18,10 @@ placeholder:
   src: Panel placeholder: project tree / viewport / properties (upcoming tasks)
   tr: Panel placeholder: project tree / viewport / properties (upcoming tasks)
 
-[RibbonPanel]
-start:
-  src: Start
-  tr: Start
-
-whats-new:
-  src: New
-  tr: New
-
-learning:
-  src: Learning
-  tr: Learning
-
 [TasksPanel]
 tab-tools:
   src: Tools
   tr: Tools
-
-tab-tasks:
-  src: Task List
-  tr: Task List
 
 tab-shared-views:
   src: Shared Views
@@ -136,25 +119,9 @@ filter:
   tr: Panta project files (*.panta)
 
 [TopChromePanel]
-menu-view:
-  src: View
-  tr: View
-
-menu-tools:
-  src: Tools
-  tr: Tools
-
-menu-community:
-  src: Community
-  tr: Community
-
 sign-in:
   src: Sign in
   tr: Sign in
-
-menu-start-learn:
-  src: Start and Learn
-  tr: Start and Learn
 
 activate-animation:
   src: Activate Animation (A)
@@ -291,3 +258,238 @@ label:
 label:
   src: Search
   tr: Search
+
+[RibbonActionNewProject]
+label:
+  src: "New\nProject"
+  tr: "New\nProject"
+
+[RibbonActionOpenProject]
+label:
+  src: "Open\nProject"
+  tr: "Open\nProject"
+
+[RibbonActionNewFeatures]
+label:
+  src: "New\nFeatures"
+  tr: "New\nFeatures"
+
+[RibbonActionStartHere]
+label:
+  src: Start Here
+  tr: Start Here
+
+[RibbonActionTutorials]
+label:
+  src: Tutorials
+  tr: Tutorials
+
+[RibbonActionVideos]
+label:
+  src: Videos
+  tr: Videos
+
+[RibbonActionHelp]
+label:
+  src: Help
+  tr: Help
+
+[RibbonActionImport]
+label:
+  src: Import
+  tr: Import
+
+[RibbonActionAdd]
+label:
+  src: Add
+  tr: Add
+
+[RibbonActionDualDomain]
+label:
+  src: "Dual\nDomain"
+  tr: "Dual\nDomain"
+
+[RibbonActionGeometry]
+label:
+  src: Geometry
+  tr: Geometry
+
+[RibbonActionMesh]
+label:
+  src: Mesh
+  tr: Mesh
+
+[RibbonActionMolding]
+label:
+  src: "Thermoplastics\nInjection Molding"
+  tr: "Thermoplastics\nInjection Molding"
+
+[RibbonActionSequence]
+label:
+  src: "Analysis\nSequence"
+  tr: "Analysis\nSequence"
+
+[RibbonActionMaterial]
+label:
+  src: "Select\nMaterial"
+  tr: "Select\nMaterial"
+
+[RibbonActionInjection]
+label:
+  src: "Injection\nLocations"
+  tr: "Injection\nLocations"
+
+[RibbonActionSettings]
+label:
+  src: "Process\nSettings"
+  tr: "Process\nSettings"
+
+[RibbonActionOptimization]
+label:
+  src: Optimization
+  tr: Optimization
+
+[RibbonActionBoundary]
+label:
+  src: "Boundary\nConditions"
+  tr: "Boundary\nConditions"
+
+[RibbonActionAnalyze]
+label:
+  src: Analyze
+  tr: Analyze
+
+[RibbonActionLogs]
+label:
+  src: Logs
+  tr: Logs
+
+[RibbonActionJobs]
+label:
+  src: "Job\nManager"
+  tr: "Job\nManager"
+
+[RibbonActionResults]
+label:
+  src: Results
+  tr: Results
+
+[RibbonActionReports]
+label:
+  src: Reports
+  tr: Reports
+
+[RibbonActionSharedViews]
+label:
+  src: "Shared\nViews"
+  tr: "Shared\nViews"
+
+[RibbonGroupStart]
+label:
+  src: Start
+  tr: Start
+
+[RibbonGroupFeatures]
+label:
+  src: New Features
+  tr: New Features
+
+[RibbonGroupLearn]
+label:
+  src: Learn
+  tr: Learn
+
+[RibbonGroupImport]
+label:
+  src: Import
+  tr: Import
+
+[RibbonGroupCreate]
+label:
+  src: Create
+  tr: Create
+
+[RibbonGroupSetup]
+label:
+  src: Molding Process Setup
+  tr: Molding Process Setup
+
+[RibbonGroupAnalysis]
+label:
+  src: Results
+  tr: Results
+
+[RibbonGroupReporting]
+label:
+  src: Reporting
+  tr: Reporting
+
+[RibbonGroupShare]
+label:
+  src: Share
+  tr: Share
+
+[ShellMenuHome]
+label:
+  src: Home
+  tr: Home
+
+[ShellMenuTools]
+label:
+  src: Tools
+  tr: Tools
+
+[ShellMenuView]
+label:
+  src: View
+  tr: View
+
+[ShellMenuGeometry]
+label:
+  src: Geometry
+  tr: Geometry
+
+[ShellMenuMesh]
+label:
+  src: Mesh
+  tr: Mesh
+
+[ShellMenuBoundary]
+label:
+  src: Boundary Conditions
+  tr: Boundary Conditions
+
+[ShellMenuOptimization]
+label:
+  src: Optimization
+  tr: Optimization
+
+[ShellMenuResults]
+label:
+  src: Results
+  tr: Results
+
+[ShellMenuReports]
+label:
+  src: Reports
+  tr: Reports
+
+[ShellMenuStartLearn]
+label:
+  src: Start & Learn
+  tr: Start & Learn
+
+[ShellMenuCommunity]
+label:
+  src: Community
+  tr: Community
+
+[TaskPanelTitle]
+label:
+  src: Tasks
+  tr: Tasks
+
+[ProjectTaskItem]
+label:
+  src: Project '%1'
+  tr: Project '%1'

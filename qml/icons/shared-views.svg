@@ -1,0 +1,4 @@
+<!-- Mono：共享视图；24 网格，2 单位圆端描边。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6.5" cy="12" r="3"/><circle cx="17.5" cy="6.5" r="3"/><circle cx="17.5" cy="17.5" r="3"/><path d="m9.5 10.5 5-2.5m-5 5.5 5 2.5"/>
+</svg>

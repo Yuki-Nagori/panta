@@ -48,8 +48,9 @@ if(BUILD_TESTING)
             Qt6::QuickDialogs2
             Qt6::Test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
-    target_link_libraries(panta_qml_shell_module_test
-                          PRIVATE panta::visualization panta_bridgeplugin panta_visualizationplugin)
+    target_link_libraries(
+      panta_qml_shell_module_test PRIVATE panta::bridge panta::visualization panta_bridgeplugin
+                                          panta_visualizationplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
   panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test)

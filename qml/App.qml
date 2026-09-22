@@ -14,6 +14,7 @@ ApplicationWindow {
     visibility: Window.Maximized
     title: qsTr("panta")
     color: Theme.colorPanel
+    readonly property bool projectOpen: projectModel.currentPath.length > 0
 
     ShellViewModel {
         id: viewModel
@@ -21,6 +22,7 @@ ApplicationWindow {
 
     ProjectViewModel {
         id: projectModel
+        objectName: "projectModel"
     }
 
     NewProjectDialog {
@@ -46,11 +48,15 @@ ApplicationWindow {
 
         TopChromePanel {
             Layout.fillWidth: true
-            caption: viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
+            caption: shellWindow.projectOpen ? "panta 2027 · " + projectModel.currentName : viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
+            projectOpen: shellWindow.projectOpen
         }
 
         RibbonPanel {
             Layout.fillWidth: true
+            projectOpen: shellWindow.projectOpen
+            onOpenProjectRequested: openProjectFileDialog.open()
+            onNewProjectRequested: newProjectDialog.open()
         }
 
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。
@@ -76,6 +82,8 @@ ApplicationWindow {
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    projectOpen: shellWindow.projectOpen
+                    projectName: projectModel.currentName
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
                     onNewProjectRequested: newProjectDialog.open()

@@ -1,0 +1,4 @@
+<!-- Mono：注塑成型；24 网格，2 单位圆端描边。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 5.5h6v5h5v-5h6v13h-6v-5h-5v5h-6Z"/>
+</svg>

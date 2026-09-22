@@ -1,6 +1,6 @@
 # panta 图标设计规范
 
-项目约定，更新日期：2026-09-22。适用 `qml/icons/` 与 Shell 图标使用点；新增图标先登记清单。布局参考 [homepage.html](../qml-html/homepage/homepage.html)，其中内联 SVG 是旧占位，本规范是正式图标的几何与颜色依据。
+项目约定，更新日期：2026-09-22。适用 `qml/icons/` 与 Shell 图标使用点；新增图标先登记清单。布局参考 [homepage.html](../qml-html/homepage/homepage.html)，HTML 共用壳层中的彩色 SVG 只作设计占位，本规范是正式图标的几何与颜色依据。
 
 ## 设计语言
 
@@ -60,7 +60,25 @@ Qt 官方依据（2026-09-22，6.11.2）：[Image 与 sourceSize](https://doc.qt
 | `output-delete.svg` | Mono | 删除输出 |
 | `ribbon-start.svg` | Mono | 开始入口 |
 | `ribbon-whatsnew.svg` | Mono | 新功能入口 |
-| `ribbon-learn.svg` | Mono | 学习入口 |
+| `ribbon-learn.svg` | Mono | 教程 / 学习入口 |
+| `project-file.svg` | Mono | 工程文件 |
+| `media-video.svg` | Mono | 视频 |
+| `project-import.svg` | Mono | 导入 |
+| `domain-dual.svg` | Mono | 双层面 |
+| `geometry.svg` | Mono | 几何 |
+| `mesh.svg` | Mono | 网格 |
+| `molding.svg` | Mono | 注塑成型 |
+| `analysis-sequence.svg` | Mono | 分析序列 |
+| `material.svg` | Mono | 材料 |
+| `injection-location.svg` | Mono | 注射位置 |
+| `process-settings.svg` | Mono | 工艺设置 |
+| `optimization.svg` | Mono | 优化 |
+| `boundary-conditions.svg` | Mono | 边界条件 |
+| `analysis-run.svg` | Mono | 运行分析 |
+| `document-report.svg` | Mono | 日志 / 报告文档 |
+| `job-manager.svg` | Mono | 作业管理 |
+| `analysis-results.svg` | Mono | 分析结果 |
+| `shared-views.svg` | Mono | 共享视图 |
 
 ## 流程与审查
 

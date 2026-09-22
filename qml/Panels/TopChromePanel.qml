@@ -1,14 +1,16 @@
 // 品牌、快捷工具、标题、搜索和菜单；caption 由宿主注入，动作尚未接业务服务。
 // 原生窗口控制仍由系统标题栏承接。
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQml
 
 Rectangle {
     id: chrome
 
     property string caption: ""
+    property bool projectOpen: false
 
     implicitWidth: 800
     implicitHeight: Theme.titlebarHeight + Theme.menubarHeight + Theme.borderWidth
@@ -39,50 +41,12 @@ Rectangle {
             spacing: 0
 
             // 小窗口横向滚动标题工具区，避免压缩按钮或遮住搜索/账户操作。
-            Flickable {
+            HorizontalToolStrip {
                 id: titleStrip
                 objectName: "titleStrip"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Theme.titlebarHeight
-                contentWidth: titleContent.width
-                contentHeight: height
-                flickableDirection: Flickable.HorizontalFlick
-                boundsBehavior: Flickable.StopAtBounds
-                clip: true
-
-                ScrollBar.horizontal: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
-
-                // 聚焦与窗口收窄都会改变可见区域；布局完成后再滚到焦点控件。
-                function ensureFocusedVisible() {
-                    const hostWindow = chrome.Window.window;
-                    const focused = hostWindow ? hostWindow.activeFocusItem : null;
-                    let ancestor = focused;
-                    while (ancestor && ancestor !== titleContent)
-                        ancestor = ancestor.parent;
-                    if (!ancestor || !focused)
-                        return;
-                    const point = focused.mapToItem(titleContent, 0, 0);
-                    const desired = point.x < contentX ? point.x : Math.max(contentX, point.x + focused.width - width);
-                    contentX = Math.max(0, Math.min(desired, contentWidth - width));
-                }
-                // RowLayout updates child positions after its width binding settles. Queue a
-                // second pass so a newly wider quick-action group cannot leave a focused search
-                // field beyond the visible strip.
-                function scheduleEnsureFocusedVisible() {
-                    Qt.callLater(function () {
-                        Qt.callLater(ensureFocusedVisible);
-                    });
-                }
-                onWidthChanged: scheduleEnsureFocusedVisible()
-                onContentWidthChanged: scheduleEnsureFocusedVisible()
-                Connections {
-                    target: chrome.Window.window
-                    function onActiveFocusItemChanged() {
-                        titleStrip.scheduleEnsureFocusedVisible();
-                    }
-                }
+                contentRoot: titleContent
 
                 RowLayout {
                     id: titleContent
@@ -216,48 +180,105 @@ Rectangle {
                 Layout.fillHeight: true
                 color: Theme.colorMenubar
 
-                Row {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.spacingTiny
+                HorizontalToolStrip {
+                    id: menuStrip
+                    objectName: "menuStrip"
+                    anchors.fill: parent
+                    contentRoot: menuContent
 
-                    ThemedToolButton {
-                        text: qsTr("Start and Learn")
-                        cornerRadius: 0
-                        highlighted: true
-                        contentColor: Theme.colorText
-                        hoverColor: Theme.colorMenubarHover
-                        contentPadding: Theme.spacingLarge
-                        font.weight: Font.DemiBold
-                    }
-                    ThemedToolButton {
-                        text: qsTr("Community")
-                        contentColor: Theme.colorMenubarText
-                        hoverColor: Theme.colorMenubarHover
-                        contentPadding: Theme.spacingLarge
-                    }
-                    ThemedToolButton {
-                        text: qsTr("Tools")
-                        contentColor: Theme.colorMenubarText
-                        hoverColor: Theme.colorMenubarHover
-                        contentPadding: Theme.spacingLarge
-                    }
-                    ThemedToolButton {
-                        text: qsTr("View")
-                        contentColor: Theme.colorMenubarText
-                        hoverColor: Theme.colorMenubarHover
-                        contentPadding: Theme.spacingLarge
-                    }
+                    Row {
+                        id: menuContent
+                        height: menuStrip.height
 
-                    Item {
-                        width: Theme.spacingMedium
-                    }
-                    ThemedToolButton {
-                        iconName: "menubar-globe"
-                        showCaret: true
-                        accessibleName: qsTranslate("IconActionLanguage", "Language")
-                        contentColor: Theme.colorMenubarText
-                        hoverColor: Theme.colorMenubarHover
+                        Repeater {
+                            model: chrome.projectOpen ? [
+                                {
+                                    key: "home",
+                                    label: qsTranslate("ShellMenuHome", "Home")
+                                },
+                                {
+                                    key: "tools",
+                                    label: qsTranslate("ShellMenuTools", "Tools")
+                                },
+                                {
+                                    key: "view",
+                                    label: qsTranslate("ShellMenuView", "View")
+                                },
+                                {
+                                    key: "geometry",
+                                    label: qsTranslate("ShellMenuGeometry", "Geometry")
+                                },
+                                {
+                                    key: "mesh",
+                                    label: qsTranslate("ShellMenuMesh", "Mesh")
+                                },
+                                {
+                                    key: "boundary",
+                                    label: qsTranslate("ShellMenuBoundary", "Boundary Conditions")
+                                },
+                                {
+                                    key: "optimization",
+                                    label: qsTranslate("ShellMenuOptimization", "Optimization")
+                                },
+                                {
+                                    key: "results",
+                                    label: qsTranslate("ShellMenuResults", "Results")
+                                },
+                                {
+                                    key: "reports",
+                                    label: qsTranslate("ShellMenuReports", "Reports")
+                                },
+                                {
+                                    key: "start-learn",
+                                    label: qsTranslate("ShellMenuStartLearn", "Start & Learn")
+                                },
+                                {
+                                    key: "community",
+                                    label: qsTranslate("ShellMenuCommunity", "Community")
+                                }
+                            ] : [
+                                {
+                                    key: "start-learn",
+                                    label: qsTranslate("ShellMenuStartLearn", "Start & Learn")
+                                },
+                                {
+                                    key: "community",
+                                    label: qsTranslate("ShellMenuCommunity", "Community")
+                                },
+                                {
+                                    key: "tools",
+                                    label: qsTranslate("ShellMenuTools", "Tools")
+                                },
+                                {
+                                    key: "view",
+                                    label: qsTranslate("ShellMenuView", "View")
+                                }
+                            ]
+                            delegate: ThemedToolButton {
+                                required property int index
+                                required property var modelData
+                                objectName: "menu-" + modelData.key
+                                text: modelData.label
+                                controlHeight: Theme.menubarHeight
+                                cornerRadius: 0
+                                highlighted: index === 0
+                                contentColor: highlighted ? Theme.colorText : Theme.colorMenubarText
+                                hoverColor: Theme.colorMenubarHover
+                                contentPadding: Theme.spacingLarge
+                                font.weight: highlighted ? Font.DemiBold : Font.Normal
+                            }
+                        }
+                        ThemedToolButton {
+                            objectName: "languageButton"
+                            iconName: "menubar-globe"
+                            showCaret: true
+                            accessibleName: qsTranslate("IconActionLanguage", "Language")
+                            controlHeight: Theme.menubarHeight
+                            cornerRadius: 0
+                            contentColor: Theme.colorMenubarText
+                            hoverColor: Theme.colorMenubarHover
+                            contentPadding: Theme.spacingLarge
+                        }
                     }
                 }
             }

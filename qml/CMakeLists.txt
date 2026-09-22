@@ -17,6 +17,8 @@ set(PANTA_SHELL_QML_FILES
     Components/Atoms/PanelSurface.qml
     Components/Composites/ToolGroup.qml
     Components/Composites/RibbonTile.qml
+    Components/Composites/RibbonGroup.qml
+    Components/Composites/HorizontalToolStrip.qml
     Components/Composites/PanelTabBar.qml
     Components/Composites/PaneCloseButton.qml
     Components/Composites/DialogTitleBar.qml

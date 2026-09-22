@@ -24,7 +24,12 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QVERIFY(translator.load(QStringLiteral(":/i18n/panta_zh_CN.qm")));
     QCOMPARE(translator.translate("App", "Ready"), QStringLiteral("就绪"));
     QCOMPARE(translator.translate("TopChromePanel", "Sign in"), QStringLiteral("登录"));
-    QCOMPARE(translator.translate("RibbonPanel", "Start"), QStringLiteral("启动"));
+    QCOMPARE(translator.translate("RibbonGroupStart", "Start"), QStringLiteral("启动"));
+    QCOMPARE(translator.translate("RibbonActionNewProject", "New\nProject"),
+             QStringLiteral("新建\n工程"));
+    QCOMPARE(translator.translate("ShellMenuHome", "Home"), QStringLiteral("主页"));
+    QCOMPARE(translator.translate("ProjectTaskItem", "Project '%1'").arg(QStringLiteral("01")),
+             QStringLiteral("工程“01”"));
     QCOMPARE(translator.translate("ViewportPane", "Mesh"), QStringLiteral("网格"));
     QCOMPARE(translator.translate("NewProjectDialog", "Create New Project"),
              QStringLiteral("新建工程"));

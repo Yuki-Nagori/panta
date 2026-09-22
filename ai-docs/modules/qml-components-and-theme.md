@@ -13,8 +13,9 @@
 ## 页面设计工作流：HTML 先行复刻
 
 新页面的视觉开发采用 HTML 先行复刻工作流（维护者 2026-09-21 确立）：先在
-`../qml-html/<page>/` 用自包含 HTML 复刻目标页面——品牌与文案统一 panta，设计值
-集中在 `:root` CSS 自定义属性，照片/渲染图以渐变占位——浏览器对照确认后，再由
+`../qml-html/<page>/` 用 HTML 状态模板复刻目标页面——品牌与文案统一 panta，
+公共壳层与样式由上一级 shell.js / shell.css 提供，设计值集中在 `:root`，
+照片/渲染图以渐变占位——浏览器对照确认后，再由
 页面任务迁移为 QML：盒模型层级映射 anchors/Layout，`:root` 设计值映射 Theme
 token，占位图映射 Image 元素。这样把视觉迭代与 QML 实现解耦，效率最高。复刻件
 是文档参考资产，不进 QML 构建图；约定与边界见
@@ -27,7 +28,7 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 |---|---|---|
 | 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
 | 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface` |
-| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`PanelTabBar`（无独立底槽的 96px 等宽分段切换，悬停与选中面同尺寸）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
 | 业务面板 | `qml/Panels/` | `TopChromePanel`、`RibbonPanel`、`TasksPanel`、`OutputPanel`、`PlaceholderPanel`（无 Bridge 变体用） |
 | 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |
 
@@ -41,14 +42,22 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 业务对话框使用 `DialogTitleBar` 组合组件时，窗口自身设置 `Qt.FramelessWindowHint`，标题栏通过 `QWindow::startSystemMove()` 发起平台移动，受限平台再使用逻辑坐标回退；关闭按钮只发组合组件信号。窗口的模态、居中和业务命令仍由对话框页面负责。
 
-显示文案统一英文源 + `qsTr()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`，上下文段与 QML 组件同名（`.pa` 同上下文源文本长度必须互异）；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
+显示文案使用英文源 + `qsTr()` / `qsTranslate()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`。`qsTr()` 使用组件同名上下文；同上下文源文本长度必须互异，等长的菜单 / 工具文案通过 `qsTranslate()` 分配独立语义上下文。Ribbon 的显式换行属于源文本，译文按目标语言排版分行；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
 
-图标遵循 [SVG 图标设计规范](../standards/icons.md)：模块内 `qml/icons/` 保存统一 24 网格的 Mono 几何，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。Shell 引擎安装 `panta-icons` provider，以 qtsvg 渲染资源并按 `ThemedIcon.color` 着色，颜色来自 Theme/宿主；不依赖 SVG 自动继承 QML 颜色。052 同步修正标题工具分组、搜索入口、32px 面板工具条与窄窗口标题工具区滚动；Ribbon 为 69px 高栏内的 64×64px 等宽磁贴，24px 图标与 10px 文字整体居中，分段页签按等宽槽定位，选择加粗不改变尺寸。
+图标遵循 [SVG 图标设计规范](../standards/icons.md)：模块内 `qml/icons/` 保存统一 24 网格的 Mono 几何，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。Shell 引擎安装 `panta-icons` provider，以 qtsvg 渲染资源并按 `ThemedIcon.color` 着色，颜色来自 Theme/宿主；不依赖 SVG 自动继承 QML 颜色。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
+
+App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入三个面板。新建或打开成功后，TasksPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单，RibbonPanel 显示项目工具；失败保留上一有效快照。首页 Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；其他 Ribbon 工具仍是设计入口，不表示求解、网格或导入业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
+
+顶部菜单目前仅展示工程状态对应的条目，首项固定高亮；`Home` / `Start & Learn` 的点击切换尚未实现。维护者已确认该交互留待后续，不包含在 060 的布局交付内。
+
+RibbonTile 将图标、至少两行的文字区和下拉指示区分开；没有下拉的工具仍保留指示区高度。单行 / 双行文案不再改变图标纵向位置，图标顶边与文字首行分别对齐。HTML 的公共 CSS 使用相同三行网格，防止两份设计基准漂移。
 
 布局取证（`tests/cpp/app/shell_module_load_test.cpp`，029 起常驻）：环境变量
 `PANTA_SHELL_CAPTURE_PATH` 指向目标 PNG 时保存 Shell 首帧渲染，
 `PANTA_SHELL_DUMP_GEOMETRY` 置非空时打印组件内容树几何；ctest 默认不设置、
-无副作用。排查布局时的示例如下（仓库根目录，先 `cargo build --locked`；
+无副作用。`PANTA_PROJECT_CAPTURE_DIR` 指定目录时，工程状态测试额外保存
+created.png / opened.png，工程数据只写测试临时目录。排查布局时的示例如下
+（仓库根目录，先 `cargo build --locked`；
 `QT_SCALE_FACTOR` 可模拟不同 DPR）：
 
 ```sh

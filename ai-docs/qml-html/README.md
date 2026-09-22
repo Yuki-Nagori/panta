@@ -38,4 +38,5 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 首页早期版本已于任务 029 按设计值迁移为 QML（`qml/App.qml` 与面板组件，见
 [组件库与主题 DSL](../modules/qml-components-and-theme.md)）。本轮两状态整理见
 [任务 059](../task/059-open-project-html-reference.md)，HTML 已经维护者手工验收，
-作为后续 QML 同步底稿；不表示本轮设计已同步到 QML。
+作为 [QML 同步任务 060](../task/060-qml-project-workspace-reference.md) 的底稿。
+布局与状态由 QML 实现，正式图标沿用仓库 Mono 规范，不直接复制彩色占位路径。

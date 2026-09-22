@@ -18,27 +18,10 @@ placeholder:
   src: Panel placeholder: project tree / viewport / properties (upcoming tasks)
   tr: 面板占位：工程树 / 视口 / 属性区（后续任务）
 
-[RibbonPanel]
-start:
-  src: Start
-  tr: 启动
-
-whats-new:
-  src: New
-  tr: 新功能
-
-learning:
-  src: Learning
-  tr: 学习
-
 [TasksPanel]
 tab-tools:
   src: Tools
   tr: 工具
-
-tab-tasks:
-  src: Task List
-  tr: 任务
 
 tab-shared-views:
   src: Shared Views
@@ -136,25 +119,9 @@ filter:
   tr: Panta 工程文件 (*.panta)
 
 [TopChromePanel]
-menu-view:
-  src: View
-  tr: 查看
-
-menu-tools:
-  src: Tools
-  tr: 工具
-
-menu-community:
-  src: Community
-  tr: 社区
-
 sign-in:
   src: Sign in
   tr: 登录
-
-menu-start-learn:
-  src: Start and Learn
-  tr: 开始并学习
 
 activate-animation:
   src: Activate Animation (A)
@@ -291,3 +258,238 @@ label:
 label:
   src: Search
   tr: 搜索
+
+[RibbonActionNewProject]
+label:
+  src: "New\nProject"
+  tr: "新建\n工程"
+
+[RibbonActionOpenProject]
+label:
+  src: "Open\nProject"
+  tr: "打开\n工程"
+
+[RibbonActionNewFeatures]
+label:
+  src: "New\nFeatures"
+  tr: 新功能
+
+[RibbonActionStartHere]
+label:
+  src: Start Here
+  tr: 这里开始
+
+[RibbonActionTutorials]
+label:
+  src: Tutorials
+  tr: 教程
+
+[RibbonActionVideos]
+label:
+  src: Videos
+  tr: 视频
+
+[RibbonActionHelp]
+label:
+  src: Help
+  tr: 帮助
+
+[RibbonActionImport]
+label:
+  src: Import
+  tr: 导入
+
+[RibbonActionAdd]
+label:
+  src: Add
+  tr: 添加
+
+[RibbonActionDualDomain]
+label:
+  src: "Dual\nDomain"
+  tr: 双层面
+
+[RibbonActionGeometry]
+label:
+  src: Geometry
+  tr: 几何
+
+[RibbonActionMesh]
+label:
+  src: Mesh
+  tr: 网格
+
+[RibbonActionMolding]
+label:
+  src: "Thermoplastics\nInjection Molding"
+  tr: "热塑性塑料\n注塑成型"
+
+[RibbonActionSequence]
+label:
+  src: "Analysis\nSequence"
+  tr: "分析\n序列"
+
+[RibbonActionMaterial]
+label:
+  src: "Select\nMaterial"
+  tr: "选择\n材料"
+
+[RibbonActionInjection]
+label:
+  src: "Injection\nLocations"
+  tr: "注射\n位置"
+
+[RibbonActionSettings]
+label:
+  src: "Process\nSettings"
+  tr: "工艺\n设置"
+
+[RibbonActionOptimization]
+label:
+  src: Optimization
+  tr: 优化
+
+[RibbonActionBoundary]
+label:
+  src: "Boundary\nConditions"
+  tr: "边界\n条件"
+
+[RibbonActionAnalyze]
+label:
+  src: Analyze
+  tr: 分析
+
+[RibbonActionLogs]
+label:
+  src: Logs
+  tr: 日志
+
+[RibbonActionJobs]
+label:
+  src: "Job\nManager"
+  tr: "作业\n管理器"
+
+[RibbonActionResults]
+label:
+  src: Results
+  tr: 结果
+
+[RibbonActionReports]
+label:
+  src: Reports
+  tr: 报告
+
+[RibbonActionSharedViews]
+label:
+  src: "Shared\nViews"
+  tr: "共享\n视图"
+
+[RibbonGroupStart]
+label:
+  src: Start
+  tr: 启动
+
+[RibbonGroupFeatures]
+label:
+  src: New Features
+  tr: 新功能
+
+[RibbonGroupLearn]
+label:
+  src: Learn
+  tr: 学习
+
+[RibbonGroupImport]
+label:
+  src: Import
+  tr: 导入
+
+[RibbonGroupCreate]
+label:
+  src: Create
+  tr: 创建
+
+[RibbonGroupSetup]
+label:
+  src: Molding Process Setup
+  tr: 成型工艺设置
+
+[RibbonGroupAnalysis]
+label:
+  src: Results
+  tr: 结果
+
+[RibbonGroupReporting]
+label:
+  src: Reporting
+  tr: 报告
+
+[RibbonGroupShare]
+label:
+  src: Share
+  tr: 共享
+
+[ShellMenuHome]
+label:
+  src: Home
+  tr: 主页
+
+[ShellMenuTools]
+label:
+  src: Tools
+  tr: 工具
+
+[ShellMenuView]
+label:
+  src: View
+  tr: 查看
+
+[ShellMenuGeometry]
+label:
+  src: Geometry
+  tr: 几何
+
+[ShellMenuMesh]
+label:
+  src: Mesh
+  tr: 网格
+
+[ShellMenuBoundary]
+label:
+  src: Boundary Conditions
+  tr: 边界条件
+
+[ShellMenuOptimization]
+label:
+  src: Optimization
+  tr: 优化
+
+[ShellMenuResults]
+label:
+  src: Results
+  tr: 结果
+
+[ShellMenuReports]
+label:
+  src: Reports
+  tr: 报告
+
+[ShellMenuStartLearn]
+label:
+  src: Start & Learn
+  tr: 开始与学习
+
+[ShellMenuCommunity]
+label:
+  src: Community
+  tr: 社区
+
+[TaskPanelTitle]
+label:
+  src: Tasks
+  tr: 任务
+
+[ProjectTaskItem]
+label:
+  src: Project '%1'
+  tr: 工程“%1”

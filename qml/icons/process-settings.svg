@@ -1,0 +1,4 @@
+<!-- Mono：工艺设置；24 网格，2 单位圆端描边。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 6h4m5 0h8M3.5 12h9m5 0h3M3.5 18h4m5 0h8"/><circle cx="10" cy="6" r="2.5"/><circle cx="15" cy="12" r="2.5"/><circle cx="10" cy="18" r="2.5"/>
+</svg>

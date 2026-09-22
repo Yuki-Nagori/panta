@@ -1,4 +1,5 @@
 // QML 原子组件的默认 token 与显式覆盖测试（029）。
+#include "quick_item_helpers.hpp"
 #include <QColor>
 #include <QDir>
 #include <QFont>
@@ -9,14 +10,19 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickImageProvider>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QSignalSpy>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
 #include <QtCore/qcontainerfwd.h>
+#include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <icon_provider.hpp>
+#include <qtestsupport_core.h>
 
 namespace {
 
@@ -101,6 +107,62 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(button->property("opacity").toDouble(), 1.0);
         button->setProperty("enabled", false);
         QCOMPARE(button->property("opacity").toDouble(), 0.4);
+    }
+
+    void ribbon_content_expands_without_losing_theme_defaults() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QQuickWindow window;
+        QObject owner;
+        auto* tile = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/RibbonTile.qml"),
+            owner);
+        QVERIFY(tile != nullptr);
+        qobject_cast<QQuickItem*>(tile)->setParentItem(window.contentItem());
+        window.show();
+        tile->setProperty("text", QStringLiteral("New\nProject"));
+        QCOMPARE(tile->property("implicitWidth").toDouble(), 56.0);
+        QCOMPARE(tile->property("implicitHeight").toDouble(), 68.0);
+        QCOMPARE(tile->property("iconSize").toInt(), 26);
+        tile->setProperty("text", QStringLiteral("Thermoplastics\nInjection Molding"));
+        QTRY_VERIFY(tile->property("implicitWidth").toDouble() > 56.0);
+        QCOMPARE(tile->property("implicitHeight").toDouble(), 68.0);
+        tile->setProperty("showCaret", true);
+        QCOMPARE(tile->property("implicitHeight").toDouble(), 68.0);
+        tile->setProperty("iconSize", 32);
+        QTRY_VERIFY(tile->property("implicitHeight").toDouble() > 68.0);
+    }
+
+    void ribbon_routes_only_existing_project_commands() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QQuickWindow window;
+        QObject owner;
+        auto* ribbon = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/RibbonPanel.qml"), owner);
+        QVERIFY(ribbon != nullptr);
+        qobject_cast<QQuickItem*>(ribbon)->setParentItem(window.contentItem());
+        window.show();
+        QTest::qWait(50);
+        QSignalSpy newRequested(ribbon, SIGNAL(newProjectRequested()));
+        QSignalSpy openRequested(ribbon, SIGNAL(openProjectRequested()));
+        QVERIFY(newRequested.isValid() && openRequested.isValid());
+        auto* ribbonItem = qobject_cast<QQuickItem*>(ribbon);
+        auto* newButton = visual_item(ribbonItem, QStringLiteral("ribbon-new-project"));
+        auto* openButton = visual_item(ribbonItem, QStringLiteral("ribbon-open-project"));
+        QVERIFY(newButton && openButton);
+        QVERIFY(QMetaObject::invokeMethod(newButton, "clicked"));
+        QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
+        QCOMPARE(newRequested.count(), 1);
+        QCOMPARE(openRequested.count(), 1);
+        ribbon->setProperty("projectOpen", true);
+        auto* importButton = visual_item(ribbonItem, QStringLiteral("ribbon-import"));
+        QVERIFY(importButton != nullptr);
+        QVERIFY(QMetaObject::invokeMethod(importButton, "clicked"));
+        QCOMPARE(newRequested.count(), 1);
+        QCOMPARE(openRequested.count(), 1);
+        ribbon->setProperty("projectOpen", false);
+        QVERIFY(visual_item(ribbonItem, QStringLiteral("ribbon-open-project")) != nullptr);
     }
 
     void button_font_size_reaches_its_label() {

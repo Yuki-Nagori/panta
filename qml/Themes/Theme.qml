@@ -44,8 +44,15 @@ QtObject {
     // 结构尺寸（逻辑像素）与栏宽比例
     readonly property int titlebarHeight: 30
     readonly property int menubarHeight: 24
-    readonly property int ribbonTileWidth: 64
-    readonly property int ribbonHeight: ribbonTileWidth + 2 * spacingTiny + borderWidth
+    readonly property int ribbonHeight: 96
+    readonly property int ribbonToolMinimumWidth: 56
+    readonly property int ribbonToolHeight: 68
+    readonly property int ribbonLabelHeight: 22
+    readonly property int ribbonContentSpacing: 3
+    readonly property int ribbonTextLineHeight: 12
+    readonly property int ribbonTextLines: 2
+    readonly property int ribbonCaretHeight: 5
+    readonly property int ribbonTrailingWidth: 64
     readonly property int statusbarHeight: 26
     readonly property int controlHeight: 24
     readonly property int searchHeight: 22
@@ -54,7 +61,7 @@ QtObject {
     readonly property int toolbarButtonHeight: 22
     readonly property int iconSizeSmall: 16
     readonly property int iconSizeDefault: 18
-    readonly property int iconSizeRibbon: 24
+    readonly property int iconSizeRibbon: 26
     readonly property int iconSizeCaret: 12
     readonly property int paneCloseSize: 20
     readonly property int tabSlideDuration: 120

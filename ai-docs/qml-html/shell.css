@@ -29,6 +29,10 @@
   --ribbon-tool-height: 68px;
   --ribbon-icon-size: 26px;
   --ribbon-label-height: 22px;
+  --ribbon-text-line-height: 12px;
+  --ribbon-text-lines: 2;
+  --ribbon-content-spacing: 3px;
+  --ribbon-caret-height: 5px;
   --toolbar-height: 32px;
   --tab-width: 96px;
   --tab-slide-duration: 120ms;
@@ -163,25 +167,26 @@ button:disabled { opacity: 0.42; }
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   padding: 2px;
 }
 .ribbon-button {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
+  display: grid;
+  grid-template-rows: var(--ribbon-icon-size) calc(var(--ribbon-text-lines) * var(--ribbon-text-line-height)) var(--ribbon-caret-height);
+  justify-items: center;
+  align-content: center;
+  gap: var(--ribbon-content-spacing);
   min-width: var(--ribbon-tool-width);
   height: var(--ribbon-tool-height);
-  padding: 3px;
+  padding: var(--ribbon-content-spacing);
   border-radius: var(--radius);
   font-size: var(--font-ribbon);
 }
 .ribbon-button > .icon { width: var(--ribbon-icon-size); height: var(--ribbon-icon-size); }
-.ribbon-button > .caret { width: 7px; height: 5px; }
-.ribbon-button .label { line-height: 12px; text-align: center; white-space: nowrap; }
+.ribbon-button > .caret { width: 7px; height: var(--ribbon-caret-height); }
+.ribbon-button .label { line-height: var(--ribbon-text-line-height); text-align: center; white-space: nowrap; }
 .ribbon-label {
   flex: 0 0 var(--ribbon-label-height);
   display: flex;

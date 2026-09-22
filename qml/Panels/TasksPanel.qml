@@ -5,6 +5,9 @@ import QtQuick.Layouts
 PanelSurface {
     id: panel
 
+    property bool projectOpen: false
+    property string projectName: ""
+
     signal closeRequested
     signal openProjectRequested
     signal newProjectRequested
@@ -22,12 +25,13 @@ PanelSurface {
         PanelTabBar {
             Layout.fillWidth: true
             rightPadding: Theme.paneCloseSize + 2 * Theme.spacingXSmall
-            tabs: [qsTr("Task List"), qsTr("Tools"), qsTr("Shared Views")]
+            tabs: [qsTranslate("TaskPanelTitle", "Tasks"), qsTr("Tools"), qsTr("Shared Views")]
         }
 
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 0
+            visible: !panel.projectOpen
 
             ThemedToolButton {
                 Layout.fillWidth: true
@@ -50,6 +54,33 @@ PanelSurface {
                 contentPadding: Theme.spacingLarge
                 hoverColor: Theme.colorHover
                 onClicked: panel.newProjectRequested()
+            }
+        }
+
+        ThemedToolButton {
+            id: projectEntry
+            objectName: "projectTaskItem"
+            Layout.fillWidth: true
+            visible: panel.projectOpen
+            text: qsTranslate("ProjectTaskItem", "Project '%1'").arg(panel.projectName)
+            iconName: "project-file"
+            contentAlignLeft: true
+            contentColor: Theme.colorText
+            contentPadding: Theme.spacingLarge
+            hoverColor: Theme.colorHover
+            contentItem: RowLayout {
+                spacing: Theme.spacingMedium
+                ThemedIcon {
+                    name: projectEntry.iconName
+                    iconSize: projectEntry.iconSize
+                    color: projectEntry.contentColor
+                }
+                ThemedLabel {
+                    Layout.fillWidth: true
+                    text: projectEntry.text
+                    textSize: projectEntry.font.pixelSize
+                    elide: Text.ElideRight
+                }
             }
         }
 

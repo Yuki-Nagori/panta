@@ -93,6 +93,7 @@ ai-docs/
 | 056 | [QML 周边 C++ 简化与性能评审](task/056-qml-native-review.md) | 应用平台扩展 | 055, 007 | done |
 | 057 | [新建项目对话框与工程命令边界](task/057-new-project-dialog.md) | 应用平台扩展 | 023, 029, 055 | done |
 | 059 | [打开工程后的 QML HTML 参考同步](task/059-open-project-html-reference.md) | 应用平台扩展 | 050, 052, 055, 057 | done |
+| 060 | [已验收 HTML 的 QML 工程工作区同步](task/060-qml-project-workspace-reference.md) | 应用平台扩展 | 059, 057, 055 | done |
 
 ## 验证与质量扩展队列
 
