@@ -7,8 +7,8 @@
 # 供给结果缓存在 QT_PROVISION_DIR（默认构建树 qt/；任务 041 起由
 # build.rs 传入 target/panta-deps/qt，跨 profile 与 presets 共享）。
 # 模块构成：qtbase + qtdeclarative（005）与 qttools（034，含 lrelease，
-# i18n 的 QM 编译经 `native/i18n` 消费）；qtsvg/qt5compat 等未取，需要时
-# 按 task 扩展。
+# i18n 的 QM 编译经 `native/i18n` 消费）与 qtsvg（029，图标资源经 Image
+# 渲染依赖 qsvg 图像格式插件）；qt5compat 等未取，需要时按 task 扩展。
 
 if(NOT DEFINED QT_PROVISION_DIR)
   set(QT_PROVISION_DIR "${CMAKE_BINARY_DIR}/qt")
@@ -31,6 +31,7 @@ if(APPLE)
       "6.11.2-0-202608131016qtbase-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|9592f84f7e26d532c5c56824d1da7c9214a766cb0a17beb5af71022bcfbcd271"
       "6.11.2-0-202608131016qtdeclarative-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|ceb8e3f3830531a52de5007ef3f50ffc5525021feb132ee322f59583eb2903cf"
       "6.11.2-0-202608131016qttools-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|415b5008059d0066ac0d4806de98f6e8dacf7b5c80ca0305875160d2107d3719"
+      "6.11.2-0-202608131016qtsvg-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|c52f6cec6ce4b52ca017e0046345a85d33b2b73e0f6a93474bb7a60f8e829317"
   )
 elseif(WIN32)
   set(_qt_repo
@@ -40,6 +41,7 @@ elseif(WIN32)
       "6.11.2-0-202608131017qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|fd984b7264361b4dd3fd2a417702ca1258e4086268f2ee6a69b9a393d9c3f6bb"
       "6.11.2-0-202608131017qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5591ca564c1a9299a45a15b6b1d324c86e0aaed7cf6c47b7e6fe464aecae2587"
       "6.11.2-0-202608131017qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5f2b387a1f8055102b1388ff4ea743124ed6389d442f75c659728bb5c2a56946"
+      "6.11.2-0-202608131017qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|417f44499c835b2303f3ff78043179bb23442f33d5d2816fbf7e8dbf275b1c89"
   )
 elseif(UNIX)
   set(_qt_repo
@@ -49,6 +51,7 @@ elseif(UNIX)
       "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
       "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
       "6.11.2-0-202608131018qttools-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|42d5f3dbfc25647d9d95ef8b64401dc7e3ef7c83a39a29b548dfa0985f71c0ca"
+      "6.11.2-0-202608131018qtsvg-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|939fe0e5d49d11d6d3eceea0184219703c25a1f8dc75f45e99071ca244824a0d"
   )
   # Qt Linux 工具使用与该发行版配套的 ICU 73。此归档由 Qt 官方仓库提供，
   # 文件直接放入 staging/lib，供 rcc、qtpaths、qmlimportscanner 等工具通过
