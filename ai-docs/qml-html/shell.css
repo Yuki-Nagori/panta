@@ -46,6 +46,7 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+[hidden], .visually-hidden { display: none !important; }
 body {
   display: flex;
   flex-direction: column;
@@ -278,6 +279,115 @@ button:disabled { opacity: 0.42; }
   white-space: nowrap;
 }
 .task-item .suffix { color: var(--color-muted); }
+.task-tree { min-width: 0; padding: 4px 0 12px; }
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 24px;
+  padding: 2px 8px;
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+}
+.tree-node:hover { background: var(--color-hover); }
+.tree-node > .icon { width: 16px; height: 16px; }
+.tree-node > .tree-caret { width: 7px; height: 5px; margin-right: 1px; transform: rotate(0deg); }
+.tree-node > .status-icon { width: 16px; height: 16px; }
+.tree-node > span { overflow: hidden; text-overflow: ellipsis; }
+.tree-children { margin-left: 12px; }
+.study-tasks { margin-left: 24px; }
+.material-tasks { margin-left: 36px; }
+.study-node { padding-left: 4px; }
+.task-complete { color: var(--color-text); }
+
+/* 导入后的 STL 只用几何 CSS 占位，避免设计参考依赖外部模型或图片。 */
+.viewport-scene {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  background: #edf2f7;
+}
+.scene-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .45;
+  background-image: linear-gradient(rgba(79, 113, 145, .16) 1px, transparent 1px), linear-gradient(90deg, rgba(79, 113, 145, .16) 1px, transparent 1px);
+  background-size: 28px 28px;
+  transform: perspective(500px) rotateX(58deg) scale(1.5);
+  transform-origin: center bottom;
+}
+.stl-model {
+  position: relative;
+  z-index: 1;
+  width: 300px;
+  height: 200px;
+  transform: rotate(-12deg) skewY(-3deg);
+  border: 2px solid #526f8c;
+  border-radius: 28% 34% 26% 30%;
+  background: linear-gradient(145deg, #d9e8f5 5%, #8eabc4 58%, #597995);
+  box-shadow: inset -26px -18px 0 rgba(54, 81, 108, .18), 18px 22px 20px rgba(47, 66, 82, .2);
+}
+.stl-model::before {
+  content: "";
+  position: absolute;
+  inset: 26px 42px 38px 36px;
+  border: 2px solid rgba(56, 80, 102, .75);
+  border-radius: 30% 26% 34% 24%;
+  background: linear-gradient(135deg, rgba(231, 242, 250, .7), rgba(95, 130, 159, .45));
+}
+.stl-model::after {
+  content: "";
+  position: absolute;
+  left: 90px;
+  top: 48px;
+  width: 112px;
+  height: 82px;
+  border: 2px solid rgba(47, 70, 91, .7);
+  border-radius: 44% 36% 50% 42%;
+  background: #edf2f7;
+  box-shadow: inset 8px 8px 0 rgba(120, 153, 180, .22);
+}
+.model-facet { position: absolute; z-index: 2; display: block; border: 1px solid rgba(62, 92, 118, .5); }
+.facet-one { left: 20px; top: 30px; width: 88px; height: 40px; transform: skewY(20deg); }
+.facet-two { right: 18px; bottom: 28px; width: 94px; height: 38px; transform: skewY(-18deg); }
+.model-hole { position: absolute; z-index: 3; right: 34px; top: 24px; width: 20px; height: 20px; border: 3px solid #526f8c; border-radius: 50%; background: #edf2f7; }
+.viewport-caption { position: absolute; z-index: 2; right: 14px; bottom: 12px; padding: 4px 8px; color: var(--color-muted); background: rgba(255, 255, 255, .78); border: 1px solid var(--color-panel-line); font-size: var(--font-small); }
+
+/* 参考件中的模态窗口只表达状态和层级，真实对话框由 QML 实现。 */
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(35, 42, 50, .38); }
+.dialog { width: min(620px, 100%); max-height: 100%; overflow: auto; background: var(--color-panel); border: 1px solid #aeb9c2; border-radius: 8px; box-shadow: 0 18px 42px rgba(0, 0, 0, .28); }
+.import-dialog { width: min(780px, 100%); }
+.dialog-titlebar { display: flex; align-items: center; min-height: 42px; padding: 0 10px 0 16px; background: #eef3f7; border-bottom: 1px solid var(--color-panel-line); }
+.dialog-titlebar h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
+.dialog-close { display: grid; place-items: center; width: 28px; height: 28px; color: var(--color-muted); border-radius: var(--radius); }
+.dialog-close .icon { width: 12px; height: 12px; }
+.dialog-body { display: flex; flex-direction: column; gap: 16px; padding: 20px 24px 22px; }
+.dialog-intro, .dialog-note, .import-warning { margin: 0; color: var(--color-muted); line-height: 1.45; }
+.form-grid { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 12px 14px; }
+.form-grid label { color: var(--color-text); }
+.form-grid input, .form-grid select, .input-with-button input { width: 100%; height: 30px; min-width: 0; padding: 0 8px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); }
+.form-grid input:focus, .form-grid select:focus { outline: 1px solid var(--color-icon); outline-offset: -1px; }
+.input-with-button { display: flex; gap: 8px; min-width: 0; }
+.input-with-button button { flex: none; width: 82px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.dialog-actions button { min-width: 82px; height: 30px; padding: 0 12px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); }
+.dialog-actions .dialog-primary { background: #e5f1fb; border-color: #5d9fc7; }
+.import-body { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 22px; min-height: 320px; }
+.import-main { display: flex; flex-direction: column; gap: 14px; }
+.import-form-grid { grid-template-columns: 100px minmax(180px, 250px); }
+.import-warning { max-width: 470px; }
+.selected-file, .dimensions { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; }
+.selected-file span, .dimensions span { color: var(--color-muted); }
+.selected-file strong, .dimensions strong { font-weight: 500; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--color-text); }
+.checkbox-row input { width: 16px; height: 16px; accent-color: #2e7ce0; }
+.import-actions { flex-direction: column; align-items: stretch; justify-content: flex-start; margin-top: 0; }
+.import-actions button { width: 104px; }
 .output-toolbar { gap: 2px; }
 .output-toolbar .tool-button { width: 24px; height: 22px; padding: 0; }
 .statusbar {

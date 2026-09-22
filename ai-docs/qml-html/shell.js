@@ -53,6 +53,18 @@ shellTemplate.innerHTML = `
     <symbol id="i-ribbon-reports" viewBox="0 0 26 26" fill="none"><path d="M6 3h10l4 4v16H6z" fill="#f2f2f2" stroke="#666" stroke-width="1.1"/><path d="M16 3v5h4M9 13h8M9 17h6" stroke="#4a4a4a" stroke-width="1.1"/></symbol>
     <symbol id="i-ribbon-shared-views" viewBox="0 0 26 26" fill="none"><path d="m13 3 8 4.5v9L13 21l-8-4.5v-9z" fill="#dce9f7" stroke="#3e6996" stroke-width="1.2"/><path d="m5 7.5 8 4.5 8-4.5M13 12v9" stroke="#3e6996" stroke-width="1.1"/></symbol>
     <symbol id="i-project-file" viewBox="0 0 16 16" fill="none"><path d="M4 1h7l3 3v11H4z" fill="#fff" stroke="#7b858a"/><path d="M11 1v3h3M6 6h6M9 8h3M9 10h3" stroke="#a9b5bc"/><path d="M1 6h4l3 3v4H4l-3-3z" fill="#b9d89b" stroke="#65854c"/><path d="M1 6l3 3h4M4 9v4" stroke="#7d9c61"/></symbol>
+    <symbol id="i-project-folder" viewBox="0 0 16 16" fill="none"><path d="M1.5 4h5l1.5 1.7h6.5v8.8h-13z" fill="#e2c47b" stroke="#8a6d2f"/><path d="M1.5 5.7h13" stroke="#8a6d2f"/></symbol>
+    <symbol id="i-study" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/><path d="M10 1.5v3h3M5 7h6M5 9.5h6M5 12h4" stroke="#6d8ba8"/></symbol>
+    <symbol id="i-stl-file" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#e8f0f7" stroke="#4a6f9f"/><path d="M10 1.5v3h3M5 11l2-3 2 2 1.5-2 1.5 3z" stroke="#2e7ce0" stroke-width="1.1" stroke-linejoin="round"/></symbol>
+    <symbol id="i-status-ok" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" fill="#fff" stroke="#5d9b54"/><path d="m4.8 8 2 2 4.4-4.5" stroke="#5d9b54" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-task-mesh" viewBox="0 0 16 16" fill="none"><path d="m8 1.5 5 3v7l-5 3-5-3v-7z" stroke="#5c8e66"/><path d="m3 4.5 5 3 5-3M8 7.5v7" stroke="#5c8e66"/></symbol>
+    <symbol id="i-task-fill" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c2.2 3.1 4.2 5.7 4.2 8a4.2 4.2 0 1 1-8.4 0c0-2.3 2-4.9 4.2-8z" fill="#f1d36a" stroke="#8a6d2f"/></symbol>
+    <symbol id="i-task-material" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.6" fill="#f0d491" stroke="#8a6d2f"/><circle cx="10.5" cy="5" r="2.6" fill="#dce9f7" stroke="#4a6f9f"/><path d="M2.5 13c.6-2 1.4-3 2.5-3s1.9 1 2.5 3M8 13c.6-2 1.4-3 2.5-3s1.9 1 2.5 3" stroke="#5a5a5a"/></symbol>
+    <symbol id="i-task-injection" viewBox="0 0 16 16" fill="none"><path d="M8 1.5 13 6.5 8 14.5 3 6.5z" fill="#dce9f7" stroke="#4a6f9f"/><circle cx="8" cy="6.5" r="1.4" fill="#c8322b"/></symbol>
+    <symbol id="i-task-settings" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="#4a4a4a"/><circle cx="5" cy="4" r="1.5" fill="#2e7ce0"/><circle cx="11" cy="8" r="1.5" fill="#2e7ce0"/><circle cx="7" cy="12" r="1.5" fill="#2e7ce0"/></symbol>
+    <symbol id="i-task-optimization" viewBox="0 0 16 16" fill="none"><path d="M3 13V3M3 13h10" stroke="#4a4a4a"/><path d="m5 10 2-2 2 1 3-4" stroke="#2e7ce0" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-task-analysis" viewBox="0 0 16 16" fill="none"><path d="M3 13V3M3 13h10" stroke="#5c8e66"/><path d="m5 10 2-3 2 2 3-5" stroke="#5c8e66" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-log" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/><path d="M10 1.5v3h3M5 8h6M5 10.5h5" stroke="#7b858a"/></symbol>
   </defs>
 </svg>
 
@@ -131,7 +143,7 @@ shellTemplate.innerHTML = `
   </aside>
   <section class="panel viewport" aria-label="Viewport">
     <button type="button" class="pane-close" aria-label="Close viewport" title="Close viewport"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
-    <div class="panel-content"></div>
+    <div class="panel-content"><template data-slot="viewport"></template></div>
     <div class="tabs tabs-bottom">
       <div class="tab-strip" role="tablist" aria-label="Viewport">
         <button type="button" role="tab" aria-selected="true" tabindex="0">Model</button>
@@ -142,6 +154,7 @@ shellTemplate.innerHTML = `
   </section>
 </main>
 
+<template data-slot="dialog"></template>
 <footer class="statusbar">Ready</footer>
 `;
 
@@ -149,9 +162,55 @@ const shell = shellTemplate.content.cloneNode(true);
 shell.querySelector(".caption").textContent = document.title;
 shell.querySelectorAll("[data-slot]").forEach((slot) => {
   const content = document.getElementById("page-" + slot.dataset.slot);
-  slot.replaceWith(content.content.cloneNode(true));
+  if (content) slot.replaceWith(content.content.cloneNode(true));
+  else slot.remove();
 });
 document.body.append(shell);
+
+const closeDialog = (dialog) => {
+  if (dialog) dialog.hidden = true;
+};
+
+document.querySelectorAll("[data-dialog]").forEach((trigger) => {
+  trigger.addEventListener("click", () => {
+    const dialog = document.querySelector(`[data-dialog-panel="${trigger.dataset.dialog}"]`);
+    if (!dialog) return;
+    dialog.hidden = false;
+    dialog.querySelector("input, select, button")?.focus();
+  });
+});
+
+document.querySelectorAll("[data-dialog-close]").forEach((trigger) => {
+  trigger.addEventListener("click", () => closeDialog(trigger.closest("[data-dialog-panel]")));
+});
+
+document.querySelectorAll("[data-file-picker]").forEach((trigger) => {
+  trigger.addEventListener("click", () => {
+    const picker = document.querySelector(`[data-import-file-input="${trigger.dataset.filePicker}"]`);
+    picker?.click();
+  });
+});
+
+document.querySelectorAll("[data-import-file-input]").forEach((picker) => {
+  picker.addEventListener("change", () => {
+    const file = picker.files?.[0];
+    if (!file) return;
+    document.querySelectorAll("[data-import-file-name]").forEach((target) => {
+      target.textContent = file.name;
+    });
+    const dialog = document.querySelector('[data-dialog-panel="import"]');
+    if (dialog) {
+      dialog.hidden = false;
+      dialog.querySelector("select")?.focus();
+    }
+  });
+});
+
+document.querySelectorAll("[data-demo-navigate]").forEach((trigger) => {
+  trigger.addEventListener("click", () => {
+    window.location.href = trigger.dataset.demoNavigate;
+  });
+});
 
 // 仅演示页签选中状态；工程命令和视图内容由后续 QML 实现承接。
 document.querySelectorAll('[role="tablist"]').forEach((bar) => {

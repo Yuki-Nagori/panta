@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<!-- STL 导入完成后的工程工作区；任务 063 的视觉与状态参考。 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>panta 2027 · Project '01'</title>
+  <link rel="stylesheet" href="../shell.css">
+  <script src="../shell.js" defer></script>
+</head>
+<body>
+<template id="page-menu">
+  <button type="button" aria-current="page">Home</button>
+  <button type="button">Tools</button>
+  <button type="button">View</button>
+  <button type="button">Geometry</button>
+  <button type="button">Mesh</button>
+  <button type="button">Boundary Conditions</button>
+  <button type="button">Optimization</button>
+  <button type="button">Results</button>
+  <button type="button">Reports</button>
+  <button type="button">Start &amp; Learn</button>
+  <button type="button">Community</button>
+</template>
+
+<template id="page-ribbon">
+  <section class="ribbon" aria-label="Project tools">
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Import"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-import"/></svg><span class="label">Import</span></button>
+      </div>
+      <span class="ribbon-label">Import</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Add"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-add"/></svg><span class="label">Add</span></button>
+        <button type="button" class="ribbon-button" aria-label="Dual Domain"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-dual-domain"/></svg><span class="label">Dual<br>Domain</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+        <button type="button" class="ribbon-button" aria-label="Geometry"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-geometry"/></svg><span class="label">Geometry</span></button>
+        <button type="button" class="ribbon-button" aria-label="Mesh"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-mesh"/></svg><span class="label">Mesh</span></button>
+      </div>
+      <span class="ribbon-label">Create</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Thermoplastics Injection Molding"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-thermoplastics-injection-molding"/></svg><span class="label">Thermoplastics<br>Injection Molding</span></button>
+        <button type="button" class="ribbon-button" aria-label="Analysis Sequence"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-analysis-sequence"/></svg><span class="label">Analysis<br>Sequence</span></button>
+        <button type="button" class="ribbon-button" aria-label="Select Material"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-select-material"/></svg><span class="label">Select<br>Material</span></button>
+        <button type="button" class="ribbon-button" aria-label="Injection Locations"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-injection-locations"/></svg><span class="label">Injection<br>Locations</span></button>
+        <button type="button" class="ribbon-button" aria-label="Process Settings"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-process-settings"/></svg><span class="label">Process<br>Settings</span></button>
+      </div>
+      <span class="ribbon-label">Molding Process Setup</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Optimization"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-optimization"/></svg><span class="label">Optimization</span></button>
+        <button type="button" class="ribbon-button" aria-label="Boundary Conditions"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-boundary-conditions"/></svg><span class="label">Boundary<br>Conditions</span></button>
+        <button type="button" class="ribbon-button" aria-label="Analyze" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-analyze"/></svg><span class="label">Analyze</span></button>
+        <button type="button" class="ribbon-button" aria-label="Logs"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-logs"/></svg><span class="label">Logs</span></button>
+        <button type="button" class="ribbon-button" aria-label="Job Manager"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-job-manager"/></svg><span class="label">Job<br>Manager</span></button>
+      </div>
+      <span class="ribbon-label">Results</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Results"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-results"/></svg><span class="label">Results</span></button>
+        <button type="button" class="ribbon-button" aria-label="Reports"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-reports"/></svg><span class="label">Reports</span></button>
+      </div>
+      <span class="ribbon-label">Reporting</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Shared Views"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-shared-views"/></svg><span class="label">Shared<br>Views</span></button>
+      </div>
+      <span class="ribbon-label">Share</span>
+    </div>
+  </section>
+</template>
+
+<template id="page-tasks">
+  <div class="task-tree" role="tree" aria-label="Imported project tasks">
+    <button type="button" class="tree-node tree-root" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-project-folder"/></svg><span>Project '01'</span></button>
+    <div class="tree-children" role="group">
+      <button type="button" class="tree-node study-node" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>iPhone17_Pro_TPU_Case_study</span></button>
+      <div class="tree-children study-tasks" role="group">
+        <button type="button" class="tree-node task-complete" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span>Part (iPhone17_Pro_TPU_Case.stl)</span></button>
+        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Create Mesh...</span></button>
+        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-fill"/></svg><span>Fill</span></button>
+        <button type="button" class="tree-node tree-expandable" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><span>Material</span></button>
+        <div class="tree-children material-tasks" role="group">
+          <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Material Data Completeness</span></button>
+          <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Environmental Properties</span></button>
+        </div>
+        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></button>
+        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></button>
+        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></button>
+        <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></button>
+        <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="page-viewport">
+  <div class="viewport-scene" aria-label="STL model preview">
+    <div class="scene-grid" aria-hidden="true"></div>
+    <div class="stl-model" aria-label="Imported STL preview">
+      <span class="model-facet facet-one"></span>
+      <span class="model-facet facet-two"></span>
+      <span class="model-hole"></span>
+    </div>
+    <span class="viewport-caption">iPhone17_Pro_TPU_Case.stl · Dual Domain · Millimeters</span>
+  </div>
+</template>
+
+<noscript>This design reference requires JavaScript to display the shared layout.</noscript>
+</body>
+</html>

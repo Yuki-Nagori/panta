@@ -9,10 +9,16 @@ QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每�
 - [shell.js](shell.js)：公共壳层、SVG 图标和页签选中态演示。
 - [homepage/homepage.html](homepage/homepage.html)：启动 / 学习首页。
 - [open-project/open-project.html](open-project/open-project.html)：工程任务项与项目工具 Ribbon。
+- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入完成后的工程树与视口状态。
 
-HTML 只保留标题、菜单、Ribbon 和任务内容模板，脚本将模板嵌入公共壳层。
-两个入口通过相对路径引用公共文件，无网络资源和构建步骤；浏览器需启用
+HTML 只保留标题、菜单、Ribbon、任务、视口和对话框状态模板，脚本将模板嵌入公共壳层。
+这些入口通过相对路径引用公共文件，无网络资源和构建步骤；浏览器需启用
 JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结构。
+
+`homepage` 通过 New Project 任务入口演示新建项目弹窗；`open-project` 的 Import
+入口先演示 `.stl` 文件选择，再打开导入选项弹窗。确认后的静态工作区参考位于
+`imported-project`。这些页面只展示状态和交互边界，不写工程文件，也不声称已实现
+STL 解析或视口渲染。
 
 ## 工作流
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 启动 / 学习首页；公共壳层由上一级目录提供，任务 059。 -->
+<!-- 启动 / 学习首页；公共壳层由上一级目录提供，任务 059/063。 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -20,7 +20,7 @@
   <section class="ribbon" aria-label="Start and Learn tools">
     <div class="ribbon-group">
       <div class="ribbon-tools">
-        <button type="button" class="ribbon-button" aria-label="New Project">
+        <button type="button" class="ribbon-button" aria-label="New Project" data-dialog="new-project">
           <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-project"/></svg>
           <span class="label">New<br>Project</span>
         </button>
@@ -66,7 +66,34 @@
 
 <template id="page-tasks">
   <button type="button" class="task-item"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>Open Project<span class="suffix">…</span></button>
-  <button type="button" class="task-item"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg>New Project<span class="suffix">…</span></button>
+  <button type="button" class="task-item" data-dialog="new-project"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg>New Project<span class="suffix">…</span></button>
+</template>
+<template id="page-dialog">
+  <div class="modal-backdrop" data-dialog-panel="new-project" hidden>
+    <section class="dialog new-project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
+      <header class="dialog-titlebar">
+        <h2 id="new-project-title">Create New Project</h2>
+        <button type="button" class="dialog-close" data-dialog-close aria-label="Close dialog" title="Close dialog"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+      </header>
+      <div class="dialog-body">
+        <p class="dialog-intro">Create a project directory and start with an empty workspace.</p>
+        <div class="form-grid">
+          <label for="project-name">Project name</label>
+          <input id="project-name" type="text" placeholder="My Project" autocomplete="off">
+          <label for="project-location">Create in</label>
+          <div class="input-with-button">
+            <input id="project-location" type="text" value="Documents/panta" aria-label="Project location">
+            <button type="button" class="dialog-secondary">Browse</button>
+          </div>
+        </div>
+        <p class="dialog-note">The project folder and .panta file will be created if they do not already exist.</p>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-primary">OK</button>
+          <button type="button" class="dialog-secondary" data-dialog-close>Cancel</button>
+        </div>
+      </div>
+    </section>
+  </div>
 </template>
 <noscript>This design reference requires JavaScript to display the shared layout.</noscript>
 </body>
