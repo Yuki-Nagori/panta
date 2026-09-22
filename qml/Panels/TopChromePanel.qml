@@ -75,7 +75,7 @@ Rectangle {
                 }
 
                 ThemedToolButton {
-                    text: qsTr("激活动图(A)")
+                    text: qsTr("Activate Animation (A)")
                     showCaret: true
                     contentColor: Theme.colorText
                     contentPadding: Theme.spacingSmall
@@ -106,7 +106,7 @@ Rectangle {
                         implicitHeight: Theme.searchHeight
                         leftPadding: Theme.spacingXSmall
                         rightPadding: Theme.spacingXSmall
-                        placeholderText: qsTr("请输入关键字或短语")
+                        placeholderText: qsTr("Enter a keyword or phrase")
                         color: Theme.colorText
                         font.pixelSize: Theme.fontSmall
                         background: Rectangle {
@@ -117,7 +117,7 @@ Rectangle {
                         iconName: "user-account"
                     }
                     ThemedToolButton {
-                        text: qsTr("登录")
+                        text: qsTr("Sign in")
                         iconName: "user-account"
                         showCaret: true
                     }
@@ -143,7 +143,7 @@ Rectangle {
                     spacing: Theme.spacingTiny
 
                     ThemedToolButton {
-                        text: qsTr("开始并学习")
+                        text: qsTr("Start and Learn")
                         highlighted: true
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorMenubarHover
@@ -151,19 +151,19 @@ Rectangle {
                         font.weight: Font.DemiBold
                     }
                     ThemedToolButton {
-                        text: qsTr("社区")
+                        text: qsTr("Community")
                         contentColor: Theme.colorMenubarText
                         hoverColor: Theme.colorMenubarHover
                         contentPadding: Theme.spacingLarge
                     }
                     ThemedToolButton {
-                        text: qsTr("工具")
+                        text: qsTr("Tools")
                         contentColor: Theme.colorMenubarText
                         hoverColor: Theme.colorMenubarHover
                         contentPadding: Theme.spacingLarge
                     }
                     ThemedToolButton {
-                        text: qsTr("查看")
+                        text: qsTr("View")
                         contentColor: Theme.colorMenubarText
                         hoverColor: Theme.colorMenubarHover
                         contentPadding: Theme.spacingLarge

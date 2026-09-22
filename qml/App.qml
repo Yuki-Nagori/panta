@@ -1,13 +1,12 @@
 // Shell 主窗口（qml.md：组件 PascalCase，id/属性 camelCase；状态用绑定表达）。
 // 按 050 复刻件 ai-docs/qml-html/homepage/homepage.html 拼装桌面框架：顶部
 // chrome、ribbon 启动区、左侧任务/输出面板、中央 VTK 视口与底部视图页签、
-// 状态栏。029 只装配静态骨架：caption/推进修订/错误展示保持既有 ViewModel
-// 冒烟链路，其余按钮与页签为视觉参考；窗口控制由系统标题栏承接。
+// 状态栏。029 只装配静态骨架：caption 与错误展示保持既有 ViewModel 绑定，
+// 其余按钮与页签为视觉参考；窗口控制由系统标题栏承接。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Panta.Bridge
-import Panta.Visualization
 
 ApplicationWindow {
     id: root
@@ -62,7 +61,6 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     onCloseRequested: tasksPanel.visible = false
-                    onAdvanceRevisionTriggered: viewModel.tick()
                 }
 
                 Rectangle {
@@ -91,40 +89,18 @@ ApplicationWindow {
                 color: Theme.colorPanelLine
             }
 
-            ColumnLayout {
+            ViewportPane {
+                id: viewportPane
+
                 anchors.left: workspaceSplit.right
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                spacing: 0
-
-                // 中央 VTK 显示区：任务 007 的原生 surface 宿主；VTK 不进入
-                // Qt Quick scenegraph。视图切换页签暂为视觉参考。
-                Item {
-                    id: vtkPane
-
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-
-                    CaeViewport {
-                        objectName: "caeViewport"
-                        anchors.fill: parent
-                    }
-
-                    PaneCloseButton {
-                        onCloseRequested: vtkPane.visible = false
-                    }
-                }
-
-                PanelTabBar {
-                    Layout.fillWidth: true
-                    edge: Qt.BottomEdge
-                    tabs: [qsTr("模型"), qsTr("网格"), qsTr("结果")]
-                }
+                onCloseRequested: viewportPane.visible = false
             }
         }
 
-        // 状态栏（复刻件 .statusbar）：就绪状态与冒烟命令的修订计数。
+        // 状态栏（复刻件 .statusbar）：就绪状态。
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.statusbarHeight
@@ -143,7 +119,7 @@ ApplicationWindow {
                 anchors.leftMargin: Theme.spacingStrip
 
                 ThemedLabel {
-                    text: qsTr("就绪")
+                    text: qsTr("Ready")
                     textSize: Theme.fontSmall
                     textColor: Theme.colorTextMuted
                 }

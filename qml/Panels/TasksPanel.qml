@@ -1,6 +1,5 @@
-// 左侧任务面板（复刻件 .tasks-panel）：任务/工具/共享视图页签与任务列表。
-// 打开/新建工程暂为视觉骨架；推进修订项承接 ShellViewModel 冒烟命令，
-// 经 advanceRevisionTriggered 信号由 App 装配。
+// 左侧任务面板（复刻件 .tasks-panel）：任务/工具/共享视图页签与任务列表；
+// 列表条目暂为视觉骨架，未接业务命令。
 import QtQuick
 import QtQuick.Layouts
 
@@ -8,7 +7,6 @@ PanelSurface {
     id: panel
 
     signal closeRequested
-    signal advanceRevisionTriggered
 
     implicitWidth: Theme.leftPanelMinimumWidth
 
@@ -22,7 +20,7 @@ PanelSurface {
 
         PanelTabBar {
             Layout.fillWidth: true
-            tabs: [qsTr("任务"), qsTr("工具"), qsTr("共享视图")]
+            tabs: [qsTr("Task List"), qsTr("Tools"), qsTr("Shared Views")]
         }
 
         // 任务列表（复刻件 .task-list）：条目悬停高亮，弱化后缀跟随主文案。
@@ -33,7 +31,7 @@ PanelSurface {
 
             ThemedToolButton {
                 Layout.fillWidth: true
-                text: qsTr("打开工程")
+                text: qsTr("Open a Project")
                 dimText: "…"
                 iconName: "project-open"
                 contentAlignLeft: true
@@ -43,25 +41,13 @@ PanelSurface {
             }
             ThemedToolButton {
                 Layout.fillWidth: true
-                text: qsTr("新建工程")
+                text: qsTr("New Project")
                 dimText: "…"
                 iconName: "project-new"
                 contentAlignLeft: true
                 contentColor: Theme.colorText
                 contentPadding: Theme.spacingLarge
                 hoverColor: Theme.colorHover
-            }
-            ThemedToolButton {
-                objectName: "advanceRevisionButton"
-                Layout.fillWidth: true
-                text: qsTr("推进修订")
-                dimText: "…"
-                iconName: "animation-preview"
-                contentAlignLeft: true
-                contentColor: Theme.colorText
-                contentPadding: Theme.spacingLarge
-                hoverColor: Theme.colorHover
-                onClicked: panel.advanceRevisionTriggered()
             }
         }
 

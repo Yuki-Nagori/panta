@@ -26,17 +26,17 @@ Rectangle {
         RibbonTile {
             height: parent.height
             iconName: "ribbon-start"
-            text: qsTr("启动")
+            text: qsTr("Start")
         }
         RibbonTile {
             height: parent.height
             iconName: "ribbon-whatsnew"
-            text: qsTr("新功能")
+            text: qsTr("What's New")
         }
         RibbonTile {
             height: parent.height
             iconName: "ribbon-learn"
-            text: qsTr("学习")
+            text: qsTr("Learning")
         }
     }
 

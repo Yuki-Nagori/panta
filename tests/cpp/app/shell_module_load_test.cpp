@@ -63,7 +63,6 @@ class ShellModuleLoadTest final : public QObject {
         };
         QVERIFY2(assert_visible("shellCaption"), "Shell caption is missing or hidden");
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
-        QVERIFY2(assert_visible("advanceRevisionButton"), "Revision button is missing or hidden");
         QVERIFY2(root->findChild<QObject*>(QStringLiteral("caeViewport")) != nullptr,
                  "CaeViewport is missing from Panta.Shell");
 #endif

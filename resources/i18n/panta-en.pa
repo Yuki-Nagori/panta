@@ -4,18 +4,92 @@ language: en
 sourcelanguage: en
 
 [App]
-title:
-  src: Panta CAE
-  tr: Panta CAE
+ready:
+  src: Ready
+  tr: Ready
 
-revision-button:
-  src: Advance revision
-  tr: Advance revision
+[AppNoBridge]
+caption:
+  src: panta — Minimal Shell (Bridge disabled)
+  tr: panta — Minimal Shell (Bridge disabled)
 
-revision-caption:
-  src: Revision %1
-  tr: Revision %1
+[PlaceholderPanel]
+placeholder:
+  src: "Panel placeholder: project tree / viewport / properties (upcoming tasks)"
+  tr: "Panel placeholder: project tree / viewport / properties (upcoming tasks)"
 
-error-title:
-  src: Error
-  tr: Error
+[RibbonPanel]
+start:
+  src: Start
+  tr: Start
+
+whats-new:
+  src: "What's New"
+  tr: "What's New"
+
+learning:
+  src: Learning
+  tr: Learning
+
+[TasksPanel]
+tab-tools:
+  src: Tools
+  tr: Tools
+
+tab-tasks:
+  src: Task List
+  tr: Task List
+
+tab-shared-views:
+  src: Shared Views
+  tr: Shared Views
+
+new-project:
+  src: New Project
+  tr: New Project
+
+open-project:
+  src: Open a Project
+  tr: Open a Project
+
+[TopChromePanel]
+menu-view:
+  src: View
+  tr: View
+
+menu-tools:
+  src: Tools
+  tr: Tools
+
+menu-community:
+  src: Community
+  tr: Community
+
+sign-in:
+  src: Sign in
+  tr: Sign in
+
+menu-start-learn:
+  src: Start and Learn
+  tr: Start and Learn
+
+activate-animation:
+  src: Activate Animation (A)
+  tr: Activate Animation (A)
+
+search-placeholder:
+  src: Enter a keyword or phrase
+  tr: Enter a keyword or phrase
+
+[ViewportPane]
+mesh:
+  src: Mesh
+  tr: Mesh
+
+model:
+  src: Model
+  tr: Model
+
+results:
+  src: Results
+  tr: Results

@@ -4,18 +4,92 @@ language: zh-CN
 sourcelanguage: en
 
 [App]
-title:
-  src: Panta CAE
-  tr: Panta CAE
+ready:
+  src: Ready
+  tr: 就绪
 
-revision-button:
-  src: Advance revision
-  tr: 推进修订
+[AppNoBridge]
+caption:
+  src: panta — Minimal Shell (Bridge disabled)
+  tr: panta — 最小 Shell（Bridge 已关闭）
 
-revision-caption:
-  src: Revision %1
-  tr: 修订 %1
+[PlaceholderPanel]
+placeholder:
+  src: "Panel placeholder: project tree / viewport / properties (upcoming tasks)"
+  tr: 面板占位：工程树 / 视口 / 属性区（后续任务）
 
-error-title:
-  src: Error
-  tr: 错误
+[RibbonPanel]
+start:
+  src: Start
+  tr: 启动
+
+whats-new:
+  src: "What's New"
+  tr: 新功能
+
+learning:
+  src: Learning
+  tr: 学习
+
+[TasksPanel]
+tab-tools:
+  src: Tools
+  tr: 工具
+
+tab-tasks:
+  src: Task List
+  tr: 任务
+
+tab-shared-views:
+  src: Shared Views
+  tr: 共享视图
+
+new-project:
+  src: New Project
+  tr: 新建工程
+
+open-project:
+  src: Open a Project
+  tr: 打开工程
+
+[TopChromePanel]
+menu-view:
+  src: View
+  tr: 查看
+
+menu-tools:
+  src: Tools
+  tr: 工具
+
+menu-community:
+  src: Community
+  tr: 社区
+
+sign-in:
+  src: Sign in
+  tr: 登录
+
+menu-start-learn:
+  src: Start and Learn
+  tr: 开始并学习
+
+activate-animation:
+  src: Activate Animation (A)
+  tr: 激活动图(A)
+
+search-placeholder:
+  src: Enter a keyword or phrase
+  tr: 请输入关键字或短语
+
+[ViewportPane]
+mesh:
+  src: Mesh
+  tr: 网格
+
+model:
+  src: Model
+  tr: 模型
+
+results:
+  src: Results
+  tr: 结果

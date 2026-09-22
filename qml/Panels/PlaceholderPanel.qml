@@ -7,7 +7,7 @@ PanelSurface {
 
     ThemedLabel {
         anchors.centerIn: parent
-        text: qsTr("面板占位：工程树 / 视口 / 属性区（后续任务）")
+        text: qsTr("Panel placeholder: project tree / viewport / properties (upcoming tasks)")
         textColor: Theme.colorTextMuted
     }
 }

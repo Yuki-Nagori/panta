@@ -36,7 +36,7 @@
 
 ## 清理与兼容例外
 
-同步清理被替换的控件、样式、默认值与调用点。无兼容例外，不长期保留双数据源或两套主题入口。本期删除 `ThemedButton.qml`（由 ThemedToolButton 替代）、无消费者的 `colorAccent`/`windowControlWidth` token、PanelSurface 圆角属性，以及 `revisionCount` 标签（维护者决定，见工作记录）。
+同步清理被替换的控件、样式、默认值与调用点。无兼容例外，不长期保留双数据源或两套主题入口。本期删除 `ThemedButton.qml`（由 ThemedToolButton 替代）、无消费者的 `colorAccent`/`windowControlWidth` token、PanelSurface 圆角属性，以及 `revisionCount` 标签与“推进修订”条目（维护者决定，见工作记录）；字典同步清理失效词条（revision-caption/error-title 等）。
 
 ## 验收标准
 
@@ -65,6 +65,7 @@
 | 2026-09-22 | `ctest --test-dir target/native/debug` | 49/49 通过：`Qml.ThemeComponentParameters` 覆盖 token 默认值断言、覆盖隔离、禁用弱化透明度、`QImageReader` 解码模块内 SVG（qsvg 插件链路）；`Qml.ShellModuleLoads` 覆盖框架装配后的 objectName 契约；`Qml.FormatCheck` 通过 |
 | 2026-09-22 | `PANTA_SHELL_CAPTURE_PATH=…` 离屏抓帧，QT_SCALE_FACTOR=1.0 与 1.5 各一帧 | 两帧与 050 复刻件区块结构一致（顶部 chrome/ribbon/任务与输出面板/VTK 视口与底部页签/状态栏）；1.5 缩放图标清晰、无布局错乱；800px 窄窗口下居中标题按 elide 收敛不与搜索框重叠 |
 | 2026-09-22 | 布局诊断（`PANTA_SHELL_DUMP_GEOMETRY=1`） | 发现嵌套 Layout 默认最大宽为隐式宽导致 fillWidth 列展不开、剩余空间错派给左栏；工作区改 anchors 锚定后左栏恢复 `max(26%, 320px)` |
+| 2026-09-22 | 文案英文化 + 字典同步后 `cargo build`、ctest、离屏抓帧 | `.pa` 解析与 TS/QM 生成通过；`I18n.CompiledQmLoads` 更新为按组件上下文断言（App/TopChromePanel/RibbonPanel/ViewportPane）；49/49 通过；抓帧确认全部显示文本为英文，zh-CN 译文经 QM 查找断言 |
 
 ## 风险与回退
 
@@ -80,9 +81,13 @@
 - 2026-09-22：Shell 自绘控件要求非原生样式，主入口 `QQuickStyle::setStyle("Basic")` 固定，与 ctest 既有 `QT_QUICK_CONTROLS_STYLE=Basic` 同源。
 - 2026-09-22：工作区（左栏/分隔线/VTK 列）用 anchors 直接锚定：嵌套 Layout 默认最大尺寸为自身隐式尺寸，fillWidth 列展不开且剩余空间分派不可预期（有几何 dump 证据）。
 - 2026-09-22：维护者决定删除 `revisionCount` 标签；同步取消 shell 加载测试中该断言，修订计数行为由 bridge ViewModel 测试继续覆盖。
-- 2026-09-22：菜单文案以 qsTr 中文源文案落地（与当前 PlaceholderPanel 口径一致）；022 启动后随语言字典迁移英文源文案。
+- 2026-09-22：维护者决策显示文案全部使用英文源 + `qsTr()`，中文译文登记进
+  `resources/i18n/panta-{en,cn}.pa`（上下文按 QML 组件命名；`.pa` 解析器要求
+  同上下文源文本长度互异，个别措辞据此调整为 Task List/Open a Project/Learning）。
+- 2026-09-22：维护者决定删去“推进修订”任务项；tick 命令不再有 UI 触发，行为由
+  bridge ViewModel 测试继续覆盖，shell 加载断言与字典词条同步移除。
 - 2026-09-22：shell 加载测试常驻布局取证能力（`PANTA_SHELL_CAPTURE_PATH` / `PANTA_SHELL_DUMP_GEOMETRY` 环境变量门控），供后续布局优化对照。
 
 ## 完成摘要
 
-QML 侧已按 050 复刻件完成组件库与 Shell 框架：Theme 以复刻件 `:root` 设计值为权威默认（chrome/menubar/ribbon 配色、13/13/12 字号、30/24/84/26 条带高度、间距刻度、图标/圆角/栏宽比例 token）；原子层 ThemedLabel、ThemedToolButton（icon/弱化后缀/caret/包边/选中态/禁用弱化/visualFocus）、ThemedIcon、PanelSurface，组合层 ToolGroup、RibbonTile、PanelTabBar（上下两态）、PaneCloseButton，面板层 TopChrome/Ribbon/Tasks/Output，App.qml 以 anchors 工作区拼装为复刻件同构桌面框架。图标为转写自复刻件的 31 个模块内 SVG（qtsvg 供给渲染），Qt 供给 manifest 三平台登记 qtsvg。ShellViewModel 冒烟链路（caption、推进修订、错误摘要）保持，窗口控制交系统标题栏，`revisionCount` 标签按维护者决定移除。参数覆盖与默认绑定、禁用弱化、SVG 解码均有组件测试；离屏首帧 1.0/1.5 缩放对照复刻件一致。030 接手主题 DSL 与运行期切换时，Theme 属性名即稳定契约。
+QML 侧已按 050 复刻件完成组件库与 Shell 框架：Theme 以复刻件 `:root` 设计值为权威默认（chrome/menubar/ribbon 配色、13/13/12 字号、30/24/84/26 条带高度、间距刻度、图标/圆角/栏宽比例 token）；原子层 ThemedLabel、ThemedToolButton（icon/弱化后缀/caret/包边/选中态/禁用弱化/visualFocus）、ThemedIcon、PanelSurface，组合层 ToolGroup、RibbonTile、PanelTabBar（上下两态）、PaneCloseButton，面板层 TopChrome/Ribbon/Tasks/Output/ViewportPane，App.qml 以 anchors 工作区拼装为复刻件同构桌面框架。图标为转写自复刻件的 31 个模块内 SVG（qtsvg 供给渲染），Qt 供给 manifest 三平台登记 qtsvg。显示文案全部为英文源 + `qsTr()`，中文译文登记进 `resources/i18n/panta-{en,cn}.pa`（022 接入运行期加载）。ShellViewModel 的 caption 与错误展示绑定保持，窗口控制交系统标题栏，`revisionCount` 标签与“推进修订”任务项按维护者决定移除（tick 行为由 bridge ViewModel 测试覆盖）。参数覆盖与默认绑定、禁用弱化、SVG 解码均有组件测试；离屏首帧 1.0/1.5 缩放对照复刻件一致。030 接手主题 DSL 与运行期切换时，Theme 属性名即稳定契约。

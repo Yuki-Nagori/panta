@@ -21,7 +21,7 @@ ApplicationWindow {
         ThemedLabel {
             objectName: "shellCaption"
             Layout.fillWidth: true
-            text: qsTr("panta — 最小 Shell（Bridge 已关闭）")
+            text: qsTr("panta — Minimal Shell (Bridge disabled)")
             textSize: Theme.fontTitle
         }
 
