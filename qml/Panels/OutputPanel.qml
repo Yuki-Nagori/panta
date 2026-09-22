@@ -22,7 +22,7 @@ PanelSurface {
         // 输出工具条（复刻件 .output-toolbar）
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.controlHeight
+            Layout.preferredHeight: Theme.panelToolbarHeight
             color: Theme.colorChrome
 
             Row {
@@ -36,20 +36,23 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-new"
+                    accessibleName: qsTranslate("IconActionNewOutput", "New output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
                     controlHeight: Theme.toolbarButtonHeight
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
-                    iconName: "output-open"
+                    iconName: "document-open"
+                    accessibleName: qsTranslate("IconActionOpenOutput", "Open output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
                     controlHeight: Theme.toolbarButtonHeight
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
-                    iconName: "output-save"
+                    iconName: "document-save"
+                    accessibleName: qsTranslate("IconActionSaveOutput", "Save output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
@@ -57,6 +60,7 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-check"
+                    accessibleName: qsTranslate("IconActionCheckOutput", "Check output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
@@ -64,13 +68,15 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-wizard"
+                    accessibleName: qsTranslate("IconActionOutputWizard", "Output wizard")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
                     controlHeight: Theme.toolbarButtonHeight
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
-                    iconName: "output-clear"
+                    iconName: "pane-close"
+                    accessibleName: qsTranslate("IconActionClearOutput", "Clear output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
@@ -78,6 +84,7 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-copy"
+                    accessibleName: qsTranslate("IconActionCopyOutput", "Copy output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
@@ -85,6 +92,7 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-image"
+                    accessibleName: qsTranslate("IconActionOutputImage", "Output image")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
@@ -92,6 +100,7 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-export"
+                    accessibleName: qsTranslate("IconActionExportOutput", "Export output")
                 }
                 ThemedToolButton {
                     width: Theme.toolbarButtonWidth
@@ -99,6 +108,7 @@ PanelSurface {
                     contentPadding: 0
                     iconSize: Theme.iconSizeSmall
                     iconName: "output-delete"
+                    accessibleName: qsTranslate("IconActionDeleteOutput", "Delete output")
                 }
             }
         }

@@ -1,3 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 15 15" fill="none">
-  <path d="M4 5V2h7v3M2 5h11v5h-2M4 8h7v5H4z" stroke="#4a4a4a" stroke-width="1.2"/>
+<!-- Mono：打印；24 网格，2 单位圆端描边。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7 8V3.5h10V8M7 17H3.5V8h17v9H17"/>
+  <rect x="7" y="13" width="10" height="7.5" rx="2.5"/>
 </svg>

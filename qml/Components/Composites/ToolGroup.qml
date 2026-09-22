@@ -9,7 +9,6 @@ Rectangle {
 
     implicitHeight: Theme.titlebarHeight
     implicitWidth: row.implicitWidth
-    radius: Theme.radiusLarge
     border.width: Theme.borderWidth
     border.color: Theme.colorPanelLine
     gradient: Gradient {
@@ -25,9 +24,10 @@ Rectangle {
 
     Row {
         id: row
+        objectName: "toolGroupContent"
 
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Theme.spacingSmall
+        spacing: Theme.spacingXSmall
     }
 }

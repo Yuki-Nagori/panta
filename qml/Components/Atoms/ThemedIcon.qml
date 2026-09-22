@@ -1,18 +1,20 @@
-// 图标原子：渲染模块内置的 SVG 图标资源（qml/icons/，经 qt_add_resources
-// 登记，映射自 050 复刻件的内联 SVG 占位）；只负责按 token 尺寸取图，
-// 不携带动作语义。颜色固定在资源内，主题化图标资源由后续任务替换。
+// 装饰性 Mono 图标：资源只描述几何，provider 按调用方颜色渲染；动作语义由宿主承担。
 import QtQuick
 
 Image {
-    id: icon
+    id: glyph
 
     property string name: ""
     property int iconSize: Theme.iconSizeDefault
+    property color color: Theme.colorIcon
+
+    // 固定八位 ARGB，避免 color 字符串省略不透明 alpha 或 URL 中的 # 片段。
+    readonly property string colorKey: [color.a, color.r, color.g, color.b].map(channel => Math.round(channel * 255).toString(16).padStart(2, "0")).join("")
 
     width: iconSize
     height: iconSize
-    source: icon.name !== "" ? Qt.resolvedUrl("../../icons/" + icon.name + ".svg") : ""
+    source: name !== "" ? "image://panta-icons/" + name + "/" + colorKey : ""
     sourceSize: Qt.size(iconSize, iconSize)
     fillMode: Image.PreserveAspectFit
-    antialiasing: true
+    Accessible.ignored: true
 }

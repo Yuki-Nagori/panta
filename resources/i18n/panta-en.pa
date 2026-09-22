@@ -15,8 +15,8 @@ caption:
 
 [PlaceholderPanel]
 placeholder:
-  src: "Panel placeholder: project tree / viewport / properties (upcoming tasks)"
-  tr: "Panel placeholder: project tree / viewport / properties (upcoming tasks)"
+  src: Panel placeholder: project tree / viewport / properties (upcoming tasks)
+  tr: Panel placeholder: project tree / viewport / properties (upcoming tasks)
 
 [RibbonPanel]
 start:
@@ -24,8 +24,8 @@ start:
   tr: Start
 
 whats-new:
-  src: "What's New"
-  tr: "What's New"
+  src: New
+  tr: New
 
 learning:
   src: Learning
@@ -93,3 +93,113 @@ model:
 results:
   src: Results
   tr: Results
+
+[IconActionNewDocument]
+label:
+  src: New document
+  tr: New document
+
+[IconActionOpenDocument]
+label:
+  src: Open document
+  tr: Open document
+
+[IconActionSaveDocument]
+label:
+  src: Save document
+  tr: Save document
+
+[IconActionUndo]
+label:
+  src: Undo
+  tr: Undo
+
+[IconActionRedo]
+label:
+  src: Redo
+  tr: Redo
+
+[IconActionPrint]
+label:
+  src: Print
+  tr: Print
+
+[IconActionPreviewAnimation]
+label:
+  src: Preview animation
+  tr: Preview animation
+
+[IconActionShoppingCart]
+label:
+  src: Shopping cart
+  tr: Shopping cart
+
+[IconActionHelp]
+label:
+  src: Help
+  tr: Help
+
+[IconActionLanguage]
+label:
+  src: Language
+  tr: Language
+
+[IconActionClosePanel]
+label:
+  src: Close panel
+  tr: Close panel
+
+[IconActionNewOutput]
+label:
+  src: New output
+  tr: New output
+
+[IconActionOpenOutput]
+label:
+  src: Open output
+  tr: Open output
+
+[IconActionSaveOutput]
+label:
+  src: Save output
+  tr: Save output
+
+[IconActionCheckOutput]
+label:
+  src: Check output
+  tr: Check output
+
+[IconActionOutputWizard]
+label:
+  src: Output wizard
+  tr: Output wizard
+
+[IconActionClearOutput]
+label:
+  src: Clear output
+  tr: Clear output
+
+[IconActionCopyOutput]
+label:
+  src: Copy output
+  tr: Copy output
+
+[IconActionOutputImage]
+label:
+  src: Output image
+  tr: Output image
+
+[IconActionExportOutput]
+label:
+  src: Export output
+  tr: Export output
+
+[IconActionDeleteOutput]
+label:
+  src: Delete output
+  tr: Delete output
+
+[IconActionSearch]
+label:
+  src: Search
+  tr: Search

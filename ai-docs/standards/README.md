@@ -29,6 +29,7 @@
 | CMake | [CMake](cmake.md) | native 构建图 |
 | Ninja | [Ninja](ninja.md) | 构建执行 |
 | Python 3.12+ | [Python](python.md) | 后续工具/自动化 |
+| 图标设计 | [SVG 图标](icons.md) | QML 图标资源、着色与可访问性 |
 | QML | [QML](qml.md) | 界面组件 |
 | Qt 6 | [Qt](qt.md) | QObject、线程、部署 |
 | OpenCASCADE | [OCCT](occt.md) | 几何适配器 |

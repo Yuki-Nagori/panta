@@ -21,20 +21,25 @@ Rectangle {
     Row {
         anchors.fill: parent
         anchors.margins: Theme.spacingTiny
+        // 分隔线独占底边，不能侵占磁贴下方的可见留白。
+        anchors.bottomMargin: Theme.spacingTiny + Theme.borderWidth
         spacing: Theme.spacingTiny
 
         RibbonTile {
             height: parent.height
+            objectName: "ribbonStart"
             iconName: "ribbon-start"
             text: qsTr("Start")
         }
         RibbonTile {
             height: parent.height
+            objectName: "ribbonNew"
             iconName: "ribbon-whatsnew"
-            text: qsTr("What's New")
+            text: qsTr("New")
         }
         RibbonTile {
             height: parent.height
+            objectName: "ribbonLearn"
             iconName: "ribbon-learn"
             text: qsTr("Learning")
         }

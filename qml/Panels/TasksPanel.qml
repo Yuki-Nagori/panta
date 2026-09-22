@@ -20,20 +20,20 @@ PanelSurface {
 
         PanelTabBar {
             Layout.fillWidth: true
+            rightPadding: Theme.paneCloseSize + 2 * Theme.spacingXSmall
             tabs: [qsTr("Task List"), qsTr("Tools"), qsTr("Shared Views")]
         }
 
         // 任务列表（复刻件 .task-list）：条目悬停高亮，弱化后缀跟随主文案。
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.topMargin: Theme.spacingMedium
             spacing: 0
 
             ThemedToolButton {
                 Layout.fillWidth: true
                 text: qsTr("Open a Project")
                 dimText: "…"
-                iconName: "project-open"
+                iconName: "document-open"
                 contentAlignLeft: true
                 contentColor: Theme.colorText
                 contentPadding: Theme.spacingLarge
@@ -43,7 +43,7 @@ PanelSurface {
                 Layout.fillWidth: true
                 text: qsTr("New Project")
                 dimText: "…"
-                iconName: "project-new"
+                iconName: "document-new"
                 contentAlignLeft: true
                 contentColor: Theme.colorText
                 contentPadding: Theme.spacingLarge

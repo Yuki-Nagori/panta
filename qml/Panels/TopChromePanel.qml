@@ -39,107 +39,151 @@ Rectangle {
             Layout.fillHeight: true
             spacing: 0
 
-            // 标题条行（复刻件 .titlebar）
-            RowLayout {
+            // 小窗口横向滚动标题工具区，避免压缩按钮或遮住搜索/账户操作。
+            Flickable {
+                id: titleStrip
+                objectName: "titleStrip"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Theme.titlebarHeight
-                spacing: Theme.spacingLarge
+                contentWidth: titleContent.width
+                contentHeight: height
+                flickableDirection: Flickable.HorizontalFlick
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
 
-                ToolGroup {
-                    Layout.leftMargin: Theme.spacingXSmall
+                ScrollBar.horizontal: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
 
-                    ThemedToolButton {
-                        iconName: "document-new"
-                        showCaret: true
+                // 聚焦与窗口收窄都会改变可见区域；布局完成后再滚到焦点控件。
+                function ensureFocusedVisible() {
+                    const hostWindow = chrome.Window.window;
+                    const focused = hostWindow ? hostWindow.activeFocusItem : null;
+                    let ancestor = focused;
+                    while (ancestor && ancestor !== titleContent)
+                        ancestor = ancestor.parent;
+                    if (!ancestor || !focused)
+                        return;
+                    const point = focused.mapToItem(titleContent, 0, 0);
+                    const desired = point.x < contentX ? point.x : Math.max(contentX, point.x + focused.width - width);
+                    contentX = Math.max(0, Math.min(desired, contentWidth - width));
+                }
+                onWidthChanged: Qt.callLater(ensureFocusedVisible)
+                Connections {
+                    target: chrome.Window.window
+                    function onActiveFocusItemChanged() {
+                        Qt.callLater(titleStrip.ensureFocusedVisible);
                     }
-                    ThemedToolButton {
-                        iconName: "document-open"
-                    }
-                    ThemedToolButton {
-                        iconName: "document-save"
-                        showCaret: true
-                    }
-                    ThemedToolButton {
-                        iconName: "edit-undo"
-                    }
-                    ThemedToolButton {
-                        iconName: "edit-redo"
-                    }
-                    ThemedToolButton {
-                        iconName: "document-print"
-                    }
-                    ThemedToolButton {
-                        iconName: "animation-preview"
-                        showCaret: true
-                    }
+                }
 
-                    // 激活动图与分屏箭头的结构包裹（复刻件 .activate + .split，
-                    // split 前有细分隔线）。
-                    Row {
-                        spacing: Theme.spacingXSmall
+                RowLayout {
+                    id: titleContent
+                    width: Math.max(titleStrip.width, Theme.titlebarMinimumContentWidth)
+                    height: titleStrip.height
+                    spacing: Theme.spacingMedium
 
+                    ToolGroup {
+                        objectName: "titleQuickActions"
                         ThemedToolButton {
-                            anchors.verticalCenter: parent.verticalCenter
+                            iconName: "document-new"
+                            accessibleName: qsTranslate("IconActionNewDocument", "New document")
+                            showCaret: true
+                        }
+                        ThemedToolButton {
+                            iconName: "document-open"
+                            accessibleName: qsTranslate("IconActionOpenDocument", "Open document")
+                        }
+                        ThemedToolButton {
+                            iconName: "document-save"
+                            accessibleName: qsTranslate("IconActionSaveDocument", "Save document")
+                            showCaret: true
+                        }
+                        ThemedToolButton {
+                            iconName: "edit-undo"
+                            accessibleName: qsTranslate("IconActionUndo", "Undo")
+                        }
+                        ThemedToolButton {
+                            iconName: "edit-redo"
+                            accessibleName: qsTranslate("IconActionRedo", "Redo")
+                        }
+                        ThemedToolButton {
+                            iconName: "document-print"
+                            accessibleName: qsTranslate("IconActionPrint", "Print")
+                        }
+                        ThemedToolButton {
+                            iconName: "animation-preview"
+                            accessibleName: qsTranslate("IconActionPreviewAnimation", "Preview animation")
+                            showCaret: true
+                        }
+                        ThemedToolButton {
                             text: qsTr("Activate Animation (A)")
                             showCaret: true
                             contentColor: Theme.colorText
                             contentPadding: Theme.spacingSmall
                             borderColor: Theme.colorPanelLine
                         }
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Theme.borderWidth
-                            height: Theme.iconSizeSmall
-                            color: Theme.colorPanelLine
-                        }
                         ThemedIcon {
                             anchors.verticalCenter: parent.verticalCenter
                             name: "activate-split"
-                            iconSize: Theme.iconSizeSmall
+                            color: Theme.colorText
                         }
                     }
-                }
-
-                ThemedLabel {
-                    objectName: "shellCaption"
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                    text: chrome.caption
-                    textSize: Theme.fontTitle
-                    textColor: Theme.colorText
-                    font.weight: Font.DemiBold
-                }
-
-                ToolGroup {
-                    Layout.rightMargin: Theme.spacingXSmall
-
-                    TextField {
-                        Layout.preferredWidth: Theme.searchFieldWidth
-                        implicitHeight: Theme.searchHeight
-                        leftPadding: Theme.spacingXSmall
-                        rightPadding: Theme.spacingXSmall
-                        placeholderText: qsTr("Enter a keyword or phrase")
-                        color: Theme.colorText
-                        font.pixelSize: Theme.fontSmall
-                        background: Rectangle {
-                            color: Theme.colorPanel
+                    ThemedLabel {
+                        objectName: "shellCaption"
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: Theme.spacingLarge
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        text: chrome.caption
+                        textSize: Theme.fontTitle
+                        textColor: Theme.colorText
+                        font.weight: Font.DemiBold
+                    }
+                    ToolGroup {
+                        objectName: "titleSearchGroup"
+                        Row {
+                            leftPadding: Theme.spacingTiny
+                            spacing: Theme.spacingXSmall
+                            TextField {
+                                id: searchField
+                                anchors.verticalCenter: parent.verticalCenter
+                                objectName: "globalSearch"
+                                width: Theme.searchFieldWidth
+                                height: Theme.searchHeight
+                                topPadding: 0
+                                bottomPadding: 0
+                                leftPadding: Theme.spacingSmall
+                                rightPadding: Theme.spacingSmall
+                                placeholderText: qsTr("Enter a keyword or phrase")
+                                Accessible.name: placeholderText
+                                color: Theme.colorText
+                                font.pixelSize: Theme.fontSmall
+                                background: Rectangle {
+                                    color: Theme.colorPanel
+                                    border.width: Theme.borderWidth
+                                    border.color: searchField.activeFocus ? Theme.colorIcon : Theme.colorPanelLine
+                                }
+                            }
+                            ThemedToolButton {
+                                objectName: "searchButton"
+                                iconName: "binoculars"
+                                accessibleName: qsTranslate("IconActionSearch", "Search")
+                            }
                         }
-                    }
-                    ThemedToolButton {
-                        iconName: "user-account"
-                    }
-                    ThemedToolButton {
-                        text: qsTr("Sign in")
-                        iconName: "user-account"
-                        showCaret: true
-                    }
-                    ThemedToolButton {
-                        iconName: "shopping-cart"
-                    }
-                    ThemedToolButton {
-                        iconName: "help-browser"
-                        showCaret: true
+                        ThemedToolButton {
+                            text: qsTr("Sign in")
+                            iconName: "user-account"
+                            showCaret: true
+                        }
+                        ThemedToolButton {
+                            iconName: "shopping-cart"
+                            accessibleName: qsTranslate("IconActionShoppingCart", "Shopping cart")
+                        }
+                        ThemedToolButton {
+                            iconName: "help-browser"
+                            accessibleName: qsTranslate("IconActionHelp", "Help")
+                            showCaret: true
+                        }
                     }
                 }
             }
@@ -157,6 +201,7 @@ Rectangle {
 
                     ThemedToolButton {
                         text: qsTr("Start and Learn")
+                        cornerRadius: 0
                         highlighted: true
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorMenubarHover
@@ -187,11 +232,8 @@ Rectangle {
                     }
                     ThemedToolButton {
                         iconName: "menubar-globe"
-                        contentColor: Theme.colorMenubarText
-                        hoverColor: Theme.colorMenubarHover
-                    }
-                    ThemedToolButton {
-                        iconName: "menubar-chevron"
+                        showCaret: true
+                        accessibleName: qsTranslate("IconActionLanguage", "Language")
                         contentColor: Theme.colorMenubarText
                         hoverColor: Theme.colorMenubarHover
                     }

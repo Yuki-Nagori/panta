@@ -6,13 +6,17 @@ import QtQuick.Controls
 
 ToolButton {
     id: button
+    hoverEnabled: true
 
     property int controlHeight: Theme.controlHeight
     property int contentPadding: Theme.spacingXSmall
+    property int cornerRadius: Theme.radiusSmall
     property color contentColor: Theme.colorIcon
     property color hoverColor: Theme.colorSelected
     property color borderColor: "transparent"
     property string iconName: ""
+    // 图标按钮由宿主提供英文源语义，用于读屏和悬停提示。
+    property string accessibleName: text
     property int iconSize: Theme.iconSizeDefault
     property bool showCaret: false
     // 追加在主文案后的弱化后缀（复刻件任务列表的 “...” 项）。
@@ -20,9 +24,16 @@ ToolButton {
     // 宽按钮（列表条目）内容靠左；默认在按钮内水平居中。
     property bool contentAlignLeft: false
 
+    Accessible.name: accessibleName
+    ToolTip.visible: hovered && text === "" && accessibleName !== ""
+    ToolTip.text: accessibleName
+    ToolTip.delay: Theme.toolTipDelay
+
     implicitHeight: controlHeight
     leftPadding: contentPadding
     rightPadding: contentPadding
+    topPadding: 0
+    bottomPadding: 0
     spacing: Theme.spacingXSmall
     // 禁用态整体弱化，配合 ToolButton 拒绝点击，让禁用原因可理解。
     opacity: enabled ? 1 : Theme.disabledOpacity
@@ -34,41 +45,47 @@ ToolButton {
         color: button.highlighted ? Theme.colorPanel : button.enabled && (button.hovered || button.visualFocus) ? button.hoverColor : "transparent"
         border.width: button.borderColor.a > 0 ? Theme.borderWidth : 0
         border.color: button.borderColor
-        radius: Theme.radiusSmall
+        radius: button.cornerRadius
     }
 
-    contentItem: Row {
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.left: button.contentAlignLeft ? parent.left : undefined
-        anchors.horizontalCenter: button.contentAlignLeft ? undefined : parent.horizontalCenter
-        spacing: button.spacing
+    contentItem: Item {
+        implicitWidth: content.implicitWidth
+        implicitHeight: content.implicitHeight
 
-        ThemedIcon {
+        Row {
+            id: content
+            objectName: "toolButtonContent"
             anchors.verticalCenter: parent.verticalCenter
-            visible: button.iconName !== ""
-            name: button.iconName
-            iconSize: button.iconSize
-        }
-        ThemedLabel {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: button.text !== ""
-            text: button.text
-            textColor: button.contentColor
-        }
-        ThemedLabel {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: button.dimText !== ""
-            text: button.dimText
-            textColor: Theme.colorTextMuted
-        }
-        Image {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: button.showCaret
-            source: Qt.resolvedUrl("../../icons/caret-down.svg")
-            sourceSize: Qt.size(Theme.caretWidth, Theme.caretHeight)
-            width: Theme.caretWidth
-            height: Theme.caretHeight
-            fillMode: Image.PreserveAspectFit
+            anchors.left: button.contentAlignLeft ? parent.left : undefined
+            anchors.horizontalCenter: button.contentAlignLeft ? undefined : parent.horizontalCenter
+            spacing: button.spacing
+
+            ThemedIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: button.iconName !== ""
+                name: button.iconName
+                iconSize: button.iconSize
+                color: button.contentColor
+            }
+            ThemedLabel {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: button.text !== ""
+                text: button.text
+                textColor: button.contentColor
+            }
+            ThemedLabel {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: button.dimText !== ""
+                text: button.dimText
+                textColor: Theme.colorTextMuted
+            }
+            ThemedIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: button.showCaret
+                name: "caret-down"
+                iconSize: Theme.iconSizeCaret
+                color: button.contentColor
+            }
         }
     }
 }

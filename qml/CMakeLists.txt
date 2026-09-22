@@ -60,10 +60,13 @@ qt_add_qml_module(
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
 panta_native_defaults(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
+target_sources(panta_shell PRIVATE ../native/app/icon_provider.cpp ../native/app/icon_provider.hpp)
+target_include_directories(panta_shell PUBLIC ../native/app)
+target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick)
 
-# 029 图标占位资源：ThemedIcon/ThemedToolButton 以模块内相对 qrc 路径解析
-# （/qt/qml/Panta/Shell/icons/）；SVG 渲染由 qtsvg 供给的 qsvg 图像格式
-# 插件承担（qt-provision.cmake）。CONFIGURE_DEPENDS 使新增图标免于手动登记。
+# 052 统一图标资源：ThemedIcon/ThemedToolButton 以模块内相对 qrc 路径解析
+# （/qt/qml/Panta/Shell/icons/）；Mono 由 QtSvg provider 着色，qsvg 插件
+# 保留普通 SVG 解码。CONFIGURE_DEPENDS 收集资源，图标清单在 icons.md 登记。
 file(
   GLOB PANTA_SHELL_ICON_FILES CONFIGURE_DEPENDS
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -75,7 +78,7 @@ if(BUILD_TESTING)
   add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)
   panta_native_defaults(panta_qml_theme_component_test)
   target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
-                                                               Qt6::Test)
+                                                               Qt6::Test Qt6::Quick)
   panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。

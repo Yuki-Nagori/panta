@@ -5,39 +5,51 @@ import QtQuick.Controls
 
 ToolButton {
     id: tile
+    hoverEnabled: true
 
     property string iconName: ""
     property int iconSize: Theme.iconSizeRibbon
 
-    leftPadding: Theme.spacingLarge
-    rightPadding: Theme.spacingLarge
-    topPadding: Theme.spacingSmall
-    bottomPadding: Theme.spacingSmall
-    spacing: Theme.spacingMedium
+    opacity: enabled ? 1 : Theme.disabledOpacity
+    Accessible.name: text
 
-    implicitWidth: contentItem.implicitWidth + leftPadding + rightPadding
+    leftPadding: Theme.spacingMedium
+    rightPadding: Theme.spacingMedium
+    topPadding: Theme.spacingXSmall
+    bottomPadding: Theme.spacingXSmall
+    spacing: Theme.spacingSmall
+
+    implicitWidth: Theme.ribbonTileWidth
     implicitHeight: contentItem.implicitHeight + topPadding + bottomPadding
 
     background: Rectangle {
-        color: tile.enabled && tile.hovered ? Theme.colorHover : Theme.colorPanel
-        radius: Theme.radiusLarge
+        color: tile.enabled && (tile.hovered || tile.visualFocus) ? Theme.colorHover : Theme.colorPanel
+        radius: Theme.radiusSmall
         border.width: Theme.borderWidth
         border.color: Theme.colorPanelLine
     }
 
-    contentItem: Column {
-        spacing: tile.spacing
+    contentItem: Item {
+        implicitWidth: content.implicitWidth
+        implicitHeight: content.implicitHeight
 
-        ThemedIcon {
-            anchors.horizontalCenter: parent.horizontalCenter
-            name: tile.iconName
-            iconSize: tile.iconSize
-        }
-        ThemedLabel {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: tile.text
-            textSize: Theme.fontSmall
-            textColor: Theme.colorText
+        Column {
+            id: content
+            objectName: "ribbonTileContent"
+            anchors.centerIn: parent
+            spacing: tile.spacing
+
+            ThemedIcon {
+                anchors.horizontalCenter: parent.horizontalCenter
+                name: tile.iconName
+                iconSize: tile.iconSize
+            }
+            ThemedLabel {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: tile.text
+                textSize: Theme.fontRibbon
+                textColor: Theme.colorText
+            }
         }
     }
 }

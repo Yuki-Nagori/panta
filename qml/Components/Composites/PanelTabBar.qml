@@ -1,6 +1,4 @@
-// 页签条组合组件（复刻件 .panel-tabs/.pane-tabs）：左面板页签与 VTK 底部
-// 视图页签共用样式；edge 决定分隔线方位与页签开口方向，激活页签白底加粗，
-// 未激活灰底弱化。选中状态由 TabBar 的互斥 checked 语义承接。
+// 共用分段页签：紧凑等宽的移动选中块；TabBar 保留键盘导航和互斥状态。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -8,28 +6,48 @@ import QtQuick.Controls
 
 TabBar {
     id: bar
+    objectName: "panelTabs"
 
     property alias tabs: repeater.model
     property int edge: Qt.TopEdge
 
-    implicitHeight: Theme.controlHeight
+    implicitWidth: count * Theme.tabSegmentWidth + leftPadding + rightPadding
+    implicitHeight: Theme.panelToolbarHeight
+    padding: Theme.spacingTiny
+    spacing: 0
 
     background: Rectangle {
         color: Theme.colorChrome
 
         Rectangle {
-            anchors.bottom: parent.bottom
+            anchors.top: bar.edge === Qt.BottomEdge ? parent.top : undefined
+            anchors.bottom: bar.edge === Qt.TopEdge ? parent.bottom : undefined
             width: parent.width
             height: Theme.borderWidth
-            visible: bar.edge === Qt.TopEdge
             color: Theme.colorPanelLine
         }
-        Rectangle {
-            anchors.top: parent.top
-            width: parent.width
-            height: Theme.borderWidth
-            visible: bar.edge === Qt.BottomEdge
-            color: Theme.colorChromeLine
+    }
+
+    contentItem: ListView {
+        id: tabList
+        objectName: "segmentedTabList"
+        implicitWidth: contentWidth
+        implicitHeight: Theme.panelToolbarHeight - 2 * Theme.spacingTiny
+        model: bar.contentModel
+        currentIndex: bar.currentIndex
+        orientation: ListView.Horizontal
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+        highlightMoveDuration: Theme.tabSlideDuration
+        highlightResizeDuration: 0
+        highlight: Item {
+            Rectangle {
+                objectName: "tabSelectedSurface"
+                anchors.fill: parent
+                anchors.margins: Theme.spacingTiny
+                radius: height / 2
+                color: Theme.colorPanel
+            }
         }
     }
 
@@ -38,31 +56,38 @@ TabBar {
 
         delegate: TabButton {
             id: tab
-
+            hoverEnabled: true
             required property string modelData
 
-            text: tab.modelData
-            width: tab.implicitWidth
-            leftPadding: Theme.spacingLarge
-            rightPadding: Theme.spacingLarge
-            topPadding: Theme.spacingXSmall
-            bottomPadding: Theme.spacingXSmall
-            font.weight: tab.checked ? Font.DemiBold : Font.Normal
-
-            background: Rectangle {
-                color: tab.checked ? Theme.colorPanel : Theme.colorChrome
-                topLeftRadius: bar.edge === Qt.TopEdge ? Theme.radiusLarge : 0
-                topRightRadius: bar.edge === Qt.TopEdge ? Theme.radiusLarge : 0
-                bottomLeftRadius: bar.edge === Qt.BottomEdge ? Theme.radiusLarge : 0
-                bottomRightRadius: bar.edge === Qt.BottomEdge ? Theme.radiusLarge : 0
-                border.width: Theme.borderWidth
-                border.color: Theme.colorPanelLine
+            text: modelData
+            width: Math.min(Theme.tabSegmentWidth, bar.availableWidth / Math.max(1, bar.count))
+            // 与 ListView 内容高度同源，避免 TabBar 按旧隐式高度居中而产生负 y。
+            implicitHeight: Theme.panelToolbarHeight - 2 * Theme.spacingTiny
+            height: bar.availableHeight
+            leftPadding: Theme.spacingMedium
+            rightPadding: Theme.spacingMedium
+            topPadding: 0
+            bottomPadding: 0
+            z: 1
+            background: Item {
+                Rectangle {
+                    objectName: "tabHoverSurface"
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingTiny
+                    radius: height / 2
+                    color: !tab.checked && tab.hovered ? Theme.colorHover : "transparent"
+                    border.width: tab.visualFocus ? Theme.borderWidth : 0
+                    border.color: Theme.colorIcon
+                }
             }
-
             contentItem: ThemedLabel {
                 text: tab.text
+                elide: Text.ElideRight
                 textSize: Theme.fontSmall
                 textColor: tab.checked ? Theme.colorText : Theme.colorTextMuted
+                font.weight: tab.checked ? Font.DemiBold : Font.Normal
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
             }
         }
     }

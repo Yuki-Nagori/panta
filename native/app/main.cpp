@@ -12,6 +12,7 @@
 #include <QQmlApplicationEngine>
 #include <QtCore/qnamespace.h>
 #include <QtQuickControls2/qquickstyle.h>
+#include <icon_provider.hpp>
 #include <panta/foundation/version.hpp>
 #include <rust/cxx.h>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
@@ -72,6 +73,7 @@ int main(int argc, char* argv[]) {
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     QQmlApplicationEngine engine;
+    panta::install_icon_provider(engine);
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         []() { QCoreApplication::exit(kExitUnavailable); }, Qt::QueuedConnection);

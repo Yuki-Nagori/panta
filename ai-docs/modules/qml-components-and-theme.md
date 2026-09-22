@@ -4,7 +4,7 @@
 
 ## 当前状态与目标
 
-`qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认值即 050 复刻件 homepage.html 的 `:root` 设计 token（029 迁入）；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，运行期默认值迁 `.pa` 与切换由 030 的 C++ ThemeViewModel 发布，Theme 属性名即稳定契约。
+`qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认布局/配色源于 050 复刻件 homepage.html 的 `:root`（029 迁入），图标与交互尺寸由 052 按用户反馈细化；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，运行期默认值迁 `.pa` 与切换由 030 的 C++ ThemeViewModel 发布，Theme 属性名即稳定契约。
 
 029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。
 
@@ -27,7 +27,7 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 |---|---|---|
 | 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
 | 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedIcon`（模块内 SVG）、`PanelSurface` |
-| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`PanelTabBar`（顶/底两态页签）、`PaneCloseButton` |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`PanelTabBar`（无独立底槽的 96px 等宽分段切换，悬停与选中面同尺寸）、`PaneCloseButton` |
 | 业务面板 | `qml/Panels/` | `TopChromePanel`、`RibbonPanel`、`TasksPanel`、`OutputPanel`、`PlaceholderPanel`（无 Bridge 变体用） |
 | 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |
 
@@ -39,11 +39,11 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 显示文案统一英文源 + `qsTr()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`，上下文段与 QML 组件同名（`.pa` 同上下文源文本长度必须互异）；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
 
-图标为模块内 SVG 资源（`qml/icons/`，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`），由 Qt 供给的 qtsvg（qsvg 图像格式插件）渲染；颜色固定在资源内，主题化图标资源待 030 后评估。
+图标遵循 [SVG 图标设计规范](../standards/icons.md)：模块内 `qml/icons/` 保存统一 24 网格的 Mono 几何，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。Shell 引擎安装 `panta-icons` provider，以 qtsvg 渲染资源并按 `ThemedIcon.color` 着色，颜色来自 Theme/宿主；不依赖 SVG 自动继承 QML 颜色。052 同步修正标题工具分组、搜索入口、32px 面板工具条与窄窗口标题工具区滚动；Ribbon 为 69px 高栏内的 64×64px 等宽磁贴，24px 图标与 10px 文字整体居中，分段页签按等宽槽定位，选择加粗不改变尺寸。
 
 布局取证（`tests/cpp/app/shell_module_load_test.cpp`，029 起常驻）：环境变量
 `PANTA_SHELL_CAPTURE_PATH` 指向目标 PNG 时保存 Shell 首帧渲染，
-`PANTA_SHELL_DUMP_GEOMETRY` 置非空时打印内容树前三层几何；ctest 默认不设置、
+`PANTA_SHELL_DUMP_GEOMETRY` 置非空时打印组件内容树几何；ctest 默认不设置、
 无副作用。排查布局时的示例如下（仓库根目录，先 `cargo build --locked`；
 `QT_SCALE_FACTOR` 可模拟不同 DPR）：
 
