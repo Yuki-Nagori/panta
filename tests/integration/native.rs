@@ -17,7 +17,7 @@ fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
         return Err(format!("ctest 不存在：{}", ctest.display()).into());
     }
 
-    let status = Command::new(cmake)
+    let status = Command::new(&cmake)
         .envs(panta_build::native_test_env(
             target_root,
             env!("PANTA_TEST_HOST"),
@@ -28,6 +28,22 @@ fn native_and_qml_suite_passes() -> Result<(), Box<dyn Error>> {
         .status()?;
     if !status.success() {
         return Err(format!("qmllint 失败（退出码 {:?}）", status.code()).into());
+    }
+
+    // CMake reconfiguration can discard gtest_discover_tests POST_BUILD files
+    // for test targets that were not rebuilt by all_qmllint. Rebuild all after
+    // that configure step so CTest never substitutes *_NOT_BUILT placeholders.
+    let status = Command::new(cmake)
+        .envs(panta_build::native_test_env(
+            target_root,
+            env!("PANTA_TEST_HOST"),
+        )?)
+        .args(["--build"])
+        .arg(native_dir)
+        .args(["--config", build_type, "--target", "all"])
+        .status()?;
+    if !status.success() {
+        return Err(format!("native test build 失败（退出码 {:?}）", status.code()).into());
     }
 
     let status = Command::new(ctest)

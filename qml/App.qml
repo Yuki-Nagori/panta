@@ -140,7 +140,7 @@ ApplicationWindow {
             ViewportPane {
                 id: viewportPane
 
-                meshPath: projectModel.hasImportedPart ? projectModel.importedAssetPath : ""
+                meshSource: projectModel
                 anchors.left: workspaceSplit.right
                 anchors.right: parent.right
                 anchors.top: parent.top

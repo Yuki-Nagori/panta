@@ -258,6 +258,8 @@ dependencies = [
 name = "panta-core"
 version = "0.1.0"
 dependencies = [
+ "panta-import",
+ "panta-mesh",
  "serde",
  "serde_json",
 ]
@@ -288,6 +290,7 @@ dependencies = [
  "panta-build",
  "panta-core",
  "panta-foundation",
+ "panta-mesh",
 ]
 
 [[package]]
@@ -298,6 +301,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "panta-import"
+version = "0.1.0"
+dependencies = [
+ "panta-mesh",
+ "serde",
+]
+
+[[package]]
 name = "panta-launcher"
 version = "0.1.0"
 dependencies = [
@@ -305,6 +316,10 @@ dependencies = [
  "panta-dsl-core",
  "panta-ffi",
 ]
+
+[[package]]
+name = "panta-mesh"
+version = "0.1.0"
 
 [[package]]
 name = "panta-tests"

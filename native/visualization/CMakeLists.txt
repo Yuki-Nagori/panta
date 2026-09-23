@@ -31,6 +31,7 @@ qt_add_qml_module(
   SOURCES
   include/panta/visualization/cae_viewport.hpp
   include/panta/visualization/render_scene.hpp
+  include/panta/visualization/mesh_source.hpp
   include/panta/visualization/viewport_backend.hpp
   src/cae_viewport.cpp
   src/vtk/vtk_viewport.hpp
@@ -41,8 +42,8 @@ qt_add_qml_module(
   src/vtk/navigation/viewport_input.hpp
   src/vtk/navigation/viewport_orientation.cpp
   src/vtk/navigation/viewport_orientation.hpp
-  src/vtk/stl_mesh.cpp
-  src/vtk/stl_mesh.hpp
+  src/vtk/surface_mesh.cpp
+  src/vtk/surface_mesh.hpp
   src/vtk/default_wordmark.cpp
   src/vtk/default_wordmark.hpp
   src/vtk/vtk_native_surface.hpp)

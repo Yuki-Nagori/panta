@@ -5,14 +5,14 @@
 #pragma once
 
 #include "panta_ffi.h"
-#include <QObject>
 #include <QUrl>
 #include <QtQml/qqmlregistration.h>
+#include <panta/visualization/mesh_source.hpp>
 #include <rust/cxx.h>
 
 namespace panta::bridge {
 
-class ProjectViewModel : public QObject {
+class ProjectViewModel : public panta::visualization::MeshSource {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(QString defaultLocation READ defaultLocation CONSTANT)
@@ -39,6 +39,8 @@ class ProjectViewModel : public QObject {
 
   public:
     explicit ProjectViewModel(QObject* parent = nullptr);
+    [[nodiscard]] std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
+    mesh_snapshot() const override;
 
     /// 默认工程目录为平台 Documents 目录下的 panta 子目录；不会在构造时写盘。
     [[nodiscard]] const QString& defaultLocation() const;

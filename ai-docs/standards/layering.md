@@ -14,7 +14,7 @@ Rust 资产 / 显示快照 → CXX → C++ RenderScene / ViewportBackend → VTK
 Rust Solver Client → 进程协议 → [External] MoldSolver
 ```
 
-这是目标职责，不代表五个规划领域 crate 已建立。native 现有 STEP 摘要与 Mesh IR 适配冒烟继续按已落地契约运行，迁移需独立任务。
+这是目标职责，不代表五个规划领域 crate 已建立。当前 STEP 摘要仍是 native 适配冒烟；Netgen Mesh IR 已由 067 接入 Rust 权威模型与校验。
 
 ## 领域、适配与桥接
 
@@ -27,12 +27,21 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 - 领域 crate 不依赖 Qt、VTK、CXX 或 `panta-ffi`；业务通过注入的后端接口使用 native 能力。禁止 `panta-core → panta-ffi → panta-core`，也禁止新增领域 crate 与 core 双向依赖；规划依赖图见架构文档。
 - 当前 `panta-core` 内的 project/path/task 保持安全 Rust，不依赖 Qt、VTK 或 FFI，按真实职责演进。进程设施归 `panta-foundation`，不能因“属于 Rust”就放进领域 core；`panta-ffi` 可调用两者，反向依赖禁止。
 
+## Rust 导入职责（067）
+
+- `panta-import` 是格式入口：识别 STEP / IGES / STL、读取 / 固定来源快照、按格式选择实际后端、持有预览与导入准备状态、记录格式专属诊断和导入选项。当前已接入 STL；STEP / IGES 只有格式识别，读取仍待 `panta-geom` 与 OCCT adapter 的真实业务任务。
+- `panta-mesh` 拥有表面 / 体 Mesh IR、STL 字节解析、网格领域校验及总体积摘要。它不管理工程包、Qt、VTK 或 OCCT；STL 不被冒充为 B-rep。
+- `panta-core` 拥有工程清单、资产写入、修订和原子提交。它调用 `panta-import` 取得已验证的输入，提交成功才替换当前网格。工程包事务不由格式解析器自行完成。
+- 后续 `panta-geom` 拥有 Shape / Face / Edge 的领域身份及 STEP / IGES 结果契约；C++ OCCT adapter 真正执行这两种几何格式的读取、转换与所需底层算法。`panta-import` 负责分发，不在 Rust 复制 OCCT 解析器。
+- 依赖方向为 `panta-core → panta-import → panta-mesh`；`panta-core` 在持有网格快照时可直接依赖 `panta-mesh`。`panta-ffi → panta-core / panta-mesh` 负责跨语言 DTO。反向依赖禁止。未来 `panta-import → panta-geom` 只在 STEP / IGES 服务接入时添加。
+- 公共导入结果应保留格式、数据类别、单位、来源修订与诊断；共享导入编排不抹平 STL 表面网格和 STEP / IGES B-rep 的语义。新增格式需要实际后端和端到端消费者，不为统一名称创建空 parser。
+
 ## 显示与数据
 
 - QML 表达用户意图，经 ViewModel / 原生视口提交；不得直接操作重库。ViewModel 负责 Qt 属性、信号与参数转换，不解析几何 / 网格文件或实现工程提交。
 - VTK C++ 后端负责渲染对象、缓存、投影与控件命中、相机插值、输入、定时器、窗口和 GPU 资源。渲染热路径不得形成 QML → C++ → Rust → C++ → VTK 的逐帧往返。
 - Rust 管理可持久化的显示配置、字段语义、选择引用及工程相机书签；C++ `RenderScene` 是显示快照和可恢复 CPU 状态，不成为第二份工程领域模型。临时鼠标导航留在 C++，确需保存时提交快照。
-- 几何解析与资产提交不放进 VTK 显示后端；当前 STL 双解析是已识别的迁移项，详见 066 审计。实施迁移后必须删除重复 parser，不能长期并存两套规则。
+- 几何解析与资产提交不放进 VTK 显示后端；067 已删除 VTK STL parser，由 Rust 网格后端解码，VTK 只构造显示对象。历史差异与审计依据见 066 / 067。
 - 数据按资产 / 修订批量跨边界，不逐点、逐单元调用 FFI。借用缓冲区必须证明有效期；异步工作拥有快照，先确保所有权再按测量优化复制。第三方缓冲区和借用不能逃逸到 QML。
 - 长任务不阻塞 GUI。每个 native 操作明确线程、串行 / 并行与取消阶段；不能为跨线程转移句柄盲目声明 Send/Sync。工程关闭或修订改变后拒绝迟到结果，失败 / 取消不覆盖有效资产。
 

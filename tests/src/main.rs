@@ -329,13 +329,21 @@ fn miri() -> Result<(), Box<dyn Error>> {
 fn lint(tool: Option<&str>, check: bool) -> Result<(), Box<dyn Error>> {
     match tool {
         None => {
+            eprintln!("cargo lint [1/8] Rust Clippy");
             lint(Some("clippy"), check)?;
+            eprintln!("cargo lint [2/8] unused Cargo dependencies");
             lint(Some("machete"), check)?;
+            eprintln!("cargo lint [3/8] CMake format and lint");
             lint(Some("cmake"), check)?;
+            eprintln!("cargo lint [4/8] native build and QML metadata");
             build_launcher()?;
+            eprintln!("cargo lint [5/8] qmllint");
             lint(Some("qmllint"), check)?;
+            eprintln!("cargo lint [6/8] clang-tidy");
             lint(Some("clang-tidy"), check)?;
+            eprintln!("cargo lint [7/8] include-cleaner");
             lint(Some("includes"), check)?;
+            eprintln!("cargo lint [8/8] cppcheck");
             lint(Some("cppcheck"), check)
         }
         Some("clippy") if check => cargo(

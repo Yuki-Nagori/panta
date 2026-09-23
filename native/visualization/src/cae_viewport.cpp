@@ -1,10 +1,11 @@
 /// CaeViewport 实现：持有后端中立的 RenderScene，经 ViewportBackend
 /// 适配层驱动渲染；第三方实现细节全部在 src/vtk/。
+#include "mesh_source.hpp"
 #include "vtk/vtk_viewport.hpp"
 #include <QObject>
 #include <QPointF>
+#include <QPointer>
 #include <QRectF>
-#include <QString>
 #include <QtCore/qtmetamacros.h>
 #include <algorithm>
 #include <memory>
@@ -16,6 +17,8 @@ namespace panta::visualization {
 
 struct CaeViewport::Impl {
     RenderScene scene;
+    QPointer<MeshSource> mesh_source;
+    QMetaObject::Connection mesh_connection;
     std::unique_ptr<ViewportBackend> backend;
 };
 
@@ -36,16 +39,27 @@ CaeViewport::CaeViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::ma
 
 CaeViewport::~CaeViewport() = default;
 
-const QString& CaeViewport::meshPath() const { return impl_->scene.mesh_path; }
+QObject* CaeViewport::meshSource() const { return impl_->mesh_source; }
 
-void CaeViewport::setMeshPath(const QString& path) {
-    if (impl_->scene.mesh_path == path) {
+void CaeViewport::setMeshSource(QObject* source) {
+    auto* mesh_source = qobject_cast<MeshSource*>(source);
+    if (impl_->mesh_source == mesh_source) {
         return;
     }
-    impl_->scene.mesh_path = path;
+    QObject::disconnect(impl_->mesh_connection);
+    impl_->mesh_source = mesh_source;
+    if (mesh_source != nullptr) {
+        impl_->mesh_connection =
+            connect(mesh_source, &MeshSource::meshChanged, this, &CaeViewport::refresh_mesh);
+    }
+    refresh_mesh();
+    emit meshSourceChanged();
+}
+
+void CaeViewport::refresh_mesh() {
+    impl_->scene.mesh = impl_->mesh_source ? impl_->mesh_source->mesh_snapshot() : nullptr;
     ++impl_->scene.revision;
     impl_->backend->apply_state(impl_->scene);
-    emit meshPathChanged();
 }
 
 void CaeViewport::componentComplete() {

@@ -19,7 +19,15 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 - `unsafe` 集中在边界模块，每处注明安全前提、所有者和线程条件。workspace 默认 `unsafe_code = "deny"`；当前登记的 allow 仅包括 CXX 桥接生成胶水和 `panta-foundation::crash` 专用模块，均不得向业务代码外扩。新增手写 unsafe 需专用模块并逐块写 `// SAFETY:`。不得为了通过类型检查无依据实现 `Send`/`Sync`。
 - 大型数据使用明确所有者和借用/共享策略；`Arc` 解决共享所有权，不自动保证内部修改安全。异步运行时是否引入由具体任务决定，不先堆叠多套 runtime。
 - panic 不作为业务错误；FFI 捕获策略依赖 panic 配置，`panic=abort` 不可由 `catch_unwind` 恢复。引擎隔离依靠外部进程，不能靠捕获 panic 承诺所有故障可恢复。
-- 单元测试留在被测 `.rs` 的 `#[cfg(test)]` 模块中以访问私有项；公共 API 的黑盒/跨模块测试放对应 crate 的 `tests/`。根跨语言聚合测试只放 [测试规范](testing.md) 规定的 `tests/integration/`。
+- 单元测试留在被测 `.rs` 的 `#[cfg(test)]` 模块中以访问私有项；公共 API 的黑盒/跨模块测试放根 `tests/rust/` 并由所属 crate 的 `[[test]]` 注册。根跨语言聚合测试放 `tests/integration/`，具体见[测试规范](testing.md)。
+
+## 导入与领域 crate（067）
+
+项目约定：按数据和生命周期分 crate。`panta-import` 负责格式识别、来源快照、预览、导入选项、解析分发与格式错误；`panta-mesh` 负责 STL 表面网格和体 Mesh IR 的解析 / 校验；`panta-core` 负责工程资产写入、清单、修订和提交。规划的 `panta-geom` 负责 STEP / IGES 的几何领域身份，底层解析必须委托 OCCT C++ adapter。实际状态和下一步见 [职责审计](../architecture/native-domain-boundaries.md) 与 [067](../task/067-rust-mesh-domain-migration.md)。
+
+拆 crate 时依次检查：是否需要重库、格式 / 规则是否频繁变化、消费者是否只占少数模块、逻辑与状态是否足够大。依赖重库的能力必须经独立 C++ adapter，不得放入 `panta-core`；但独立 Rust crate 本身也不直接链接重库。格式变化快、消费者少或生命周期独立时倾向独立 crate。`panta-core` 过渡期只拥有应用服务与工程存储；ID、单位和错误先留在各自的领域 crate，第二个真实消费者需要相同语义时再考虑低层契约 crate。不得为潜在复用提前创建 `panta-common` 或空领域 crate。此判断是项目模块边界准则，不是 Rust 语言的硬规则。
+
+依赖只从应用服务流向导入与领域库；领域 crate 不依赖 `panta-core` / `panta-ffi`。跨格式统一的是来源快照、单位策略、修订与失败保留旧资产的导入事务，不把 B-rep、STL 表面网格和 Netgen 体网格强制塞进一个通用解析结构。STL 解码器位于 `panta-mesh`；STEP / IGES 的领域结果由未来的 `panta-geom` 拥有，native shape 由 C++ adapter 持有并释放，Rust 仅传稳定 ID 和修订号。导入器持有待提交快照，预览后来源变化必须重新确认；工程事务只在提交成功后发布新修订和显示资产。业务模块不可调用 `unsafe` 绕开 native adapter。
 
 ## 验证
 

@@ -37,7 +37,7 @@ target_include_directories(panta_bridge PUBLIC src)
 # 传播到最终链接者（与 native/ffi 测试同规则）。
 target_include_directories(panta_bridge PUBLIC "${PANTA_FFI_INCLUDE_DIR}"
                                                "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
-target_link_libraries(panta_bridge PUBLIC Qt6::Core "${PANTA_FFI_STATIC_LIB}")
+target_link_libraries(panta_bridge PUBLIC Qt6::Core panta::visualization "${PANTA_FFI_STATIC_LIB}")
 if(UNIX)
   find_package(Threads REQUIRED)
   target_link_libraries(panta_bridge PUBLIC Threads::Threads ${CMAKE_DL_LIBS})

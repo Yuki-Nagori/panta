@@ -1,5 +1,5 @@
 [package]
-name = "panta-core"
+name = "panta-import"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,14 +8,8 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-serde.workspace = true
-serde_json.workspace = true
 panta-mesh.workspace = true
-panta-import.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true
-
-[[test]]
-name = "project"
-path = "../../tests/rust/project.rs"

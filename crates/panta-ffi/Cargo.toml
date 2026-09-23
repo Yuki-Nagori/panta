@@ -15,6 +15,7 @@ crate-type = ["rlib", "staticlib"]
 [dependencies]
 cxx.workspace = true
 panta-core.workspace = true
+panta-mesh.workspace = true
 panta-foundation.workspace = true
 
 [build-dependencies]

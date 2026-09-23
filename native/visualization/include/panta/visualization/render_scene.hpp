@@ -8,8 +8,9 @@
 #pragma once
 
 #include <QColor>
-#include <QString>
 #include <cstdint>
+#include <memory>
+#include <panta/visualization/mesh_source.hpp>
 
 namespace panta::visualization {
 
@@ -23,8 +24,8 @@ struct RenderScene {
     QColor background{232, 238, 247};
     /// 临时欢迎图形可见性；053 的最终字样设计仍为规划。
     bool primitive_visible = true;
-    /// 工程包内的可选 STL 资产；为空时显示默认欢迎图形，非空时替换场景网格。
-    QString mesh_path;
+    /// Rust 工程服务已校验的表面网格快照；为空时显示默认欢迎图形。
+    std::shared_ptr<const SurfaceMeshSnapshot> mesh;
 };
 
 } // namespace panta::visualization

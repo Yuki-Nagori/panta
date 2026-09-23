@@ -21,5 +21,7 @@
 - QML 经 C++ ViewModel 调用服务，不直接操作 OCCT、Netgen、VTK；自有 C++ 使用 C++20。
 - Rust 承担领域数据、业务规则与编排；CXX 仅声明映射和签名，C++ 适配层实际调用重库并封装类型、异常与所有权。VTK 的窗口、输入和逐帧显示留在 C++，具体边界与 crate 规划见 [分层规则](ai-docs/standards/layering.md) / [职责审计](ai-docs/architecture/native-domain-boundaries.md)。
 - Cargo 提供统一入口，CMake 拥有 native 构建图；Rust/C++ 桥接优先验证 CXX。
+- 常规构建、测试和质量验收直接使用仓库 Cargo 聚合入口：`cargo build`、`cargo test --workspace`、`cargo format --check`、`cargo lint`。定向 crate 测试、CTest 或单项 lint 用于定位问题，最终结果仍以适用的聚合入口为准；实际性能基准按对应 task 单独运行。
+- 需要真实窗口验收时直接运行 Cargo 构建出的 `panta-native` 二进制；有 computer use 能力时用它观察并操作 Panta 窗口，记录看到的界面与交互结果。不要为验收先连接 VS Code，也不要把无头 QML/CTest 或仅启动进程当作真实 GPU 窗口通过；图形会话不可用时记录具体限制，已有用户人工验收可单独记为用户证据。
 - 外部求解器通过进程与版本化协议接入，不链接其 C++ ABI；大型数据走数据面。
 - 外部文档只说明协作边界。未落地的接口、目录和命令标为规划，只运行实际存在的检查。

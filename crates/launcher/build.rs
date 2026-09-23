@@ -22,6 +22,8 @@ const RERUN_PATHS: &[&str] = &[
     "../../tests/qml",
     "../panta-ffi",
     "../panta-core",
+    "../panta-import",
+    "../panta-mesh",
     "../panta-foundation",
     "../../qml",
     "../../resources/i18n",
@@ -296,9 +298,8 @@ fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
     }
 
     // build.rs 的 OUT_DIR 位于 target/<profile>/build/<pkg-hash>/out；Cargo
-    // 将 staticlib 放在同一 profile 根目录（例如 target/debug/libpanta_ffi.a），
-    // 而不是 deps/。只选当前 package 名称，避免把 rlib 或其它 profile 的旧产物
-    // 传进 CMake；保留 deps/作为对旧版 Cargo/平台布局的兜底。
+    // staticlib 既可能在 profile 根，也可能在 deps/。两处均可
+    // 留有旧制品；按修改时间取最新，避免新桥接头配上旧 staticlib。
     let profile_dir = out_dir.ancestors().nth(3).ok_or_else(|| {
         format!(
             "无法从 launcher OUT_DIR 推导 profile：{}",
@@ -326,25 +327,18 @@ fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
                 }),
         );
     }
-    let staticlib = candidates
-        .iter()
-        .find(|path| path.parent() == Some(profile_dir))
-        .cloned()
-        .or_else(|| {
-            candidates.sort_by_key(|path| {
-                fs::metadata(path)
-                    .and_then(|metadata| metadata.modified())
-                    .unwrap_or(SystemTime::UNIX_EPOCH)
-            });
-            candidates.into_iter().next_back()
-        })
-        .ok_or_else(|| {
-            format!(
-                "未找到 panta-ffi staticlib（检查 {} 与 {}）",
-                profile_dir.display(),
-                deps_dir.display()
-            )
-        })?;
+    candidates.sort_by_key(|path| {
+        fs::metadata(path)
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or(SystemTime::UNIX_EPOCH)
+    });
+    let staticlib = candidates.into_iter().next_back().ok_or_else(|| {
+        format!(
+            "未找到 panta-ffi staticlib（检查 {} 与 {}）",
+            profile_dir.display(),
+            deps_dir.display()
+        )
+    })?;
     Ok((include, staticlib))
 }
 

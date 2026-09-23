@@ -5,10 +5,11 @@
 #include "vtk_viewport.hpp"
 
 #include "default_wordmark.hpp"
+#include "mesh_source.hpp"
 #include "navigation/viewport_camera.hpp"
 #include "navigation/viewport_input.hpp"
 #include "navigation/viewport_orientation.hpp"
-#include "stl_mesh.hpp"
+#include "surface_mesh.hpp"
 #include "vtk_native_surface.hpp"
 #include <QElapsedTimer>
 #include <QGuiApplication>
@@ -121,7 +122,7 @@ struct VtkViewport::Impl {
     bool refresh_scheduled = false;
     bool scene_dirty = true;
     bool creation_warning_emitted = false;
-    QString applied_mesh_path;
+    std::shared_ptr<const SurfaceMeshSnapshot> applied_mesh;
     bool pointer_dragging = false;
     bool cube_pressed = false;
     int last_pointer_x = 0;
@@ -175,7 +176,7 @@ void VtkViewport::apply_state(const RenderScene& state) {
     }
     impl_->scene_dirty |= state.background != impl_->pending.background ||
                           state.primitive_visible != impl_->pending.primitive_visible ||
-                          state.mesh_path != impl_->pending.mesh_path;
+                          state.mesh != impl_->pending.mesh;
     impl_->pending = state;
     schedule_refresh();
 }
@@ -279,7 +280,7 @@ void VtkViewport::ensure_render_window() {
     impl_->primitive_actor = vtkSmartPointer<vtkActor>::New();
 
     update_mesh_actor();
-    impl_->applied_mesh_path = impl_->pending.mesh_path;
+    impl_->applied_mesh = impl_->pending.mesh;
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
     impl_->orientation.attach(impl_->render_window);
@@ -337,18 +338,9 @@ void VtkViewport::update_mesh_actor() {
     }
 
     vtkSmartPointer<vtkPolyData> geometry;
-    const bool imported_mesh = !impl_->pending.mesh_path.isEmpty();
-    if (imported_mesh) {
-        QString error;
-        geometry = load_stl_mesh(impl_->pending.mesh_path, &error);
-        if (geometry == nullptr) {
-            qCWarning(viewport_log)
-                << "STL mesh could not be rendered:" << error << impl_->pending.mesh_path;
-        }
-    }
-    if (geometry == nullptr) {
-        geometry = create_default_wordmark();
-    }
+    const bool imported_mesh = impl_->pending.mesh != nullptr;
+    geometry =
+        imported_mesh ? make_surface_poly_data(*impl_->pending.mesh) : create_default_wordmark();
 
     vtkNew<vtkPolyDataNormals> normals;
     normals->SetInputData(geometry);
@@ -549,9 +541,9 @@ void VtkViewport::sync_native_surface() {
     const qreal scale = window()->devicePixelRatio();
     const QSize pixel_size(qMax(1, qRound(width() * scale)), qMax(1, qRound(height() * scale)));
     bool resized = pixel_size != impl_->applied_pixel_size;
-    if (impl_->primitive_actor != nullptr && impl_->pending.mesh_path != impl_->applied_mesh_path) {
+    if (impl_->primitive_actor != nullptr && impl_->pending.mesh != impl_->applied_mesh) {
         update_mesh_actor();
-        impl_->applied_mesh_path = impl_->pending.mesh_path;
+        impl_->applied_mesh = impl_->pending.mesh;
         resized = true;
     }
     if (!impl_->scene_dirty && !resized) {
@@ -601,7 +593,7 @@ void VtkViewport::destroy_render_window() {
     impl_->renderer = nullptr;
     impl_->interactor = nullptr;
     impl_->primitive_actor = nullptr;
-    impl_->applied_mesh_path.clear();
+    impl_->applied_mesh.reset();
     if (impl_->hardware_window != nullptr) {
         impl_->hardware_window->Destroy();
         impl_->hardware_window.reset();

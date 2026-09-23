@@ -1,7 +1,8 @@
 // 欢迎字样的 CPU 几何验证：封闭实体、字孔拓扑和有效顶点色不依赖 GPU。
 #include "default_wordmark.hpp"
 #include "navigation/viewport_orientation.hpp"
-#include "stl_mesh.hpp"
+#include "panta/visualization/mesh_source.hpp"
+#include "surface_mesh.hpp"
 #include <QFile>
 #include <QIODevice>
 #include <QTemporaryDir>
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <cstddef>
 #include <map>
+#include <qobject.h>
 #include <set>
 #include <string>
 #include <utility>
@@ -21,11 +23,11 @@
 #include <vtkAlgorithmOutput.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
-#include <vtkCubeSource.h>
 #include <vtkDataArray.h>
 #include <vtkMatrix4x4.h>
 #include <vtkNew.h>
 #include <vtkPointData.h>
+#include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkPropCollection.h>
@@ -102,28 +104,13 @@ class DefaultWordmarkTest final : public QObject {
                  4);
     }
 
-    void reads_ascii_stl_as_triangle_poly_data() {
-        QTemporaryDir fixture;
-        QVERIFY(fixture.isValid());
-        const QString path = fixture.filePath(QStringLiteral("sample.stl"));
-        QFile file(path);
-        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
-        QVERIFY(file.write("solid sample\n"
-                           "facet normal 0 0 1\n"
-                           " outer loop\n"
-                           "  vertex 0 0 0\n"
-                           "  vertex 1 0 0\n"
-                           "  vertex 0 1 0\n"
-                           " endloop\n"
-                           "endfacet\n"
-                           "endsolid sample\n") > 0);
-        file.close();
-
-        QString error;
-        const auto mesh = panta::visualization::load_stl_mesh(path, &error);
-        QVERIFY2(mesh != nullptr, qPrintable(error));
+    void converts_surface_snapshot_to_poly_data() {
+        panta::visualization::SurfaceMeshSnapshot snapshot;
+        snapshot.vertices = {{{0.0, 0.0, 0.0}}, {{1.0, 0.0, 0.0}}, {{0.0, 1.0, 0.0}}};
+        const auto mesh = panta::visualization::make_surface_poly_data(snapshot);
         QCOMPARE(mesh->GetNumberOfPoints(), vtkIdType(3));
         QCOMPARE(mesh->GetNumberOfPolys(), vtkIdType(1));
+        QCOMPARE(mesh->GetPoints()->GetDataType(), VTK_DOUBLE);
     }
 
     void ignores_detached_and_invalid_cube_picks() {
@@ -151,7 +138,10 @@ class DefaultWordmarkTest final : public QObject {
                 break;
             }
         }
-        QVERIFY(cube_renderer != nullptr);
+        if (cube_renderer == nullptr) {
+            QFAIL("orientation cube renderer was not created");
+            return;
+        }
 
         struct FaceView {
             panta::visualization::CubeDirection direction;

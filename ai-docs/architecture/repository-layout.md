@@ -32,7 +32,8 @@ panta/
 │   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034 实施中）
 │   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035 实施中）
 │   ├── panta-geom/            # 规划：几何身份、修订与后端契约
-│   ├── panta-mesh/            # 规划：Mesh IR、导入与轻量校验
+│   ├── panta-import/          # 当前：格式识别、来源快照与 STL 导入准备
+│   ├── panta-mesh/            # 当前：STL 网格数据、Mesh IR 与领域校验
 │   ├── panta-bc/              # 规划：边界条件与目标引用
 │   ├── panta-material/        # 规划：材料数据、单位与版本
 │   ├── panta-visualization/   # 规划：显示配置、字段与选择语义
@@ -48,7 +49,7 @@ panta/
 │   ├── bridge/                # ViewModel（ShellViewModel + GTest 信号测试，005 已落地）
 │   ├── app/                   # Qt 桌面入口 panta-native（005 已落地 Qt 实现）
 │   ├── geometry/{include,src/occt}/       # 当前：自有摘要契约与 OCCT adapter
-│   ├── mesh/{include,src/netgen}/         # 当前：native Mesh IR 与 Netgen adapter
+│   ├── mesh/{include,src/netgen}/         # 当前：native 网格 DTO、CXX 校验适配与 Netgen adapter
 │   └── visualization/{include,src/vtk}/   # 当前：显示契约与 VTK 后端（含 navigation/）
 ├── qml/
 │   ├── App.qml                # 主窗口（005 已落地；URI Panta.Shell，NO_PLUGIN 资源模块）
@@ -59,12 +60,12 @@ panta/
 ├── python/                    # 后续 Python API，包名待定
 ├── schemas/                   # 本地工程 schema、外部契约版本引用
 ├── resources/                 # 图标、.pa 源文件与样例；TS/QM 只进构建树
-└── tests/                     # 跨模块场景与回归数据
+└── tests/                     # Rust 公共 API、native/QML 测试与回归数据
 ```
 
 ## 模块归属
 
-当前 `panta-core` 已包含 project/path/task 与工程存储服务；`panta-foundation` 拥有进程设施，`panta-ffi` 负责跨语言契约和服务转发。规划的五个领域 crate 按实际功能建立，其职责、依赖方向和迁移门槛以 [重库适配与 Rust 领域模块](native-domain-boundaries.md) 为准；领域 crate 不反向依赖承载应用服务的 core，避免循环。
+当前 `panta-core` 已包含 project/path/task 与工程存储服务；导入格式入口在 `panta-import`，STL 网格解析与领域校验在 `panta-mesh`。`panta-foundation` 拥有进程设施，`panta-ffi` 负责跨语言契约和服务转发。规划的五个领域 crate 按实际功能建立，其职责、依赖方向和迁移门槛以 [重库适配与 Rust 领域模块](native-domain-boundaries.md) 为准；领域 crate 不反向依赖承载应用服务的 core，避免循环。
 
 `project`、`workflow`、`storage` 与 `solver-client` 是后续职责拆分方向，不是已存在的独立 crate。当前不再规划另一份含义重叠的 `crates/core/`；共享基础类型有真实消费者后才确定归属。C++ `include/panta/<module>/` 暴露自有 native 契约，`src/occt`、`src/netgen` 封装重库；`src/vtk` 同时承载显示后端，导航内部归 `navigation/`。业务状态逐步归 Rust；保留本地相机、命中和窗口生命周期。ViewModel 只适配 UI，QML 处理布局、展示与绑定。
 
@@ -74,6 +75,6 @@ panta/
 
 ## 新增文件原则
 
-按职责放置文件，避免按语言把所有业务堆进一个桥接层。模块内部测试可贴近实现；跨模块端到端验证放在 `tests/`。测试资产应小且能合法分发，大型 CAD/结果数据通过受控的外部资产机制管理。
+按职责放置文件，避免按语言把所有业务堆进一个桥接层。访问私有实现的单元测试贴近源码；公开 API 的 Rust 黑盒测试放根 `tests/rust/` 并由所属 crate 注册，native/QML 测试和回归夹具按[测试规范](../standards/testing.md)归档。测试资产应小且能合法分发，大型 CAD/结果数据通过受控的外部资产机制管理。
 
 工程名与 Rust package 名已统一：工程为 `panta`，Rust package 用 `panta-` 前缀，当前 launcher 的 bin 名为 `panta-launcher`（任务 001）。Python package 名与最终桌面可执行文件名在相应脚手架任务（014 / 005）搭建时确定；不直接沿用附件中的 `moldcae-desktop` 等示意名称。

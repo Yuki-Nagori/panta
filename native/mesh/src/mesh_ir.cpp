@@ -1,102 +1,62 @@
-/// Mesh IR 有效性检查。检查项与顺序即报告的确定性顺序；
-/// 发现问题不抛异常、不截断，逐项记录后统一返回。
-#include <cmath>
+/// Native Mesh IR 到 Rust 领域校验的批量转换。
+#include "panta_ffi.h"
 #include <cstddef>
+#include <limits>
 #include <panta/mesh/mesh_ir.hpp>
+#include <rust/cxx.h>
+#include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace panta::mesh {
+namespace {
 
-MeshValidationReport validate_tet_mesh(const TetMesh& mesh) {
-    MeshValidationReport report;
+std::size_t checked_size(std::size_t count, std::size_t width) {
+    if (count > std::numeric_limits<std::size_t>::max() / width) {
+        throw std::length_error("mesh DTO size overflow");
+    }
+    return count * width;
+}
 
-    if (mesh.nodes.empty())
-        report.issues.push_back("mesh has no nodes");
-    if (mesh.tets.empty())
-        report.issues.push_back("mesh has no volume elements");
+} // namespace
 
-    for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
-        for (int axis = 0; axis < 3; ++axis) {
-            if (!std::isfinite(mesh.nodes[i][axis])) {
-                report.issues.push_back("node " + std::to_string(i) +
-                                        " has a non-finite coordinate");
-                break;
-            }
+RustMeshValidationResult validate_native_mesh_with_rust(const NativeTetMeshDto& mesh) {
+    panta::ffi::TetMeshData data;
+    data.nodes.reserve(checked_size(mesh.nodes.size(), 3));
+    for (const auto& node : mesh.nodes) {
+        for (const double coordinate : node) {
+            data.nodes.push_back(coordinate);
         }
     }
-
-    // 区域引用范围与完整性：引用必须落在声明数量内，且每个区域被引用。
-    std::vector<bool> region_used(mesh.region_count, false);
-    for (std::size_t i = 0; i < mesh.tets.size(); ++i) {
-        const Tetrahedron& tet = mesh.tets[i];
-        // 索引与重复检查先行：越界时不读取节点坐标，避免未定义行为。
-        bool nodes_usable = true;
+    data.tets.reserve(checked_size(mesh.tets.size(), 4));
+    data.tet_regions.reserve(mesh.tets.size());
+    for (const NativeTetrahedronDto& tet : mesh.tets) {
         for (const MeshIndex node : tet.nodes) {
-            if (node >= mesh.nodes.size()) {
-                report.issues.push_back("tetrahedron " + std::to_string(i) + " references node " +
-                                        std::to_string(node) + " outside the node range");
-                nodes_usable = false;
-            }
+            data.tets.push_back(node);
         }
-        if (tet.nodes[0] == tet.nodes[1] || tet.nodes[0] == tet.nodes[2] ||
-            tet.nodes[0] == tet.nodes[3] || tet.nodes[1] == tet.nodes[2] ||
-            tet.nodes[1] == tet.nodes[3] || tet.nodes[2] == tet.nodes[3]) {
-            report.issues.push_back("tetrahedron " + std::to_string(i) + " repeats a node");
-            nodes_usable = false;
-        }
-        if (nodes_usable) {
-            const double six_volume =
-                tet_six_times_volume(mesh.nodes[tet.nodes[0]], mesh.nodes[tet.nodes[1]],
-                                     mesh.nodes[tet.nodes[2]], mesh.nodes[tet.nodes[3]]);
-            if (six_volume <= 0.0) {
-                report.issues.push_back("tetrahedron " + std::to_string(i) +
-                                        " has non-positive signed volume");
-            }
-        }
-        if (tet.region >= mesh.region_count) {
-            report.issues.push_back("tetrahedron " + std::to_string(i) + " references region " +
-                                    std::to_string(tet.region) + " outside the declared count");
-        } else {
-            region_used[tet.region] = true;
-        }
+        data.tet_regions.push_back(tet.region);
     }
-    for (MeshIndex region = 0; region < mesh.region_count; ++region) {
-        if (!region_used[region]) {
-            report.issues.push_back("region " + std::to_string(region) + " is not referenced");
+    data.boundary.reserve(checked_size(mesh.boundary.size(), 3));
+    data.boundary_groups.reserve(mesh.boundary.size());
+    for (const NativeSurfaceTriangleDto& face : mesh.boundary) {
+        for (const MeshIndex node : face.nodes) {
+            data.boundary.push_back(node);
         }
+        data.boundary_groups.push_back(face.group);
     }
+    data.region_count = mesh.region_count;
+    data.boundary_group_count = mesh.boundary_group_count;
 
-    std::vector<bool> group_used(mesh.boundary_group_count, false);
-    for (std::size_t i = 0; i < mesh.boundary.size(); ++i) {
-        const SurfaceTriangle& tri = mesh.boundary[i];
-        for (const MeshIndex node : tri.nodes) {
-            if (node >= mesh.nodes.size()) {
-                report.issues.push_back("boundary triangle " + std::to_string(i) +
-                                        " references node " + std::to_string(node) +
-                                        " outside the node range");
-            }
-        }
-        if (tri.nodes[0] == tri.nodes[1] || tri.nodes[0] == tri.nodes[2] ||
-            tri.nodes[1] == tri.nodes[2]) {
-            report.issues.push_back("boundary triangle " + std::to_string(i) + " repeats a node");
-        }
-        if (tri.group >= mesh.boundary_group_count) {
-            report.issues.push_back("boundary triangle " + std::to_string(i) +
-                                    " references group " + std::to_string(tri.group) +
-                                    " outside the declared count");
-        } else {
-            group_used[tri.group] = true;
-        }
+    const panta::ffi::TetMeshValidation native_report =
+        panta::ffi::mesh_validate_tet(std::move(data));
+    RustMeshValidationResult report;
+    report.issues.reserve(native_report.issues.size());
+    for (const auto& issue : native_report.issues) {
+        report.issues.emplace_back(std::string(issue));
     }
-    for (MeshIndex group = 0; group < mesh.boundary_group_count; ++group) {
-        if (!group_used[group]) {
-            report.issues.push_back("boundary group " + std::to_string(group) +
-                                    " is not referenced");
-        }
-    }
-
     report.ok = report.issues.empty();
+    report.volume_mm3 = native_report.volume_mm3;
     return report;
 }
 

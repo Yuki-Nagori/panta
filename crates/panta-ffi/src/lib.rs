@@ -113,6 +113,31 @@ pub mod bridge {
         pub size_z: f64,
     }
 
+    /// 连续三角面坐标：每三个 f64 为一个点，每三个点为一片面；
+    /// CXX Vec 独占缓冲区，调用返回后 C++ 复制到自身场景快照。
+    pub struct SurfaceMeshSnapshot {
+        pub coordinates: Vec<f64>,
+        pub revision: u64,
+    }
+
+    /// native Netgen 转换结果的批量输入。坐标每三项一个节点；tet 每四项、
+    /// boundary 每三项一个单元；区域 / 分组数组各与对应单元数一致。
+    pub struct TetMeshData {
+        pub nodes: Vec<f64>,
+        pub tets: Vec<u32>,
+        pub tet_regions: Vec<u32>,
+        pub boundary: Vec<u32>,
+        pub boundary_groups: Vec<u32>,
+        pub region_count: u32,
+        pub boundary_group_count: u32,
+    }
+
+    /// Rust 领域校验结果；诊断和有效网格总体积统一从 Rust 返回。
+    pub struct TetMeshValidation {
+        pub issues: Vec<String>,
+        pub volume_mm3: f64,
+    }
+
     /// 工程模型命令种类；新增值必须同步 Rust 映射与失败测试。
     pub enum ProjectCommandKind {
         Rename = 0,
@@ -214,9 +239,11 @@ pub mod bridge {
         ) -> Result<ProjectImport>;
         fn project_service_imports(service: &ProjectService) -> Result<Vec<ProjectImport>>;
         fn project_service_inspect_stl(
-            service: &ProjectService,
+            service: &mut ProjectService,
             source: String,
         ) -> Result<StlImportPreview>;
+        fn project_service_mesh_snapshot(service: &ProjectService) -> Result<SurfaceMeshSnapshot>;
+        fn mesh_validate_tet(data: TetMeshData) -> TetMeshValidation;
 
         /// 崩溃信号处理器安装（任务 047，panta_foundation::crash 的 FFI 面）：
         /// 返回日志路径；log_dir 为空时用系统临时目录。
@@ -559,7 +586,7 @@ fn project_service_imports(service: &ProjectService) -> Result<Vec<bridge::Proje
 }
 
 fn project_service_inspect_stl(
-    service: &ProjectService,
+    service: &mut ProjectService,
     source: String,
 ) -> Result<bridge::StlImportPreview, String> {
     service
@@ -567,6 +594,111 @@ fn project_service_inspect_stl(
         .inspect_stl(std::path::Path::new(&source))
         .map(stl_import_preview)
         .map_err(|error| error.to_string())
+}
+
+fn mesh_validate_tet(data: bridge::TetMeshData) -> bridge::TetMeshValidation {
+    if !data.nodes.len().is_multiple_of(3)
+        || !data.tets.len().is_multiple_of(4)
+        || !data.boundary.len().is_multiple_of(3)
+        || data.tet_regions.len() != data.tets.len() / 4
+        || data.boundary_groups.len() != data.boundary.len() / 3
+    {
+        return bridge::TetMeshValidation {
+            issues: vec!["invalid mesh DTO layout".to_owned()],
+            volume_mm3: 0.0,
+        };
+    }
+    let mut nodes = Vec::new();
+    let mut tets = Vec::new();
+    let mut boundary = Vec::new();
+    if let Err(error) = nodes.try_reserve_exact(data.nodes.len() / 3) {
+        return bridge::TetMeshValidation {
+            issues: vec![format!("cannot allocate mesh nodes: {error}")],
+            volume_mm3: 0.0,
+        };
+    }
+    if let Err(error) = tets.try_reserve_exact(data.tets.len() / 4) {
+        return bridge::TetMeshValidation {
+            issues: vec![format!("cannot allocate tetrahedra: {error}")],
+            volume_mm3: 0.0,
+        };
+    }
+    if let Err(error) = boundary.try_reserve_exact(data.boundary.len() / 3) {
+        return bridge::TetMeshValidation {
+            issues: vec![format!("cannot allocate boundary triangles: {error}")],
+            volume_mm3: 0.0,
+        };
+    }
+    nodes.extend(
+        data.nodes
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|point| [point[0], point[1], point[2]]),
+    );
+    tets.extend(
+        data.tets
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(data.tet_regions)
+            .map(|(nodes, region)| panta_mesh::Tetrahedron {
+                nodes: [nodes[0], nodes[1], nodes[2], nodes[3]],
+                region,
+            }),
+    );
+    boundary.extend(
+        data.boundary
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(data.boundary_groups)
+            .map(|(nodes, group)| panta_mesh::SurfaceTriangle {
+                nodes: [nodes[0], nodes[1], nodes[2]],
+                group,
+            }),
+    );
+    let mesh = panta_mesh::TetMesh {
+        nodes,
+        tets,
+        boundary,
+        region_count: data.region_count,
+        boundary_group_count: data.boundary_group_count,
+    };
+    let report = panta_mesh::validate_tet_mesh(&mesh);
+    bridge::TetMeshValidation {
+        issues: report.issues,
+        volume_mm3: report.volume_mm3,
+    }
+}
+
+fn project_service_mesh_snapshot(
+    service: &ProjectService,
+) -> Result<bridge::SurfaceMeshSnapshot, String> {
+    let snapshot = service
+        .service
+        .current()
+        .map_err(|error| error.to_string())?;
+    let mut coordinates = Vec::new();
+    if let Some(mesh) = service.service.current_mesh() {
+        let values = mesh
+            .triangles
+            .len()
+            .checked_mul(9)
+            .ok_or("mesh snapshot coordinate count overflow")?;
+        coordinates
+            .try_reserve_exact(values)
+            .map_err(|error| format!("mesh snapshot allocation failed: {error}"))?;
+        for triangle in &mesh.triangles {
+            for point in triangle {
+                coordinates.extend_from_slice(point);
+            }
+        }
+    }
+    Ok(bridge::SurfaceMeshSnapshot {
+        coordinates,
+        revision: snapshot.revision,
+    })
 }
 
 fn project_snapshot(snapshot: panta_core::project::ProjectSnapshot) -> bridge::ProjectSnapshot {

@@ -1,4 +1,4 @@
-// CaeViewport 原生视口与视图页签；工程内复制的 STL 路径通过 meshPath 注入。
+// CaeViewport 原生视口与视图页签；工程网格由 Rust 服务快照提供。
 // 仅进入启用 Bridge 的构建变体，QML 无法覆盖原生视口表面。
 import QtQuick
 import QtQuick.Layouts
@@ -7,7 +7,7 @@ import Panta.Visualization
 PanelSurface {
     id: panel
 
-    property string meshPath: ""
+    property var meshSource: null
     signal closeRequested
 
     PaneCloseButton {
@@ -25,7 +25,7 @@ PanelSurface {
             CaeViewport {
                 objectName: "caeViewport"
                 anchors.fill: parent
-                meshPath: panel.meshPath
+                meshSource: panel.meshSource
             }
         }
 

@@ -1,6 +1,7 @@
 /// ProjectViewModel 验收测试（任务 057）：Qt 字符串适配、Rust 工程服务命令
 /// 生命周期、清单创建/打开/保存和可恢复错误。
 
+#include "panta/visualization/mesh_source.hpp"
 #include "project_view_model.hpp"
 #include <QCoreApplication>
 #include <QDir>
@@ -11,6 +12,7 @@
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QtTest/qtest.h>
+#include <array>
 #include <gtest/gtest.h>
 
 using panta::bridge::ProjectViewModel;
@@ -100,6 +102,10 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
     EXPECT_EQ(view_model.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
     EXPECT_EQ(view_model.importedTriangleCount(), 1U);
     EXPECT_TRUE(QFile::exists(view_model.importedAssetPath()));
+    const auto mesh = view_model.mesh_snapshot();
+    ASSERT_NE(mesh, nullptr);
+    EXPECT_EQ(mesh->vertices.size(), 3U);
+    EXPECT_EQ(mesh->vertices[1], (std::array<double, 3>{1.0, 0.0, 0.0}));
 
     ProjectViewModel reopened;
     ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
@@ -107,6 +113,25 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
     EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample.stl"));
     EXPECT_EQ(reopened.importedAssetPath(), view_model.importedAssetPath());
     EXPECT_EQ(reopened.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
+    const auto reopened_mesh = reopened.mesh_snapshot();
+    ASSERT_NE(reopened_mesh, nullptr);
+    EXPECT_EQ(reopened_mesh->vertices, mesh->vertices);
+
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 2 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+    QSignalSpy mesh_changed(&view_model, &panta::visualization::MeshSource::meshChanged);
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
+                                     QStringLiteral("millimeters"), false));
+    EXPECT_EQ(mesh_changed.count(), 1);
+    const auto replacement = view_model.mesh_snapshot();
+    ASSERT_NE(replacement, nullptr);
+    EXPECT_EQ(replacement->vertices[1], (std::array<double, 3>{2.0, 0.0, 0.0}));
+    EXPECT_EQ(mesh->vertices[1], (std::array<double, 3>{1.0, 0.0, 0.0}));
+    ASSERT_TRUE(view_model.inspectStl(sourcePath));
+    EXPECT_FALSE(view_model.inspectStl(sourcePath + QStringLiteral(".missing")));
+    EXPECT_FALSE(view_model.importPreviewReady());
+    EXPECT_TRUE(view_model.hasImportedPart());
 }
 
 int main(int argc, char** argv) {

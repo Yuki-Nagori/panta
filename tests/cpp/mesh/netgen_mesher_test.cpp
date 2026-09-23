@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 using panta::mesh::generate_tet_mesh_from_step;
 using panta::mesh::TetMeshGenerationParameters;
 using panta::mesh::TetMeshGenerationStatus;
-using panta::mesh::validate_tet_mesh;
+using panta::mesh::validate_native_mesh_with_rust;
 
 const fs::path& fixture_dir() {
     // 夹具根经编译定义注入裸路径（cppcheck 兼容，见 009 同型说明）。
@@ -37,7 +37,7 @@ TEST(NetgenMesher, BoxYieldsValidTetMeshWithExpectedVolumeAndGroups) {
     // 单一实体 → 单一区域；长方体 6 个面 → 6 个边界分组，且无丢失。
     EXPECT_EQ(result.mesh.region_count, 1u);
     EXPECT_EQ(result.mesh.boundary_group_count, 6u);
-    EXPECT_EQ(validate_tet_mesh(result.mesh).ok, true);
+    EXPECT_EQ(validate_native_mesh_with_rust(result.mesh).ok, true);
 
     // 名义体积 10×20×30 = 6000 mm³；面网格贴合平面，断言容差 1%。
     EXPECT_NEAR(result.volume_mm3, 6000.0, 60.0);

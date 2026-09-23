@@ -73,9 +73,20 @@ MeshIndex compressed_index(const std::vector<MeshIndex>& mapping, int one_based)
     return static_cast<MeshIndex>(found - mapping.begin());
 }
 
+/// 仅用于 Netgen 节点顺序转换，Mesh IR 的度量计算由 Rust 所有。
+double six_times_tet_volume(const std::array<double, 3>& p0, const std::array<double, 3>& p1,
+                            const std::array<double, 3>& p2, const std::array<double, 3>& p3) {
+    const auto u = std::array{p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]};
+    const auto v = std::array{p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]};
+    const auto w = std::array{p3[0] - p0[0], p3[1] - p0[1], p3[2] - p0[2]};
+    const std::array cross = {u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+                              u[0] * v[1] - u[1] * v[0]};
+    return cross[0] * w[0] + cross[1] * w[1] + cross[2] * w[2];
+}
+
 /// 把 netgen::Mesh 的节点、四面体与边界面元转换为 IR；区域取自体单元
 /// 的域号，边界分组取自面描述子的 OCC 面序号（SurfNr）。
-bool convert_to_ir(const netgen::Mesh& source, TetMeshGenerationResult& result) {
+bool convert_to_native_dto(const netgen::Mesh& source, TetMeshGenerationResult& result) {
     result.mesh.nodes.reserve(static_cast<std::size_t>(source.GetNP()));
     for (int i = 1; i <= source.GetNP(); ++i) {
         const auto& point = source.Point(i);
@@ -117,10 +128,9 @@ bool convert_to_ir(const netgen::Mesh& source, TetMeshGenerationResult& result) 
         std::array<MeshIndex, 4> nodes = {
             static_cast<MeshIndex>(element[0]) - 1U, static_cast<MeshIndex>(element[1]) - 1U,
             static_cast<MeshIndex>(element[2]) - 1U, static_cast<MeshIndex>(element[3]) - 1U};
-        // 方向归一化：Netgen 的局部顺序与 IR 的正体积约定相反（见
-        // generate_tet_mesh_from_step 内说明），有向体积为负时交换末两个
-        // 节点，使 IR 四面体统一为标准正向。
-        if (tet_six_times_volume(result.mesh.nodes[nodes[0]], result.mesh.nodes[nodes[1]],
+        // 方向归一化属于 Netgen →领域值转换：源库局部顺序可能为负；
+        // Rust Mesh IR 统一要求正有向体积，所以此处只按契约调整节点顺序。
+        if (six_times_tet_volume(result.mesh.nodes[nodes[0]], result.mesh.nodes[nodes[1]],
                                  result.mesh.nodes[nodes[2]], result.mesh.nodes[nodes[3]]) < 0.0) {
             std::swap(nodes[2], nodes[3]);
         }
@@ -183,7 +193,7 @@ TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path&
             native_parameters.maxh = parameters.max_length_mm;
         // Netgen 内部节点顺序与标准 FEM 正体积约定相反（box 实测 236/236
         // 为负，且 nglib 的 invert_tets 在该制品 OCC 路径未生效）；方向
-        // 归一化在 convert_to_ir 内完成，满足 Mesh IR 的方向契约。
+        // 归一化在 convert_to_native_dto 内完成，满足 Mesh IR 的方向契约。
 
         const nglib::Ng_Result set_size =
             nglib::Ng_OCC_SetLocalMeshSize(geometry, native_mesh, &native_parameters);
@@ -212,34 +222,28 @@ TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path&
             if (mesh->GetNP() == 0 || mesh->GetNE() == 0) {
                 result.status = TetMeshGenerationStatus::kEmptyMesh;
                 result.detail = "generation finished without a non-empty mesh";
-            } else if (!convert_to_ir(*mesh, result)) {
-                result.mesh = TetMesh{};
+            } else if (!convert_to_native_dto(*mesh, result)) {
+                result.mesh = NativeTetMeshDto{};
             }
         }
 
         if (result.status == TetMeshGenerationStatus::kNone) {
-            for (const Tetrahedron& tet : result.mesh.tets) {
-                result.volume_mm3 += tet_six_times_volume(result.mesh.nodes[tet.nodes[0]],
-                                                          result.mesh.nodes[tet.nodes[1]],
-                                                          result.mesh.nodes[tet.nodes[2]],
-                                                          result.mesh.nodes[tet.nodes[3]]) /
-                                     6.0;
-            }
-
-            const MeshValidationReport report = validate_tet_mesh(result.mesh);
+            const RustMeshValidationResult report = validate_native_mesh_with_rust(result.mesh);
             if (!report.ok) {
                 // 候选网格不发布：校验失败即丢弃并携带首个问题。
                 result.status = TetMeshGenerationStatus::kInvalidMesh;
                 result.detail = report.issues.front();
-                result.mesh = TetMesh{};
+                result.mesh = NativeTetMeshDto{};
                 result.volume_mm3 = 0.0;
+            } else {
+                result.volume_mm3 = report.volume_mm3;
             }
         }
     } catch (const std::exception& error) {
         // 网格库异常的统一兜底：丢弃候选输出，保留异常原文作为诊断。
         result.status = TetMeshGenerationStatus::kInternalFailure;
         result.detail = error.what();
-        result.mesh = TetMesh{};
+        result.mesh = NativeTetMeshDto{};
         result.volume_mm3 = 0.0;
     }
 

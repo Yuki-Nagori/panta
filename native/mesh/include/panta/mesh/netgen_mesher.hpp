@@ -1,7 +1,8 @@
 /// Netgen 体网格生成适配器（任务 010）的公共契约。
 ///
-/// 输入 STEP 的坐标与生成参数一律毫米；输出为自有 Mesh IR
-/// （panta/mesh/mesh_ir.hpp）。Netgen/OCCT 类型不出现在本头文件。
+/// 输入 STEP 的坐标与生成参数一律毫米；输出为自有 native DTO
+/// （panta/mesh/mesh_ir.hpp），再由桥接交给 Rust Mesh IR 校验。Netgen/OCCT
+/// 类型不出现在本头文件。
 /// 冒烟范围：单一闭合实体 → 线性四面体 + 三角形边界；二次单元、
 /// 混合单元与局部加密不在本任务内。
 #pragma once
@@ -43,12 +44,12 @@ struct TetMeshGenerationResult {
     /// 面向日志的英文诊断上下文（失败阶段、Netgen 返回码或校验问题），
     /// 不直接展示给最终用户。
     std::string detail;
-    TetMesh mesh;
+    NativeTetMeshDto mesh;
     /// 四面体有向体积之和（毫米³）；成功时为正，失败时为 0。
     double volume_mm3 = 0.0;
 };
 
-/// 同步从 STEP 文件生成四面体网格并转换为自有 Mesh IR。
+/// 同步从 STEP 文件生成四面体网格并转换为 native DTO。
 ///
 /// 适配器内部对全部 Netgen/OCCT 调用串行化（两者均为进程级全局状态，
 /// standards/netgen.md 首期保守串行），调用方无须额外加锁；当前不提供

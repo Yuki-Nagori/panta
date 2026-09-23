@@ -45,6 +45,8 @@ add_library(panta_mesh STATIC)
 add_library(panta::mesh ALIAS panta_mesh)
 
 target_include_directories(panta_mesh PUBLIC include)
+target_include_directories(panta_mesh PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
+                                              "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
 
 target_sources(
   panta_mesh PRIVATE include/panta/mesh/mesh_ir.hpp include/panta/mesh/netgen_mesher.hpp
@@ -54,7 +56,14 @@ panta_native_defaults(panta_mesh)
 # nglib 经其 INTERFACE_LINK_LIBRARIES 传递 ngcore；OCCT 工具链全集见上
 # 文说明。全部 PRIVATE：公共头零第三方类型（静态库符号经 LINK_ONLY
 # 传播给最终链接者）。
-target_link_libraries(panta_mesh PRIVATE nglib ${_panta_netgen_occt_toolkits})
+target_link_libraries(panta_mesh PRIVATE nglib ${_panta_netgen_occt_toolkits}
+                                         "${PANTA_FFI_STATIC_LIB}")
+if(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(panta_mesh PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+elseif(WIN32)
+  target_link_libraries(panta_mesh PRIVATE ws2_32 userenv ntdll)
+endif()
 
 # 冒烟阶段不进安装导出集：消费方（网格业务任务）接入时再按 foundation
 # 模式补 install(TARGETS) 与 package 配置。
@@ -66,6 +75,10 @@ if(BUILD_TESTING)
   add_executable(panta_mesh_ir_test ../../tests/cpp/mesh/mesh_ir_test.cpp)
   panta_native_defaults(panta_mesh_ir_test)
   target_link_libraries(panta_mesh_ir_test PRIVATE panta::mesh GTest::gtest_main)
+  # 手动性能入口，不注册为时间敏感的 CTest 门禁。
+  add_executable(panta_mesh_ir_benchmark ../../tests/cpp/mesh/mesh_ir_benchmark.cpp)
+  panta_native_defaults(panta_mesh_ir_benchmark)
+  target_link_libraries(panta_mesh_ir_benchmark PRIVATE panta::mesh)
   add_executable(panta_mesh_netgen_test ../../tests/cpp/mesh/netgen_mesher_test.cpp)
   panta_native_defaults(panta_mesh_netgen_test)
   target_link_libraries(panta_mesh_netgen_test PRIVATE panta::mesh GTest::gtest_main)

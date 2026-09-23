@@ -1,5 +1,6 @@
 #include "project_view_model.hpp"
 
+#include "panta/visualization/mesh_source.hpp"
 #include "panta_ffi.h"
 #include "path_host.hpp"
 #include <QDir>
@@ -10,6 +11,9 @@
 #include <QString>
 #include <QUrl>
 #include <QtCore/qtmetamacros.h>
+#include <cstddef>
+#include <memory>
+#include <qlogging.h>
 #include <rust/cxx.h>
 #include <string>
 
@@ -32,8 +36,33 @@ QString format_dimensions(double sizeX, double sizeY, double sizeZ, const QStrin
 } // namespace
 
 ProjectViewModel::ProjectViewModel(QObject* parent)
-    : QObject(parent), m_defaultLocation(default_project_location()),
+    : MeshSource(parent), m_defaultLocation(default_project_location()),
       m_service(panta::ffi::project_service_new()) {}
+
+std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
+ProjectViewModel::mesh_snapshot() const {
+    if (m_currentPath.isEmpty()) {
+        return nullptr;
+    }
+    try {
+        const auto snapshot = panta::ffi::project_service_mesh_snapshot(*m_service);
+        if (snapshot.coordinates.empty() || snapshot.coordinates.size() % 9 != 0) {
+            return nullptr;
+        }
+        auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        mesh->project_revision = snapshot.revision;
+        mesh->vertices.reserve(snapshot.coordinates.size() / 3);
+        for (std::size_t offset = 0; offset < snapshot.coordinates.size(); offset += 3) {
+            mesh->vertices.push_back({snapshot.coordinates[offset],
+                                      snapshot.coordinates[offset + 1],
+                                      snapshot.coordinates[offset + 2]});
+        }
+        return mesh;
+    } catch (const rust::Error& error) {
+        qWarning("ProjectViewModel mesh snapshot failed: %s", error.what());
+        return nullptr;
+    }
+}
 
 const QString& ProjectViewModel::defaultLocation() const { return m_defaultLocation; }
 
@@ -205,6 +234,13 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
 
 bool ProjectViewModel::inspectStl(const QString& rawPath) {
     clearError();
+    if (m_importPreviewReady) {
+        m_importPreviewReady = false;
+        m_importPreviewName.clear();
+        m_importPreviewDimensions.clear();
+        m_importPreviewTriangleCount = 0;
+        emit importPreviewChanged();
+    }
     std::string path;
     QString conversionError;
     if (!toBoundaryText(QDir::cleanPath(QDir::fromNativeSeparators(rawPath.trimmed())), &path,
@@ -304,6 +340,7 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
 bool ProjectViewModel::refreshImports() {
     try {
         applyImports(panta::ffi::project_service_imports(*m_service));
+        emit meshChanged();
         return true;
     } catch (const rust::Error& failure) {
         return fail(QString::fromUtf8(failure.what()));
@@ -353,6 +390,10 @@ QString ProjectViewModel::userMessageFor(const QString& errorCode) {
     if (errorCode == QStringLiteral("project.import_unsupported_mesh_type") ||
         errorCode == QStringLiteral("project.import_unsupported_units")) {
         return QStringLiteral("Choose a supported mesh type and unit.");
+    }
+    if (errorCode == QStringLiteral("project.import_source_changed")) {
+        return QStringLiteral(
+            "The STL file changed after preview. Review it again before importing.");
     }
     if (errorCode == QStringLiteral("project.import_parse_failed")) {
         return QStringLiteral("The selected STL file could not be read.");

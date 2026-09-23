@@ -12,12 +12,14 @@ tests/
 ├── build.rs                   # 解析当前 profile 的 CMake/工具路径
 ├── src/main.rs                # format/lint/quality 调度器
 ├── integration/native.rs      # cargo test 触发的 CTest + qmllint 聚合
+├── rust/<domain>.rs            # Rust 公共 API 黑盒测试，由所属 crate 注册
 ├── cpp/<module>/*_test.cpp    # C++20、GTest/QtTest 源文件
 └── qml/*_test.cpp             # 面向 QML 组件的 QtTest 源文件
 ```
 
 - `tests/src/` 只放入口编排代码，不放领域测试断言。
 - `tests/integration/` 只放 `panta-tests` package 的 Cargo 集成测试；manifest 用显式 `[[test]]` 注册，不能依赖 Cargo 对 `tests/tests` 的默认猜测。
+- `tests/rust/` 放 Rust crate 公共 API 的黑盒测试；所属 crate 的 Cargo manifest 用 `[[test]]` 显式注册相对路径，故 `cargo test -p <crate>` 和 workspace 测试均会运行。
 - `tests/cpp/` 和 `tests/qml/` 是测试源代码唯一归档位置。CMake target 仍在被测模块的 `CMakeLists.txt` 注册，源文件使用明确相对路径；测试二进制不安装、不导出。
 - `native/cmake/tests/` 只保留 CMake 脚本和小型 configure fixture，不放 C++/QML 行为测试。
 - 生产 QML 仍在 `qml/`；`tests/qml/` 只存 QtTest 驱动的验证代码，不复制生产组件。
@@ -26,7 +28,7 @@ tests/
 ## Rust 测试边界
 
 - 单元测试使用同一 `.rs` 文件中的 `#[cfg(test)] mod tests`，因为它们需要访问模块私有项；不要为了目录整齐把私有实现测试搬到根 `tests/`。
-- crate 级公共行为、跨模块和黑盒测试放对应 crate 的 `tests/`，按领域命名（如 `crates/panta-dsl-core/tests/catalog.rs`）。它们只能使用公开 API。
+- crate 级公共行为、跨模块和黑盒测试优先放根 `tests/rust/`，按领域命名并由所属 crate 注册；只能使用公开 API。已有的 crate 内 `tests/` 可随相关任务逐步迁移，不能保留同一用例的双份实现。
 - 根 `tests/integration/native.rs` 是跨语言聚合测试，不承载 Rust 领域断言；它只验证构建树、qmllint、CTest 的退出码和失败传播。
 - 测试应断言行为、不变量和错误上下文；不要复制实现、依赖测试顺序或通过重复调用提升覆盖率。
 
