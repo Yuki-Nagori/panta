@@ -98,6 +98,7 @@ ai-docs/
 | 062 | [Ribbon 页签内容与公共渲染拆分](task/062-ribbon-tab-components.md) | 应用平台扩展 | 061, 060 | done |
 | 063 | [STL 导入、导入选项持久化与工程工作区](task/063-stl-import-and-mesh-workspace.md) | 应用平台扩展 | 057, 060, 062 | in-progress |
 | 064 | [VTK 视口导航、笛卡尔坐标系与六面体定位](task/064-vtk-navigation-and-orientation.md) | 应用平台扩展 | 007, 063 | in-progress |
+| 065 | [VTK 视口缩放、右键旋转与方向过渡](task/065-vtk-zoom-and-cube-transition.md) | 应用平台扩展 | 007, 064 | done |
 
 ## 验证与质量扩展队列
 

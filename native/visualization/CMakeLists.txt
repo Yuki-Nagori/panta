@@ -35,8 +35,12 @@ qt_add_qml_module(
   src/cae_viewport.cpp
   src/vtk/vtk_viewport.hpp
   src/vtk/vtk_viewport.cpp
-  src/vtk/viewport_orientation.cpp
-  src/vtk/viewport_orientation.hpp
+  src/vtk/navigation/viewport_camera.cpp
+  src/vtk/navigation/viewport_camera.hpp
+  src/vtk/navigation/viewport_input.cpp
+  src/vtk/navigation/viewport_input.hpp
+  src/vtk/navigation/viewport_orientation.cpp
+  src/vtk/navigation/viewport_orientation.hpp
   src/vtk/stl_mesh.cpp
   src/vtk/stl_mesh.hpp
   src/vtk/default_wordmark.cpp
@@ -90,11 +94,14 @@ vtk_module_autoinit(
   VTK::FiltersSources)
 
 if(BUILD_TESTING)
-  add_executable(panta_default_wordmark_test
-                 ../../tests/cpp/visualization/default_wordmark_test.cpp)
-  panta_native_defaults(panta_default_wordmark_test)
-  target_include_directories(panta_default_wordmark_test PRIVATE src/vtk)
-  target_link_libraries(panta_default_wordmark_test PRIVATE panta_visualization Qt6::Test
-                                                            VTK::CommonDataModel)
+  foreach(_test IN ITEMS default_wordmark_test viewport_navigation_test
+                         viewport_navigation_benchmark)
+    add_executable(panta_${_test} ../../tests/cpp/visualization/${_test}.cpp)
+    panta_native_defaults(panta_${_test})
+    target_include_directories(panta_${_test} PRIVATE src/vtk)
+    target_link_libraries(panta_${_test} PRIVATE panta_visualization Qt6::Test VTK::CommonDataModel)
+  endforeach()
   panta_add_qml_test(Visualization.DefaultWordmark panta_default_wordmark_test)
+  panta_add_qml_test(Visualization.ViewportNavigation panta_viewport_navigation_test)
+  # CPU 性能采样只作为开发侧入口，不注册 CI 时间门禁。
 endif()

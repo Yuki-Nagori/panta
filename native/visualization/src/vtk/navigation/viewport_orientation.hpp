@@ -2,6 +2,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <vtkSmartPointer.h>
 
@@ -17,7 +18,7 @@ class vtkVectorText;
 
 namespace panta::visualization {
 
-enum class CubeDirection {
+enum class CubeDirection : std::uint8_t {
     PositiveX,
     NegativeX,
     PositiveY,

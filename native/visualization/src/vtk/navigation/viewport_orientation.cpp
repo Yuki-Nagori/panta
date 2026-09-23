@@ -3,7 +3,9 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <limits>
+#include <optional>
 #include <utility>
 #include <vtkActor.h>
 #include <vtkBillboardTextActor3D.h>
@@ -12,10 +14,12 @@
 #include <vtkLineSource.h>
 #include <vtkMath.h>
 #include <vtkMatrix4x4.h>
+#include <vtkNew.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 #include <vtkTextProperty.h>
 #include <vtkTransform.h>
 #include <vtkTransformFilter.h>
@@ -30,6 +34,14 @@ struct AxisColor {
     double blue;
 };
 
+struct FaceFrame {
+    /// 六面体局部坐标中的面中心、屏幕右、屏幕上和面外法向。
+    std::array<double, 3> position;
+    std::array<double, 3> right;
+    std::array<double, 3> up;
+    std::array<double, 3> normal;
+};
+
 constexpr AxisColor kXAxisColor{0.50, 0.04, 0.16}; // 勃艮第红
 constexpr AxisColor kYAxisColor{0.10, 0.34, 0.18}; // 勃艮第绿
 constexpr AxisColor kZAxisColor{0.12, 0.27, 0.52}; // 勃艮第蓝
@@ -42,8 +54,7 @@ constexpr double kAxesTop = 0.24;
 constexpr double kCubeBottom = 0.76;
 constexpr double kCubeHalfExtent = 0.8;
 
-vtkSmartPointer<vtkActor> make_axis(const double endpoint[3], double red, double green,
-                                    double blue) {
+vtkSmartPointer<vtkActor> make_axis(const double endpoint[3], const AxisColor& color) {
     vtkNew<vtkLineSource> line;
     line->SetPoint1(0.0, 0.0, 0.0);
     line->SetPoint2(endpoint);
@@ -53,21 +64,20 @@ vtkSmartPointer<vtkActor> make_axis(const double endpoint[3], double red, double
 
     auto actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(red, green, blue);
+    actor->GetProperty()->SetColor(color.red, color.green, color.blue);
     actor->GetProperty()->SetLineWidth(3.0);
     return actor;
 }
 
 vtkSmartPointer<vtkBillboardTextActor3D> make_label(const char* text, const double position[3],
-                                                    double red, double green, double blue,
-                                                    int font_size) {
+                                                    const AxisColor& color, int font_size) {
     auto label = vtkSmartPointer<vtkBillboardTextActor3D>::New();
     label->SetInput(text);
     label->SetPosition(position[0], position[1], position[2]);
     vtkNew<vtkTextProperty> text_property;
     text_property->SetFontSize(font_size);
     text_property->SetBold(true);
-    text_property->SetColor(red, green, blue);
+    text_property->SetColor(color.red, color.green, color.blue);
     text_property->SetJustificationToCentered();
     text_property->SetVerticalJustificationToCentered();
     label->SetTextProperty(text_property);
@@ -76,17 +86,16 @@ vtkSmartPointer<vtkBillboardTextActor3D> make_label(const char* text, const doub
 }
 
 vtkSmartPointer<vtkBillboardTextActor3D> make_axis_label(const char* text, const double position[3],
-                                                         double red, double green, double blue) {
-    return make_label(text, position, red, green, blue, 20);
+                                                         const AxisColor& color) {
+    return make_label(text, position, color, 20);
 }
 
 void recenter_face_label(vtkVectorText* source, vtkTransform* centering_transform,
                          vtkTransformFilter* geometry);
 
-vtkSmartPointer<vtkActor> make_face_label(const char* text, const double position[3],
-                                          const double local_x[3], const double local_y[3],
-                                          const double normal[3], double red, double green,
-                                          double blue, vtkSmartPointer<vtkVectorText>& source,
+vtkSmartPointer<vtkActor> make_face_label(const char* text, const FaceFrame& frame,
+                                          const AxisColor& color,
+                                          vtkSmartPointer<vtkVectorText>& source,
                                           vtkSmartPointer<vtkTransform>& centering_transform,
                                           vtkSmartPointer<vtkTransformFilter>& geometry) {
     source = vtkSmartPointer<vtkVectorText>::New();
@@ -104,13 +113,13 @@ vtkSmartPointer<vtkActor> make_face_label(const char* text, const double positio
     actor->SetMapper(mapper);
     vtkNew<vtkMatrix4x4> face_matrix;
     for (int row = 0; row < 3; ++row) {
-        face_matrix->SetElement(row, 0, local_x[row]);
-        face_matrix->SetElement(row, 1, local_y[row]);
-        face_matrix->SetElement(row, 2, normal[row]);
-        face_matrix->SetElement(row, 3, position[row]);
+        face_matrix->SetElement(row, 0, frame.right[static_cast<std::size_t>(row)]);
+        face_matrix->SetElement(row, 1, frame.up[static_cast<std::size_t>(row)]);
+        face_matrix->SetElement(row, 2, frame.normal[static_cast<std::size_t>(row)]);
+        face_matrix->SetElement(row, 3, frame.position[static_cast<std::size_t>(row)]);
     }
     actor->SetUserMatrix(face_matrix);
-    actor->GetProperty()->SetColor(red, green, blue);
+    actor->GetProperty()->SetColor(color.red, color.green, color.blue);
     actor->GetProperty()->SetAmbient(0.35);
     actor->GetProperty()->SetDiffuse(0.65);
 
@@ -142,7 +151,7 @@ void recenter_face_label(vtkVectorText* source, vtkTransform* centering_transfor
     geometry->Update();
 }
 
-void copy_orientation(vtkCamera* source, vtkCamera* destination, double parallel_scale) {
+void copy_orientation(vtkCamera* source, vtkCamera& destination, double parallel_scale) {
     double position[3];
     double focal_point[3];
     double view_up[3];
@@ -162,12 +171,12 @@ void copy_orientation(vtkCamera* source, vtkCamera* destination, double parallel
     }
 
     constexpr double marker_distance = 5.0;
-    destination->SetPosition(direction[0] * marker_distance, direction[1] * marker_distance,
-                             direction[2] * marker_distance);
-    destination->SetFocalPoint(0.0, 0.0, 0.0);
-    destination->SetViewUp(view_up);
-    destination->SetParallelProjection(true);
-    destination->SetParallelScale(parallel_scale);
+    destination.SetPosition(direction[0] * marker_distance, direction[1] * marker_distance,
+                            direction[2] * marker_distance);
+    destination.SetFocalPoint(0.0, 0.0, 0.0);
+    destination.SetViewUp(view_up);
+    destination.SetParallelProjection(true);
+    destination.SetParallelScale(parallel_scale);
 }
 
 std::optional<CubeDirection> pick_cube_face(vtkRenderer* renderer, int display_x, int display_y) {
@@ -278,9 +287,9 @@ void ViewportOrientation::attach(vtkRenderWindow* render_window) {
     constexpr double x_endpoint[3] = {1.0, 0.0, 0.0};
     constexpr double y_endpoint[3] = {0.0, 1.0, 0.0};
     constexpr double z_endpoint[3] = {0.0, 0.0, 1.0};
-    x_axis_ = make_axis(x_endpoint, kXAxisColor.red, kXAxisColor.green, kXAxisColor.blue);
-    y_axis_ = make_axis(y_endpoint, kYAxisColor.red, kYAxisColor.green, kYAxisColor.blue);
-    z_axis_ = make_axis(z_endpoint, kZAxisColor.red, kZAxisColor.green, kZAxisColor.blue);
+    x_axis_ = make_axis(x_endpoint, kXAxisColor);
+    y_axis_ = make_axis(y_endpoint, kYAxisColor);
+    z_axis_ = make_axis(z_endpoint, kZAxisColor);
     axes_renderer_->AddActor(x_axis_);
     axes_renderer_->AddActor(y_axis_);
     axes_renderer_->AddActor(z_axis_);
@@ -289,12 +298,9 @@ void ViewportOrientation::attach(vtkRenderWindow* render_window) {
     constexpr double x_label_position[3] = {axis_label_offset, 0.0, 0.0};
     constexpr double y_label_position[3] = {0.0, axis_label_offset, 0.0};
     constexpr double z_label_position[3] = {0.0, 0.0, axis_label_offset};
-    x_label_ = make_axis_label("X", x_label_position, kXAxisColor.red, kXAxisColor.green,
-                               kXAxisColor.blue);
-    y_label_ = make_axis_label("Y", y_label_position, kYAxisColor.red, kYAxisColor.green,
-                               kYAxisColor.blue);
-    z_label_ = make_axis_label("Z", z_label_position, kZAxisColor.red, kZAxisColor.green,
-                               kZAxisColor.blue);
+    x_label_ = make_axis_label("X", x_label_position, kXAxisColor);
+    y_label_ = make_axis_label("Y", y_label_position, kYAxisColor);
+    z_label_ = make_axis_label("Z", z_label_position, kZAxisColor);
     axes_renderer_->AddActor(x_label_);
     axes_renderer_->AddActor(y_label_);
     axes_renderer_->AddActor(z_label_);
@@ -318,51 +324,37 @@ void ViewportOrientation::attach(vtkRenderWindow* render_window) {
     constexpr double face_center = kCubeHalfExtent;
     constexpr double face_offset = 0.03;
     constexpr double label_plane = face_center + face_offset;
-    constexpr double x_positive_position[3] = {label_plane, 0.0, 0.0};
-    constexpr double x_negative_position[3] = {-label_plane, 0.0, 0.0};
-    constexpr double y_positive_position[3] = {0.0, label_plane, 0.0};
-    constexpr double y_negative_position[3] = {0.0, -label_plane, 0.0};
-    constexpr double z_positive_position[3] = {0.0, 0.0, label_plane};
-    constexpr double z_negative_position[3] = {0.0, 0.0, -label_plane};
     // 每个面的局部 X/Y/Z 轴分别对应屏幕右、屏幕上和面外法向。
-    constexpr double positive_x_right[3] = {0.0, 1.0, 0.0};
-    constexpr double negative_x_right[3] = {0.0, -1.0, 0.0};
-    constexpr double positive_y_right[3] = {-1.0, 0.0, 0.0};
-    constexpr double negative_y_right[3] = {1.0, 0.0, 0.0};
-    constexpr double positive_z_right[3] = {1.0, 0.0, 0.0};
-    constexpr double negative_z_right[3] = {-1.0, 0.0, 0.0};
-    constexpr double side_face_up[3] = {0.0, 0.0, 1.0};
-    constexpr double z_face_up[3] = {0.0, 1.0, 0.0};
-    constexpr double positive_x_normal[3] = {1.0, 0.0, 0.0};
-    constexpr double negative_x_normal[3] = {-1.0, 0.0, 0.0};
-    constexpr double positive_y_normal[3] = {0.0, 1.0, 0.0};
-    constexpr double negative_y_normal[3] = {0.0, -1.0, 0.0};
-    constexpr double positive_z_normal[3] = {0.0, 0.0, 1.0};
-    constexpr double negative_z_normal[3] = {0.0, 0.0, -1.0};
+    constexpr FaceFrame x_positive_frame{
+        {label_plane, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}, {1.0, 0.0, 0.0}};
+    constexpr FaceFrame x_negative_frame{
+        {-label_plane, 0.0, 0.0}, {0.0, -1.0, 0.0}, {0.0, 0.0, 1.0}, {-1.0, 0.0, 0.0}};
+    constexpr FaceFrame y_positive_frame{
+        {0.0, label_plane, 0.0}, {-1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}};
+    constexpr FaceFrame y_negative_frame{
+        {0.0, -label_plane, 0.0}, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {0.0, -1.0, 0.0}};
+    constexpr FaceFrame z_positive_frame{
+        {0.0, 0.0, label_plane}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
+    constexpr FaceFrame z_negative_frame{
+        {0.0, 0.0, -label_plane}, {-1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, -1.0}};
     cube_labels_[0] =
-        make_face_label(kDirectionLabels[0], x_positive_position, positive_x_right, side_face_up,
-                        positive_x_normal, kXAxisColor.red, kXAxisColor.green, kXAxisColor.blue,
-                        cube_label_sources_[0], cube_label_transforms_[0], cube_label_geometry_[0]);
+        make_face_label(kDirectionLabels[0], x_positive_frame, kXAxisColor, cube_label_sources_[0],
+                        cube_label_transforms_[0], cube_label_geometry_[0]);
     cube_labels_[1] =
-        make_face_label(kDirectionLabels[1], x_negative_position, negative_x_right, side_face_up,
-                        negative_x_normal, kXAxisColor.red, kXAxisColor.green, kXAxisColor.blue,
-                        cube_label_sources_[1], cube_label_transforms_[1], cube_label_geometry_[1]);
+        make_face_label(kDirectionLabels[1], x_negative_frame, kXAxisColor, cube_label_sources_[1],
+                        cube_label_transforms_[1], cube_label_geometry_[1]);
     cube_labels_[2] =
-        make_face_label(kDirectionLabels[2], y_positive_position, positive_y_right, side_face_up,
-                        positive_y_normal, kYAxisColor.red, kYAxisColor.green, kYAxisColor.blue,
-                        cube_label_sources_[2], cube_label_transforms_[2], cube_label_geometry_[2]);
+        make_face_label(kDirectionLabels[2], y_positive_frame, kYAxisColor, cube_label_sources_[2],
+                        cube_label_transforms_[2], cube_label_geometry_[2]);
     cube_labels_[3] =
-        make_face_label(kDirectionLabels[3], y_negative_position, negative_y_right, side_face_up,
-                        negative_y_normal, kYAxisColor.red, kYAxisColor.green, kYAxisColor.blue,
-                        cube_label_sources_[3], cube_label_transforms_[3], cube_label_geometry_[3]);
+        make_face_label(kDirectionLabels[3], y_negative_frame, kYAxisColor, cube_label_sources_[3],
+                        cube_label_transforms_[3], cube_label_geometry_[3]);
     cube_labels_[4] =
-        make_face_label(kDirectionLabels[4], z_positive_position, positive_z_right, z_face_up,
-                        positive_z_normal, kZAxisColor.red, kZAxisColor.green, kZAxisColor.blue,
-                        cube_label_sources_[4], cube_label_transforms_[4], cube_label_geometry_[4]);
+        make_face_label(kDirectionLabels[4], z_positive_frame, kZAxisColor, cube_label_sources_[4],
+                        cube_label_transforms_[4], cube_label_geometry_[4]);
     cube_labels_[5] =
-        make_face_label(kDirectionLabels[5], z_negative_position, negative_z_right, z_face_up,
-                        negative_z_normal, kZAxisColor.red, kZAxisColor.green, kZAxisColor.blue,
-                        cube_label_sources_[5], cube_label_transforms_[5], cube_label_geometry_[5]);
+        make_face_label(kDirectionLabels[5], z_negative_frame, kZAxisColor, cube_label_sources_[5],
+                        cube_label_transforms_[5], cube_label_geometry_[5]);
     for (const auto& label : cube_labels_) {
         cube_renderer_->AddActor(label);
     }
@@ -401,8 +393,8 @@ void ViewportOrientation::update(vtkCamera* scene_camera) {
     if (scene_camera == nullptr || axes_renderer_ == nullptr || cube_renderer_ == nullptr) {
         return;
     }
-    copy_orientation(scene_camera, axes_renderer_->GetActiveCamera(), 2.8);
-    copy_orientation(scene_camera, cube_renderer_->GetActiveCamera(), 2.4);
+    copy_orientation(scene_camera, *axes_renderer_->GetActiveCamera(), 2.8);
+    copy_orientation(scene_camera, *cube_renderer_->GetActiveCamera(), 2.4);
 
     const double* camera_position = cube_renderer_->GetActiveCamera()->GetPosition();
     const double* camera_focal_point = cube_renderer_->GetActiveCamera()->GetFocalPoint();
@@ -449,19 +441,7 @@ std::optional<CubeDirection> ViewportOrientation::cube_direction(int display_x, 
         return pick_cube_face(cube_renderer_, display_x, display_y);
     }
 
-    const double center_x = width * ((kOverlayLeft + kOverlayRight) * 0.5);
-    const double center_y = height * ((kCubeBottom + 1.0) * 0.5);
-    const double half_extent_x = width * ((kOverlayRight - kOverlayLeft) * 0.5);
-    const double half_extent_y = height * ((1.0 - kCubeBottom) * 0.5);
-    const double x = (display_x - center_x) / half_extent_x;
-    const double y = (display_y - center_y) / half_extent_y;
-    if (std::abs(x) < 0.25 && std::abs(y) < 0.25) {
-        return y >= 0.0 ? CubeDirection::PositiveZ : CubeDirection::NegativeZ;
-    }
-    if (std::abs(x) >= std::abs(y)) {
-        return x >= 0.0 ? CubeDirection::PositiveX : CubeDirection::NegativeX;
-    }
-    return y >= 0.0 ? CubeDirection::PositiveY : CubeDirection::NegativeY;
+    return std::nullopt;
 }
 
 } // namespace panta::visualization

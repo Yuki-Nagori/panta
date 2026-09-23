@@ -5,9 +5,12 @@
 #include "vtk_viewport.hpp"
 
 #include "default_wordmark.hpp"
+#include "navigation/viewport_camera.hpp"
+#include "navigation/viewport_input.hpp"
+#include "navigation/viewport_orientation.hpp"
 #include "stl_mesh.hpp"
-#include "viewport_orientation.hpp"
 #include "vtk_native_surface.hpp"
+#include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QList>
 #include <QLoggingCategory>
@@ -19,10 +22,12 @@
 #include <QString>
 #include <QTimer>
 #include <QWindow>
+#include <QtCore/qnamespace.h>
 #include <QtCore/qtmetamacros.h>
 #include <QtGlobal>
 #include <QtLogging>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
@@ -32,6 +37,7 @@
 #include <vtkCommand.h>
 #include <vtkHardwareWindow.h>
 #include <vtkNew.h>
+#include <vtkObject.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkProperty.h>
@@ -50,6 +56,10 @@ namespace panta::visualization {
 namespace {
 
 Q_LOGGING_CATEGORY(viewport_log, "panta.viewport", QtWarningMsg)
+
+constexpr int kCameraTransitionDurationMs = 260;
+
+using Vector3 = std::array<double, 3>;
 
 // 字样保持透视深度；按实际宽高比留出 25% 边距，窄窗口也不裁字。
 void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect) {
@@ -103,6 +113,9 @@ struct VtkViewport::Impl {
     QMetaObject::Connection window_visibility_connection;
     QMetaObject::Connection scene_graph_initialized_connection;
     QList<QMetaObject::Connection> ancestor_connections;
+    QTimer camera_transition_timer;
+    QElapsedTimer camera_transition_clock;
+    ViewportCameraTransition camera_transition;
     /// 最近一次提交给 render window 的像素尺寸；空值表示尚无有效提交。
     QSize applied_pixel_size;
     bool refresh_scheduled = false;
@@ -117,6 +130,10 @@ struct VtkViewport::Impl {
 
 VtkViewport::VtkViewport(QQuickItem* parent) : QQuickItem(parent), impl_(std::make_unique<Impl>()) {
     setFlag(ItemHasContents, false);
+    impl_->camera_transition_timer.setInterval(16);
+    impl_->camera_transition_timer.setTimerType(Qt::PreciseTimer);
+    connect(&impl_->camera_transition_timer, &QTimer::timeout, this,
+            &VtkViewport::advance_camera_transition);
     connect(this, &QQuickItem::windowChanged, this, &VtkViewport::bind_window);
     bind_window(window());
     watch_ancestors();
@@ -133,6 +150,9 @@ void VtkViewport::bind_window(QQuickWindow* new_window) {
     }
     impl_->window_visibility_connection = QObject::connect(
         new_window, &QWindow::visibilityChanged, this, [this](QWindow::Visibility visibility) {
+            if (visibility == QWindow::Hidden || visibility == QWindow::Minimized) {
+                stop_camera_transition();
+            }
             impl_->scene_dirty |= visibility != QWindow::Hidden && visibility != QWindow::Minimized;
             schedule_refresh();
         });
@@ -174,6 +194,7 @@ void VtkViewport::itemChange(ItemChange change, const ItemChangeData& value) {
     } else if (change == ItemVisibleHasChanged) {
         // 隐藏立即撤下 surface；恢复显示时补帧，Wayland 据此重新映射 buffer。
         if (!isVisible()) {
+            stop_camera_transition();
             set_native_surface_visible(impl_->native_surface, false);
         }
         impl_->scene_dirty = true;
@@ -275,8 +296,12 @@ void VtkViewport::ensure_render_window() {
     auto interaction_command = vtkSmartPointer<ViewportInteractionCommand>::New();
     interaction_command->set_viewport(this);
     impl_->interactor->AddObserver(vtkCommand::LeftButtonPressEvent, interaction_command);
+    impl_->interactor->AddObserver(vtkCommand::RightButtonPressEvent, interaction_command);
     impl_->interactor->AddObserver(vtkCommand::MouseMoveEvent, interaction_command);
     impl_->interactor->AddObserver(vtkCommand::LeftButtonReleaseEvent, interaction_command);
+    impl_->interactor->AddObserver(vtkCommand::RightButtonReleaseEvent, interaction_command);
+    impl_->interactor->AddObserver(vtkCommand::MouseWheelForwardEvent, interaction_command);
+    impl_->interactor->AddObserver(vtkCommand::MouseWheelBackwardEvent, interaction_command);
     impl_->render_window->Initialize();
     impl_->interactor->Initialize();
 
@@ -374,15 +399,34 @@ void VtkViewport::handle_interaction_event(unsigned long event_id,
     const int y = event_position[1];
     const int width = render_size[0];
     const int height = render_size[1];
-    if (event_id == vtkCommand::LeftButtonPressEvent) {
-        impl_->last_pointer_x = x;
-        impl_->last_pointer_y = y;
-        impl_->cube_pressed = impl_->orientation.contains_cube(x, y, width, height);
-        impl_->pointer_dragging = !impl_->cube_pressed;
+    const auto action = classify_viewport_input(event_id, impl_->pointer_dragging);
+    if (action == ViewportInputAction::ZoomIn || action == ViewportInputAction::ZoomOut) {
+        stop_camera_transition();
+        auto* camera = impl_->renderer->GetActiveCamera();
+        ViewportCamera::zoom(camera, impl_->primitive_actor, action == ViewportInputAction::ZoomIn);
+        impl_->renderer->ResetCameraClippingRange();
+        impl_->orientation.update(camera);
+        impl_->scene_dirty = true;
+        schedule_refresh();
         return;
     }
 
-    if (event_id == vtkCommand::MouseMoveEvent && impl_->pointer_dragging) {
+    if (action == ViewportInputAction::PressCube) {
+        impl_->cube_pressed = impl_->orientation.contains_cube(x, y, width, height);
+        impl_->pointer_dragging = false;
+        return;
+    }
+
+    if (action == ViewportInputAction::BeginRotation) {
+        impl_->last_pointer_x = x;
+        impl_->last_pointer_y = y;
+        impl_->cube_pressed = false;
+        impl_->pointer_dragging = true;
+        stop_camera_transition();
+        return;
+    }
+
+    if (action == ViewportInputAction::MoveRotation) {
         const int delta_x = x - impl_->last_pointer_x;
         const int delta_y = y - impl_->last_pointer_y;
         if (delta_x != 0 || delta_y != 0) {
@@ -390,6 +434,7 @@ void VtkViewport::handle_interaction_event(unsigned long event_id,
             camera->Azimuth(-static_cast<double>(delta_x) * 0.5);
             camera->Elevation(static_cast<double>(delta_y) * 0.5);
             camera->OrthogonalizeViewUp();
+            impl_->renderer->ResetCameraClippingRange();
             impl_->orientation.update(camera);
             impl_->scene_dirty = true;
             impl_->last_pointer_x = x;
@@ -399,20 +444,20 @@ void VtkViewport::handle_interaction_event(unsigned long event_id,
         return;
     }
 
-    if (event_id != vtkCommand::LeftButtonReleaseEvent) {
+    if (action == ViewportInputAction::EndRotation) {
+        impl_->pointer_dragging = false;
+        impl_->cube_pressed = false;
+        return;
+    }
+    if (action != ViewportInputAction::ReleaseCube) {
         return;
     }
 
     if (impl_->cube_pressed) {
         const auto direction = impl_->orientation.cube_direction(x, y, width, height);
         if (direction.has_value()) {
-            double focal_point[3];
             const double* center = impl_->primitive_actor->GetCenter();
-            focal_point[0] = center[0];
-            focal_point[1] = center[1];
-            focal_point[2] = center[2];
-            const double distance =
-                std::max(impl_->renderer->GetActiveCamera()->GetDistance(), 1.0);
+            const Vector3 focal_point = {center[0], center[1], center[2]};
             double direction_vector[3] = {0.0, 0.0, 1.0};
             double view_up[3] = {0.0, 0.0, 1.0};
             switch (*direction) {
@@ -443,20 +488,48 @@ void VtkViewport::handle_interaction_event(unsigned long event_id,
                 break;
             }
             auto* camera = impl_->renderer->GetActiveCamera();
-            camera->SetFocalPoint(focal_point);
-            camera->SetPosition(focal_point[0] + direction_vector[0] * distance,
-                                focal_point[1] + direction_vector[1] * distance,
-                                focal_point[2] + direction_vector[2] * distance);
-            camera->SetViewUp(view_up);
-            camera->OrthogonalizeViewUp();
-            impl_->renderer->ResetCameraClippingRange();
-            impl_->orientation.update(camera);
-            impl_->scene_dirty = true;
-            schedule_refresh();
+            const CameraFrame target_frame{
+                {direction_vector[0], direction_vector[1], direction_vector[2]},
+                {view_up[0], view_up[1], view_up[2]}};
+            if (impl_->camera_transition.start(camera, target_frame, focal_point,
+                                               impl_->primitive_actor)) {
+                // 从相机当前实姿态开始采样，连续点击会平滑重定向而不跳帧。
+                impl_->camera_transition_clock.restart();
+                impl_->camera_transition_timer.start();
+            } else {
+                stop_camera_transition();
+            }
         }
     }
     impl_->pointer_dragging = false;
     impl_->cube_pressed = false;
+}
+
+void VtkViewport::advance_camera_transition() {
+    if (impl_->renderer == nullptr || impl_->primitive_actor == nullptr ||
+        impl_->render_window == nullptr || !impl_->camera_transition_clock.isValid() ||
+        !impl_->camera_transition.active()) {
+        stop_camera_transition();
+        return;
+    }
+
+    const qint64 elapsed = impl_->camera_transition_clock.elapsed();
+    auto* camera = impl_->renderer->GetActiveCamera();
+    ViewportCamera::apply(camera, impl_->camera_transition.pose_at(static_cast<double>(elapsed),
+                                                                   kCameraTransitionDurationMs));
+    impl_->renderer->ResetCameraClippingRange();
+    impl_->orientation.update(camera);
+    impl_->scene_dirty = true;
+    schedule_refresh();
+    if (elapsed >= kCameraTransitionDurationMs) {
+        stop_camera_transition();
+    }
+}
+
+void VtkViewport::stop_camera_transition() {
+    impl_->camera_transition_timer.stop();
+    impl_->camera_transition_clock.invalidate();
+    impl_->camera_transition.cancel();
 }
 
 void VtkViewport::sync_native_surface() {
@@ -467,6 +540,7 @@ void VtkViewport::sync_native_surface() {
     const bool visible = isVisible() && width() > 0 && height() > 0;
     set_native_surface_visible(impl_->native_surface, visible);
     if (!visible || impl_->render_window == nullptr) {
+        stop_camera_transition();
         return;
     }
     ::panta::visualization::sync_native_surface(window(), this, impl_->hardware_window.get(),
@@ -484,6 +558,7 @@ void VtkViewport::sync_native_surface() {
         return;
     }
     if (resized) {
+        stop_camera_transition();
         impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
         if (impl_->interactor != nullptr) {
             impl_->interactor->UpdateSize(pixel_size.width(), pixel_size.height());
@@ -503,6 +578,7 @@ void VtkViewport::sync_native_surface() {
 }
 
 void VtkViewport::destroy_render_window() {
+    stop_camera_transition();
     impl_->applied_pixel_size = {};
     impl_->scene_dirty = true;
     impl_->pointer_dragging = false;

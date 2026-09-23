@@ -1,11 +1,12 @@
 // 欢迎字样的 CPU 几何验证：封闭实体、字孔拓扑和有效顶点色不依赖 GPU。
 #include "default_wordmark.hpp"
+#include "navigation/viewport_orientation.hpp"
 #include "stl_mesh.hpp"
-#include "viewport_orientation.hpp"
 #include <QFile>
 #include <QIODevice>
 #include <QTemporaryDir>
 #include <QtCore/qtmetamacros.h>
+#include <QtTest/qbenchmark.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <algorithm>
@@ -23,6 +24,7 @@
 #include <vtkCubeSource.h>
 #include <vtkDataArray.h>
 #include <vtkMatrix4x4.h>
+#include <vtkNew.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -124,27 +126,11 @@ class DefaultWordmarkTest final : public QObject {
         QCOMPARE(mesh->GetNumberOfPolys(), vtkIdType(1));
     }
 
-    void resolves_orientation_cube_hit_zones() {
+    void ignores_detached_and_invalid_cube_picks() {
         panta::visualization::ViewportOrientation orientation;
-        constexpr int width = 1000;
-        constexpr int height = 800;
-        const auto direction = [&](int x, int y) {
-            const auto result = orientation.cube_direction(x, y, width, height);
-            return result.has_value() ? static_cast<int>(*result) : -1;
-        };
-        QCOMPARE(direction(970, 704),
-                 static_cast<int>(panta::visualization::CubeDirection::PositiveX));
-        QCOMPARE(direction(910, 704),
-                 static_cast<int>(panta::visualization::CubeDirection::NegativeX));
-        QCOMPARE(direction(940, 760),
-                 static_cast<int>(panta::visualization::CubeDirection::PositiveY));
-        QCOMPARE(direction(940, 650),
-                 static_cast<int>(panta::visualization::CubeDirection::NegativeY));
-        QCOMPARE(direction(940, 720),
-                 static_cast<int>(panta::visualization::CubeDirection::PositiveZ));
-        QCOMPARE(direction(940, 690),
-                 static_cast<int>(panta::visualization::CubeDirection::NegativeZ));
-        QVERIFY(!orientation.contains_cube(600, 600, width, height));
+        QVERIFY(!orientation.cube_direction(940, 704, 1000, 800).has_value());
+        QVERIFY(!orientation.contains_cube(600, 600, 1000, 800));
+        QVERIFY(!orientation.contains_cube(0, 0, 0, 0));
     }
 
     void picks_projected_cube_faces() {
@@ -214,7 +200,8 @@ class DefaultWordmarkTest final : public QObject {
                 static_cast<int>(std::lround(display[0])),
                 static_cast<int>(std::lround(display[1])), width, height);
             QVERIFY(picked.has_value());
-            QCOMPARE(static_cast<int>(*picked), static_cast<int>(view.direction));
+            QCOMPARE(static_cast<int>(picked.value_or(view.direction)),
+                     static_cast<int>(view.direction));
         }
     }
 
@@ -229,7 +216,7 @@ class DefaultWordmarkTest final : public QObject {
         orientation.detach();
         QCOMPARE(render_window->GetRenderers()->GetNumberOfItems(), 0);
         orientation.detach();
-        QVERIFY(orientation.cube_direction(940, 704, 1000, 800).has_value());
+        QVERIFY(!orientation.cube_direction(940, 704, 1000, 800).has_value());
     }
 
     // 基线：没有 overlay renderer 时，场景更新应在入口处快速返回。
@@ -312,8 +299,8 @@ class DefaultWordmarkTest final : public QObject {
                 std::array<double, 9> basis{};
                 for (int row = 0; row < 3; ++row) {
                     for (int column = 0; column < 3; ++column) {
-                        basis[static_cast<std::size_t>(row * 3 + column)] =
-                            matrix->GetElement(row, column);
+                        basis[static_cast<std::size_t>(row) * 3U +
+                              static_cast<std::size_t>(column)] = matrix->GetElement(row, column);
                     }
                 }
                 bases.emplace(label->GetText(), basis);
