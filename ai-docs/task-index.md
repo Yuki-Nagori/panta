@@ -99,6 +99,7 @@ ai-docs/
 | 063 | [STL 导入、导入选项持久化与工程工作区](task/063-stl-import-and-mesh-workspace.md) | 应用平台扩展 | 057, 060, 062 | in-progress |
 | 064 | [VTK 视口导航、笛卡尔坐标系与六面体定位](task/064-vtk-navigation-and-orientation.md) | 应用平台扩展 | 007, 063 | in-progress |
 | 065 | [VTK 视口缩放、右键旋转与方向过渡](task/065-vtk-zoom-and-cube-transition.md) | 应用平台扩展 | 007, 064 | done |
+| 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | planned |
 
 ## 验证与质量扩展队列
 
