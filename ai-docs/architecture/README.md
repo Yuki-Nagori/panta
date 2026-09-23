@@ -6,6 +6,7 @@
 
 | 主题 | 文档 | 范围 |
 |---|---|---|
+| Rust 领域与 C++ 重库边界 | [适配边界与 crate 规划](native-domain-boundaries.md) | 本仓库；当前审计与目标 |
 | 目录与模块归属 | [目录规划](repository-layout.md) | 本仓库 |
 | Cargo/CMake、运行与部署 | [构建与开发](build-and-development.md) | 本仓库 |
 | QML、ViewModel 与交互 | [界面与桥接](ui-and-bridge.md) | 本仓库 |
@@ -47,16 +48,14 @@ V1 不实现 AI、自研 GPU 计算后端或物理求解内核。VTK/Qt 正常�
 ## 分层和依赖方向
 
 ```text
-QML 界面
-  → C++ ViewModel / Controller
-    → Application Services
-      ├─ C++ Geometry / Mesh / RenderScene → OCCT / Netgen / VTK adapters
-      └─ Rust Project / Workflow / Storage / Solver Client
-                                                ↓ 进程协议
-                                  [External] MoldSolver
+QML → C++ ViewModel → CXX → Rust 应用服务 / 领域模型
+                              ↓ 自有后端接口
+                          CXX → C++ adapter → OCCT / Netgen
+Rust 资产 / 显示快照 → CXX → C++ RenderScene / ViewportBackend → VTK
+Rust Solver Client → 进程协议 → [External] MoldSolver
 ```
 
-界面表达用户意图，服务协调业务，领域模型表达几何、网格、工程和结果，适配器封装第三方库。库对象不能成为跨层公共数据模型。Rust 和 C++ 在应用服务边界协作，不应为每次渲染调用形成 QML → C++ → Rust → C++ → VTK 的往返链路。
+这是目标职责；现有 native STEP 摘要、Mesh IR 与 Rust 服务的接入状态见 [重库适配与 Rust 领域模块](native-domain-boundaries.md)。Rust 拥有业务、数据与编排，C++ 适配器实际调用重库并封装其类型 / 异常 / 生命周期。VTK 后端还负责窗口、输入与逐帧显示，不为每帧形成 QML → C++ → Rust → C++ → VTK 的往返。
 
 进程级设施单独归 Rust 基础设施层：`panta-foundation` 实现崩溃信号、日志
 等需要操作系统边界的能力，`panta-ffi` 只把安全入口映射到 CXX；`panta-core`

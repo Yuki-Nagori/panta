@@ -9,12 +9,13 @@ CXX 用一个 `#[cxx::bridge]` 模块声明双向边界，并生成两侧桥接�
 本项目优先采用下列位置，Qt 元对象与 CAE 库适配继续由 C++ 负责：
 
 ```text
-QML → QObject ViewModel → C++ Application Service adapter
-                               ├─ CXX → Rust project / workflow / storage
-                               └─ native Geometry / Mesh / RenderScene
+QML → QObject ViewModel → CXX → Rust 应用服务 / 领域模型
+                                  ↓ 自有后端接口
+                              CXX → C++ adapter → OCCT / Netgen
+Rust 资产 / 显示快照 → CXX → C++ RenderScene / VTK 后端
 ```
 
-这是项目设计选择。先写小而稳定的服务桥接，不尝试暴露整个 OCCT、VTK 或 QObject 继承体系，也不为每帧渲染往返 Rust。
+这是目标职责，当前接入情况与 crate 依赖见 [边界审计](../architecture/native-domain-boundaries.md)。`#[cxx::bridge]` 内仅声明映射和签名；模块外的胶水仅做转换、组装与转发，领域实现留在 Rust 业务模块。先写小而稳定的服务桥接，不尝试暴露整个 OCCT、VTK 或 QObject 继承体系，也不为每帧渲染往返 Rust。
 
 ## 类型与所有权
 
@@ -54,3 +55,11 @@ CXX 的 `Result<T>` 在边界映射为 C++ 异常机制。未声明 Result 的 C
 - 明确线程/回调支持范围；异步关闭与取消在任务 008 补齐。
 
 CXX 当前主分支 README 的编译器要求不应等同于未来锁定 release 的要求；任务 001/006 应以实际选用版本确认 Rust 最低版本，不能只依赖 edition 2024 的最低线。
+
+## 066 补充：重库边界与所有权
+
+2026-09-23 复核在线官方文档；仓库依赖仍为锁定的 CXX 1.0.202，新接口落地须以该版本编译验证。
+
+- 自有 C++ opaque wrapper 可通过 `UniquePtr` 管理，禁止直接绑定 OCCT / Netgen / VTK 原始类型。需要自定义库释放操作时，由 wrapper 析构执行；CXX 当前仅支持使用默认 deleter 的 `std::unique_ptr`。[UniquePtr](https://cxx.rs/binding/uniqueptr.html)
+- CXX 的签名静态校验不证明线程和借用安全；opaque C++ 类型不会自动具有 Send/Sync，业务层不得为转移线程盲目补 unsafe 实现。[extern C++](https://cxx.rs/extern-c%2B%2B.html)
+- CXX 默认异常转换捕获 `std::exception`；adapter 必须显式归一化 OCCT 等库的异常，不能假定任意异常都自动变成 Err。需要错误码时用结构化状态，不从日志文字反推业务类别。[Result](https://cxx.rs/binding/result.html)

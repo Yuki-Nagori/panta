@@ -19,6 +19,7 @@
 - 每次 commit 保持功能、测试、配置、文档和 task 一致，遵循 [提交规范](ai-docs/standards/commits.md)；不把已知损坏状态留给下一提交修复。
 - 只阅读任务相关的架构与规范；范围变化先更新任务，长期决策同步对应文档。
 - QML 经 C++ ViewModel 调用服务，不直接操作 OCCT、Netgen、VTK；自有 C++ 使用 C++20。
+- Rust 承担领域数据、业务规则与编排；CXX 仅声明映射和签名，C++ 适配层实际调用重库并封装类型、异常与所有权。VTK 的窗口、输入和逐帧显示留在 C++，具体边界与 crate 规划见 [分层规则](ai-docs/standards/layering.md) / [职责审计](ai-docs/architecture/native-domain-boundaries.md)。
 - Cargo 提供统一入口，CMake 拥有 native 构建图；Rust/C++ 桥接优先验证 CXX。
 - 外部求解器通过进程与版本化协议接入，不链接其 C++ ABI；大型数据走数据面。
 - 外部文档只说明协作边界。未落地的接口、目录和命令标为规划，只运行实际存在的检查。

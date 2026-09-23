@@ -10,6 +10,10 @@ Netgen 上游说明其网格生成及几何内核连接能力。[Netgen upstream
 
 官方 OCC 教程展示几何到网格的流程，并说明 fuse、glue、compound 对内部界面/分区的不同影响。教程包含 Python/NGSolve 展示代码，不等同于本项目 C++ API 选型。[OCC Geometry Tutorial](https://docu.ngsolve.org/latest/i-tutorials/unit-4.4-occ/occ.html)
 
+## 职责边界（2026-09-23 项目约定）
+
+Rust 拥有网格领域数据、业务校验与任务提交；C++ adapter 实际调用 Netgen 生成算法，索引 / 分组 / 节点顺序归一化属于接口转换。 当前实现与迁移项见 [重库适配审计](../architecture/native-domain-boundaries.md)，执行 [分层规则](layering.md)；规划不代表已落地。
+
 ## 项目规则
 
 - 所锁定版本的 C++ 接口、导出 targets 和 OCC 支持已由 010 以制品头文件与运行实测核实；不从 Python 示例推断 C++ 签名，也不照搬文档中的 NGSolve solver 依赖。

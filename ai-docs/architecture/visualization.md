@@ -16,7 +16,9 @@ VTK 采用 WebGPU render window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCoco
 
 ## RenderScene 契约
 
-建议定义 `RenderScene` 抽象，提供添加/移除网格、设置可见性、显示标量、设置裁剪面、切换时间步、拾取和相机控制等语义。示意接口包括 `addMesh`、`showScalar`、`setClipPlane`、`setTimeStep`、`pick`，尚未形成实际头文件。
+当前 `native/visualization/include/panta/visualization/render_scene.hpp` 已定义最小 `RenderScene`，含修订、背景、欢迎图形可见性和 STL 路径。添加 / 移除网格、字段、裁剪、时间步与实体拾取仍为规划；`addMesh`、`showScalar`、`setClipPlane`、`setTimeStep`、`pick` 是示意接口，尚未实现。
+
+Rust 规划的 `panta-visualization` 拥有后端中立的显示配置、字段和选择语义；C++ RenderScene 消费快照并重建显示状态。当前 VTK 内 STL 解析拟统一到 Rust 网格模块，转换为 VTK 数据对象的部分保留 C++；具体函数审计、依赖与迁移顺序见 [适配边界](native-domain-boundaries.md)。相机插值、方向控件命中、GUI 定时器与 GPU 生命周期留在 C++。
 
 接口参数使用 Mesh/Field ID、自有选项和结果类型；不暴露 `vtkActor`、`vtkDataSet` 或 Qt Quick 内部对象。VTK 适配器负责转换与缓存，未来更换渲染后端时尽量保持应用和 QML 调用语义稳定，但不承诺无需任何迁移。
 

@@ -8,8 +8,8 @@
 `panta-foundation` 进程基础设施、`panta-core` 领域模型、`panta-ffi` CXX
 边界，以及任务 034 正在实施的 `.pa` DSL parser/CLI（`crates/panta-dsl-core`、
 `crates/panta-dslc`）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt
-桌面骨架，任务 007 已落地 VTK 适配模块和创建级测试，但默认窗口集成仍因
-macOS 26 渲染阻塞保持回退。下图中其余应用源码与构建部分为规划，不应据此
+桌面骨架；任务 007 的 VTK WebGPU 原生视口已接入默认窗口，065 补齐导航。
+真实窗口的跨平台覆盖仍见各任务。下图标为规划的部分不应据此
 创建无用途的占位模块。
 
 ```text
@@ -31,7 +31,11 @@ panta/
 │   ├── panta-ffi/             # CXX DTO/句柄/错误边界与 staticlib（006/047）
 │   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034 实施中）
 │   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035 实施中）
-│   ├── core/                  # 规划：通用 ID、错误和应用契约
+│   ├── panta-geom/            # 规划：几何身份、修订与后端契约
+│   ├── panta-mesh/            # 规划：Mesh IR、导入与轻量校验
+│   ├── panta-bc/              # 规划：边界条件与目标引用
+│   ├── panta-material/        # 规划：材料数据、单位与版本
+│   ├── panta-visualization/   # 规划：显示配置、字段与选择语义
 │   ├── project/               # 规划：工程模型与命令
 │   ├── workflow/              # 规划：任务、作业和流程编排
 │   ├── solver-client/         # 规划：外部求解器客户端
@@ -43,9 +47,9 @@ panta/
 │   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
 │   ├── bridge/                # ViewModel（ShellViewModel + GTest 信号测试，005 已落地）
 │   ├── app/                   # Qt 桌面入口 panta-native（005 已落地 Qt 实现）
-│   ├── geometry/{core,occt}/
-│   ├── mesh/{core,netgen}/
-│   └── visualization/{core,vtk}/
+│   ├── geometry/{include,src/occt}/       # 当前：自有摘要契约与 OCCT adapter
+│   ├── mesh/{include,src/netgen}/         # 当前：native Mesh IR 与 Netgen adapter
+│   └── visualization/{include,src/vtk}/   # 当前：显示契约与 VTK 后端（含 navigation/）
 ├── qml/
 │   ├── App.qml                # 主窗口（005 已落地；URI Panta.Shell，NO_PLUGIN 资源模块）
 │   ├── Components/
@@ -60,14 +64,9 @@ panta/
 
 ## 模块归属
 
-`panta-core` 保持领域模型职责，只存放任务、路径等 Rust 业务契约；
-`panta-foundation` 存放进程级设施和手写平台边界，不能把 unsafe 设施倒灌进
-领域 core。`panta-ffi` 只做跨语言 DTO、错误、句柄和生命周期转换。规划中的
-`core` 保持小而稳定，只存放多模块确实共享的基础契约，不能变成所有业务逻辑
-的容器。`project` 管理实体关系、修订与命令；`workflow` 管理执行过程；
-`storage` 管理读写和资产引用；`solver-client` 管理外部进程及事件转换。
+当前 `panta-core` 已包含 project/path/task 与工程存储服务；`panta-foundation` 拥有进程设施，`panta-ffi` 负责跨语言契约和服务转发。规划的五个领域 crate 按实际功能建立，其职责、依赖方向和迁移门槛以 [重库适配与 Rust 领域模块](native-domain-boundaries.md) 为准；领域 crate 不反向依赖承载应用服务的 core，避免循环。
 
-C++ 各模块的 `core` 定义自有类型与行为，`occt`、`netgen`、`vtk` 目录实现适配。ViewModel 不应承担几何修复、网格算法或文件格式解析。QML 组件处理布局、状态展示和交互绑定。
+`project`、`workflow`、`storage` 与 `solver-client` 是后续职责拆分方向，不是已存在的独立 crate。当前不再规划另一份含义重叠的 `crates/core/`；共享基础类型有真实消费者后才确定归属。C++ `include/panta/<module>/` 暴露自有 native 契约，`src/occt`、`src/netgen` 封装重库；`src/vtk` 同时承载显示后端，导航内部归 `navigation/`。业务状态逐步归 Rust；保留本地相机、命中和窗口生命周期。ViewModel 只适配 UI，QML 处理布局、展示与绑定。
 
 `schemas/` 若包含共享协议，应明确其上游来源、版本及生成方式，不能与候选外部协议仓库分别维护两个权威版本。跨语言 FFI 优先验证 CXX；任务 006 的 `crates/panta-ffi` 生成桥接头和 Rust staticlib，native CMake 通过 launcher 传入它们，不在 CMake 中回调 Cargo。QML 模块可在 qml/ 下设置自己的 CMakeLists.txt，由 native 顶层纳入构建。
 

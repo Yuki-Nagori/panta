@@ -21,6 +21,10 @@ pybind11 文档区分持有/释放 GIL 的执行环境，释放 GIL 的 native �
 - 回调注销与任务结束有明确时序，关闭工程后拒绝旧修订事件。大数据先采用简单明确的所有权，再引入借用或零拷贝。
 - Python binding 是后续单独任务：释放 GIL 前确认不访问 Python 状态，回调 Python 时重新获取必要执行上下文；不把 GIL 当作 native 全局互斥锁。
 
+## 重库服务边界
+
+2026-09-23 项目约定：OCCT / Netgen / VTK 通过自有 C++ adapter 接入；Rust 不直接声明重库 ABI。自有领域类型与桥接 DTO 分离，值、借用或 opaque 句柄的选择须写明所有权和线程。领域 crate 不依赖 `panta-ffi`，native 后端通过窄接口注入，避免依赖循环；大数据按快照批量传递。完整规则见 [分层](layering.md)，现有代码差距见 [边界审计](../architecture/native-domain-boundaries.md)。
+
 ## 验证
 
 成功返回只是最小检查；任务 006 还需验证错误转换、非 ASCII 文本、空数组、大长度拒绝和重复创建/释放。任务 008 再验证异步取消和关闭时回调，不把同步 FFI 测试当成线程安全证明。

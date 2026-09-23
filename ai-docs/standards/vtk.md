@@ -41,6 +41,10 @@ VTK 的 C++ 接入文档使用 CMake 与模块依赖。[Using C++ and CMake](htt
 
 Qt Quick 场景图存在不同渲染循环与图形资源生命周期。[Qt Quick Scene Graph](https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html)
 
+## 职责边界（2026-09-23 项目约定）
+
+Rust 拥有领域数据、显示选项与选择引用；C++ VTK 后端保留渲染对象、输入与相机导航、控件命中、窗口和 GPU 生命周期。不得为每帧导航引入 Rust 往返。 当前实现与迁移项见 [重库适配审计](../architecture/native-domain-boundaries.md)，执行 [分层规则](layering.md)；规划不代表已落地。
+
 ## 项目规则
 
 - nightly 资料仅用于设计线索，任务 007 必须对照新 SDK 的实际头文件/API；若接口不同，记录事实并修订任务，不临时切到未锁定版本。

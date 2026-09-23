@@ -10,6 +10,10 @@
 
 OCCT 有自己的基础类型、内存与 handle 机制，不能以通用裸指针所有权习惯替代。[OCCT Foundation Classes](https://dev.opencascade.org/doc/overview/html/occt_user_guides__foundation_classes.html)
 
+## 职责边界（2026-09-23 项目约定）
+
+Rust 拥有导入业务、几何身份与修订；C++ adapter 实际调用 OCCT 算法，处理异常 / 所有权 / 数据转换，不自行重写几何内核。 当前实现与迁移项见 [重库适配审计](../architecture/native-domain-boundaries.md)，执行 [分层规则](layering.md)；规划不代表已落地。
+
 ## 项目规则
 
 - 所有 OCCT include 和类型限定在 adapter 内；公共几何契约使用工程 ID、单位、修订和自有诊断。
