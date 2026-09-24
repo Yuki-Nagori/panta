@@ -102,6 +102,7 @@ ai-docs/
 | 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | done |
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |
 | 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
+| 073 | [Flow DSL 与首个异步导入状态机](task/073-flow-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；真实消费者接口待登记 | planned |
 
 ## 验证与质量扩展队列
 
@@ -134,6 +135,7 @@ ai-docs/
 | 021 | [重要模块说明与后续任务规划](task/021-important-module-planning.md) | 文档维护 | — | done |
 | 028 | [QML 原子组件与主题 DSL 规划](task/028-qml-theme-planning.md) | 文档维护 | — | done |
 | 066 | [重库适配边界与 Rust 领域模块规划](task/066-native-domain-boundaries.md) | 架构与规范 | 065 | done |
+| 072 | [Flow DSL 与 Rust 状态机方案评估](task/072-flow-state-machine-planning.md) | 架构与文档准备 | 008, 066, 067 | done |
 
 ## 执行顺序与交付边界
 
@@ -146,5 +148,7 @@ ai-docs/
 新增分支：001 → 034；005 + 034 → 022；005 → 026；005 + 006 → 023；008 + 023 → 024，024 + 034 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；当上游没有完整资产时由 038 生产可缓存制品；032 在 011 统一入口上补齐跨语言质量工具与 100% 覆盖率门禁。
 
 014 已完成最小 Python/uv 质量工具环境：仅锁定 cmakelang 并供 `cargo format` 调用，不接入 Python 运行时/API，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
+
+Flow 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [073 实施规划](task/073-flow-dsl-and-import-state-machine.md) 跟踪：复用 034/035 的 DSL 内核，随首个真实异步导入消费者接入。073 开始前需登记对应业务任务并冻结接口与提交边界；不追加 067 同步 STL 改造，也不阻塞当前 M0 主线。
 
 后续新任务使用当前最大编号加一，不复用已有编号。001–006、009 已完成；主线当前项 [010 Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md)（CAE 接入）已实现并通过 macOS 全量验证，待 push 后三平台 CI 复验收尾；[007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已完成原生叠加实现且三平台 CI 全绿，剩真实窗口复验收尾。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
