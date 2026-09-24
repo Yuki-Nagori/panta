@@ -84,11 +84,11 @@
 | 2026-09-24 | macOS：缓存命中后再次运行 `cargo test --locked --workspace` | GoogleTest staging marker 命中且不需要归档下载 | 通过；`.panta-sdk-provisioned` SHA256 与 manifest 一致，SDK `archives` 目录无归档 |
 | 2026-09-24 | macOS：managed CMake configure `-DBUILD_TESTING=OFF`、`-DPANTA_ENABLE_FFI_TEST=OFF` | 不请求 GoogleTest，其他产品依赖正常配置 | 通过；cache 确认为 `BUILD_TESTING:BOOL=OFF`，configure 输出无 GoogleTest 供给步骤 |
 | 2026-09-24 | macOS：`cargo run --locked -p panta-tests -- toolchain` | 当前平台解析到固定 GoogleTest SDK config | 通过；解析为 `macos-arm64/lib/cmake/GTest/GTestConfig.cmake` |
-| — | CI：macOS / Ubuntu / Windows `cargo test --locked --workspace` | 三平台消费构建与测试通过 | 待运行；本地仅验证 macOS，SDK 生产 CI 三平台已通过，见任务 070 |
+| 2026-09-24 | GitHub Actions run [35992062001](https://github.com/Yuki-Nagori/panta/actions/runs/35992062001)，Windows `cargo check and build` 与 sanitizer | 三平台固定 SDK consumer 链接与测试通过 | Windows 失败；`lld-link` 报 `testing::*`、`__mingw_vfprintf`、`__cxxabiv1` 未解析符号，输入为 MinGW `libgtest.a`，不兼容 MSVC ABI。修复和重产证据见任务 075 |
 
 ## 风险与回退
 
-SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT；任务 070 各平台独立构建且使用 Windows shared CRT，生产矩阵与 consumer CI 覆盖该约束。Release 资产被删除或哈希变化时 manifest 强校验会阻断 configure，不回退系统包或源码克隆；恢复对应资产或回退整笔消费接入即可。
+SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT。任务 070 早期 Windows 生产自检未覆盖该边界，run 35992062001 已暴露 MinGW/MSVC 不匹配；任务 075 固定生产工具链并重产归档。在 manifest 摘要更新且 consumer CI 通过前，本任务保持 in-progress。Release 资产被删除或哈希变化时 manifest 强校验会阻断 configure，不回退系统包或源码克隆；恢复对应资产或回退整笔消费接入即可。
 
 ## 决策与工作记录
 
@@ -96,7 +96,8 @@ SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT；�
 - 2026-09-24：创建任务。
 - 2026-09-24：平台支持限定为 macOS arm64、Linux x86_64、Windows x86_64；其他 OS/架构组合明确报错。
 - 2026-09-24：完成 manifest、CMake 消费、toolchain 检查及文档迁移；macOS 聚合测试两次通过、`BUILD_TESTING=OFF` configure 和 toolchain 检查通过。等待三平台消费者 CI 结果后关闭任务。
+- 2026-09-24：run 35992062001 的 Linux/macOS consumer checks 通过，但 Windows normal build 和 sanitizer 均在链接 GTest 时失败；确认 Release Windows `libgtest.a` 是 MinGW ABI。跟踪任务 075 将修复 Windows producer、自检与资产摘要。
 
 ## 完成摘要
 
-接入实现与本地验证已完成：GoogleTest 静态 SDK 通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。macOS Cargo 聚合测试（native CTest 56/56）、缓存复用、`BUILD_TESTING=OFF` configure、toolchain 检查及格式检查通过。三平台消费者 CI 尚待执行，因此 task 暂保持 in-progress。
+接入实现与本地 macOS 验证已完成：GoogleTest 静态 SDK 通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。macOS Cargo 聚合测试（native CTest 56/56）、缓存复用、`BUILD_TESTING=OFF` configure、toolchain 检查及格式检查通过。run 35992062001 的 Linux/macOS consumer checks 通过，Windows 因 SDK ABI 错配失败；等待任务 075 重产归档并完成三平台 consumer CI。

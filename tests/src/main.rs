@@ -79,7 +79,7 @@ fn audit() -> Result<(), Box<dyn Error>> {
 
 fn coverage() -> Result<(), Box<dyn Error>> {
     let tool = ensure_cargo_tool("cargo-llvm-cov", CARGO_LLVM_COV_VERSION)?;
-    let target_dir = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let target_dir = target_root();
     let mut command = Command::new(tool);
     command
         // cargo-llvm-cov 的直接调用仍要求 Cargo 子命令名作为第一个参数。
@@ -131,7 +131,7 @@ fn native_coverage() -> Result<(), Box<dyn Error>> {
         std::ffi::OsString::from("LLVM_PROFILE_FILE"),
         profile_file.into_os_string(),
     ));
-    run_ctest_in(&native, envs, "native coverage tests", None)?;
+    run_ctest_in(&native, envs, "native coverage tests", None, None, None)?;
     let llvm = panta_build::resolve_llvm_compilers(target)?;
     let raw = fs::read_dir(&profiles)?
         .collect::<Result<Vec<_>, _>>()?
@@ -252,6 +252,8 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
         &native,
         sanitizer_test_env(target, name)?,
         &format!("sanitizer {name} ctest"),
+        None,
+        None,
         exclude,
     )
 }
@@ -338,13 +340,14 @@ fn lint(tool: Option<&str>, check: bool) -> Result<(), Box<dyn Error>> {
             eprintln!("cargo lint [4/8] native build and QML metadata");
             build_launcher()?;
             eprintln!("cargo lint [5/8] qmllint");
-            lint(Some("qmllint"), check)?;
+            run_qmllint()?;
+            build_qml_benchmark_moc()?;
             eprintln!("cargo lint [6/8] clang-tidy");
-            lint(Some("clang-tidy"), check)?;
+            scan_clang_tidy(false, check)?;
             eprintln!("cargo lint [7/8] include-cleaner");
-            lint(Some("includes"), check)?;
+            scan_clang_tidy(true, check)?;
             eprintln!("cargo lint [8/8] cppcheck");
-            lint(Some("cppcheck"), check)
+            scan_cppcheck()
         }
         Some("clippy") if check => cargo(
             "clippy",
@@ -415,7 +418,7 @@ fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Error>> {
 
 fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     let target_root = target_root();
-    let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
+    let native_dir = native_build_dir();
     let cmake = panta_build::resolve_cmake(target_root)?;
     let llvm = panta_build::resolve_llvm_compilers(target_root)?;
     let clang_format = &llvm.clang_format;
@@ -607,7 +610,7 @@ fn cargo_command(
     subcommand: &str,
     args: impl IntoIterator<Item = &'static str>,
 ) -> Result<(String, Command), Box<dyn Error>> {
-    let target_dir = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let target_dir = target_root();
     // deny/machete 走托管的独立二进制；其余是 cargo 子命令。
     let managed_scanner = matches!(subcommand, "deny" | "machete");
     let mut command = if managed_scanner {
@@ -648,7 +651,9 @@ fn cargo_command(
 
 /// 扫描类工具的静默运行：通过时零输出，失败时原样转发全部捕获输出。
 fn run_scanner(description: &str, mut command: Command) -> Result<(), Box<dyn Error>> {
-    let output = command.output()?;
+    let output = command
+        .output()
+        .map_err(|error| format!("{description} 启动失败：{error}"))?;
     if output.status.success() {
         Ok(())
     } else {
@@ -663,7 +668,7 @@ fn run_scanner(description: &str, mut command: Command) -> Result<(), Box<dyn Er
 }
 
 fn ensure_cargo_tool(name: &str, version: &str) -> Result<PathBuf, Box<dyn Error>> {
-    let target_root = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let target_root = target_root();
     let root = panta_build::install_directory(target_root, name, version, |staging| {
         let mut command = Command::new("cargo");
         command
@@ -702,13 +707,25 @@ fn run_ctest_in(
     native_dir: &Path,
     envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
     description: &str,
+    configuration: Option<&str>,
+    regex: Option<&str>,
     exclude: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     let cmake = panta_build::resolve_cmake(target_root())?;
-    let mut test = Command::new(cmake.with_file_name(panta_build::exe_name("ctest")));
+    let ctest = cmake.with_file_name(panta_build::exe_name("ctest"));
+    if !ctest.is_file() {
+        return Err(format!("ctest 不存在：{}", ctest.display()).into());
+    }
+    let mut test = Command::new(ctest);
     test.envs(envs);
     test.current_dir(native_dir)
         .args(["--output-on-failure", "--no-tests=error"]);
+    if let Some(configuration) = configuration {
+        test.args(["-C", configuration]);
+    }
+    if let Some(regex) = regex {
+        test.args(["-R", regex]);
+    }
     if let Some(exclude) = exclude {
         test.args(["-E", exclude]);
     }
@@ -717,7 +734,7 @@ fn run_ctest_in(
 
 fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
-    let target_root = Path::new(env!("PANTA_TEST_TARGET_DIR"));
+    let target_root = target_root();
     let qmlformat = qmlformat_path(target_root);
     if !qmlformat.is_file() {
         provision_qml_format(root, target_root)?;
@@ -755,7 +772,7 @@ fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {
 
 fn qml_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if entry.file_type()?.is_dir() {
@@ -791,12 +808,17 @@ fn provision_qml_format(root: &Path, target_root: &Path) -> Result<(), Box<dyn E
 
 fn run_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>> {
     build_launcher()?;
+    build_qml_benchmark_moc()?;
+    scan_clang_tidy(includes_only, check)
+}
+
+fn scan_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>> {
     let llvm = panta_build::resolve_llvm_compilers(target_root())?;
     let tool = llvm
         .root
         .join("bin")
         .join(panta_build::exe_name("clang-tidy"));
-    let directory = Path::new(env!("PANTA_TEST_NATIVE_DIR")).join("quality");
+    let directory = native_build_dir().join("quality");
     let commands = panta_build::database::read(&directory.join("compile_commands.json"))?;
     if commands.is_empty() {
         return Err("clang-tidy 翻译单元清单为空".into());
@@ -857,9 +879,25 @@ fn run_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>
     }
 }
 
+/// QML benchmark 默认不构建，但仍在 clang-tidy 编译数据库中且包含 moc 输出。
+fn build_qml_benchmark_moc() -> Result<(), Box<dyn Error>> {
+    let mut command = cmake_build_command()?;
+    command.args([
+        "--target",
+        "panta_qml_cpu_benchmark_autogen",
+        "panta_qml_gpu_benchmark_autogen",
+        "--parallel",
+    ]);
+    run("生成 QML benchmark moc", command)
+}
+
 fn run_cppcheck() -> Result<(), Box<dyn Error>> {
     build_launcher()?;
-    let database = Path::new(env!("PANTA_TEST_NATIVE_DIR")).join("quality/cppcheck.json");
+    scan_cppcheck()
+}
+
+fn scan_cppcheck() -> Result<(), Box<dyn Error>> {
+    let database = native_build_dir().join("quality/cppcheck.json");
     let mut entries = panta_build::database::read(&database)?;
     let root = repository_root()?;
     // Qt 6.11 的编译器宏超出 Cppcheck 解析能力；使用 Qt 库模型，LLVM 负责真实头文件。
@@ -904,46 +942,40 @@ fn run_cppcheck() -> Result<(), Box<dyn Error>> {
     run_scanner("cppcheck", command)
 }
 
+fn cmake_build_command() -> Result<Command, Box<dyn Error>> {
+    let native_dir = native_build_dir();
+    let mut command = Command::new(panta_build::resolve_cmake(target_root())?);
+    command
+        .envs(panta_build::native_test_env(
+            target_root(),
+            env!("PANTA_TEST_HOST"),
+        )?)
+        .current_dir(native_dir)
+        .args(["--build"])
+        .arg(native_dir)
+        .args(["--config", env!("PANTA_TEST_BUILD_TYPE")]);
+    Ok(command)
+}
+
 fn run_qmllint() -> Result<(), Box<dyn Error>> {
-    let cmake = panta_build::resolve_cmake(target_root())?;
-    let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
-    let build_type = env!("PANTA_TEST_BUILD_TYPE");
-    let mut command = Command::new(cmake);
-    command.envs(panta_build::native_test_env(
-        target_root(),
-        env!("PANTA_TEST_HOST"),
-    )?);
-    command.args(["--build"]).arg(native_dir).args([
-        "--config",
-        build_type,
-        "--target",
-        "all_qmllint",
-    ]);
+    let mut command = cmake_build_command()?;
+    command.args(["--target", "all_qmllint"]);
     // 通过时静默：Qt 生成的 no-op qmllint 目标会回显 "Nothing to do"，
     // 失败时原样转发全部输出（含 qmllint 诊断）。
     run_scanner("qmllint", command)
 }
 
 fn run_ctest(regex: Option<&str>) -> Result<(), Box<dyn Error>> {
-    let cmake = panta_build::resolve_cmake(target_root())?;
-    let native_dir = Path::new(env!("PANTA_TEST_NATIVE_DIR"));
-    let build_type = env!("PANTA_TEST_BUILD_TYPE");
-    let ctest_name = if cfg!(windows) { "ctest.exe" } else { "ctest" };
-    let ctest = cmake.with_file_name(ctest_name);
-    if !ctest.is_file() {
-        return Err(format!("ctest 不存在：{}", ctest.display()).into());
-    }
-    let mut command = Command::new(&ctest);
-    command.envs(panta_build::native_test_env(
-        target_root(),
-        env!("PANTA_TEST_HOST"),
-    )?);
-    command.args(["--output-on-failure", "--no-tests=error", "-C", build_type]);
-    if let Some(regex) = regex {
-        command.args(["-R", regex]);
-    }
-    command.current_dir(native_dir);
-    run("ctest", command)
+    let native_dir = native_build_dir();
+    let envs = panta_build::native_test_env(target_root(), env!("PANTA_TEST_HOST"))?;
+    run_ctest_in(
+        native_dir,
+        envs,
+        "ctest",
+        Some(env!("PANTA_TEST_BUILD_TYPE")),
+        regex,
+        None,
+    )
 }
 
 fn check_cpp_format(check: bool) -> Result<(), Box<dyn Error>> {
@@ -962,17 +994,14 @@ fn check_cpp_format(check: bool) -> Result<(), Box<dyn Error>> {
         return Err("C++ 源文件清单为空".into());
     }
     files.sort();
-    for file in files {
-        let mut command = Command::new(clang_format);
-        if check {
-            command.args(["--dry-run", "-Werror"]);
-        } else {
-            command.arg("-i");
-        }
-        command.arg(&file);
-        run(&format!("clang-format {}", file.display()), command)?;
+    let mut command = Command::new(clang_format);
+    if check {
+        command.args(["--dry-run", "-Werror"]);
+    } else {
+        command.arg("-i");
     }
-    Ok(())
+    command.args(files.iter());
+    run(&format!("clang-format（{} 个文件）", files.len()), command)
 }
 
 fn run_cmake_format(check: bool) -> Result<(), Box<dyn Error>> {
@@ -999,9 +1028,13 @@ fn target_root() -> &'static Path {
     Path::new(env!("PANTA_TEST_TARGET_DIR"))
 }
 
+fn native_build_dir() -> &'static Path {
+    Path::new(env!("PANTA_TEST_NATIVE_DIR"))
+}
+
 fn cpp_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if entry.file_type()?.is_dir() {
@@ -1017,7 +1050,7 @@ fn cpp_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
 
 fn cmake_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if entry.file_type()?.is_dir() {
@@ -1054,7 +1087,9 @@ fn repository_root() -> Result<&'static Path, Box<dyn Error>> {
 }
 
 fn run(description: &str, mut command: Command) -> Result<(), Box<dyn Error>> {
-    let status = command.status()?;
+    let status = command
+        .status()
+        .map_err(|error| format!("{description} 启动失败：{error}"))?;
     if status.success() {
         Ok(())
     } else {

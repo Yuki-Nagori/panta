@@ -56,7 +56,12 @@ jobs:
       - name: Build and install static SDK
         shell: bash
         run: |
-          cmake -S sdk-build/googletest -B sdk-build/build \
+          generator_args=()
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # 消费端要求 MSVC ABI；Windows 上 Ninja 继承的默认编译器可能是 MinGW。
+            generator_args=(-G "Visual Studio 17 2022" -A x64)
+          fi
+          cmake "${generator_args[@]}" -S sdk-build/googletest -B sdk-build/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PWD/sdk-build/install" \
             -DCMAKE_CXX_STANDARD=17 \
@@ -64,8 +69,13 @@ jobs:
             -DBUILD_GMOCK=OFF \
             -DINSTALL_GTEST=ON \
             -Dgtest_force_shared_crt=ON
-          cmake --build sdk-build/build --parallel
-          cmake --install sdk-build/build
+          cmake --build sdk-build/build --config Release --parallel
+          cmake --install sdk-build/build --config Release
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test -f sdk-build/install/lib/gtest.lib
+            test -f sdk-build/install/lib/gtest_main.lib
+            test ! -e sdk-build/install/lib/libgtest.a
+          fi
           cmake -E make_directory sdk-build/install/share/licenses/GoogleTest
           cmake -E copy_if_different sdk-build/googletest/LICENSE \
             sdk-build/install/share/licenses/GoogleTest/LICENSE
@@ -93,7 +103,11 @@ jobs:
       - name: Selfcheck SDK package and static link
         shell: bash
         run: |
-          cmake -S tools/sdk/selfcheck/googletest -B sdk-build/selfcheck \
+          generator_args=()
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            generator_args=(-G "Visual Studio 17 2022" -A x64)
+          fi
+          cmake "${generator_args[@]}" -S tools/sdk/selfcheck/googletest -B sdk-build/selfcheck \
             -DPSDK_ROOT="$PWD/sdk-build/install"
           cmake --build sdk-build/selfcheck --config Release --parallel
           ctest --test-dir sdk-build/selfcheck -C Release --output-on-failure
