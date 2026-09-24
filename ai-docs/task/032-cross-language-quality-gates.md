@@ -93,8 +93,9 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 | 2026-09-21 | CI `miri` job（ubuntu，rust 域触发） | 已接线；等待当前提交的三平台之外 CI run 证据 |
 | 2026-09-24 | `cargo coverage`（macOS arm64，本地复现 `origin/main` / `ec2f919` 的 Rust coverage gate） | 失败：函数 86.47%（377/436），行 90.00%（3854/4282），低于固定门槛 89% / 92%。测试本身全部通过；覆盖率报告显示多个 Rust crate 有未覆盖路径。保持门槛，补齐可达行为测试后重跑并记录结果。GitHub Actions API 当前不可达，本次依据同一仓库命令复现，尚无 CI 原始摘要。 |
 | 2026-09-24 | 修复后 `cargo coverage`（macOS arm64，rustc 1.98.1 / cargo-llvm-cov 0.9.1） | 通过：函数 90.34%（402/445），行 93.95%（4270/4545）；门槛仍为 89% / 92%。所有参与统计的 Rust 测试通过。Ubuntu CI 尚待重新运行。 |
-| 2026-09-24 | `cargo format`（macOS arm64，仓库固定 uv 0.8.22 / Python 3.13.7） | 未能完成聚合检查：进入 `cmake-format` 阶段前，uv 的 `system-configuration 0.6.1` 在访问 `com.apple.SystemConfiguration.configd` 被 Seatbelt 拦截后 panic（`Attempted to create a NULL object`；后续 `Tokio executor failed`）。设置 `UV_OFFLINE=1` 无效；单独 `cargo fmt --all -- --check` 通过。该故障为沙箱与 uv 依赖兼容问题，不是格式差异；完整聚合结果待 Ubuntu CI 验证。上游已在 `system-configuration` 0.7.0 增加 NULL 检查，记录于根 `AGENTS.md`。 |
-| 2026-09-24 | `cargo format --check`（macOS arm64，仓库固定 uv / Python；授权在 Codex Seatbelt 沙箱外执行） | 通过：仓库聚合 Rust、C++/CXX、CMake、QML 格式检查全部通过。与上一行沙箱内 uv panic 对照，确认该失败由 macOS Seatbelt 环境导致；已记录于根 `AGENTS.md`。 |
+| 2026-09-24 | `cargo format`（macOS arm64，仓库固定 uv 0.8.22 / Python 3.13.7） | 未能完成聚合检查：进入 `cmake-format` 阶段前，uv 的 `system-configuration 0.6.1` 在访问 `com.apple.SystemConfiguration.configd` 被 Seatbelt 拦截后 panic（`Attempted to create a NULL object`；后续 `Tokio executor failed`）。设置 `UV_OFFLINE=1` 无效；单独 `cargo fmt --all -- --check` 通过。上游 uv 从 0.9.29 起修复该沙箱 panic；本仓库升级到 0.12.18 后的沙箱内复验见下行。 |
+| 2026-09-24 | `cargo format --check`（macOS arm64，仓库固定 uv 0.8.22；授权在 Codex Seatbelt 沙箱外执行） | 通过：仓库聚合 Rust、C++/CXX、CMake、QML 格式检查全部通过；与上一行对照确认故障由沙箱限制触发。 |
+| 2026-09-24 | `cargo format --check`（macOS arm64，仓库固定 uv 0.12.18 / Python 3.14.7，Codex Seatbelt 沙箱内） | 通过：uv 与托管 CPython 均由仓库固定配置供给；`pyvenv.cfg` 确认解释器为 3.14.7。Rust、C++/CXX、CMake、QML 聚合格式检查全部通过，原 macOS 沙箱 panic 已消除。 |
 
 ## 风险与回退
 
@@ -108,6 +109,7 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 - 2026-09-18（本轮评审）：修正指标与 CI 矛盾、全局阈值防下降和无依据排除；补齐阶段门禁说明。native 聚合须修复 Windows 后缀、配置/target-dir、空套件、源码扫描吞错与 formatter 缓存身份；无兼容例外。
 - 2026-09-18（Rust 测试批次）：新增 DSL 24 项公共 API 行为测试、FFI 取消/失败事件和路径类别/读写链验证；测试错误使用 Error + ? 传播。评审修复关闭线程测试吞掉 submit 失败，恢复 CLI 完整 usage 断言，删除只为覆盖率实例重复调用的 CLI 测试和冗余 dev-dependency。原始暂存中的重复/矛盾工作日志已收敛；未更改生产业务契约。
 - 2026-09-24（coverage gate 修复）：本地复现门禁失败后，在 FFI 层覆盖 STL 预览、持久化导入、mesh snapshot、TetMesh DTO 校验及错误映射；在 `panta-import` 覆盖来源快照变化、格式拒绝、单位换算与坐标溢出，并让 `ImportError` 实现标准 `Display` / `Error` 以便测试自然传播错误。固定阈值未调整；`cargo coverage` 本地通过，等待 Ubuntu CI 复验。
+- 2026-09-24（格式运行时升级）：固定 uv 从 0.8.22 升到当前最新 0.12.18（包含 0.9.29 引入的 macOS 沙箱修复及后续 Windows 安全修复），托管 CPython 从 3.13.7 升到 3.14.7；更新 macOS arm64、Linux x86_64、Windows x86_64 官方制品 SHA256 和工具版本表。升级后在 Codex Seatbelt 沙箱内外执行 `cargo format --check` 均通过；移除临时 `AGENTS.md` 绕行说明，保留仓库固定运行时。
 
 - 2026-09-16：新增跨语言质量任务；用户要求各语言配置 format/test/lint/依赖与死代码工具，并以 100% 覆盖率作为门禁目标。
 - 2026-09-18（增量一，Rust 质量完备 + QML 格式门禁 + CI 接线；维护者指示 032 优先于 007）：工具版本固定入 `modules/quality-tooling.md`（cargo-deny 0.20.2 / cargo-machete 0.9.2 / cargo-llvm-cov 0.9.1 / qmlformat 6.11.2）。发现并修复三类真实问题：quick-xml 0.38.4 有 RustSec 告警（升 0.41，DSL 测试全过、TS 生成语义不变）；syn 2/3 双版本为 pest↔cxx 锁定组合的传递依赖（deny skip 登记）；内部 path 依赖无版本号触发 wildcard 拒绝（workspace 表补 version、成员统一 `.workspace = true`）。launcher 的 panta-ffi 依赖被 machete 误报（仅经 build.rs 的 DEP_* 环境变量消费），按官方机制登记豁免。QML 格式门禁落地为 CTest `Qml.FormatCheck`（qmlformat stdout diff，两分支受控失败均验证）。Rust 覆盖率基线：line 74.21%（path 87.15/task 92.16/dsl-core 66.94/dslc 0/ffi 83.96），launcher（启动胶水）按 032 允许条款登记排除；stable rustc 无分支覆盖数据，门禁先以 line 执行（工具限制已记录）；**100% 门禁在缺口清零前不启用**。CI 新增 `quality`（deny+machete，单平台）与 `coverage`（报告非门禁）两个 job。

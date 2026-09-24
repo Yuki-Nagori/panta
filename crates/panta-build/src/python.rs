@@ -3,37 +3,37 @@ use super::{Tool, ToolAsset, ensure_tool};
 use std::path::Path;
 use std::process::Command;
 
-pub const UV_VERSION: &str = "0.8.22";
-pub const PYTHON_VERSION: &str = "3.13.7";
+pub const UV_VERSION: &str = "0.12.18";
+pub const PYTHON_VERSION: &str = "3.14.7";
 
 pub(super) fn uv_asset() -> Option<ToolAsset> {
     let (filename, sha256) = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
         (
             "uv-aarch64-apple-darwin.tar.gz",
-            "3f61099e261e449527141dbf125629fab33ad696468c8c90cebbac40185a306c",
+            "cf40e0c6a202190ccd9e0406dcfdd5b2d6668a9a5c779b17948963df32aafe5b",
         )
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         (
             "uv-x86_64-unknown-linux-gnu.tar.gz",
-            "741ff1f5742c5a4a25d2f829e8395355e43f7a5ae2ebc6368e9ae2df0efb69cf",
+            "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16",
         )
     } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
         (
             "uv-x86_64-pc-windows-msvc.zip",
-            "5049375aa2a5162f132b2c1cb992e25d42d47d934cab8c174dbe6f60973dcc12",
+            "cae6a3bc25239f83dffb467a4b180508d9da23986c04639ebfa44e43e6a84bff",
         )
     } else {
         return None;
     };
     let url = match filename {
         "uv-aarch64-apple-darwin.tar.gz" => {
-            "https://github.com/astral-sh/uv/releases/download/0.8.22/uv-aarch64-apple-darwin.tar.gz"
+            "https://releases.astral.sh/github/uv/releases/download/0.12.18/uv-aarch64-apple-darwin.tar.gz"
         }
         "uv-x86_64-unknown-linux-gnu.tar.gz" => {
-            "https://github.com/astral-sh/uv/releases/download/0.8.22/uv-x86_64-unknown-linux-gnu.tar.gz"
+            "https://releases.astral.sh/github/uv/releases/download/0.12.18/uv-x86_64-unknown-linux-gnu.tar.gz"
         }
         _ => {
-            "https://github.com/astral-sh/uv/releases/download/0.8.22/uv-x86_64-pc-windows-msvc.zip"
+            "https://releases.astral.sh/github/uv/releases/download/0.12.18/uv-x86_64-pc-windows-msvc.zip"
         }
     };
     Some(ToolAsset { url, sha256 })

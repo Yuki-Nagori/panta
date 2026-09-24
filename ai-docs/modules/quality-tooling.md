@@ -32,7 +32,7 @@
 | include-cleaner | 随 LLVM 22.1.7 | `cargo lint includes`，仅启用 `misc-include-cleaner` | 缺失/多余 include 建议变为错误；取代独立 IWYU |
 | Cppcheck | 2.17.1（wheel 1.5.1） | `cargo lint cppcheck`；`pyproject.toml`/`uv.lock` | 补充 `unusedFunction`，`--error-exitcode=1` 阻断 |
 | qmlformat / qmllint | Qt 6.11.2 | Cargo/CMake 供给 Qt | 应用及测试 QML 格式、类型检查 |
-| uv / CPython | 0.8.22 / 3.13.7 | `crates/panta-build/src/python.rs`；官方固定 uv 资产校验 SHA256 | 禁止选用系统 Python；解释器、venv、缓存均在 target |
+| uv / CPython | 0.12.18 / 3.14.7 | `crates/panta-build/src/python.rs`；官方固定 uv 资产校验 SHA256 | 禁止选用系统 Python；解释器、venv、缓存均在 target |
 | cmake-format / cmake-lint | cmakelang 0.6.13 | `cargo format` / `cargo lint cmake` | `uv run --locked --managed-python --no-build`，仅消费锁定 wheels |
 
 LLVM、CMake、Ninja、uv 按版本与摘要隔离到 `target/panta-tools/<tool>/<version-sha256>/`；安装持有 OS 文件锁，下载到临时文件并校验，解包成功后才发布目录。进程中断释放锁，下次持锁重试清理未发布目录；旧版本不受失败升级影响。Cargo 扩展按版本隔离并沿用同一发布机制。Qt 供给也串行化，防止 build/format 同时解包。升级同步供给清单、CMake 版本检查、CI 缓存、文档与验收。
