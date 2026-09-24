@@ -150,12 +150,52 @@ bool convert_to_native_dto(const netgen::Mesh& source, TetMeshGenerationResult& 
 
 } // namespace
 
-/// 生成收尾：释放几何对象。网格对象按官方示例（ng_occ.cpp 不调用
-/// Ng_DeleteMesh）保留至进程结束——制品 v6.2.2604 的 Mesh 析构会释放
-/// 悬空的边界名指针（上游在 tag 之后重构了名字/描述符所有权，master
-/// 的 ~Mesh 已不再手工 delete），038 重新固定制品后恢复网格释放。
-/// TODO(task 010): 制品升级后恢复 Ng_DeleteMesh 并回归全部网格用例。
-void finish_generation(nglib::Ng_OCC_Geometry* geometry) { nglib::Ng_OCC_DeleteGeometry(geometry); }
+namespace {
+
+/// COMPAT(task 010; remove-task 079): Netgen v6.2.2604 的 OCC
+/// 名称表会与 FaceDescriptor 共享字符串指针。按地址识别并摘除借用项，
+/// 不解引用名称字符串，避免将描述符内部存储误当作独立堆对象释放。
+void delete_native_mesh(nglib::Ng_Mesh* native_mesh) {
+    if (native_mesh == nullptr)
+        return;
+
+    auto& mesh = *reinterpret_cast<netgen::Mesh*>(native_mesh);
+    const auto clear_descriptor_aliases = [&mesh] {
+        for (int codimension = 0; codimension < 4; ++codimension) {
+            auto& names = mesh.GetRegionNamesCD(codimension);
+            for (std::size_t name_index = 0; name_index < names.Size(); ++name_index) {
+                const std::string* const name = names[name_index];
+                if (name == nullptr)
+                    continue;
+
+                for (int descriptor_index = 1; descriptor_index <= mesh.GetNFD();
+                     ++descriptor_index) {
+                    const std::string* const descriptor_name =
+                        &mesh.GetFaceDescriptor(descriptor_index).GetBCName();
+                    if (name == descriptor_name) {
+                        names[name_index] = nullptr;
+                        break;
+                    }
+                }
+            }
+        }
+    };
+    clear_descriptor_aliases();
+
+    // v6.2.2604 的 Ng_DeleteMesh 先调用 DeleteMesh 再析构 Mesh；两段清理都会
+    // 释放 codim-1/2 名称。保留这两个官方清理步骤，并在其间清空已释放的槽，
+    // 避免析构二次释放；codim-0/3 名称仍由 Mesh 析构释放。
+    mesh.DeleteMesh();
+    for (int codimension = 1; codimension <= 2; ++codimension) {
+        auto& names = mesh.GetRegionNamesCD(codimension);
+        for (std::size_t name_index = 0; name_index < names.Size(); ++name_index)
+            names[name_index] = nullptr;
+    }
+
+    delete &mesh;
+}
+
+} // namespace
 
 TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path& file,
                                                     const TetMeshGenerationParameters& parameters) {
@@ -247,7 +287,9 @@ TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path&
         result.volume_mm3 = 0.0;
     }
 
-    finish_generation(geometry);
+    // Mesh 内部对 OCC 几何仅持非拥有引用，因此必须先销毁 mesh。
+    delete_native_mesh(native_mesh);
+    nglib::Ng_OCC_DeleteGeometry(geometry);
     return result;
 }
 

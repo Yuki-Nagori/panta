@@ -80,4 +80,15 @@ TEST(NetgenMesher, FailureDoesNotCorruptSubsequentGeneration) {
     EXPECT_NEAR(recovered.volume_mm3, 6000.0, 60.0);
 }
 
+TEST(NetgenMesher, RepeatedGenerationsReleaseNativeMeshes) {
+    TetMeshGenerationParameters parameters;
+    parameters.max_length_mm = 5.0;
+
+    for (int generation = 0; generation < 3; ++generation) {
+        const auto result = generate_tet_mesh_from_step(fixture_dir() / "box_mm.step", parameters);
+        ASSERT_EQ(result.status, TetMeshGenerationStatus::kNone) << result.detail;
+        EXPECT_FALSE(result.mesh.tets.empty());
+    }
+}
+
 } // namespace
