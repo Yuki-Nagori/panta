@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- STL 导入完成后的工程工作区；任务 063 的视觉与状态参考。 -->
+<!-- 项目工作区与视口文档页签的视觉、交互状态参考；见任务 080。 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -80,9 +80,9 @@
   <div class="task-tree" role="tree" aria-label="Imported project tasks">
     <button type="button" class="tree-node tree-root" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-project-folder"/></svg><span>Project '01'</span></button>
     <div class="tree-children project-studies" role="group" aria-label="Imported studies">
-      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="true" data-study-name="iPhone17_Pro_TPU_Case_study" data-source-name="iPhone17_Pro_TPU_Case.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>iPhone17_Pro_TPU_Case_study</span></button>
-      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-study-name="housing_study" data-source-name="housing.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>housing_study</span></button>
-      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-study-name="bracket_study" data-source-name="bracket.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>bracket_study</span></button>
+      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="true" data-import-id="import-1" data-study-name="iPhone17_Pro_TPU_Case_study" data-source-name="iPhone17_Pro_TPU_Case.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>iPhone17_Pro_TPU_Case_study</span></button>
+      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-import-id="import-2" data-study-name="housing_study" data-source-name="housing.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>housing_study</span></button>
+      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-import-id="import-3" data-study-name="bracket_study" data-source-name="bracket.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>bracket_study</span></button>
     </div>
   </div>
 </template>
@@ -91,11 +91,11 @@
   <div class="part-inspector" aria-label="Selected part tasks">
     <div class="inspector-heading">
       <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg>
-      <strong>Study Tasks: iPhone17_Pro_TPU_Case_study</strong>
+      <strong data-inspector-heading>Study Tasks: iPhone17_Pro_TPU_Case_study</strong>
     </div>
-    <div class="inspector-list" role="list">
+    <div class="inspector-list" data-inspector-list role="list">
       <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span class="inspector-part-name">Part (iPhone17_Pro_TPU_Case.stl)</span></div>
-      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Create Mesh...</span></div>
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>3D Mesh (37066 elements)</span></div>
       <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-fill"/></svg><span>Fill</span></div>
       <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Generic PP: General Default</span></div>
       <div class="inspector-row inspector-indent" role="listitem"><span></span><span>Material Data Completeness</span></div>
@@ -113,14 +113,14 @@
 <template id="page-layer-tab"></template>
 
 <template id="page-viewport">
-  <div class="viewport-scene" aria-label="STL model preview">
+  <div class="viewport-scene" data-document-view="part" aria-label="STL model preview" hidden>
     <div class="scene-grid" aria-hidden="true"></div>
     <div class="stl-model" aria-label="Imported STL preview">
       <span class="model-facet facet-one"></span>
       <span class="model-facet facet-two"></span>
       <span class="model-hole"></span>
     </div>
-    <span class="viewport-caption">iPhone17_Pro_TPU_Case.stl · Dual Domain · Millimeters</span>
+    <span class="viewport-caption" data-viewport-caption></span>
   </div>
 </template>
 

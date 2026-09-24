@@ -1,6 +1,6 @@
 # `.pa` Flow 与 Rust 状态机（规划）
 
-[模块导航](README.md) · [DSL 工具链](dsl-engine-and-toolchain.md) · [PA 规范](../standards/pa.md) · [职责边界](../architecture/native-domain-boundaries.md) · [评估任务 072](../task/072-flow-state-machine-planning.md) · [实施任务 073](../task/073-flow-dsl-and-import-state-machine.md)
+[模块导航](README.md) · [DSL 工具链](dsl-engine-and-toolchain.md) · [PA 规范](../standards/pa.md) · [职责边界](../architecture/native-domain-boundaries.md) · [评估任务 072](../task/072-flow-state-machine-planning.md) · [实施任务 073](../task/073-flow-dsl-and-import-state-machine.md) · [视口首个消费者 080](../task/080-qml-viewport-document-tabs.md)
 
 更新 / 官方资料查阅日期：2026-09-24。本文是后续实现的设计依据；所有 Flow 语法、生成类型和目录均为规划，不代表当前 CLI 已支持。
 
@@ -14,7 +14,7 @@
 - [`panta-import`](../../crates/panta-import/src/lib.rs) 已负责来源快照、STL 预览和导入准备；[`panta-core::project`](../../crates/panta-core/src/project/import.rs) 写资产与清单、维护修订，成功后替换当前网格。
 - [`panta-core::task`](../../crates/panta-core/src/task.rs) 已有 `Running / Succeeded / Failed / Cancelled` 生命周期、取消请求和拉取式事件队列。当前执行体仍为模拟任务，不能把它当作已经接入 STEP 的异步事务。
 
-因此，067 已完成的 STL 迁移不追加 Flow 改造；首个实施窗口是 STEP 等真实异步导入闭环，先明确后端、工程提交和取消边界。
+因此，067 已完成的 STL 导入路径不追加 Flow 改造；首个 Flow 消费者改为任务 080 中按需读取已提交 STL 资产并重建视口网格的异步激活流程。它只读工程，不承担提交；未来 STEP 等写入型导入事务另行登记消费者并明确后端、提交和取消边界。
 
 ## 对原方案的调整
 
@@ -37,14 +37,15 @@
 |---|---|---|
 | 状态 / 事件种类、初态、终态、允许的边、guard 名称 | 领域 crate 随代码提交的 `flows/*.pa` | 不可在运行期编辑或热加载；不承载事件数据 |
 | Flow grammar、schema、AST、诊断、formatter、Rust 元数据生成 | `panta-dsl-core`（扩展规划） | 不依赖 `panta-import` / `panta-core`、Qt 或重库，不生成业务动作 |
-| 来源固定、格式分发、解析完成与取消 | `panta-import` 的导入准备流程 | 产出拥有明确所有权的准备结果，不写工程清单 |
-| 工程身份、修订校验、资产发布与提交终态 | `panta-core::project` 的导入事务 | 调用准备服务，协调工程存储；重试建立新事务 |
+| 来源固定、格式分发、解析完成与取消 | `panta-import` / 数据领域 crate 的准备或读取服务 | 产出拥有明确所有权的准备结果；首个 073 消费者只读取已提交 STL 资产 |
+| 工程身份、资产定位与只读激活请求相关性 | `panta-core::project` | 校验 session / generation 与 ImportRecord ID；只读激活不改 revision 或 dirty |
+| 修订校验、资产发布与提交终态 | `panta-core::project` 的未来写入型导入事务 | 调用准备服务并协调工程存储；重试建立新事务 |
 | TaskId、执行状态、进度、取消请求、终态事件 | 现有 `panta-core::task` | 与领域阶段关联，不能把准备完成直接当作工程提交成功 |
 | 展示属性、加载动画、按钮启用、弹窗阶段 | C++ ViewModel / QML | 消费 Rust 快照与事件；UI 禁用按钮不能代替 Rust 校验 |
 
-编译依赖维持 `panta-core → panta-import → panta-mesh / 未来 panta-geom`。各 Flow 消费者只在构建期依赖公共 DSL 内核；运行期不加载 Flow 源码。第一个导入准备 flow 留在 `panta-import` 内，完整事务跨越工程提交时由 core 编排；不以一个公共 FSM 对象跨 crate 持有所有上下文。
+编译依赖维持 `panta-core → panta-import → panta-mesh / 未来 panta-geom`。各 Flow 消费者只在构建期依赖公共 DSL 内核；运行期不加载 Flow 源码。首个只读激活 flow 由 `panta-core` 持有请求身份和工程 session 上下文，解析复用 `panta-mesh`；未来的导入准备 flow 可留在 `panta-import`，跨工程提交的写入事务由 core 编排。不以一个公共 FSM 对象跨 crate 持有所有上下文。
 
-通用任务状态机已存在，不在 import 内再造 `task_lifecycle`。073 复用其任务身份、队列与展示契约，但必须调整真实导入的终态驱动：现有模拟执行体自行决定成功 / 失败 / 取消，不能原样包裹导入事务。对一次导入，core 事务协调者唯一裁决取消是否接受及最终结果，Task 状态只是该结果的投影；通用 worker 的取消标志、超时或 shutdown 不得独立覆盖事务结论。是否将 core 的生命周期也描述成 `.pa`，以实际复杂度和重复维护成本决定，另记范围后实施。
+通用任务状态机已存在，不在 import 内再造 `task_lifecycle`。073 首期复用任务身份、队列与展示契约，使 Task 成功表示只读网格快照就绪；旧模拟执行体不能独立覆盖取消、过期请求或资源释放结果。首个流程没有工程提交，不能套用写事务终态。对未来一次写入型导入，core 事务协调者唯一裁决提交 / 取消及最终结果，Task 状态只是结果投影；通用 worker 的取消标志、超时或 shutdown 不得独立覆盖事务结论。是否将该生命周期也描述成 `.pa`，以实际复杂度和重复维护成本决定，另记消费者任务后实施。
 
 ## Flow V1 语法草案
 
@@ -107,14 +108,14 @@ V1 的静态约束：
 ```text
 crates/panta-dsl-core/src/flow/        # schema、校验与生成；不持有领域行为
 crates/panta-import/
-  flows/import-preparation.pa         # 版本化输入
+  flows/open-saved-stl.pa             # 首个只读视口资源激活输入
   build.rs                            # 调用公共 DSL 内核
   src/flow/mod.rs                     # 私有模块 include! OUT_DIR 生成文件
-  src/flow/import_preparation.rs      # 手写 Rust 行为
-OUT_DIR/flow/import_preparation.rs    # 构建输出；不提交
+  src/flow/open_saved_stl.rs          # 手写 Rust 行为
+OUT_DIR/flow/open_saved_stl.rs        # 构建输出；不提交
 ```
 
-core 的工程提交 flow 按同样布局归入 core，不从 import 导出完整工程状态机。元数据生成器输出 `State / EventKind / Guard`、`INITIAL_STATE`、`ALL_STATES / ALL_EVENTS / TERMINAL_STATES` 和带边 ID 的 `TRANSITIONS`。转移元素语义为 `Transition { from, on, to, guard: Option<Guard> }`；guard 不能在生成时丢弃或降为无关联字符串表。
+未来 core 的工程提交 flow 也按同样布局归入 core，不从 import 导出完整工程状态机。上例 OUT_DIR 名称对应调整为 `open_saved_stl.rs`。元数据生成器输出 `State / EventKind / Guard`、`INITIAL_STATE`、`ALL_STATES / ALL_EVENTS / TERMINAL_STATES` 和带边 ID 的 `TRANSITIONS`。转移元素语义为 `Transition { from, on, to, guard: Option<Guard> }`；guard 不能在生成时丢弃或降为无关联字符串表。
 
 手写 `Event` 负责源快照、准备资产、错误等 payload，通过穷尽匹配映射到生成的 `EventKind`；手写 guard 求值对 `Guard` 穷尽匹配，不用默认真分支。生成的 tag、名字或枚举序号不能直接作为 CXX ABI / 工程持久化格式。测试夹具可构造状态上下文，生产接口不能公开任意 `set_state`。
 
@@ -124,9 +125,11 @@ Cargo 的 [build script 规则](https://doc.rust-lang.org/cargo/reference/build-
 
 生成器只编译结构元数据，不生成执行引擎。手写匹配仍与声明存在结构重复，因此双向测试是必需成本；若长期出现明显漂移，再评估由声明生成纯转移决策，不能默默把它变成可执行业务 DSL。
 
-## 事务、取消与异步结果
+## 写入事务、取消与异步结果（后续消费者）
 
-导入准备的候选阶段为 `Idle → Snapshotting → Parsing → Prepared`，失败 / 协作取消结束在自己的终态；完整 core 事务在准备结果发布后才进入提交阶段。两者通过有所有权的结果组合，不引入层级 FSM 框架。来源快照、单位选择、工程身份与输入修订在提交任务时固定。
+本节的工程发布、提交回执与修订规则适用于未来写入型导入，不是 073 首个只读 STL 激活流程的验收范围。首期取消可以在解析器安全检查点生效；不可中断解析在完成边界校验 project generation、ImportRecord ID 和 attempt，过期快照应释放，不得发布到 UI。
+
+073 / 080 首期只读资产激活的候选阶段为 `Idle → LoadingAsset → Parsing → Ready`，另有失败、取消与过期结果终态；它不发布工程变更。未来写入型导入仍可分为 `Idle → Snapshotting → Parsing → Prepared` 的准备流程和 core 提交流程，两者通过有所有权的结果组合，不引入层级 FSM 框架。来源快照、单位选择、工程身份与输入修订在写入任务提交时固定。
 
 提交阶段遵守以下顺序：
 
@@ -174,7 +177,8 @@ UI 关闭、重建或重载后的业务展示以 Rust 快照为准，表单草�
 
 | 触发条件 | 后续动作 |
 |---|---|
-| 首个真实多阶段异步导入任务准备就绪 | 启动 073，随真实消费者交付最小 Flow 支持 |
+| 视口按需读取已提交 STL 资产 | 由 073 / 080 首先验证只读资源激活与迟到结果处理 |
+| STEP 等写入型导入任务准备就绪 | 新增业务消费者，扩展 073 或另立实施范围以涵盖提交裁决 |
 | Qt 复杂交互需要集中编排 | 由 074 独立接入 QStateMachine 与导入窗口；不等待 073 完成，异步业务能力随后按实际契约联调 |
 | 第二个领域需要 Flow | 复用已有 DSL 内核；只在实际共同语义明确时提取执行辅助，不自动建立 `panta-fsm / panta-common` |
 | 多处出现相同调度、异步 action、层级 / 并行状态需求 | 先记录具体难点，再核验 `rust-fsm`、`smlang` 等上游能力及依赖成本，不以库名提前承诺解决方案 |

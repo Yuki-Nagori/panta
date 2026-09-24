@@ -163,12 +163,19 @@ shellTemplate.innerHTML = `
   </aside>
   <section class="panel viewport" aria-label="Viewport">
     <button type="button" class="pane-close" aria-label="Close viewport" title="Close viewport"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
-    <div class="panel-content"><template data-slot="viewport"></template></div>
-    <div class="tabs tabs-bottom">
-      <div class="tab-strip" role="tablist" aria-label="Viewport">
-        <button type="button" role="tab" aria-selected="true" tabindex="0">Model</button>
-        <button type="button" role="tab" aria-selected="false" tabindex="-1">Mesh</button>
-        <button type="button" role="tab" aria-selected="false" tabindex="-1">Results</button>
+    <div class="panel-content viewport-content" id="viewport-document-panel" role="tabpanel" aria-labelledby="viewport-tab-welcome">
+      <div class="welcome-scene" data-document-view="welcome" aria-label="Welcome to panta">
+        <div class="welcome-wordmark" aria-label="panta">panta</div>
+        <p>Welcome to panta</p>
+      </div>
+      <template data-slot="viewport"></template>
+    </div>
+    <div class="tabs tabs-bottom document-tabs">
+      <div class="document-tab-list" role="tablist" aria-label="Viewport documents">
+        <div class="document-tab-item is-active" role="presentation">
+          <button type="button" class="document-tab-select" role="tab" id="viewport-tab-welcome" data-document-id="welcome" data-document-label="Welcome" aria-controls="viewport-document-panel" aria-selected="true" tabindex="0"><span class="welcome-tab-icon" aria-hidden="true">P</span><span class="document-tab-label">Welcome</span></button>
+          <button type="button" class="document-tab-close" aria-label="Close Welcome" title="Close Welcome"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+        </div>
       </div>
     </div>
   </section>
@@ -249,22 +256,276 @@ document.querySelectorAll("[data-demo-navigate]").forEach((trigger) => {
   });
 });
 
-document.querySelectorAll(".part-node").forEach((part) => {
-  part.addEventListener("click", () => {
-    document.querySelectorAll(".part-node").forEach((item) => item.setAttribute("aria-selected", String(item === part)));
-    const studyName = part.dataset.studyName || "";
-    const partName = part.dataset.sourceName || "";
-    const title = document.querySelector(".inspector-heading strong");
-    const partLabel = document.querySelector(".inspector-part-name");
-    const caption = document.querySelector(".viewport-caption");
-    if (title) title.textContent = `Study Tasks: ${studyName}`;
-    if (partLabel) partLabel.textContent = `Part (${partName})`;
-    if (caption) caption.textContent = `${partName} · Dual Domain · Millimeters`;
+const documentTabList = document.querySelector(".document-tab-list");
+const documentTabBar = document.querySelector(".document-tabs");
+const viewportPanel = document.querySelector("#viewport-document-panel");
+const welcomeScene = document.querySelector('[data-document-view="welcome"]');
+const partScene = document.querySelector('[data-document-view="part"]');
+const partNodes = [...document.querySelectorAll(".part-node")];
+const statusBar = document.querySelector(".statusbar");
+const inspectorHeading = document.querySelector("[data-inspector-heading]");
+const inspectorList = document.querySelector("[data-inspector-list]");
+
+const updateInspector = (part) => {
+  if (!part) return;
+  partNodes.forEach((item) => item.setAttribute("aria-selected", String(item === part)));
+  if (inspectorHeading) inspectorHeading.textContent = `Study Tasks: ${part.dataset.studyName || part.dataset.sourceName || "STL"}`;
+  const partLabel = document.querySelector(".inspector-part-name");
+  if (partLabel && part) partLabel.textContent = `Part (${part.dataset.sourceName || "STL"})`;
+  if (inspectorList) inspectorList.hidden = false;
+};
+
+const activateDocument = (documentId) => {
+  const tabs = [...(documentTabList?.querySelectorAll(".document-tab-select") || [])];
+  const activeTab = tabs.find((tab) => tab.dataset.documentId === documentId);
+  if (!activeTab) return;
+  tabs.forEach((tab) => {
+    const active = tab === activeTab;
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    tab.closest(".document-tab-item")?.classList.toggle("is-active", active);
   });
+
+  const isWelcome = documentId === "welcome";
+  if (welcomeScene) welcomeScene.hidden = !isWelcome;
+  if (partScene) partScene.hidden = isWelcome;
+  if (viewportPanel) viewportPanel.setAttribute("aria-labelledby", activeTab.id);
+  const part = partNodes.find((item) => item.dataset.importId === documentId) || null;
+  if (part) updateInspector(part);
+  const caption = document.querySelector("[data-viewport-caption]");
+  if (caption && part) caption.textContent = `${part.dataset.sourceName} · Dual Domain · Millimeters`;
+  if (statusBar) {
+    statusBar.textContent = isWelcome
+      ? "Welcome · select an STL in the project tree to open its viewport tab."
+      : `Viewport · ${part?.dataset.sourceName || activeTab.dataset.documentLabel || "STL"}`;
+  }
+};
+
+// Keep the initial Welcome tab, viewport scene, and accessibility state in sync.
+activateDocument("welcome");
+
+const createIcon = (symbolId) => {
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.classList.add("icon");
+  icon.setAttribute("aria-hidden", "true");
+  icon.setAttribute("focusable", "false");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", `#${symbolId}`);
+  icon.append(use);
+  return icon;
+};
+
+const addDocumentTab = (part) => {
+  const documentId = part.dataset.importId;
+  const existing = [...documentTabList.querySelectorAll(".document-tab-select")]
+    .find((tab) => tab.dataset.documentId === documentId);
+  if (existing) {
+    activateDocument(documentId);
+    if (statusBar) statusBar.textContent = `Activated existing tab · ${part.dataset.sourceName}`;
+    return;
+  }
+
+  const item = document.createElement("div");
+  item.className = "document-tab-item";
+  item.setAttribute("role", "presentation");
+
+  const tab = document.createElement("button");
+  tab.type = "button";
+  tab.className = "document-tab-select";
+  tab.setAttribute("role", "tab");
+  tab.id = `viewport-tab-${documentId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  tab.dataset.documentId = documentId;
+  tab.dataset.documentLabel = part.dataset.sourceName || "STL";
+  tab.setAttribute("aria-controls", "viewport-document-panel");
+  tab.setAttribute("aria-selected", "false");
+  tab.tabIndex = -1;
+  const label = document.createElement("span");
+  label.className = "document-tab-label";
+  label.textContent = part.dataset.sourceName || "STL";
+  tab.append(createIcon("i-stl-file"), label);
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "document-tab-close";
+  close.setAttribute("aria-label", `Close ${part.dataset.sourceName || "STL"}`);
+  close.title = close.getAttribute("aria-label");
+  close.append(createIcon("i-close"));
+  item.append(tab, close);
+  if (documentTabBar) documentTabBar.hidden = false;
+  documentTabList.append(item);
+  activateDocument(documentId);
+};
+
+function closeDocumentTab(documentId) {
+  const tabs = [...documentTabList.querySelectorAll(".document-tab-select")];
+  const closingTab = tabs.find((tab) => tab.dataset.documentId === documentId);
+  if (!closingTab) return;
+  const closingIndex = tabs.indexOf(closingTab);
+  const wasActive = closingTab.getAttribute("aria-selected") === "true";
+  const label = closingTab.dataset.documentLabel || "STL";
+  closingTab.closest(".document-tab-item")?.remove();
+  if (!wasActive) {
+    if (statusBar) statusBar.textContent = `Closed tab · ${label}`;
+    return;
+  }
+  const remaining = [...documentTabList.querySelectorAll(".document-tab-select")];
+  if (!remaining.length) {
+    if (welcomeScene) welcomeScene.hidden = true;
+    if (partScene) partScene.hidden = true;
+    viewportPanel?.removeAttribute("aria-labelledby");
+    if (documentTabBar) documentTabBar.hidden = true;
+    if (statusBar) statusBar.textContent = "No viewport document open";
+    return;
+  }
+  const fallback = remaining[Math.min(closingIndex, remaining.length - 1)];
+  activateDocument(fallback.dataset.documentId);
+  fallback.focus();
+  if (statusBar) statusBar.textContent = `Closed ${label} · showing ${fallback.dataset.documentLabel || "Welcome"}`;
+}
+
+documentTabList?.addEventListener("click", (event) => {
+  const tab = event.target.closest(".document-tab-select");
+  if (tab) activateDocument(tab.dataset.documentId);
+  const close = event.target.closest(".document-tab-close");
+  if (close) {
+    const documentId = close.closest(".document-tab-item")?.querySelector(".document-tab-select")?.dataset.documentId;
+    if (documentId) closeDocumentTab(documentId);
+  }
+});
+
+let tabDrag = null;
+const tabReorderAnimations = new WeakMap();
+const reducedMotionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+const tabLayoutLeft = (item) => {
+  const transform = getComputedStyle(item).transform;
+  const animatedX = transform === "none" ? 0 : new DOMMatrixReadOnly(transform).m41;
+  return item.getBoundingClientRect().left - animatedX;
+};
+const animateTabX = (item, offsetX) => {
+  if (reducedMotionPreference.matches || !offsetX) return;
+  const animation = item.animate(
+    [{ transform: `translateX(${offsetX}px)` }, { transform: "translateX(0)" }],
+    { duration: 150, easing: "ease-out" },
+  );
+  tabReorderAnimations.set(item, animation);
+  animation.onfinish = () => {
+    if (tabReorderAnimations.get(item) === animation) tabReorderAnimations.delete(item);
+  };
+};
+const finishTabDrag = (pointerId) => {
+  if (!tabDrag || tabDrag.pointerId !== pointerId) return;
+  const { tab, item, dragging, captureTarget } = tabDrag;
+  tabDrag = null;
+  const visualLeft = item.getBoundingClientRect().left;
+  item.style.transform = "";
+  item.classList.remove("is-dragging");
+  if (dragging) animateTabX(item, visualLeft - item.getBoundingClientRect().left);
+  if (captureTarget?.hasPointerCapture(pointerId)) captureTarget.releasePointerCapture(pointerId);
+};
+
+const reorderDocumentTab = (draggedItem, pointerX) => {
+  const items = [...documentTabList.children];
+  const target = items.find((item) =>
+    item !== draggedItem && pointerX < tabLayoutLeft(item) + item.offsetWidth / 2,
+  );
+  if (target ? draggedItem.nextElementSibling === target : documentTabList.lastElementChild === draggedItem) return;
+
+  // Preserve each sibling's current visual position so repeated pointer moves retarget smoothly.
+  const siblings = items.filter((item) => item !== draggedItem);
+  const previousPositions = new Map(siblings.map((item) => [item, item.getBoundingClientRect().left]));
+  for (const item of siblings) {
+    tabReorderAnimations.get(item)?.cancel();
+    tabReorderAnimations.delete(item);
+  }
+  if (target) documentTabList.insertBefore(draggedItem, target);
+  else documentTabList.append(draggedItem);
+
+  if (reducedMotionPreference.matches) return;
+  for (const item of siblings) {
+    const deltaX = previousPositions.get(item) - item.getBoundingClientRect().left;
+    animateTabX(item, deltaX);
+  }
+};
+
+documentTabList?.addEventListener("pointerdown", (event) => {
+  if (!event.isPrimary || event.button !== 0 || tabDrag) return;
+  const tab = event.target.closest(".document-tab-select");
+  const item = tab?.closest(".document-tab-item");
+  if (!item) return;
+  tabDrag = {
+    tab,
+    item,
+    pointerId: event.pointerId,
+    captureTarget: null,
+    startX: event.clientX,
+    startY: event.clientY,
+    grabOffsetX: 0,
+    dragOffsetX: 0,
+    dragging: false,
+  };
+});
+
+document.addEventListener("pointermove", (event) => {
+  if (!tabDrag || tabDrag.pointerId !== event.pointerId) return;
+  const deltaX = event.clientX - tabDrag.startX;
+  const deltaY = event.clientY - tabDrag.startY;
+  if (!tabDrag.dragging) {
+    if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 4) return;
+    if (Math.abs(deltaX) <= Math.abs(deltaY)) {
+      finishTabDrag(event.pointerId);
+      return;
+    }
+    activateDocument(tabDrag.tab.dataset.documentId);
+    tabDrag.tab.focus({ preventScroll: true });
+    // Capture only after a drag starts, so ordinary tab clicks retain their target.
+    tabDrag.captureTarget = documentTabList;
+    documentTabList.setPointerCapture(event.pointerId);
+    // Take over any in-flight reorder animation without jumping before following the pointer.
+    const visualLeft = tabDrag.item.getBoundingClientRect().left;
+    tabReorderAnimations.get(tabDrag.item)?.cancel();
+    tabReorderAnimations.delete(tabDrag.item);
+    tabDrag.dragOffsetX = visualLeft - tabDrag.item.getBoundingClientRect().left;
+    tabDrag.grabOffsetX = event.clientX - visualLeft;
+    tabDrag.item.style.transform = `translateX(${tabDrag.dragOffsetX}px)`;
+    tabDrag.dragging = true;
+    tabDrag.item.classList.add("is-dragging");
+  }
+
+  event.preventDefault();
+  reorderDocumentTab(tabDrag.item, event.clientX);
+  const renderedLeft = tabDrag.item.getBoundingClientRect().left;
+  const layoutLeft = renderedLeft - tabDrag.dragOffsetX;
+  const desiredLeft = event.clientX - tabDrag.grabOffsetX;
+  tabDrag.dragOffsetX = desiredLeft - layoutLeft;
+  tabDrag.item.style.transform = `translateX(${tabDrag.dragOffsetX}px)`;
+});
+
+document.addEventListener("pointerup", (event) => finishTabDrag(event.pointerId));
+document.addEventListener("pointercancel", (event) => finishTabDrag(event.pointerId));
+documentTabList?.addEventListener("lostpointercapture", (event) => finishTabDrag(event.pointerId));
+
+partNodes.forEach((part) => {
+  part.addEventListener("click", () => addDocumentTab(part));
+});
+
+documentTabList?.addEventListener("keydown", (event) => {
+  const tabs = [...documentTabList.querySelectorAll(".document-tab-select")];
+  const currentIndex = tabs.findIndex((tab) => tab === document.activeElement);
+  if (currentIndex < 0) return;
+  let nextIndex = currentIndex;
+  if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+  else if (event.key === "ArrowLeft") nextIndex = (currentIndex + tabs.length - 1) % tabs.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = tabs.length - 1;
+  else return;
+  event.preventDefault();
+  const nextTab = tabs[nextIndex];
+  activateDocument(nextTab.dataset.documentId);
+  nextTab.focus();
 });
 
 // 仅演示页签选中状态；工程命令和视图内容由后续 QML 实现承接。
 document.querySelectorAll('[role="tablist"]').forEach((bar) => {
+  if (bar.classList.contains("document-tab-list")) return;
   const tabs = [...bar.querySelectorAll('[role="tab"]')];
   const selectTab = (index) => {
     bar.style.setProperty("--tab-index", index);

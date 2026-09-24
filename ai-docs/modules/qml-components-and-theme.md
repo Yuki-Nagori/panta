@@ -1,6 +1,6 @@
 # 原子组件库、Theme 与主题 DSL（029 已落地组件层；DSL 为 030 规划）
 
-[模块导航](README.md) · [QML 规范](../standards/qml.md) · [029 组件库](../task/029-qml-component-library.md) · [030 主题切换](../task/030-theme-dsl.md)
+[模块导航](README.md) · [QML 规范](../standards/qml.md) · [029 组件库](../task/029-qml-component-library.md) · [030 主题切换](../task/030-theme-dsl.md) · [081 视觉与图标统一](../task/081-qml-visual-language-and-iconography.md)
 
 ## 当前状态与目标
 

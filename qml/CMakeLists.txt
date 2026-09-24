@@ -75,7 +75,7 @@ target_include_directories(panta_shell PUBLIC ../native/app)
 target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick Qt6::QuickDialogs2)
 
 # ThemedIcon 使用 image://panta-icons；provider 读取下列 qrc 资源并着色。
-# CONFIGURE_DEPENDS 收集资源，图标清单在 icons.md 登记。
+# CONFIGURE_DEPENDS 收集资源；视觉、功能及来源清单见 ai-docs/standards/icons.md。
 file(
   GLOB PANTA_SHELL_ICON_FILES CONFIGURE_DEPENDS
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"

@@ -88,7 +88,7 @@ ai-docs/
 | 050 | [QML 页面设计 HTML 先行复刻](task/050-qml-html-page-replica.md) | 应用平台扩展 | 028, 029 | done |
 | 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | ready |
 | 052 | [QML 图标规范与首页布局优化](task/052-qml-icon-and-layout-polish.md) | 应用平台扩展 | 029, 050 | done |
-| 053 | [默认视口立体 panta 字样](task/053-default-panta-wordmark.md) | 应用平台扩展 | 007 | planned |
+| 053 | [默认视口立体 panta 字样](task/053-default-panta-wordmark.md) | 应用平台扩展 | 007, 081 | planned |
 | 054 | [顶部折叠图标与搜索框引导](task/054-titlebar-search-details.md) | 应用平台扩展 | 052 | done |
 | 055 | [QML 组件评审与整理](task/055-qml-review-and-cleanup.md) | 应用平台扩展 | 052, 054 | done |
 | 056 | [QML 周边 C++ 简化与性能评审](task/056-qml-native-review.md) | 应用平台扩展 | 055, 007 | done |
@@ -103,8 +103,10 @@ ai-docs/
 | 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | done |
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |
 | 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
-| 073 | [Flow DSL 与首个异步导入状态机](task/073-flow-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；真实消费者接口待登记 | planned |
+| 073 | [Flow DSL 与首个异步 STL 视口资源激活](task/073-flow-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | planned |
 | 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
+| 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073 | in-progress |
+| 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | planned |
 
 ## 验证与质量扩展队列
 
@@ -155,7 +157,7 @@ ai-docs/
 
 014 已完成最小 Python/uv 质量工具环境：仅锁定 cmakelang 并供 `cargo format` 调用，不接入 Python 运行时/API，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 
-Flow 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [073 实施规划](task/073-flow-dsl-and-import-state-machine.md) 跟踪：复用 034/035 的 DSL 内核，随首个真实异步导入消费者接入。073 开始前需登记对应业务任务并冻结接口与提交边界；不追加 067 同步 STL 改造，也不阻塞当前 M0 主线。
+Flow 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [073 实施规划](task/073-flow-dsl-and-import-state-machine.md) 跟踪：复用 034/035 的 DSL 内核，首个消费者是 [080](task/080-qml-viewport-document-tabs.md) 的只读 STL 视口资源激活，不改写工程或修订。后续 STEP 等写入型导入事务另行登记消费者并冻结提交边界；不追加 067 同步 STL 改造，也不阻塞当前 M0 主线。
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 

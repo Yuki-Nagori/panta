@@ -6,7 +6,7 @@ QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每�
 ## 文件组织
 
 - [shell.css](shell.css)：两页共用的设计 token、Ribbon、面板和工具栏样式。
-- [shell.js](shell.js)：公共壳层、SVG 图标和页签选中态演示。
+- [shell.js](shell.js)：公共壳层、SVG 图标、通用页签状态和视口文档页签交互。
 - [homepage/homepage.html](homepage/homepage.html)：启动 / 学习首页。
 - [open-project/open-project.html](open-project/open-project.html)：工程任务项与项目工具 Ribbon。
 - [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入完成后的工程树与视口状态。
@@ -18,8 +18,11 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 `homepage` 通过 New Project 任务入口演示新建项目弹窗；`open-project` 展示打开后的
 工程树、多选 STL 导入确认弹窗，以及空 Layers Dock（尚无导入时隐藏 Layers 页签行）；`imported-project`
 展示导入后的两个独立 Dock：上部工程 / 任务 Dock 内含工程树和零件任务两个分区，底部
-保留工具按钮与 Layers 图标页签，内容暂空。同一工程中可展示多个 STL 和当前选中零件
-的任务。这些页面只展示状态和交互边界，不写工程文件，也不声称已实现 STL 解析或视口渲染。
+保留工具按钮与 Layers 图标页签，内容暂空。同一工程可展示多个 STL；视口默认显示 Welcome，
+点击工程树会创建对应 STL 页签，再次点击会激活既有页签；页签可切换、关闭和水平拖动重排
+（拖动非活动页签时会先激活它；被拖标签不透明并持续跟随指针，跨过相邻标签时平滑让位直至松开，标题始终保持固定宽度并截断，垂直拖动不改变位置），全部关闭后
+视口与标签栏留空。关闭标签不会删除示例工程树记录。这些页面只演示交互状态，不写工程文件，
+不执行 STL 读取、解析或真实 VTK 渲染。
 
 ## 工作流
 
@@ -37,8 +40,8 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 ## 边界
 
 - 复刻件是文档参考资产，不进 QML 构建图，不参与任何质量门禁。
-- 复刻件是布局/配色参考，不追求像素级逐帧校对；仅演示页签滑块与按钮反馈，
-  不执行工程命令或切换真实业务视图，不实现移动端布局。
+- 复刻件是布局/配色参考，不追求像素级逐帧校对；视口文档页签演示打开、去重、选择和关闭，
+  但不执行工程命令、不解析资产或切换真实业务视图，也不实现移动端布局。
 - 复刻对象里的内嵌网页视图等内容区可按需求留空（如桌面主窗口的 WebEngineView
   区域），迁移时映射为对应 QML 元素。
 
