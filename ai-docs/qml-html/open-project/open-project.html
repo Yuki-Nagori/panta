@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../shell.css">
   <script src="../shell.js" defer></script>
 </head>
-<body>
+<body class="project-workspace">
 <template id="page-menu">
   <button type="button" aria-current="page">Home</button>
   <button type="button">Tools</button>
@@ -145,7 +145,7 @@
       </header>
       <div class="dialog-body import-body">
         <div class="import-main">
-          <p class="dialog-intro">Before you can import this file you must select the type of mesh you want to work with:</p>
+          <p class="dialog-intro">Selected files will be added to this project as separate parts. Choose the mesh type and units to apply to all of them:</p>
           <div class="form-grid import-form-grid">
             <label for="mesh-type">Mesh type</label>
             <select id="mesh-type">
@@ -161,8 +161,12 @@
             </select>
           </div>
           <p class="import-warning">The units for this file are not specified. Select the units used by the STL source.</p>
-          <p class="selected-file"><span>Selected file</span><strong data-import-file-name>Choose an STL file</strong></p>
-          <p class="dimensions"><span>Approximate dimensions:</span><strong>73.40 × 151.60 × 14.60 mm</strong></p>
+          <p class="import-selection-count" data-import-count>2 files selected</p>
+          <ul class="import-file-list" data-import-files aria-label="Selected STL files">
+            <li>housing.stl</li>
+            <li>cover.stl</li>
+          </ul>
+          <p class="dimensions"><span>Approximate dimensions:</span><strong>Previewed for each selected file</strong></p>
           <label class="checkbox-row"><input type="checkbox" checked><span>Show import log</span></label>
         </div>
         <div class="dialog-actions import-actions">
@@ -171,7 +175,7 @@
           <button type="button" class="dialog-secondary">Help</button>
         </div>
       </div>
-      <input class="visually-hidden" type="file" accept=".stl" data-import-file-input="stl" aria-label="Choose STL file">
+      <input class="visually-hidden" type="file" accept=".stl" multiple data-import-file-input="stl" aria-label="Choose one or more STL files">
     </section>
   </div>
 </template>

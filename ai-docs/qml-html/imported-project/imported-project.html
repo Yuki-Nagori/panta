@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../shell.css">
   <script src="../shell.js" defer></script>
 </head>
-<body>
+<body class="project-workspace">
 <template id="page-menu">
   <button type="button" aria-current="page">Home</button>
   <button type="button">Tools</button>
@@ -79,26 +79,37 @@
 <template id="page-tasks">
   <div class="task-tree" role="tree" aria-label="Imported project tasks">
     <button type="button" class="tree-node tree-root" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-project-folder"/></svg><span>Project '01'</span></button>
-    <div class="tree-children" role="group">
-      <button type="button" class="tree-node study-node" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>iPhone17_Pro_TPU_Case_study</span></button>
-      <div class="tree-children study-tasks" role="group">
-        <button type="button" class="tree-node task-complete" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span>Part (iPhone17_Pro_TPU_Case.stl)</span></button>
-        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Create Mesh...</span></button>
-        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-fill"/></svg><span>Fill</span></button>
-        <button type="button" class="tree-node tree-expandable" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><span>Material</span></button>
-        <div class="tree-children material-tasks" role="group">
-          <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Material Data Completeness</span></button>
-          <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Environmental Properties</span></button>
-        </div>
-        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></button>
-        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></button>
-        <button type="button" class="tree-node" role="treeitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></button>
-        <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></button>
-        <button type="button" class="tree-node" role="treeitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></button>
-      </div>
+    <div class="tree-children project-studies" role="group" aria-label="Imported studies">
+      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="true" data-study-name="iPhone17_Pro_TPU_Case_study" data-source-name="iPhone17_Pro_TPU_Case.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>iPhone17_Pro_TPU_Case_study</span></button>
+      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-study-name="housing_study" data-source-name="housing.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>housing_study</span></button>
+      <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-study-name="bracket_study" data-source-name="bracket.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg><span>bracket_study</span></button>
     </div>
   </div>
 </template>
+
+<template id="page-inspector">
+  <div class="part-inspector" aria-label="Selected part tasks">
+    <div class="inspector-heading">
+      <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-study"/></svg>
+      <strong>Study Tasks: iPhone17_Pro_TPU_Case_study</strong>
+    </div>
+    <div class="inspector-list" role="list">
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span class="inspector-part-name">Part (iPhone17_Pro_TPU_Case.stl)</span></div>
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Create Mesh...</span></div>
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-fill"/></svg><span>Fill</span></div>
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Generic PP: General Default</span></div>
+      <div class="inspector-row inspector-indent" role="listitem"><span></span><span>Material Data Completeness</span></div>
+      <div class="inspector-row inspector-indent" role="listitem"><span></span><span>Environmental Properties</span></div>
+      <div class="inspector-row" role="listitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></div>
+      <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></div>
+      <div class="inspector-row inspector-muted" role="listitem"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></div>
+      <div class="inspector-row" role="listitem"><span class="empty-checkbox" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></div>
+    </div>
+  </div>
+</template>
+
+<template id="page-layers"></template>
 
 <template id="page-viewport">
   <div class="viewport-scene" aria-label="STL model preview">

@@ -208,10 +208,18 @@ button:disabled { opacity: 0.42; }
   width: max(var(--left-width), var(--left-min-width));
   border-right: 1px solid var(--color-panel-line);
 }
+.task-workspace-dock { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .tasks-panel, .viewport { flex: 1; }
 .output-panel { flex: 0 0 var(--output-height); border-top: 1px solid var(--color-panel-line); }
+.layer-panel { flex: 1; border-top: 1px solid var(--color-panel-line); }
 .panel-content { flex: 1; min-height: 0; overflow: auto; }
+body.project-workspace .task-workspace-dock { flex: 0 0 56%; }
+body.project-workspace .task-workspace-dock.task-workspace-full { flex: 1; }
+body.project-workspace .tasks-panel { flex: 0 0 39%; }
+body.project-workspace .output-panel { flex: 1; }
+body.project-workspace .output-toolbar { display: none; }
+body.project-workspace .output-panel > .pane-close { display: none; }
 .pane-close {
   position: absolute;
   top: 4px;
@@ -226,7 +234,7 @@ button:disabled { opacity: 0.42; }
 }
 .pane-close > .icon { width: 10px; height: 10px; }
 .pane-close:enabled:hover, .window-close:enabled:hover { background: var(--color-close-hover); color: #fff; }
-.tabs, .output-toolbar {
+.tabs, .output-toolbar, .layer-toolbar {
   flex: 0 0 var(--toolbar-height);
   display: flex;
   align-items: center;
@@ -235,7 +243,14 @@ button:disabled { opacity: 0.42; }
 }
 .tabs { padding: 2px; }
 .tabs-bottom { border-top: 1px solid var(--color-panel-line); border-bottom: 0; }
-.tabs-closable, .output-toolbar { padding-right: calc(var(--close-size) + 8px); }
+.tabs-closable, .output-toolbar, .layer-toolbar { padding-right: calc(var(--close-size) + 8px); }
+.layer-toolbar { gap: 3px; padding-left: 3px; }
+.layer-toolbar .tool-button { width: 25px; height: 24px; padding: 1px; border: 1px solid transparent; }
+.layer-toolbar .tool-button:enabled:hover { border-color: var(--color-panel-line); }
+.layer-tabs { flex: 0 0 24px; display: flex; align-items: stretch; gap: 1px; padding-left: 3px; background: var(--color-chrome); border-bottom: 1px solid var(--color-panel-line); }
+.layer-tabs button { display: flex; align-items: center; gap: 4px; min-width: 38px; padding: 0 6px; color: var(--color-muted); font-size: var(--font-small); }
+.layer-tabs button .icon { width: 14px; height: 14px; }
+.layer-tabs button[aria-selected="true"] { color: var(--color-text); background: var(--color-panel); font-weight: 600; }
 .tab-strip {
   --tab-index: 0;
   position: relative;
@@ -296,11 +311,18 @@ button:disabled { opacity: 0.42; }
 .tree-node > .tree-caret { width: 7px; height: 5px; margin-right: 1px; transform: rotate(0deg); }
 .tree-node > .status-icon { width: 16px; height: 16px; }
 .tree-node > span { overflow: hidden; text-overflow: ellipsis; }
+.tree-node[aria-selected="true"] { background: #dce9f7; }
 .tree-children { margin-left: 12px; }
-.study-tasks { margin-left: 24px; }
-.material-tasks { margin-left: 36px; }
-.study-node { padding-left: 4px; }
-.task-complete { color: var(--color-text); }
+.project-parts { margin-left: 18px; }
+.part-inspector { min-width: 0; padding: 0 0 12px; }
+.inspector-heading { display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 3px 8px; border-bottom: 1px solid var(--color-panel-line); font-weight: 500; }
+.inspector-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-list { padding-top: 2px; }
+.inspector-row { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 8px; }
+.inspector-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-indent { margin-left: 52px; }
+.inspector-muted { color: var(--color-muted); }
+.empty-checkbox { flex: none; width: 12px; height: 12px; border: 1px solid var(--color-panel-line); background: var(--color-panel); }
 
 /* 导入后的 STL 只用几何 CSS 占位，避免设计参考依赖外部模型或图片。 */
 .viewport-scene {
@@ -381,9 +403,12 @@ button:disabled { opacity: 0.42; }
 .import-main { display: flex; flex-direction: column; gap: 14px; }
 .import-form-grid { grid-template-columns: 100px minmax(180px, 250px); }
 .import-warning { max-width: 470px; }
-.selected-file, .dimensions { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; }
-.selected-file span, .dimensions span { color: var(--color-muted); }
-.selected-file strong, .dimensions strong { font-weight: 500; }
+.dimensions { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; }
+.dimensions span { color: var(--color-muted); }
+.dimensions strong { font-weight: 500; }
+.import-file-list { margin: -8px 0 0 88px; padding: 0 0 0 18px; max-height: 86px; overflow: auto; color: var(--color-muted); }
+.import-file-list li { padding: 2px 0; }
+.import-selection-count { margin: 0; color: var(--color-muted); }
 .checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--color-text); }
 .checkbox-row input { width: 16px; height: 16px; accent-color: #2e7ce0; }
 .import-actions { flex-direction: column; align-items: stretch; justify-content: flex-start; margin-top: 0; }

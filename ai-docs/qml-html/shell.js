@@ -22,6 +22,7 @@ shellTemplate.innerHTML = `
     <symbol id="i-image" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="2.5" width="12" height="10" stroke="currentColor" stroke-width="1.2"/><circle cx="5" cy="6" r="1.2" fill="currentColor"/><path d="M3 11l3.5-3.5 2.5 2 2-2 3 3.5" stroke="currentColor" stroke-width="1.2"/></symbol>
     <symbol id="i-export" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3"/><path d="M2 12.5h11" stroke="currentColor" stroke-width="1.3"/></symbol>
     <symbol id="i-delete" viewBox="0 0 15 15" fill="none"><path d="M2.5 4h10M5.5 4V2.5h4V4M4 4l1 9h5l1-9" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 16 16" fill="none"><path d="m1.5 4 6.5-3 6.5 3-6.5 3zM1.5 7l6.5 3 6.5-3M1.5 10l6.5 3 6.5-3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
     <symbol id="i-caret" viewBox="0 0 7 5" fill="none"><path d="M0 0h7L3.5 5z" fill="currentColor"/></symbol>
     <symbol id="i-globe" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.4" stroke="currentColor" stroke-width="1.3"/><ellipse cx="8.5" cy="8.5" rx="2.9" ry="6.4" stroke="currentColor" stroke-width="1.3"/><path d="M2.4 8.5h12.2" stroke="currentColor" stroke-width="1.3"/></symbol>
     <symbol id="i-split" viewBox="0 0 10 12" fill="none"><path d="M1 1.5h8" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 5.5L5 8.8 7.5 5.5z" fill="currentColor"/></symbol>
@@ -111,34 +112,53 @@ shellTemplate.innerHTML = `
 
 <main class="workspace">
   <aside class="left-column" aria-label="Project panels">
-    <section class="panel tasks-panel" aria-label="Tasks">
-      <button type="button" class="pane-close" aria-label="Close tasks" title="Close tasks"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
-      <div class="tabs tabs-closable">
-        <div class="tab-strip" role="tablist" aria-label="Task panel">
-          <button type="button" role="tab" aria-selected="true" tabindex="0">Tasks</button>
-          <button type="button" role="tab" aria-selected="false" tabindex="-1">Tools</button>
-          <button type="button" role="tab" aria-selected="false" tabindex="-1">Shared Views</button>
+    <div class="task-workspace-dock" role="group" aria-label="Project and task dock">
+      <section class="panel tasks-panel" aria-label="Tasks">
+        <button type="button" class="pane-close" aria-label="Close tasks" title="Close tasks"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+        <div class="tabs tabs-closable">
+          <div class="tab-strip" role="tablist" aria-label="Task panel">
+            <button type="button" role="tab" aria-selected="true" tabindex="0">Tasks</button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1">Tools</button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1">Shared Views</button>
+          </div>
         </div>
+        <div class="panel-content">
+          <template data-slot="tasks"></template>
+        </div>
+      </section>
+      <section class="panel output-panel" aria-label="Output">
+        <button type="button" class="pane-close" aria-label="Close output" title="Close output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+        <div class="output-toolbar" role="group" aria-label="Output actions">
+          <button type="button" class="tool-button" aria-label="New output" title="New output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Open output" title="Open output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Save output" title="Save output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-save"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Check output" title="Check output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Output wizard" title="Output wizard"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-wizard"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Clear output" title="Clear output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Copy output" title="Copy output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Image" title="Image"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Export output" title="Export output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-export"/></svg></button>
+          <button type="button" class="tool-button" aria-label="Delete output" title="Delete output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-delete"/></svg></button>
+        </div>
+        <div class="panel-content"><template data-slot="inspector"></template></div>
+      </section>
+    </div>
+    <section class="panel layer-panel" aria-label="Model layers" hidden>
+      <button type="button" class="pane-close" aria-label="Close model layers" title="Close model layers"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+      <div class="layer-toolbar" role="toolbar" aria-label="Layer tools">
+        <button type="button" class="tool-button" aria-label="New layer"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Open layer"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Validate layer"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Edit layer"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-wizard"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Remove layer"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-delete"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Layer options"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Move layer"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-export"/></svg></button>
+        <button type="button" class="tool-button" aria-label="Close layer tools"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
       </div>
-      <div class="panel-content">
-        <template data-slot="tasks"></template>
+      <div class="layer-tabs" role="tablist" aria-label="Model tree views">
+        <button type="button" role="tab" aria-selected="true" tabindex="0"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-layers"/></svg><span>Layers</span></button>
       </div>
-    </section>
-    <section class="panel output-panel" aria-label="Output">
-      <button type="button" class="pane-close" aria-label="Close output" title="Close output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
-      <div class="output-toolbar" role="group" aria-label="Output actions">
-        <button type="button" class="tool-button" aria-label="New output" title="New output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Open output" title="Open output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Save output" title="Save output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-save"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Check output" title="Check output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Output wizard" title="Output wizard"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-wizard"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Clear output" title="Clear output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Copy output" title="Copy output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Image" title="Image"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Export output" title="Export output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-export"/></svg></button>
-        <button type="button" class="tool-button" aria-label="Delete output" title="Delete output"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-delete"/></svg></button>
-      </div>
-      <div class="panel-content"></div>
+      <div class="panel-content"><template data-slot="layers"></template></div>
     </section>
   </aside>
   <section class="panel viewport" aria-label="Viewport">
@@ -167,6 +187,15 @@ shell.querySelectorAll("[data-slot]").forEach((slot) => {
 });
 document.body.append(shell);
 
+if (document.body.classList.contains("project-workspace")) {
+  document.querySelector(".tasks-panel")?.setAttribute("aria-label", "Project tree");
+  const partTasks = document.querySelector(".output-panel");
+  partTasks?.setAttribute("aria-label", "Part tasks");
+  partTasks?.querySelector(".pane-close")?.remove();
+  if (document.getElementById("page-layers")) document.querySelector(".layer-panel")?.removeAttribute("hidden");
+  else document.querySelector(".task-workspace-dock")?.classList.add("task-workspace-full");
+}
+
 const closeDialog = (dialog) => {
   if (dialog) dialog.hidden = true;
 };
@@ -193,10 +222,17 @@ document.querySelectorAll("[data-file-picker]").forEach((trigger) => {
 
 document.querySelectorAll("[data-import-file-input]").forEach((picker) => {
   picker.addEventListener("change", () => {
-    const file = picker.files?.[0];
-    if (!file) return;
-    document.querySelectorAll("[data-import-file-name]").forEach((target) => {
-      target.textContent = file.name;
+    const files = [...(picker.files || [])];
+    if (!files.length) return;
+    document.querySelectorAll("[data-import-count]").forEach((target) => {
+      target.textContent = `${files.length} ${files.length === 1 ? "file" : "files"} selected`;
+    });
+    document.querySelectorAll("[data-import-files]").forEach((target) => {
+      target.replaceChildren(...files.map((file) => {
+        const item = document.createElement("li");
+        item.textContent = file.name;
+        return item;
+      }));
     });
     const dialog = document.querySelector('[data-dialog-panel="import"]');
     if (dialog) {
@@ -209,6 +245,20 @@ document.querySelectorAll("[data-import-file-input]").forEach((picker) => {
 document.querySelectorAll("[data-demo-navigate]").forEach((trigger) => {
   trigger.addEventListener("click", () => {
     window.location.href = trigger.dataset.demoNavigate;
+  });
+});
+
+document.querySelectorAll(".part-node").forEach((part) => {
+  part.addEventListener("click", () => {
+    document.querySelectorAll(".part-node").forEach((item) => item.setAttribute("aria-selected", String(item === part)));
+    const studyName = part.dataset.studyName || "";
+    const partName = part.dataset.sourceName || "";
+    const title = document.querySelector(".inspector-heading strong");
+    const partLabel = document.querySelector(".inspector-part-name");
+    const caption = document.querySelector(".viewport-caption");
+    if (title) title.textContent = `Study Tasks: ${studyName}`;
+    if (partLabel) partLabel.textContent = `Part (${partName})`;
+    if (caption) caption.textContent = `${partName} · Dual Domain · Millimeters`;
   });
 });
 
