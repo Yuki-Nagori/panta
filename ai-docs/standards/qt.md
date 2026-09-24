@@ -22,6 +22,7 @@ QML 部署脚本参与 install 流程，其平台支持和行为依 Qt 版本而
 - 明确 worker、QThread 对象、事件循环的生命周期；停止线程前完成取消与对象清理，不能把 QThread 对象自身当成已运行于 worker 线程。
 - 可观察错误进入 UI，详细诊断进入日志；后台错误不打开任意线程的对话框。关闭窗口时阻止迟到任务更新已销毁 ViewModel。
 - 发布检查 Qt plugins、QML imports 和 native 动态库。部署脚本只是流程的一部分，不能推断会自动打包所有非 Qt 依赖。
+- 复杂 UI 流程采用由 ViewModel / 交互控制器持有的 `QStateMachine`，实施边界见 [Qt 交互状态机设计](../modules/qt-interaction-state-machines.md) 与 [074](../task/074-qt-interaction-state-machine.md)（尚未接入）。它只拥有交互阶段，不决定业务提交或取消结果；`start / stop / finished` 不得被当作 Rust 任务生命周期回执。普通视觉绑定不强制迁入状态机。
 - 屏幕迁移、DPI 改变和热插拔发布完整快照；不要在 GUI 线程之外直接访问 `QScreen`，也不要让单个组件自行处理平台 DPI 分支。渲染像素转换、截图 DPR 和拾取坐标必须在明确的边界完成。
 
 ## 验证

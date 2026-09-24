@@ -164,15 +164,18 @@ Cargo 的 [build script 规则](https://doc.rust-lang.org/cargo/reference/build-
 
 最终验证从仓库 Cargo 聚合入口执行，具体命令与证据由 [073](../task/073-flow-dsl-and-import-state-machine.md) 记录；只有接入真实 UI / FFI 时才包含相应窗口与跨平台验收，不以无头状态图测试替代。
 
-## Qt 显示状态与演进门槛
+## Qt 交互状态与演进门槛
 
-Qt 只消费 Rust 发布的状态。简单展示优先属性绑定和 QML `states / transitions`；[Qt Quick States](https://doc.qt.io/qt-6/qtquick-statesanimations-states.html) 描述对象 / 属性配置，不等同于领域事务执行器。复杂的本地交互流程确有层级、事件驱动需求时，再评估 [QStateMachine](https://doc.qt.io/qt-6/qtstatemachine-cpp-guide.html)；其执行依赖 Qt 事件循环，不能替代业务工作线程。当前方案不要求新增 Qt StateMachine 模块，也不把其使用写成既有事实。
+复杂 UI 交互明确采用 Qt 自带的 `QStateMachine`，由 [074](../task/074-qt-interaction-state-machine.md) 独立接入，设计见 [Qt 交互状态机](qt-interaction-state-machines.md)。首期由 C++ ViewModel / 控制器管理导入窗口的选文件、预览、等待回执与关闭；Qt 拥有这些局部交互状态，业务结果仍来自 Rust。Qt StateMachine 当前尚未在构建供给与链接中登记，不把本决策写成已实现。
 
-UI 关闭、重建或重载后从 Rust 快照恢复展示，不能根据动画结束、按钮点击或本地状态推断工程已提交。任何 Qt 状态方案都不读取 Flow `.pa`，不重复 guard 或工程提交规则。
+简单展示继续使用属性绑定和 QML `states / transitions`；[Qt Quick States](https://doc.qt.io/qt-6/qtquick-statesanimations-states.html) 描述对象 / 属性配置，不等同于领域事务执行器。Qt 状态机依赖事件循环，不能替代业务工作线程，也不自动使当前 STL 同步调用异步化。
+
+UI 关闭、重建或重载后的业务展示以 Rust 快照为准，表单草稿和 UI 服务会话的存续范围由 074 / 027 明确，不能根据动画结束、按钮点击或本地状态推断工程已提交。任何 Qt 状态方案都不读取 Flow `.pa`，不重复 guard 或工程提交规则。
 
 | 触发条件 | 后续动作 |
 |---|---|
 | 首个真实多阶段异步导入任务准备就绪 | 启动 073，随真实消费者交付最小 Flow 支持 |
+| Qt 复杂交互需要集中编排 | 由 074 独立接入 QStateMachine 与导入窗口；不等待 073 完成，异步业务能力随后按实际契约联调 |
 | 第二个领域需要 Flow | 复用已有 DSL 内核；只在实际共同语义明确时提取执行辅助，不自动建立 `panta-fsm / panta-common` |
 | 多处出现相同调度、异步 action、层级 / 并行状态需求 | 先记录具体难点，再核验 `rust-fsm`、`smlang` 等上游能力及依赖成本，不以库名提前承诺解决方案 |
 | 希望在类型层限制合法调用序列 | 单独评估 typestate 与运行期事件的适配；不将某个库直接等同于完整形式化证明 |

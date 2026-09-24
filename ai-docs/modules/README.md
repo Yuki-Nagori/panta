@@ -18,6 +18,7 @@
 | `.pa` 解析、聚合与 TS/QM 工具链 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [034](../task/034-rust-panta-artifact-parser.md) |
 | `.pa` 格式化与校验 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [035](../task/035-pa-formatter-and-validator.md) |
 | 编译期 Flow 声明、Rust 状态机与异步事务（规划） | [Flow 与状态机](flow-state-machines.md) | [072 评估](../task/072-flow-state-machine-planning.md)、[073 实施](../task/073-flow-dsl-and-import-state-machine.md) |
+| Qt 交互流程、导入窗口与状态恢复（规划） | [Qt 交互状态机](qt-interaction-state-machines.md) | [074](../task/074-qt-interaction-state-machine.md) |
 | 打包后软件内增量更新、签名、回滚 | [软件内增量更新](incremental-updates.md) | [037](../task/037-incremental-update-foundation.md) |
 | VTK/OCCT/Netgen 预编译 SDK 与受信制品 | [Native 依赖供给](native-dependency-supply.md) | [031](../task/031-prebuilt-native-dependencies.md)、[038](../task/038-native-sdk-artifact-production.md) |
 | 性能基线、剖析与回归对比（开发侧，非 CI 门禁） | [性能测试与剖析](performance.md) | [048](../task/048-performance-testing.md) |
