@@ -1072,6 +1072,15 @@ mod tests {
             std::fs::create_dir_all(&directory)?;
             path_service_set_root(&mut service, kind, directory.display().to_string())?;
         }
+        let invalid_root = match path_service_set_root(
+            &mut service,
+            bridge::PathRootKind::Project,
+            "relative-root".to_owned(),
+        ) {
+            Ok(()) => panic!("relative root unexpectedly accepted"),
+            Err(error) => error,
+        };
+        assert!(invalid_root.starts_with("path.root_not_absolute:"));
 
         // 每个类别都可纯逻辑解析,且 scheme 往返经 bridge_kind 全分支。
         for scheme in ["user-config", "app-data", "cache", "session"] {
@@ -1176,5 +1185,178 @@ mod tests {
 
         let _ = fs::remove_dir_all(&root);
         Ok(())
+    }
+
+    #[test]
+    fn project_stl_bridge_preserves_preview_commit_and_snapshot_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!("panta-ffi-stl-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+        let source = root.join("part.stl");
+        let original = b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 2 0\nendsolid\n";
+        fs::write(&source, original)?;
+
+        let mut service = project_service_new();
+        let no_project = match crate::project_service_imports(&service) {
+            Ok(imports) => panic!("empty project returned {} imports", imports.len()),
+            Err(error) => error,
+        };
+        assert_eq!(no_project, "project.no_project");
+        let no_project_mesh = match crate::project_service_mesh_snapshot(&service) {
+            Ok(snapshot) => panic!("empty project returned revision {}", snapshot.revision),
+            Err(error) => error,
+        };
+        assert_eq!(no_project_mesh, "project.no_project");
+
+        let preview =
+            crate::project_service_inspect_stl(&mut service, source.display().to_string())?;
+        assert_eq!(preview.source_name, "part.stl");
+        assert_eq!(preview.triangle_count, 1);
+        assert_eq!(
+            [preview.size_x, preview.size_y, preview.size_z],
+            [1.0, 2.0, 0.0]
+        );
+        let import_without_project = match crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".to_owned(),
+            "millimeters".to_owned(),
+            false,
+        ) {
+            Ok(imported) => panic!("import without a project succeeded as {}", imported.id),
+            Err(error) => error,
+        };
+        assert_eq!(import_without_project, "project.no_project");
+
+        let created =
+            project_service_create(&mut service, root.display().to_string(), "Demo".to_owned())?;
+        let before_import = crate::project_service_mesh_snapshot(&service)?;
+        assert_eq!(before_import.revision, created.revision);
+        assert!(before_import.coordinates.is_empty());
+        assert!(crate::project_service_imports(&service)?.is_empty());
+
+        let imported = crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".to_owned(),
+            "centimeters".to_owned(),
+            true,
+        )?;
+        assert_eq!(imported.id, "import-1");
+        assert_eq!(imported.source_name, "part.stl");
+        assert_eq!(imported.asset, "assets/imports/0001-part.stl");
+        assert_eq!(imported.mesh_type, "solid-3d");
+        assert_eq!(imported.units, "centimeters");
+        assert!(imported.show_import_log);
+        assert_eq!(imported.triangle_count, 1);
+        assert_eq!(
+            [imported.size_x, imported.size_y, imported.size_z],
+            [1.0, 2.0, 0.0]
+        );
+
+        let imports = crate::project_service_imports(&service)?;
+        assert_eq!(imports.len(), 1);
+        assert_eq!(imports[0].parser_version, imported.parser_version);
+        let snapshot = crate::project_service_mesh_snapshot(&service)?;
+        assert_eq!(snapshot.revision, 1);
+        assert_eq!(
+            snapshot.coordinates,
+            [0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 20.0, 0.0]
+        );
+
+        let mut reopened = project_service_new();
+        project_service_open(&mut reopened, created.path)?;
+        let restored = crate::project_service_mesh_snapshot(&reopened)?;
+        assert_eq!(restored.revision, snapshot.revision);
+        assert_eq!(restored.coordinates, snapshot.coordinates);
+
+        let step_source = root.join("part.step");
+        fs::write(&step_source, b"not a supported STL source")?;
+        let unsupported = match crate::project_service_inspect_stl(
+            &mut service,
+            step_source.display().to_string(),
+        ) {
+            Ok(preview) => panic!(
+                "STEP file unexpectedly parsed as {} triangles",
+                preview.triangle_count
+            ),
+            Err(error) => error,
+        };
+        assert!(unsupported.starts_with("project.import_invalid_file:"));
+
+        crate::project_service_inspect_stl(&mut service, source.display().to_string())?;
+        fs::write(&source, b"vertex 0 0 0\nvertex 3 0 0\nvertex 0 4 0\n")?;
+        let changed = match crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".to_owned(),
+            "millimeters".to_owned(),
+            false,
+        ) {
+            Ok(imported) => panic!("changed source was imported as {}", imported.id),
+            Err(error) => error,
+        };
+        assert!(changed.starts_with("project.import_source_changed:"));
+        assert_eq!(crate::project_service_imports(&service)?.len(), 1);
+
+        fs::write(&source, original)?;
+        let invalid_options = match crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "unknown".to_owned(),
+            "millimeters".to_owned(),
+            false,
+        ) {
+            Ok(imported) => panic!("unsupported mesh type was imported as {}", imported.id),
+            Err(error) => error,
+        };
+        assert!(invalid_options.starts_with("project.import_unsupported_mesh_type:"));
+        assert_eq!(crate::project_service_imports(&service)?.len(), 1);
+
+        let invalid_units = match crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".to_owned(),
+            "yards".to_owned(),
+            false,
+        ) {
+            Ok(imported) => panic!("unsupported units were imported as {}", imported.id),
+            Err(error) => error,
+        };
+        assert!(invalid_units.starts_with("project.import_unsupported_units:"));
+        assert_eq!(crate::project_service_imports(&service)?.len(), 1);
+
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn tet_mesh_bridge_checks_layout_and_domain_data() {
+        let mesh_data = || bridge::TetMeshData {
+            nodes: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            tets: vec![0, 1, 2, 3],
+            tet_regions: vec![0],
+            boundary: vec![0, 1, 2],
+            boundary_groups: vec![0],
+            region_count: 1,
+            boundary_group_count: 1,
+        };
+
+        let valid = crate::mesh_validate_tet(mesh_data());
+        assert!(valid.issues.is_empty());
+        assert_eq!(valid.volume_mm3, 1.0 / 6.0);
+
+        let mut invalid_layout = mesh_data();
+        invalid_layout.nodes.pop();
+        let layout = crate::mesh_validate_tet(invalid_layout);
+        assert_eq!(layout.issues, ["invalid mesh DTO layout"]);
+        assert_eq!(layout.volume_mm3, 0.0);
+
+        let mut invalid_mesh = mesh_data();
+        invalid_mesh.tets[3] = 9;
+        let domain = crate::mesh_validate_tet(invalid_mesh);
+        assert!(!domain.issues.is_empty());
+        assert_eq!(domain.volume_mm3, 0.0);
     }
 }

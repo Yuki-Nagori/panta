@@ -82,17 +82,19 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 | 2026-09-18 | **关键发现（影响 100% 门禁的口径）**：llvm-cov summary 的分母包含 `#[cfg(test)]` 测试代码自身的错误闭包与 panic 分支——仓库旧测试普遍使用 `unwrap_or_else(panic!)`，这些从不执行的闭包全部计为"未覆盖行"（path.rs 攻坚后"覆盖率下降"即因新增测试的闭包）。结论：100% 门禁的真实工作量 = ①全仓库测试风格统一为 `?` 传播（stable rustc 无 `#[coverage(off)]`，E0658 实证）；②补真实逻辑缺口。`allow-unwrap-in-tests` 被 011 记录的决策排除。约定已写入本表供后续 crate 复用 |
 | 2026-09-18 | task.rs 缺口补齐（8 项新测试，全套 29 项通过）：SubmitError Display 全变体、TaskEventKind label 全变体、`TaskManager::default()` 行为、日志环 256 容量淘汰（超量提交后 `recent_logs().len() == 256`）、cancel 对未知/终态任务拒绝、**迟到位事件拒绝**（经 `manager.inner` 直接驱动 `transition`/`publish_progress`：未知 id 与终态任务均不产生事件）、spawn 回滚（`rollback_spawn` 从 submit Err 臂提取为独立函数以便测试：移除记录+写日志+SpawnFailed）、`wait_for` 超时/命中两态；`io_other_error` clippy 修正 |
 | 2026-09-18 | **本地覆盖率工具链不可靠（已证实）**：同一 profdata 下，Apple llvm-cov 17.x 的 summary/lcov/show 三种口径互相矛盾（task.rs run_task 明明执行却报 0 计数；show 无任何 0 行而 lcov 有几十条）——rustc 1.98 插桩格式与 Apple 17.x 解析存在版本错配。**权威口径定为 CI**（rustup `llvm-tools-preview` 与 rustc 严格配套，coverage job 已配置）；本地 lcov 数据仅作方向参考（dsl-core ~369 行缺口的量级可信，具体行清单以 CI 报告为准）。032 增量二的门禁启用以 CI 报告为唯一依据 |
-
 | 2026-09-18 | 本轮 Rust 验证，cwd 仓库根，macOS arm64，rustc 1.98.1 / cargo-llvm-cov 0.9.1 + 同工具链 llvm-tools；`cargo test --locked --workspace --exclude panta-launcher` | 90 项测试通过；新增 DSL features 24 项。移除 CLI 重复实例测试后覆盖数字不变 |
 | 2026-09-18 | `cargo llvm-cov --locked --workspace --exclude panta-launcher --summary-only --fail-under-functions 89 --fail-under-lines 92` | 通过：函数 89.69%（30/291 未进入），行 94.23%（163/2826 未覆盖）；仍有实际报告缺口，未宣称 100% |
-| 2026-09-20 | macOS arm64；`cargo coverage`（commit `a613a31` 的 CI 复现，补充 crash 跨平台实现与同进程覆盖测试后） | 通过：函数 89.18%、行 93.84%，均达到 89%/92% 门禁；`panta-foundation/src/crash.rs` 函数覆盖从 75.00% 提升到 100.00%，未降低门禁 |
-| 2026-09-21 | macOS arm64；`cargo ub-check`（nightly-2026-09-15，rustc 1.100.0-nightly 574ff7d98，MIRIFLAGS=-Zmiri-disable-isolation，产物 target/miri） | 通过：panta-core 30 项、panta-dsl-core 9+2+22 项全部通过（features 的两个容量压力用例按登记忽略），panta-foundation crash 进程测试按登记跳过、模块本体编译通过；未发现 UB；EXIT=0 |
-| 2026-09-21 | CI `miri` job（ubuntu，rust 域触发） | 已接线；等待当前提交的三平台之外 CI run 证据 |
-
 | 2026-09-18 | 完整 `cargo test --locked --workspace`，macOS arm64 / rustc 1.98.1；CMake 4.3.3 / clang-format 20.1.0 / Qt 6.11.2，使用本地固定/缓存供给 | 101 项 Rust/聚合测试通过，含 CTest 28/28、qmllint、自有 native + CXX 格式。沙箱内初跑 Qt 测试配置目录不可写，扩大执行权限后全部通过；新增纳管的两个 CXX 源文件已格式化 |
 | 2026-09-18 | `cargo test --locked --release --target-dir target/review-target -p panta-tests --test native`（复用第三方缓存） | Release 与自定义 target-dir 的聚合 2/2、CTest 28/28，通过；从 build.rs 导出当前构建树/配置，不再读取 Debug 旧产物 |
 | 2026-09-18 | 同一覆盖率数据分别运行 `cargo llvm-cov report --summary-only --fail-under-functions 100` 与 `--fail-under-lines 100`；临时 CTest 夹具编译根 `tests/integration/native.rs` | 两个覆盖率受控失败均 exit 1；空套件与失败用例均使聚合测试 exit 101，成功夹具 exit 0 |
 | 2026-09-18 | `cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、差异空白检查 | 通过。Linux/Windows 的本轮 CI 尚未运行；未将其写成本地已验证 |
+| 2026-09-20 | macOS arm64；`cargo coverage`（commit `a613a31` 的 CI 复现，补充 crash 跨平台实现与同进程覆盖测试后） | 通过：函数 89.18%、行 93.84%，均达到 89%/92% 门禁；`panta-foundation/src/crash.rs` 函数覆盖从 75.00% 提升到 100.00%，未降低门禁 |
+| 2026-09-21 | macOS arm64；`cargo ub-check`（nightly-2026-09-15，rustc 1.100.0-nightly 574ff7d98，MIRIFLAGS=-Zmiri-disable-isolation，产物 target/miri） | 通过：panta-core 30 项、panta-dsl-core 9+2+22 项全部通过（features 的两个容量压力用例按登记忽略），panta-foundation crash 进程测试按登记跳过、模块本体编译通过；未发现 UB；EXIT=0 |
+| 2026-09-21 | CI `miri` job（ubuntu，rust 域触发） | 已接线；等待当前提交的三平台之外 CI run 证据 |
+| 2026-09-24 | `cargo coverage`（macOS arm64，本地复现 `origin/main` / `ec2f919` 的 Rust coverage gate） | 失败：函数 86.47%（377/436），行 90.00%（3854/4282），低于固定门槛 89% / 92%。测试本身全部通过；覆盖率报告显示多个 Rust crate 有未覆盖路径。保持门槛，补齐可达行为测试后重跑并记录结果。GitHub Actions API 当前不可达，本次依据同一仓库命令复现，尚无 CI 原始摘要。 |
+| 2026-09-24 | 修复后 `cargo coverage`（macOS arm64，rustc 1.98.1 / cargo-llvm-cov 0.9.1） | 通过：函数 90.34%（402/445），行 93.95%（4270/4545）；门槛仍为 89% / 92%。所有参与统计的 Rust 测试通过。Ubuntu CI 尚待重新运行。 |
+| 2026-09-24 | `cargo format`（macOS arm64，仓库固定 uv 0.8.22 / Python 3.13.7） | 未能完成聚合检查：进入 `cmake-format` 阶段前，uv 的 `system-configuration 0.6.1` 在访问 `com.apple.SystemConfiguration.configd` 被 Seatbelt 拦截后 panic（`Attempted to create a NULL object`；后续 `Tokio executor failed`）。设置 `UV_OFFLINE=1` 无效；单独 `cargo fmt --all -- --check` 通过。该故障为沙箱与 uv 依赖兼容问题，不是格式差异；完整聚合结果待 Ubuntu CI 验证。上游已在 `system-configuration` 0.7.0 增加 NULL 检查，记录于根 `AGENTS.md`。 |
+| 2026-09-24 | `cargo format --check`（macOS arm64，仓库固定 uv / Python；授权在 Codex Seatbelt 沙箱外执行） | 通过：仓库聚合 Rust、C++/CXX、CMake、QML 格式检查全部通过。与上一行沙箱内 uv panic 对照，确认该失败由 macOS Seatbelt 环境导致；已记录于根 `AGENTS.md`。 |
 
 ## 风险与回退
 
@@ -105,12 +107,14 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 
 - 2026-09-18（本轮评审）：修正指标与 CI 矛盾、全局阈值防下降和无依据排除；补齐阶段门禁说明。native 聚合须修复 Windows 后缀、配置/target-dir、空套件、源码扫描吞错与 formatter 缓存身份；无兼容例外。
 - 2026-09-18（Rust 测试批次）：新增 DSL 24 项公共 API 行为测试、FFI 取消/失败事件和路径类别/读写链验证；测试错误使用 Error + ? 传播。评审修复关闭线程测试吞掉 submit 失败，恢复 CLI 完整 usage 断言，删除只为覆盖率实例重复调用的 CLI 测试和冗余 dev-dependency。原始暂存中的重复/矛盾工作日志已收敛；未更改生产业务契约。
+- 2026-09-24（coverage gate 修复）：本地复现门禁失败后，在 FFI 层覆盖 STL 预览、持久化导入、mesh snapshot、TetMesh DTO 校验及错误映射；在 `panta-import` 覆盖来源快照变化、格式拒绝、单位换算与坐标溢出，并让 `ImportError` 实现标准 `Display` / `Error` 以便测试自然传播错误。固定阈值未调整；`cargo coverage` 本地通过，等待 Ubuntu CI 复验。
 
 - 2026-09-16：新增跨语言质量任务；用户要求各语言配置 format/test/lint/依赖与死代码工具，并以 100% 覆盖率作为门禁目标。
 - 2026-09-18（增量一，Rust 质量完备 + QML 格式门禁 + CI 接线；维护者指示 032 优先于 007）：工具版本固定入 `modules/quality-tooling.md`（cargo-deny 0.20.2 / cargo-machete 0.9.2 / cargo-llvm-cov 0.9.1 / qmlformat 6.11.2）。发现并修复三类真实问题：quick-xml 0.38.4 有 RustSec 告警（升 0.41，DSL 测试全过、TS 生成语义不变）；syn 2/3 双版本为 pest↔cxx 锁定组合的传递依赖（deny skip 登记）；内部 path 依赖无版本号触发 wildcard 拒绝（workspace 表补 version、成员统一 `.workspace = true`）。launcher 的 panta-ffi 依赖被 machete 误报（仅经 build.rs 的 DEP_* 环境变量消费），按官方机制登记豁免。QML 格式门禁落地为 CTest `Qml.FormatCheck`（qmlformat stdout diff，两分支受控失败均验证）。Rust 覆盖率基线：line 74.21%（path 87.15/task 92.16/dsl-core 66.94/dslc 0/ffi 83.96），launcher（启动胶水）按 032 允许条款登记排除；stable rustc 无分支覆盖数据，门禁先以 line 执行（工具限制已记录）；**100% 门禁在缺口清零前不启用**。CI 新增 `quality`（deny+machete，单平台）与 `coverage`（报告非门禁）两个 job。
 - 2026-09-18（增量二补充，提交门禁）：维护者要求 commit 强制 fmt+lint。husky 依赖 Node.js/package.json，与"未引入 Node 时不创建其生态配置"规则冲突，经说明后采用原生 git hooks：`.githooks/pre-commit` 执行与 CI 同命令的 fmt --check 与 clippy -D warnings，失败即拒绝提交；`git config core.hooksPath .githooks` 一次性启用（git 不携带 hooks 配置，README 与 quality-tooling 已记录）。本机已启用并验证。
 - 2026-09-18（增量二，覆盖率缺口清零与门禁启用）：按 llvm-cov 未覆盖行清单逐 crate 补测试（基线 631 行缺口：dsl-core 406/ffi 60/path 50/task 29/dslc 86）；全部清零后启用 line 覆盖率门禁（CI coverage job 转阻断）。分支覆盖继续受 stable rustc 工具限制记录在案。门禁范围：workspace 除 launcher（启动胶水，已登记）。
 - 2026-09-21（Miri 增量，维护者要求补充 Rust 侧 UB 动态检测）：`cargo ub-check` 入口（runner 子命令 + Cargo alias；不叫 miri，避免别名遮蔽 cargo-miri 外部子命令，见 cargo #10049）以固定日期 nightly 工具链（runner 常量，随验证记录升级）解释执行纯 Rust crate `panta-core`、`panta-dsl-core`、`panta-foundation` 的测试，独立 `target/miri` 目录，`MIRIFLAGS=-Zmiri-disable-isolation` 关闭隔离（路径/日志测试按设计使用真实文件系统夹具；UB 与数据竞争检查不受影响）。边界：CXX FFI 调用、进程/构建类 crate（panta-build、panta-tests、launcher）不在 Miri 语义内；`panta-foundation::crash` 的 fork/信号/Win32 FFI 测试以 `#[cfg(all(test, not(miri)))]` 在 Miri 下跳过，真实平台照常执行；dsl-core 的两个容量压力用例（2^20 字节超长源、16384+ 条声明）输入必须超过固定阈值才能触发拒绝诊断，Miri 解释执行不可行，以 `#[cfg_attr(miri, ignore)]` 跳过，容量维度由常规 cargo test 覆盖。CI 新增 ubuntu `miri` job，按 rust 域触发。数据竞争与弱内存序检测依赖测试实际执行到相应并发路径，不宣称覆盖所有并发场景。
+- 2026-09-24（coverage gate 回归）：`ec2f919` 后在 macOS 用同一 `cargo coverage` 入口复现 Ubuntu 门禁失败；当前总函数/行覆盖率 86.47% / 90.00%，低于 89% / 92%。不调低阈值；定位并补测新增 Rust 领域逻辑以及此前被新统计口径暴露的可达路径，确保测试断言结果与失败状态，不只为数字调用代码。修复后重新执行该入口并同步本行结果。
 
 ## 完成摘要
 
