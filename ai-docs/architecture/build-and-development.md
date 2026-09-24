@@ -8,7 +8,7 @@ Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.to
 
 native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 库、`native/app` 可执行骨架与 CTest 测试；单配置 Ninja presets（`debug`/`release`），安装树可被 `find_package(panta-native)` 消费。
 
-Cargo 调度已接通（任务 004）：Cargo manifest 通过 panta-ffi 的普通依赖 + build-dependency 双边确保 staticlib 先于 launcher build script 生成，`crates/launcher/build.rs` 再以与 presets 一致的有效配置构建 native 树（任务 041：构建树固定为 `target/native/<profile>`，presets 与 Cargo 共用；Qt、VTK SDK 与 googletest 缓存在 `target/panta-deps/`，工具在 `target/panta-tools/`，均与 launcher 哈希目录无关）；构建完成后 `cargo run` 启动 native 产物并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。
+Cargo 调度已接通（任务 004）：Cargo manifest 通过 panta-ffi 的普通依赖 + build-dependency 双边确保 staticlib 先于 launcher build script 生成，`crates/launcher/build.rs` 再以与 presets 一致的有效配置构建 native 树（任务 041：构建树固定为 `target/native/<profile>`，presets 与 Cargo 共用；Qt 与各平台 SDK 缓存在 `target/panta-deps/`，工具在 `target/panta-tools/`，均与 launcher 哈希目录无关）；构建完成后 `cargo run` 启动 native 产物并转发参数与退出码（未知参数 64、产物缺失 69、信号终止 128+信号）。
 
 QML 模块可裁剪：`cargo build --locked` 默认启用 `bridge-module` feature，构建并静态注册 `Panta.Bridge`；诊断时使用 `cargo build --locked --no-default-features`，由 launcher 将 feature 状态映射为 `PANTA_ENABLE_BRIDGE_MODULE=OFF`，移除该模块并使用 `Panta.Shell` 的 `AppNoBridge` 最小入口。
 

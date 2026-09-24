@@ -4,7 +4,9 @@ Panta project CI builds and self-checks a static GoogleTest SDK for macOS arm64,
 Linux x86_64, and Windows x86_64. Each archive contains the upstream CMake
 package, headers, static libraries, source metadata, and BSD-3-Clause license.
 The normal project build continues to use its current FetchContent path until a
-separate task registers and validates these assets for consumption.
+task 071 registers these assets in `native/cmake/sdk-provision.cmake`; native
+tests consume the verified platform SDK through `panta_require_sdk` when
+`BUILD_TESTING=ON`. No FetchContent or system-package fallback remains.
 
 ## Source and build
 
@@ -21,5 +23,6 @@ separate task registers and validates these assets for consumption.
 
 The release uses the single tag `sdk-googletest-1.18.0`. Reproduction clears
 all previous assets and uploads the complete three-platform set after all
-matrix jobs pass. Every archive has an adjacent `.sha256` file; consumers must
-pin the actual published checksum.
+matrix jobs pass. Every archive has an adjacent `.sha256` file. Task 071
+registers these artifacts in the native SDK provision manifest with the
+verified SHA256 values.

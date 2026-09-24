@@ -121,6 +121,7 @@ ai-docs/
 | 049 | [CI 修复：Netgen Linux 制品 ISA 基线与 Windows ASan 链接](task/049-ci-mesh-sigill-windows-asan.md) | 验证基础 | 038, 042, 010 | done |
 | 058 | [项目包提交后的 CI 回归修复](task/058-ci-regression-after-project-package.md) | 验证基础 | 057, 032, 043 | in-progress |
 | 070 | [GoogleTest 三平台 SDK 制品 CI](task/070-googletest-sdk-ci.md) | 验证基础 | 019, 031, 038 | done |
+| 071 | [GoogleTest SDK 消费接入](task/071-googletest-sdk-consumption.md) | 验证基础 | 070, 031 | in-progress |
 
 ## 仓库与文档维护
 

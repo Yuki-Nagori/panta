@@ -70,7 +70,7 @@
 
 ## 风险与回退
 
-FetchContent 使 configure 依赖网络（与托管原则一致，首次构建需联网；拉取结果缓存在构建树 `_deps`）；GTest 编译选项与本树隔离（EXCLUDE_FROM_ALL、告警仅自有 target）。回退仅撤销本任务变更，恢复 003 的手写断言测试实现并在任务记录注明。
+原始 FetchContent 实现曾使 configure 依赖网络，且 Git 历史克隆在慢网下阻塞 Cargo 聚合入口。任务 071 已将现行获取方式替换为固定 URL/SHA256 的三平台静态 SDK，缓存于 `target/panta-deps/sdk`；回退消费切换时使用对应 manifest/构建入口整体回退，不恢复无哈希源码获取。
 
 ## 决策与工作记录
 
@@ -85,4 +85,4 @@ FetchContent 使 configure 依赖网络（与托管原则一致，首次构建�
 
 ## 完成摘要
 
-已交付：googletest v1.18.0 经 FetchContent（完整 SHA 固定）接入 native 测试，仅 `BUILD_TESTING` 下拉取；`foundation` 测试改写为 GTest 断言并以 `gtest_discover_tests` 注册独立用例；GTest 项目规则成文于新增 [gtest.md](../standards/gtest.md)（断言、命名、fixture、浮点容差、death test、mock 边界、第三方隔离），并登记规范索引。固定清单与 baseline 增加 GoogleTest 条目。验证：干净拉取构建、独立用例注册、失败注入可见 gtest 上下文、`BUILD_TESTING=OFF` 零拉取、安装树无测试产物、无改动不重编。剩余限制：MSVC/CRT 组合待 012 runner；gmock 未启用；聚合归 011。后续：004（Cargo 调度 CMake 与运行入口）保持 ready。
+原始交付（2026-09-16）：googletest v1.18.0 经 FetchContent（完整 SHA 固定）接入 native 测试，仅 `BUILD_TESTING` 下拉取；`foundation` 测试改写为 GTest 断言并以 `gtest_discover_tests` 注册独立用例；GTest 项目规则成文于新增 [gtest.md](../standards/gtest.md)（断言、命名、fixture、浮点容差、death test、mock 边界、第三方隔离），并登记规范索引。任务 070/071 后续将 FetchContent 替换为三平台预编译 SDK，现行版本与固定资产见 [依赖获取清单](../standards/dependency-acquisition.md)。原始验证包括干净拉取构建、独立用例注册、失败注入输出、`BUILD_TESTING=OFF` 零拉取、安装树无测试产物、无改动不重编。

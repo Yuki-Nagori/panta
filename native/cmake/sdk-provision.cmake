@@ -1,4 +1,4 @@
-# VTK/OCCT/Netgen 预编译 SDK 供给（任务 031）。
+# VTK/OCCT/Netgen/GoogleTest 预编译 SDK 供给（任务 031/071）。
 #
 # 托管原则（standards/dependency-acquisition.md、modules/native-dependency-supply.md）：
 # - 只消费 manifest 中 URL + SHA256 固定的预编译 SDK；本平台缺资产时立即
@@ -617,3 +617,56 @@ panta_sdk_declare_asset(
   LICENSE
   share/licenses/Netgen/LICENSE
   (LGPL-2.1))
+
+panta_sdk_declare_version(googletest 1.18.0)
+# GoogleTest 1.18.0 测试专用静态 SDK（任务 070/071；workflow run
+# 35972333653 三平台构建、自检、打包与 Release 发布全绿）。上游 commit
+# 063de7e9578f82b369302001269680b4b1553359；C++17，Windows /MD；不含 gmock。
+panta_sdk_declare_asset(
+  googletest
+  macos-arm64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-macos-arm64.tar.gz
+  SHA256
+  f1c28c7121cd2b34beaa0fdbec660b32b2e45ba8d252f14073eb93e357c73579
+  PACKAGE
+  GTest
+  REQUIRED_TARGETS
+  GTest::gtest
+  GTest::gtest_main
+  ABI
+  macos-15-apple-clang-arm64-Release-static-cxx17
+  LICENSE
+  BSD-3-Clause)
+panta_sdk_declare_asset(
+  googletest
+  linux-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-linux-x86_64.tar.gz
+  SHA256
+  ae6bf4752d4e95893d81ce316efd0dc37c433b87cad243c87103f7c78bcf948f
+  PACKAGE
+  GTest
+  REQUIRED_TARGETS
+  GTest::gtest
+  GTest::gtest_main
+  ABI
+  ubuntu-24.04-gcc-x86_64-Release-static-cxx17
+  LICENSE
+  BSD-3-Clause)
+panta_sdk_declare_asset(
+  googletest
+  windows-x86_64
+  URL
+  https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-windows-x86_64.tar.gz
+  SHA256
+  a395b0f227254509f7df1dbd562287556df8d5192c1a940d0cf06e6813c70f96
+  PACKAGE
+  GTest
+  REQUIRED_TARGETS
+  GTest::gtest
+  GTest::gtest_main
+  ABI
+  windows-msvc2022-v143-x64-Release-static-MD-cxx17
+  LICENSE
+  BSD-3-Clause)

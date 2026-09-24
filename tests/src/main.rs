@@ -426,7 +426,16 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     let managed_llvm = managed_root.join("llvm");
     let ninja = panta_build::resolve_ninja(target_root, &cmake)?;
     let qt_bin = target_root.join("panta-deps/qt/staging/bin");
-    let googletest = target_root.join("panta-deps/fetchcontent/googletest-src/CMakeLists.txt");
+    let googletest_triple = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("macos", "aarch64") => "macos-arm64",
+        ("linux", "x86_64") => "linux-x86_64",
+        ("windows", "x86_64") => "windows-x86_64",
+        (os, arch) => return Err(format!("不支持的 GoogleTest SDK 平台：{os}/{arch}").into()),
+    };
+    let googletest = target_root
+        .join("panta-deps/sdk/googletest/1.18.0")
+        .join(googletest_triple)
+        .join("lib/cmake/GTest/GTestConfig.cmake");
     let compile_database = native_dir.join("compile_commands.json");
 
     require_file("托管 CMake", &cmake)?;
@@ -461,7 +470,7 @@ fn verify_toolchain() -> Result<(), Box<dyn Error>> {
         &qt_bin.join(panta_build::exe_name("qmlformat")),
     )?;
     require_file("Qt qmllint", &qt_bin.join(panta_build::exe_name("qmllint")))?;
-    require_file("GoogleTest FetchContent", &googletest)?;
+    require_file("GoogleTest SDK", &googletest)?;
     require_file("native compile_commands.json", &compile_database)?;
     if !cmake.starts_with(&managed_cmake) {
         return Err(format!(

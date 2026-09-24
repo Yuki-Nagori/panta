@@ -21,7 +21,7 @@ GoogleTest 的断言在失败时输出表达式与两侧值；`EXPECT_*` 失败�
 - 参数化用例（`TEST_P`）仅在多实现/多输入矩阵场景使用，不为结构整齐引入；death test（`EXPECT_DEATH`）仅用于进程级不可恢复路径，使用前确认该路径确为 abort/exit 而非可恢复错误。
 - mock（gmock，随 googletest 提供）只用于模块边界的外部依赖隔离，不为内部实现细节打桩；引入时在对应 task 说明被隔离的边界。
 - 测试源按 `tests/cpp/<module>/` 分类；二进制命名 `<被测目标>_test`（如 `panta_foundation_version_test`），构建产物只在构建树中生成，不把测试产物加入安装与导出。
-- 获取与注册：googletest 经 FetchContent 按 [依赖获取](dependency-acquisition.md) 固定点拉取，仅在 `BUILD_TESTING` 下启用并 `EXCLUDE_FROM_ALL`；注册用 `gtest_discover_tests`，ctest 过滤用 `ctest --test-dir <dir> -R <用例名>`。
+- 获取与注册：GoogleTest v1.18.0 通过 `sdk-provision` 按 [依赖获取](dependency-acquisition.md) 固定 URL/SHA256 获取平台静态 SDK，仅在 `BUILD_TESTING=ON` 时启用；`BUILD_TESTING=OFF` 不请求 SDK。注册用 `gtest_discover_tests`，ctest 过滤用 `ctest --test-dir <dir> -R <用例名>`。
 - 第三方隔离：本项目告警选项只作用于自有 target，不为 gtest 关闭或放宽自有告警；gtest 自身的编译选项不回灌本树。
 
 ## 验证
