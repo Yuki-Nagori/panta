@@ -39,4 +39,16 @@ Qt 建议分离界面与业务逻辑，并使用资源系统组织应用资源�
 
 使用所锁定 Qt 提供的 qmllint/格式工具检查实际模块；验证必需属性、导入、绑定循环、窗口缩放和键盘焦点。打包后的资源加载必须独立验证，不能只用源码目录启动成功作为证据。
 
+### 性能基准
+
+每次新增 QML 文件或可复用组件，都要把它实际放进一个可复现的手动性能基准场景；修改会改变对象创建、delegate 数量、属性绑定、布局、JavaScript、渲染或高频交互更新的 QML 时，也要更新受影响的场景。基准入口使用任务 [069](../task/069-project-docks-review-and-ablation.md) 建立的可扩展 CPU / GPU harness；在对应实现 task 中记录组件到场景的映射、运行命令和结果，不能只登记文件名或用静态截图代替测量。
+
+| 要测的成本 | 基准入口与边界 |
+|---|---|
+| 组件构造、模型/delegate 创建与回收、绑定/布局/JavaScript 更新 | `tests/qml/project_docks_cpu_benchmark.cpp`。允许使用 offscreen 场景测 CPU 构造和更新成本，不据此声称 GPU 渲染性能。 |
+| 可见内容的帧呈现、动画或场景更新 | `tests/qml/project_docks_gpu_benchmark.cpp`。必须在真实图形窗口测量，并把结果表述为 Qt Quick 端到端帧间隔；不得称作 GPU 内核耗时。 |
+| 同时影响 CPU 更新和可见渲染 | 两种入口都覆盖。 |
+
+每个新场景选择能代表实际使用的低、典型和较大负载；列表、重复委托等按实际数量测量，并比较适用的组件消融。记录 Qt 版本、平台/图形后端、构建配置、输入规模、预热与采样次数、p50/p95 及测量限制；性能改动还要在同环境和同输入下比较前后结果。性能基准是开发侧诊断工具，不注册为 CTest，也不增加 CI 性能门槛，遵循[性能测试模块](../modules/performance.md)。
+
 VS Code 的 Qt Qml 扩展通过 [工作区配置](../../.vscode/settings.json) 使用 Cargo 供给的 qmlls，并传入 `target/native/debug` 构建目录与 Qt staging 的 QML 导入路径。先执行 `cargo build --locked` 生成模块类型信息；编辑器不自行触发 CMake。若出现 `color was not found [import]` 等导入诊断，先对照 `cargo lint qmllint --check`，再检查 QML Language Server 日志中的工具路径和参数，必要时重启语言服务；不关闭 import 诊断。

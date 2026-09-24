@@ -1,6 +1,6 @@
 # 058 — 项目包提交后的 CI 回归修复
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[057](057-new-project-dialog.md)、[032](032-cross-language-quality-gates.md)、[043](043-root-quality-runner.md)
 - 优先级：P0
@@ -46,11 +46,11 @@
 
 ## 验收标准
 
-- [ ] `cargo format --check` 通过。
-- [ ] Rust coverage functions/lines 门禁在现有 89%/92% 阈值下通过。
-- [ ] macOS sanitizer 的 `Qml.ShellModuleLoads` 通过，且不以跳过该测试规避回归。
-- [ ] 项目包既有 Rust/native 测试继续通过，`git diff --check` 通过。
-- [ ] 任务、索引与实际验证证据一致，无已知损坏状态。
+- [x] `cargo format --check` 通过。
+- [x] Rust coverage functions/lines 门禁在现有 89%/92% 阈值下通过。
+- [x] macOS sanitizer 的 `Qml.ShellModuleLoads` 通过，且不以跳过该测试规避回归。
+- [x] 项目包既有 Rust/native 测试继续通过，`git diff --check` 通过。
+- [x] 任务、索引与实际验证证据一致，无已知损坏状态。
 
 ## 验证计划与结果
 
@@ -63,6 +63,7 @@
 | 2026-09-22 | `cargo check --locked --workspace --all-targets`、`cargo build --locked --workspace`、`cargo run --locked --package panta-tests -- toolchain` | 通过；复用现有 `target/` 中的 LLVM、CMake、Ninja 和 Qt 工具链。 |
 | 2026-09-22 | `cargo test --locked --workspace` | 通过；native 54/54、QML 格式和模块加载测试，以及 Rust/doc tests 全部通过。首次运行的 `Visualization.DefaultWordmark` 超时在重跑中通过，未修改超时配置。 |
 | 2026-09-22 | GitHub Actions run `35712220845` | 该次仍对应修复提交前状态，失败项为 QML/C++/CMake 格式和覆盖率；上述本地修复已覆盖这些失败原因，待新提交触发 CI 后回填。 |
+| 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | 全绿：聚合格式和 Rust coverage gate 通过；macOS sanitizer 中 `Qml.ShellModuleLoads` 53/56 Passed（未跳过），macOS/Linux/Windows Cargo tests 通过，Linux native CTest 56/56、Windows CTest 54/54。CI run success，关闭回归任务。 |
 
 ## 决策与工作记录
 
@@ -70,7 +71,8 @@
 - 2026-09-22：补齐 `ProjectService` 错误路径和清单边界测试，延迟两轮标题栏焦点可见性计算，并修正 C++ 测试格式；本地构建阻塞点确认在 `proc-macro2` build script 启动，而非项目代码或 Qt 依赖。
 - 2026-09-22：补充 `panta-ffi` 项目 service 桥接测试，使覆盖率恢复至门禁以上；按仓库实际 formatter 修正 QML、CMake 和 C++ 排版。
 - 2026-09-22：本地完整验证通过；覆盖率使用已有 `target/llvm-cov-target`，未新增 LLVM target 目录。
+- 2026-09-24：run 36001859191 全绿；Rust coverage 与聚合格式门禁通过，macOS sanitizer 的 `Qml.ShellModuleLoads` 未跳过且通过，关闭本任务。
 
 ## 完成摘要
 
-待完成。
+三类 CI 回归均已修复并由 run 36001859191 复验：格式检查与 Rust 覆盖率门禁通过，macOS sanitizer 的 `Qml.ShellModuleLoads` 通过，项目包 Rust/native 测试在三平台继续通过。覆盖率阈值未降低，测试未被跳过。

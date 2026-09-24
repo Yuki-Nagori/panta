@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008–009、011、012、014、018–020、026、036、039–041、043–046 已完成（Rust 骨架、主平台与依赖固定清单、native 构建骨架、三平台 CI、GTest 规则、Cargo 调度 CMake、Qt Quick 主窗口、Rust/C++ FFI 最小契约、后台任务与错误/日志基础、统一测试与质量入口、CMake/Ninja/Qt/GoogleTest 托管供给、Python/uv 质量工具、跨平台 native CI 修复、FFI 构建链修复、统一 Cargo 构建编排入口、构建产物归一/第三方缓存共享、CI 依赖缓存与可复现检查、Windows CI 停滞诊断与修复、Windows CI 分支代码审查与收敛、QML 静态模块注册边界、根目录质量入口与测试聚合、CI 触发拆分与缓存预算、OCCT 依赖与 STEP 适配冒烟均落地并验证），整轮三平台 CI 曾全绿；2026-09-24 `ec2f919` 后的 Rust coverage gate 已在本地复现并修复，`cargo coverage` 函数/行覆盖率 90.34% / 93.95%，固定门槛为 89% / 92%，待 Ubuntu CI 复验（任务 032）。031 已登记三平台 manifest：VTK WebGPU 制品 `sdk-vtk-9.7.0-webgpu`（Linux 为 Wayland-only，纯 X11 需单独变体）与 OCCT/Netgen 制品 `sdk-occt-netgen-8.0.1-6.2.2604`。其剩余项即 007/010 的集成证据，可并行推进——007 已完成原生叠加实现并恢复三平台 CI 全绿（Windows 测试挂起结案），剩目标平台真实窗口复验与收尾；010 已完成 Netgen 适配实现并通过 macOS 全量本机验证，三平台 CI 复验后收尾，其余基础设施任务未完成。仓库与文档维护任务单独列出。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008–009、011、012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest；007 仍待真实窗口/硬件渲染生命周期验收，010 的核心网格测试三平台通过但因固定 Netgen SDK 的 OCC mesh 安全销毁缺陷处于 blocked。其他未完成项及其剩余条件见下方 task 表和任务 077 的逐项审计。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -54,7 +54,7 @@ ai-docs/
 | 007 | [VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031, 038 | in-progress |
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | done |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | done |
-| 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | in-progress |
+| 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | blocked |
 | 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | done |
 | 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | done |
 | 013 | [桌面安装布局与部署冒烟](task/013-desktop-deployment-smoke.md) | 交付基础 | 011 | ready |
@@ -122,10 +122,10 @@ ai-docs/
 | 047 | [崩溃信号处理与日志落地](task/047-crash-signal-logging.md) | 验证基础 | 008 | in-progress |
 | 048 | [性能基线与性能测试体系](task/048-performance-testing.md) | 验证基础 | 011, 032 | in-progress |
 | 049 | [CI 修复：Netgen Linux 制品 ISA 基线与 Windows ASan 链接](task/049-ci-mesh-sigill-windows-asan.md) | 验证基础 | 038, 042, 010 | done |
-| 058 | [项目包提交后的 CI 回归修复](task/058-ci-regression-after-project-package.md) | 验证基础 | 057, 032, 043 | in-progress |
-| 070 | [GoogleTest 三平台 SDK 制品 CI](task/070-googletest-sdk-ci.md) | 验证基础 | 019, 031, 038 | in-progress |
-| 071 | [GoogleTest SDK 消费接入](task/071-googletest-sdk-consumption.md) | 验证基础 | 070, 031 | in-progress |
-| 075 | [CI 修复：Windows GoogleTest ABI 与 Qt benchmark lint](task/075-ci-windows-gtest-and-qt-lint.md) | 验证基础 | 070, 071, 046 | in-progress |
+| 058 | [项目包提交后的 CI 回归修复](task/058-ci-regression-after-project-package.md) | 验证基础 | 057, 032, 043 | done |
+| 070 | [GoogleTest 三平台 SDK 制品 CI](task/070-googletest-sdk-ci.md) | 验证基础 | 019, 031, 038 | done |
+| 071 | [GoogleTest SDK 消费接入](task/071-googletest-sdk-consumption.md) | 验证基础 | 070, 031 | done |
+| 075 | [CI 修复：Windows GoogleTest ABI 与 Qt benchmark lint](task/075-ci-windows-gtest-and-qt-lint.md) | 验证基础 | 070, 071, 046 | done |
 | 076 | [Cargo 测试与质量 runner 维护](task/076-panta-tests-runner-maintenance.md) | 验证基础 | 011, 043 | done |
 
 ## 仓库与文档维护
@@ -139,6 +139,8 @@ ai-docs/
 | 028 | [QML 原子组件与主题 DSL 规划](task/028-qml-theme-planning.md) | 文档维护 | — | done |
 | 066 | [重库适配边界与 Rust 领域模块规划](task/066-native-domain-boundaries.md) | 架构与规范 | 065 | done |
 | 072 | [Flow DSL 与 Rust 状态机方案评估](task/072-flow-state-machine-planning.md) | 架构与文档准备 | 008, 066, 067 | done |
+| 077 | [进行中任务状态盘点](task/077-active-task-status-audit.md) | 文档维护 | — | done |
+| 078 | [QML 性能基准登记规范](task/078-qml-performance-benchmark-policy.md) | 文档维护 | 069, 048 | done |
 
 ## 执行顺序与交付边界
 
@@ -156,4 +158,4 @@ Flow 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 
-后续新任务使用当前最大编号加一，不复用已有编号。001–006、009 已完成；主线当前项 [010 Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md)（CAE 接入）已实现并通过 macOS 全量验证，待 push 后三平台 CI 复验收尾；[007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已完成原生叠加实现且三平台 CI 全绿，剩真实窗口复验收尾。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。主线仍有 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 的真实窗口验收、[010 Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) 的 SDK 生命周期阻塞，以及 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) / [038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 的运行时分发、Linux 基线与 SBOM/provenance 收尾。全部 in-progress 项已在 [077 状态盘点](task/077-active-task-status-audit.md) 对照验收与 CI 证据逐项检查。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

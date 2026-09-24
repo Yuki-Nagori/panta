@@ -49,34 +49,26 @@
 
 ## 验收标准
 
-- [ ] 正常开发 configure/build 只消费校验通过的预编译 SDK，不编译 VTK、OCCT 或 Netgen 第三方源码。
+- [x] 正常开发 configure/build 只消费校验通过的预编译 SDK，不编译 VTK、OCCT 或 Netgen 第三方源码。
 - [x] 每个支持平台的包记录 URL、SHA256、版本、架构、ABI、Qt 兼容范围、模块、许可证和 CMake package 入口。
 - [x] 缺包、哈希错误、架构/ABI 不匹配、缺少 `RenderingWebGPU`/`RenderingUI` 或 CMake target 时立即失败，并显示可操作诊断；不退回系统库或隐式源码编译。
 - [x] 清除缓存后可按 manifest 重建，已有正确缓存支持离线重复 configure；失败不会破坏另一版本缓存。
 - [ ] 007、009、010 能以 imported targets 接入，不需要在各适配器重复写平台路径；安装产物能定位运行库和许可证。
-- [ ] 三平台验证证据真实记录；未提供官方包的平台明确标记未覆盖，并有下一步制品任务或决策。
+- [x] 三平台验证证据真实记录；未提供官方包的平台明确标记未覆盖，并有下一步制品任务或决策。
 - [ ] 代码、构建、文档、固定清单与 task 自洽，废弃源码入口和失效引用已清理。
 
 ## 验证计划与结果
 
-执行供给脚本/manifest 的哈希、缓存、离线、失败诊断测试；对每个平台运行 CMake configure 与最小链接/运行冒烟。第三方库本体测试不在此重复，由 007/009/010 负责集成行为。fixture 级供给路径验证已执行（见下表）；真实 SDK 的三平台 configure/package 冒烟待资产齐备后补齐。
+执行供给脚本/manifest 的哈希、缓存、离线和失败诊断测试；对每个平台运行 CMake configure 与最小链接/运行冒烟。fixture 级供给路径、三平台 SDK 制品生产/自检、macOS 生产 consumer 以及 run 36001859191 的三平台 SDK 消费和 CTest 均有记录。剩余应用运行时分发与真实窗口/引擎集成由 007/009/010 验收，不因 SDK configure 成功而视为闭环。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-09-16 | 仅完成规划 | 未执行；等待逐平台预编译 SDK 盘点 |
-| 2026-09-17 | `gh api repos/Open-Cascade-SAS/OCCT/releases/latest`；下载并检查 `opencascade-release-no-pch.zip` | OCCT `V8.0.1` 提供官方 Windows 预编译 SDK；外层归档 SHA256 为 `307f694f1d4a280c7f58ee2ddb69a7f7e2b78d82749339efd40ce8b8b116d76c`，内层 `opencascade-8.0.1-vc14-64.zip` SHA256 为 `24d947bf045e8da43f559592d28eee4df389dd8034754d70f3ab341346a22ca8`；归档含 `cmake/OpenCASCADEConfig.cmake`、头文件、Windows DLL/库和许可证。尚未证明其与本项目 Qt/编译器 ABI 的集成。 |
-| 2026-09-17 | [VTK 官方下载页](https://vtk.org/download/) 与最新 tag `v9.7.0` 资产盘点 | 官方页面明确提供源码归档、Python wheels，并提到 SDK packages；本轮未找到可直接消费的、包含 `GUISupportQtQuick`/`QQuickVTKItem` 的 macOS arm64、Linux 或 Windows C++ SDK 及 SHA256。因此不能将 Python wheel 或源码归档当作 C++ 预编译依赖；需另立项目制品生产/发布任务。 |
-| 2026-09-17 | Netgen tag/release 资产盘点（当前清单仍固定 `v6.2.2604`） | 更新 tag `v6.2.2607` 可见但没有对应 GitHub release 预编译资产；当前 `v6.2.2604` 也未取得三平台 SDK。保持现有版本候选和 commit pin，不在本任务内擅自升级或触发源码构建；需要与 OCCT ABI 一起由后续制品任务验证。 |
-| 2026-09-17 | `ctest --preset debug -R Build.SdkProvision`（macOS arm64，native 构建树 `target/native/debug`） | 通过：10 组场景全绿——038 布局成功供给（下载/SHA256 校验/解包/原子发布/marker/`find_package` CONFIG/imported target 自检）、归档缓存离线复用（删除源归档后新 consumer 成功）、marker 损坏按缓存归档重建、版本目录隔离（v1/v2 并存互不覆盖）、哈希不符拒收并清场、生产 manifest 缺资产诊断（vtk 报出固定版本 9.7.0 并指向 038）、OCCT 内嵌归档+包装目录布局（内层 SHA256 校验、外层残留不进 staging）、归档内配置歧义拒绝、未登记名诊断、SHA256 格式登记校验。测试自清理工作目录，连续两次运行均通过。 |
-| 2026-09-17 | `ctest --preset debug`（macOS arm64） | 16/16 全绿（15 项既有 + Build.SdkProvision），SDK 供给接入未影响既有构建与测试。 |
-| 2026-09-17 | `cargo build --locked`（macOS arm64） | 通过：build.rs 注入 `PANTA_SDK_PROVISION_DIR=target/panta-deps/sdk`，共享树重新 configure 引入 sdk-provision.cmake（manifest 登记 + 函数定义，不触发下载）；消费方任务未接入，生产构建零 SDK 下载。 |
-| 2026-09-17 | 三平台 CI（push 5130ca3，run [35230584355](https://github.com/Yuki-Nagori/panta/actions/runs/35230584355)） | windows-2022 / macos-latest / ubuntu-latest 全绿（5m26s）：sdk-provision.cmake 的解析与 manifest 登记在三平台 configure 均执行通过。注意 CI 当前不运行 CTest（011 聚合前），`Build.SdkProvision` 的 Windows/Linux 执行证据待 CI 扩展或平台实测补齐。 |
-| 2026-09-18 | 历史：038 Release `sdk-vtk-9.7.0` 落地（workflow run [35242622228](https://github.com/Yuki-Nagori/panta/actions/runs/35242622228)，三平台 success，1h58m）；`panta_sdk_declare_asset` 按发布资产 URL/SHA256 登记旧 vtk macos-arm64 / linux-x86_64 / windows-x86_64 | 历史 Qt/OpenGL 资产；REQUIRED_TARGETS `VTK::GUISupportQtQuick VTK::RenderingQt`，已被 WebGPU Release 替换 |
-| 2026-09-18 | 生产 consumer 烟测（macOS arm64）：`cmake -S native/cmake/tests/sdk/consumer -DCONSUMER_KIND=production -DSDK_NAME=vtk -DPANTA_SDK_PROVISION_DIR=target/panta-deps/sdk -DCMAKE_PREFIX_PATH=<Qt staging>` | 通过：从 GitHub Release 下载 58MB 归档、SHA256 校验、解包发布、`find_package(VTK CONFIG)` 与 required-target 自检全部成功（staging 293MB）。consumer 工程改为 `LANGUAGES CXX`（VTK config 的 add_library(IMPORTED)/FindThreads 需要编译语言，NONE 会失败）；fixture 负例"生产缺资产"由 vtk 改 occt（vtk 已有资产，避免测试触网）。二跑零下载（离线复用）；`ctest --preset debug` 27/27 |
-| 2026-09-20 | 007 WebGPU 硬件窗口路线制品契约更新 | 旧 Release 的 `GUISupportQtQuick`/`RenderingQt` 制品不满足新路径；新制品必须提供 `VTK::RenderingWebGPU`、`VTK::RenderingUI`，并在 `panta-sdk.json` 标记 WebGPU、窗口系统和 hardware window（Linux Wayland、macOS Cocoa、Windows Win32）；纯 X11 需单独资产变体，消费 manifest 等新 Release 资产和 SHA256 回填后再切换 |
-| 2026-09-20 | Release [sdk-vtk-9.7.0-webgpu](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-vtk-9.7.0-webgpu)（workflow run [35479202321](https://github.com/Yuki-Nagori/panta/actions/runs/35479202321)，三平台 success） | 三个平台归档、`.sha256`、`panta-sdk.json` 与 selfcheck/package 均通过；manifest 已切换到新 Release。真实校验：macOS `191f93371d612978…`、Linux `01a84e97d35b0a0f…`、Windows `771877f2c8cb1701…`；required targets 为 `VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn`，窗口系统分别为 Cocoa、Wayland、Win32 |
-| 2026-09-18 | Release `sdk-occt-netgen-8.0.1-6.2.2604` 落地（run [35307708622](https://github.com/Yuki-Nagori/panta/actions/runs/35307708622) 三平台 success，38m）；manifest 按 6 个资产 URL/SHA256 登记 occt/netgen 三平台，**OCCT 官方 Windows 条目被自托管制品替换**（维护者决策：仅 Windows 有归档、跨平台工具链不一致） | SHA256 取自各 `.sha256` 资产；occt `PACKAGE=OpenCASCADE`（targets `TKernel TKDESTEP`）、netgen `PACKAGE=Netgen`（`ngcore nglib`——包配置为大写 `NetgenConfig.cmake`，Linux ext4 大小写敏感约束实证于 run 35304961896） |
-| 2026-09-18 | 生产 consumer 烟测（macOS arm64）：occt 与 netgen 各自从 Release 真实下载消费（netgen 未借助额外 CMAKE_PREFIX_PATH，验证供给自足性） | 双双通过：SHA256 校验、解包、`find_package` 与 required-target 自检成功（occt 111MB、netgen 9.5MB staging）；fixture 套件"缺资产"负例改为 consumer 的 missing-asset 模式（不再依赖生产 manifest 状态、不触网）；`ctest --preset debug -R Build.SdkProvision` 通过。**至此 VTK/OCCT/Netgen 三依赖 9 条 manifest 全部登记并经真实消费验证——依赖引入完毕**，007/009/010 供给前置全部满足 |
+| 2026-09-17 | 官方 VTK、OCCT、Netgen 资产盘点 | 仅 OCCT 8.0.1 有可复核的官方 Windows SDK，无法覆盖本项目所需的三平台 ABI；VTK 缺可用 C++ SDK，Netgen 无固定版本预编译资产。因此转为项目维护的固定 SDK 制品，不以源码/Python 包代替 C++ SDK。 |
+| 2026-09-17 | `ctest --preset debug -R Build.SdkProvision`、`ctest --preset debug`、`cargo build --locked`（macOS arm64） | SDK 供给 fixture 10/10、CTest 16/16、Cargo build 通过；覆盖 SHA256、离线缓存、坏缓存、归档布局、`find_package` 与 imported targets。早期三平台 configure CI [35230584355](https://github.com/Yuki-Nagori/panta/actions/runs/35230584355) 通过，但当时 CI 尚未聚合 CTest。 |
+| 2026-09-18 | OCCT/Netgen Release [35307708622](https://github.com/Yuki-Nagori/panta/actions/runs/35307708622)；macOS 生产 consumer | 三平台六个 SDK 资产、许可证与 manifest 通过；macOS 两个 consumer 完成 Release 下载、哈希校验、`find_package` 和 target 自检，离线复用通过。Netgen 包名大小写差异已按 Linux 实测统一为 `Netgen`。 |
+| 2026-09-20 | VTK WebGPU Release [sdk-vtk-9.7.0-webgpu](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-vtk-9.7.0-webgpu)，run [35479202321](https://github.com/Yuki-Nagori/panta/actions/runs/35479202321) | 三平台 production/selfcheck/package 成功；manifest 记录 SHA256、C++20、WebGPU targets 与 Cocoa/Wayland/Win32 窗口系统。旧 Qt/OpenGL 制品不再作为当前输入。 |
+| 2026-09-24 | SDK-consuming CI [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191) | macOS/Linux/Windows 构建与 CTest 通过（56/56、56/56、54/54）；确认当前 SDK 可被测试工程消费，不代表应用运行时分发或真实窗口集成已完成。 |
+
 
 ## 风险与回退
 
@@ -84,10 +76,9 @@
 
 ## 决策与工作记录
 
-- 2026-09-16：根据维护者要求将 native 第三方依赖改为预编译优先，新增本任务统一供给；007 暂不接入源码构建。
-- 2026-09-17（官方资产盘点）：OCCT `V8.0.1` 的 Windows 官方归档是当前唯一取得可复核 CMake SDK 的候选，URL 为 `https://github.com/Open-Cascade-SAS/OCCT/releases/download/V8.0.1/opencascade-release-no-pch.zip`；其余平台仍未覆盖。VTK 官方渠道本轮只确认源码归档/Python wheels/SDK 提示，未确认可用 C++ SDK；Netgen `v6.2.2607` 只有 tag、没有 release 资产。以上只作为供给实现的输入，不代表集成通过。
-- 2026-09-17（范围决策）：在 macOS arm64、Linux x86_64/aarch64、Windows x86_64 的固定平台资产完成 URL/SHA256/ABI/CMake target 记录前，031 保持 `in-progress`，007/009/010 不启动第三方源码构建；缺少上游资产时另立可缓存、可校验的项目制品任务。
-- 2026-09-17（供给基础设施增量，已实施）：`native/cmake/sdk-provision.cmake` 落地：`panta_sdk_declare_version`/`panta_sdk_declare_asset` 登记 manifest，`panta_require_sdk` 完成归档下载（`EXPECTED_HASH` 强校验、缓存哈希复检）、两段临时目录解包（支持 OCCT 内嵌归档）、恰一配置文件定位与 find_package 前缀推导、原子 rename 发布（`.panta-sdk-provisioned` marker 记录哈希与前缀）与 imported target 自检；缺资产/哈希不符/配置缺失或歧义/缺 target 均立即失败并给出指向 038 的修复动作。staging 布局 `target/panta-deps/sdk/<name>/<version>/<triple>/`（build.rs 注入共享根，presets 默认构建树内）。OCCT Windows 资产按盘点数据登记为首个条目（ABI 集成未验证，留待 009/038）；VTK/Netgen 全平台无条目。验证证据见上表（Build.SdkProvision 10 场景 + ctest 16/16 + cargo build）。剩余：三平台 CI 尚未跑 ctest（011 聚合前 CTest 不在 CI 检查内，Windows/Linux 的 Build.SdkProvision 执行待 CI 扩展或本地证据补齐）、全平台资产登记（038 制品）、真实 SDK configure/package 冒烟。
+- 2026-09-16–17：确定预编译 SDK 优先。因上游资产不能覆盖三平台 ABI，落地 `sdk-provision.cmake`，以 manifest、SHA256、隔离缓存、原子 staging 和 imported-target 自检供给依赖；fixture 与早期构建证据见验证表。
+- 2026-09-18–20：VTK WebGPU、OCCT 与 Netgen 三平台制品发布并登记；OCCT/Netgen 作为 ABI 配对制品，VTK 则独立发布。旧 VTK Qt/OpenGL manifest 已替换。
+- 2026-09-24：run 360018 提供三平台 SDK 消费和 native CTest 证据。应用运行时分发、真实窗口/引擎集成、Linux glibc 基线及 SBOM/provenance 仍由本任务与 007/009/010 收尾。
 
 ## 完成摘要
 

@@ -1,6 +1,6 @@
 # 071 — GoogleTest SDK 消费接入
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[070 GoogleTest 三平台 SDK 制品 CI](070-googletest-sdk-ci.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)
 - 优先级：P1
@@ -73,7 +73,7 @@
 - [x] `BUILD_TESTING=OFF` 不请求、不下载、不查找 GoogleTest SDK。
 - [x] `cargo test --locked --workspace` 在当前 macOS 平台通过；native CTest 中各 GoogleTest suite 全绿。
 - [x] SDK 归档二次复用不下载；损坏 marker/哈希时按现有 provision 契约重建或拒绝。
-- [ ] 三平台消费 CI 使用固定资产完成构建与测试；task / index / 固定清单已同步。
+- [x] 三平台消费 CI 使用固定资产完成构建与测试；task / index / 固定清单已同步。
 
 ## 验证计划与结果
 
@@ -88,10 +88,11 @@
 | 2026-09-24 | GitHub Actions run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400)：下载三平台 `.sha256` sidecar，并与 Release API archive digest 对照 | 新制品摘要准确且 Release 资产完整 | 通过；三平台 sidecar 值逐一等于 Release API 对应 `.tar.gz` digest，已同步至 manifest 与本 task |
 | 2026-09-24 | macOS：更新三平台摘要后运行 `cargo test --locked --workspace` | staging 用新 manifest 摘要下载/接受当前平台 SDK，native 与 Rust 测试通过 | 通过；staging marker SHA256 为 `654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`，native CTest 56/56 |
 | 2026-09-24 | GitHub Actions run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) | 三平台 consumer CI 使用新 Release 摘要通过 | 该 run 的 commit `262ad8b` 尚未包含新 SHA；Windows 比较旧期望值与新资产 digest 后按设计拒绝，不能视为新 manifest 的消费者失败。下一次 push CI 待复验 |
+| 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | macOS arm64、Linux x86_64、Windows x86_64 使用新 manifest 完成 build/test；Windows sanitizer 与固定 ABI 校验通过 | 全绿。三平台 Cargo build/test 均成功，Windows MSVC sanitizer 成功；Release API 的三个归档 digest 与 manifest SHA256 一致 |
 
 ## 风险与回退
 
-SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT。任务 070 早期 Windows 生产自检未覆盖该边界，run 35992062001 已暴露 MinGW/MSVC 不匹配；任务 075 固定生产工具链并重产归档。在 manifest 摘要更新且 consumer CI 通过前，本任务保持 in-progress。Release 资产被删除或哈希变化时 manifest 强校验会阻断 configure，不回退系统包或源码克隆；恢复对应资产或回退整笔消费接入即可。
+SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT。任务 070 早期 Windows 生产自检未覆盖该边界，run 35992062001 已暴露 MinGW/MSVC 不匹配；任务 075 固定生产工具链并重产归档。run 36001859191 已验证更新后的 manifest 与三平台消费者，其中 Windows build 和 sanitizer 通过。Release 资产被删除或哈希变化时 manifest 强校验会阻断 configure，不回退系统包或源码克隆；恢复对应资产或回退整笔消费接入即可。
 
 ## 决策与工作记录
 
@@ -100,7 +101,8 @@ SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT。�
 - 2026-09-24：平台支持限定为 macOS arm64、Linux x86_64、Windows x86_64；其他 OS/架构组合明确报错。
 - 2026-09-24：完成 manifest、CMake 消费、toolchain 检查及文档迁移；macOS 聚合测试两次通过、`BUILD_TESTING=OFF` configure 和 toolchain 检查通过。等待三平台消费者 CI 结果后关闭任务。
 - 2026-09-24：run 35992062001 的 Linux/macOS consumer checks 通过，但 Windows normal build 和 sanitizer 均在链接 GTest 时失败；确认 Release Windows `libgtest.a` 是 MinGW ABI。跟踪任务 075 将修复 Windows producer、自检与资产摘要。
+- 2026-09-24：run 36001859191 在三平台完成 Cargo build/test，Windows sanitizer 及 Linux native/QML 检查也通过；Release API digest 与 manifest SHA256 匹配，关闭消费接入任务。
 
 ## 完成摘要
 
-接入实现与本地 macOS 验证已完成：GoogleTest 静态 SDK 通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。macOS Cargo 聚合测试（native CTest 56/56）、缓存复用、`BUILD_TESTING=OFF` configure、toolchain 检查及格式检查通过。run 35992062001 的 Linux/macOS consumer checks 通过，Windows 因 SDK ABI 错配失败；等待任务 075 重产归档并完成三平台 consumer CI。
+GoogleTest 静态 SDK 现通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。三平台归档来自 MSVC 修正后的 Release，API digest 与 manifest 摘要一致；run 36001859191 的三平台 Cargo build/test、Windows sanitizer 和相关质量检查全绿，生产与消费闭环完成。

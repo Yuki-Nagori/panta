@@ -1,6 +1,6 @@
 # 010 — Netgen 接入与最小 Mesh IR
 
-- 状态：in-progress
+- 状态：blocked
 - 阶段：CAE 接入基础
 - 依赖：[009](009-occt-adapter-smoke.md)（已完成）
 - 优先级：P1
@@ -11,7 +11,7 @@
 
 证明 Netgen/OCCT 组合可生成并转换小型分析网格，固定后续业务使用的数据边界。
 
-本任务尚未实施；拟改路径不代表文件已存在，执行前核对依赖任务的实际产物。
+Netgen 适配器、Mesh IR 转换和跨平台消费测试已实现。当前仅阻塞于固定 Netgen 制品在释放 OCC 生成的网格对象时触发上游无效释放；不得把进程生命周期保留对象当作已完成的正常清理路径。
 
 ## 必读
 
@@ -31,6 +31,8 @@
 
 开始条件：所列依赖任务完成且有验证记录；动手前核实所需工具和主平台。步骤中尚未确定的版本、接口、目录或工具须先写入下方决策记录，并同步受影响规范。依赖未完成时保持 planned；外部条件无法满足时改 blocked 并写具体原因。
 
+当前阻塞：Netgen v6.2.2604 的 OCC 生成 mesh 调用 `Ng_DeleteMesh` 会触发 `malloc: pointer being freed was not allocated`，在没有自有转换代码的探针中可复现。适配器现暂存该对象至进程结束以避免崩溃。只有任务 038 固定并发布包含上游释放修复的 SDK 后，才能恢复销毁并验证重复生成/释放；该制品更新前本任务保持 blocked。边界映射表持久化属于后续网格业务范围，不阻塞本任务。
+
 ## 实施步骤
 
 1. 核对固定 Netgen 的 C++ 接口、OCC 支持和导出配置，确认实际 OCCT ABI 组合。
@@ -48,16 +50,17 @@ native/mesh/（include/panta/mesh/ 公共契约 + src/netgen/ 适配器，与 ge
 
 ## 验收标准
 
-- [ ] 小模型生成体网格并转成自有 IR，索引范围与单元方向检查通过。
-- [ ] 边界/区域映射可核验，参数单位明确，失败不会发布半成品。
-- [ ] 依赖基线更新为实际验证结果，没有混入不需要的 NGSolve solver。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [x] 小模型生成体网格并转成自有 IR，索引范围与单元方向检查通过。
+- [x] 边界/区域映射可核验，参数单位明确，失败不会发布半成品。
+- [x] 依赖基线更新为实际验证结果，没有混入不需要的 NGSolve solver。
+- [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
-- [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [ ] 固定 Netgen SDK 提供安全的 OCC mesh 销毁路径；适配器在重复生成后能释放网格，且生命周期测试通过。
 
 ## 验证计划与结果
 
-上方命令和场景均为待执行计划。只在对应入口存在后执行，记录 cwd、平台/版本、完整命令、结果和必要日志路径；手工图形操作记录步骤与观察。失败、跳过及未覆盖范围分别注明。
+上方命令和场景定义验收边界；下表记录已执行验证与历史取证。后续验证记录 cwd、平台/版本、完整命令、结果和必要日志路径；失败、跳过及未覆盖范围分别注明。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
@@ -69,7 +72,7 @@ native/mesh/（include/panta/mesh/ 公共契约 + src/netgen/ 适配器，与 ge
 | 2026-09-20 | 异常边界实测 | `Ng_OCC_Load_STEP` 对不可解析输入抛 C++ 异常（"Couldn't load OCC geometry"）而非返回空；适配器边界捕获转 `kGeometryLoadFailed`，其余阶段异常兜底转 `kInternalFailure` 并丢弃候选 |
 | 2026-09-20 | `cargo build --locked` + `ctest -R "NetgenMesher\|MeshIr"` | 通过：NetgenMesher 5/5（box 摘要：region 1、边界分组 6、体积 6000±60 mm³、校验通过；maxh 10 vs 3 单元数递增；缺失文件 kFileNotFound；垃圾输入 kGeometryLoadFailed 不崩溃；失败后恢复生成）+ MeshIr 8/8 |
 | 2026-09-20 | `ctest` 全量 + `cargo test --locked --workspace` + `cargo lint` + `cargo format --check` | 通过：ctest 49/49（既有 41 项不受影响）；workspace 18 个测试目标全 ok；lint（clippy/machete/cmake/qmllint/clang-tidy/includes/cppcheck）零告警 |
-| 待 CI | push 后三平台 CI（018 矩阵） | Linux/Windows 首次 configure 下载 netgen 制品并编译本模块；Linux 验证 OCCT 工具链全集直接依赖 + 构建策略（DT_RUNPATH 非传递），Windows 验证 DLL 加载。此前 010 验收项不勾选、任务保持 in-progress |
+| 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`，三平台 Linux CTest、macOS sanitizer CTest、Windows CTest | 三平台实际消费固定 SDK；`NetgenMesher` 5/5、`MeshIr` 8/8，Windows DLL 加载与 mesh tests 通过。Linux native CTest 56/56；macOS ASan/UBSan CTest 56/56；Windows CTest 54/54。仅安全销毁仍受固定制品上游缺陷阻塞。 |
 
 ## 风险与回退
 
@@ -82,8 +85,9 @@ native/mesh/（include/panta/mesh/ 公共契约 + src/netgen/ 适配器，与 ge
 - 2026-09-20（结构与消费）：模块布局与 007/009 适配层同构——`native/mesh/include/panta/mesh/` 公共契约（零第三方类型）+ `src/netgen/` 唯一 Netgen 头位置；单静态库 `panta_mesh`（IR 独立性在公共头类型层保证，不拆 core 子库；安装导出待业务任务）。OCCT imported targets 为目录作用域，mesh 目录内再次 `panta_require_sdk("occt")`（缓存 marker 命中零下载）；OCCT 工具链全集按制品 NetgenConfig 显式链接并作为可执行文件直接依赖——Linux DT_RUNPATH 不传递，传递性依赖无法经可执行文件 rpath 解析。
 - 2026-09-20（API 选型）：nglib v1 的 OCC 生成流程 + libnglib 同源 C++ 头读取（区域=体单元域号、边界=FD `SurfNr`，压缩为 0 起连续 ID）；不从 Python 示例推断 C++ 签名，全部以本地 SDK 头与实测为准。制品符号位于 `namespace nglib` 而头文件声明在全局——按制品 ABI 把 nglib 头包含进 namespace 后限定调用；`mystdlib.h` 的 `using namespace std` 是 netgen 头的上游契约，污染仅限适配器 TU。
 - 2026-09-20（缺陷与取舍）：`Ng_DeleteMesh` 在 OCC 网格化对象上触发上游过渡态缺陷（证据见验证表），按官方示例模式保留网格对象至进程结束并登记 TODO(task 010)（解除条件：038 将制品重固定至含修复的上游版本）；方向归一化在转换层完成（`invert_tets` 未生效实测）；两者均不改变 IR 契约。
-- 待记录：三平台 CI 复验；多区域/内部面几何（fuse/glue/compound 语义）与边界映射表持久化归网格业务任务。
+- 2026-09-24：run 36001859191 三平台 NetgenMesher / MeshIr 与消费 CTest 通过；CI 收尾不再是阻塞项。仍无法安全释放 OCC mesh 对象，按当前 SDK 上游缺陷将任务状态改为 blocked，解除条件为 038 发布带修复的新 Netgen SDK 并完成释放回归。
+- 多区域/内部面几何（fuse/glue/compound 语义）与边界映射表持久化归网格业务任务，不作为本任务剩余验收项。
 
 ## 完成摘要
 
-未完成。macOS arm64 已实现并通过全量本机验证（Netgen/OCCT 成对消费、Mesh IR 转换、方向归一化、异常边界、失败恢复）；三平台 CI 复验通过、验收项核实后，与索引一起标 done。遗留：网格对象释放恢复（制品升级后）、边界映射表持久化（业务任务）。
+核心功能与平台消费验收已完成：macOS 本机验证、run 36001859191 三平台 NetgenMesher/MeshIr 测试均通过。任务当前 blocked：固定 Netgen v6.2.2604 对 OCC 生成对象调用 `Ng_DeleteMesh` 会无效释放；待任务 038 升级至含上游修复的制品后恢复对象销毁并通过生命周期回归。边界映射表持久化由后续网格业务任务承接。

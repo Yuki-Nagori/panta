@@ -22,7 +22,7 @@
 ## 范围与非目标
 
 范围：Rust `panta-foundation` 崩溃处理器（POSIX 全量：信号名/pid/回溯落盘；
-Windows 最小信号写出）、经 `panta-ffi` 暴露、app 入口安装、fork 自验测试。
+Windows 最小 SEH 记录写出）、经 `panta-ffi` 暴露、app 入口安装，以及经 Cargo 运行的平台专属测试（POSIX 子进程信号测试、Windows 异常过滤器验证）。
 `panta-core` 保持领域模型职责，不承载该进程级平台设施。非目标：完整符号化（.ips 对照）、
 minidump/WER、Qt 消息处理、远程上报。
 
@@ -34,15 +34,15 @@ minidump/WER、Qt 消息处理、远程上报。
 2. 处理器仅用 async-signal-safe 操作（write/整数格式化）；回溯
    `backtrace_symbols_fd` 为 best-effort（崩溃点在分配器内时可能缺失，
    头文件注明取舍）。
-3. app main 入口首行安装；fork 自验测试：子进程 raise(SIGSEGV)，父进程
-   断言子进程死于 SIGSEGV 且日志含信号与 pid。
+3. app main 入口首行安装；macOS/Linux 在 Rust 测试中 fork 子进程触发
+   SIGSEGV，父进程断言原信号终止及日志内容；Windows 使用独立子进程验证
+   异常记录写入后继续默认 WER 处置，不能在测试进程内直接触发未处理异常。
 
 ## 验收标准
 
-- [ ] 崩溃信号触发时 stderr 与日志文件均有信号名/pid 记录，进程仍以原
-      信号终止（.ips 照常生成）。
-- [ ] fork 自验 CTest 三平台通过。
-- [ ] 文档、task、索引同步；无未登记兼容代码。
+- [ ] macOS/Linux 子进程触发 POSIX 崩溃信号时，stderr 与日志文件均有信号名/pid，子进程仍以原信号终止；macOS `.ips` 语义保留。
+- [ ] Windows 子进程触发 SEH 后，stderr 与日志文件记录异常码/pid，并继续 Windows 默认 WER 处理；不在父测试进程内触发异常。
+- [x] macOS/Linux POSIX 行为测试与 Windows 安装 smoke 经 Cargo 入口执行；测试注册方式、文档、task 与索引一致，无未登记兼容代码。
 
 ## 验证计划与结果
 
@@ -53,6 +53,7 @@ minidump/WER、Qt 消息处理、远程上报。
 | 2026-09-19 | macOS arm64；`cargo build --locked` | 通过；panta-foundation → panta-ffi staticlib → Cargo 调度 native/VTK 构建链成功 |
 | 2026-09-20 | GitHub Actions CI run [35459273420](https://github.com/Yuki-Nagori/panta/actions/runs/35459273420)（commit `a613a31`）Windows job `105940092071`、Rust coverage job `105940092069` | Windows 暴露实现只使用 Unix `std::os::fd`、POSIX 信号常量和 `libc::write`；Rust 覆盖率为 88.55%，新增 crash 模块仅 42.79% 行覆盖，低于现行 92% 门禁。保留 POSIX 完整信号路径，补 Windows 最小 SEH 日志路径，并为纯格式化/写出辅助函数增加同进程测试覆盖 |
 | 2026-09-20 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets`、`cargo check --locked -p panta-foundation --target x86_64-pc-windows-msvc`、`cargo coverage` | 通过：macOS crash 测试 2/2；Windows 目标交叉检查通过；覆盖率函数 89.18%、行 93.84%。Windows 使用 `SetUnhandledExceptionFilter` 写出最小 SEH 进程记录后继续 WER，POSIX 路径保留信号重发与 `.ips` 语义 |
+| 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`，macOS/Linux/Windows Cargo test | macOS 与 Linux 的 `handler_logs_segfault_and_reraises` 通过；Windows `handler_installs_windows_filter` 通过。Windows 测试只验证 filter 安装和日志路径创建，尚未在子进程触发 SEH 并验证异常记录/WER；POSIX stderr 仍缺捕获断言，因此保留 in-progress。 |
 
 ## 决策与工作记录
 
@@ -66,4 +67,4 @@ minidump/WER、Qt 消息处理、远程上报。
 
 ## 完成摘要
 
-未完成。
+POSIX 子进程崩溃记录与原信号重发已在 macOS/Linux 测试中验证，三平台 Cargo 测试通过。Windows 目前只验证异常过滤器安装和日志路径创建，尚未在子进程中触发 SEH 并检查 stderr、日志内容及默认 WER 行为；POSIX stderr 的捕获断言也仍需补齐。

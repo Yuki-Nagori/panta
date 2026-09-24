@@ -92,7 +92,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 
 ## 验证计划与结果
 
-实施验证记录实际命令、工具版本、缓存路径和 CI 平台结果；三平台完整构建仍由本次 CI 运行补齐。
+实施验证记录实际命令、工具版本、缓存路径和 CI 平台结果。run 36001859191 提供当前代码的三平台构建与测试证据；任务声明的 clean/incremental × Debug/Release 与 SDK/ABI 组合矩阵仍需逐项核对。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
@@ -104,6 +104,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 | 2026-09-21 | macOS arm64；`cargo sanitize`（托管 LLVM 22.1.7，asan-ubsan 与 tsan 两棵独立插桩树，完整 CTest） | 通过：两树各 49/49（asan-ubsan 约 20s，tsan 约 66s，TSan 初始化显著变慢）；LeakSanitizer 按官方文档显式 `detect_leaks=1`，第三方噪声按抑制清单处理 |
 | 2026-09-21 | 受控失败实证：托管 clang 分别构造 signed-overflow、heap-buffer-overflow、自有代码泄漏样本 | 均非零退出：UBSan 报 `signed integer overflow` exit 134（`-fno-sanitize-recover=undefined` 生效）；ASan 报 `heap-buffer-overflow` exit 134；LSan 在抑制清单生效下仍报自有泄漏 exit 1，证明清单不掩盖自有代码 |
 | 2026-09-21 | Linux x86_64 / Windows x64 sanitizer 与 CI `sanitize` 矩阵 | 未在本机运行；job 已接线（Windows 仅 ASan），等待当前提交的三平台 CI 证据，不宣称三平台等价 |
+| 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`：macOS/Linux/Windows build and test jobs | 三平台构建与测试成功：Linux CTest 56/56、macOS ASan/UBSan CTest 56/56、Windows CTest 54/54。没有单独证明每个平台的 clean/incremental Debug/Release 和全部 SDK/ABI 组合，因此该验收项仍未完成。 |
 
 ## 2026-09-19 复审时发现的问题（修复记录见下）
 
@@ -126,7 +127,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 
 ## 完成摘要
 
-统一 LLVM 供给和编译器选择已落地：Cargo 默认下载并校验 LLVM 22.1.7 到 `target/panta-tools/llvm`，CMake 与 panta-ffi CXX 使用同一目录；macOS/Linux 选择 clang++，Windows 选择 clang-cl；clang-format 与 clang-tidy 复用该版本。本轮已补无资产平台拒绝、共享供给互斥与版本隔离、Windows Ninja/SDK 配置、CXX 数据库和实际编译器核验、native coverage 配套 LLVM 工具。三平台冷/增量和 Debug/Release 全矩阵仍需当前代码 CI 证据，不能用本机系统旁路替代。
+统一 LLVM 供给和编译器选择已落地：Cargo 默认下载并校验 LLVM 22.1.7 到 `target/panta-tools/llvm`，CMake 与 panta-ffi CXX 使用同一目录；macOS/Linux 选择 clang++，Windows 选择 clang-cl；clang-format 与 clang-tidy 复用该版本。本轮已补无资产平台拒绝、共享供给互斥与版本隔离、Windows Ninja/SDK 配置、CXX 数据库和实际编译器核验、native coverage 配套 LLVM 工具。run 36001859191 的三平台 build/test 均通过；完整 cold/incremental、Debug/Release 与 SDK/ABI 组合矩阵仍缺对应证据。
 
 ## 2026-09-19 修复验证
 
@@ -134,4 +135,4 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 - 两条 C++ 链显式使用 Apple SDK libc++ 头与 sysroot，修复 LLVM 发行包 libc++ 头引用平台运行库尚无的 `__hash_memory` 符号。部署目标取 `MACOSX_DEPLOYMENT_TARGET`，未指定时与 cc 的 SDK 默认值一致。
 - `cargo test --locked --release` 通过，Rust 与 native CTest 28/28；Debug 聚合由 `cargo quality` 通过。`cargo coverage native` 使用 LLVM 22 配套 profdata/cov 成功生成报告（函数 93.51%、行 92.93%、分支 50.26%，包含自有测试源，不能视为纯业务代码指标）。QML 仅有行为验证，CXX adapter 插桩与 native 百分比门禁仍待 032。
 - panta-build 的 12 项测试通过：并发安装只发布一次、失败升级保留旧版本、进程退出后重试成功、数据库筛选和实际编译器拒错、Cppcheck 依赖模型投影。Rust coverage 对象目录复用根 target LLVM 缓存，不再重复下载。
-- Linux/Windows 当前代码未在本机运行，远程 CI 尚未触发；完整平台运行库、sanitizer 与后续 CAE SDK 消费矩阵仍未完成，保持 in-progress。
+- 截至 2026-09-21，Linux/Windows 未在本机运行，远程 CI 尚未触发。后续 run 36001859191 已提供三平台 build/test 成功证据；但完整 clean/incremental、Debug/Release、平台运行库、sanitizer 与 CAE SDK 组合矩阵仍未完成，保持 in-progress。
