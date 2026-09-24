@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008–009、011、012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest；007 仍待真实窗口/硬件渲染生命周期验收，010 的核心网格测试三平台通过，当前验证不修改 SDK 的 OCC mesh 安全销毁方案。其他未完成项及其剩余条件见下方 task 表和任务 077 的逐项审计。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest；007 仍待真实窗口/硬件渲染生命周期验收，010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。其他未完成项及其剩余条件见下方 task 表和任务 077 的逐项审计。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -54,7 +54,7 @@ ai-docs/
 | 007 | [VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) | M0 | 005, 031, 038 | in-progress |
 | 008 | [后台任务、错误与日志基础](task/008-tasks-errors-logging.md) | 基础平台 | 005, 006 | done |
 | 009 | [OCCT 依赖与 STEP 适配冒烟](task/009-occt-adapter-smoke.md) | CAE 接入基础 | 003, 008 | done |
-| 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | in-progress |
+| 010 | [Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) | CAE 接入基础 | 009 | done |
 | 079 | [清理 Netgen mesh 销毁 workaround](task/079-remove-netgen-mesh-cleanup-workaround.md) | CAE 接入基础维护 | 010, 038 | planned |
 | 011 | [统一测试与质量入口](task/011-test-quality-entrypoints.md) | 验证基础 | 007, 008, 010 | done |
 | 012 | [CI 与依赖缓存](task/012-ci-reproducibility.md) | 验证基础 | 011 | done |
@@ -159,4 +159,4 @@ Flow 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 
-后续新任务使用当前最大编号加一，不复用已有编号。主线仍有 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 的真实窗口验收、[010 Netgen 接入与最小 Mesh IR](task/010-netgen-adapter-smoke.md) 的 OCC mesh 安全销毁验证，以及 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) / [038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 的运行时分发、Linux 基线与 SBOM/provenance 收尾。全部 in-progress 项已在 [077 状态盘点](task/077-active-task-status-audit.md) 对照验收与 CI 证据逐项检查。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。主线仍有 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 的真实窗口验收，以及 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) / [038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 的运行时分发、Linux 基线与 SBOM/provenance 收尾。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。全部 in-progress 项已在 [077 状态盘点](task/077-active-task-status-audit.md) 对照验收与 CI 证据逐项检查。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

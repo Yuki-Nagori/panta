@@ -1,6 +1,6 @@
 # 010 — Netgen 接入与最小 Mesh IR
 
-- 状态：in-progress
+- 状态：done
 - 阶段：CAE 接入基础
 - 依赖：[009](009-occt-adapter-smoke.md)（已完成）
 - 优先级：P1
@@ -11,7 +11,7 @@
 
 证明 Netgen/OCCT 组合可生成并转换小型分析网格，固定后续业务使用的数据边界。
 
-Netgen 适配器、Mesh IR 转换和跨平台消费测试已实现。固定 Netgen v6.2.2604 的 OCC mesh 销毁缺陷已通过调用侧 workaround 暂时规避，macOS sanitizer 与重复生成回归通过；新改动仍需三平台 CI 验证，不能将 workaround 当作长期 SDK 修复。
+Netgen 适配器、Mesh IR 转换和跨平台消费测试已实现。固定 Netgen v6.2.2604 的 OCC mesh 销毁缺陷由调用侧 workaround 规避；macOS sanitizer、重复生成回归及三平台 CI 均通过。workaround 仍是 SDK 特例，待 SDK 缺陷修复并进入消费基线后由 task 079 清理。
 
 ## 必读
 
@@ -31,7 +31,7 @@ Netgen 适配器、Mesh IR 转换和跨平台消费测试已实现。固定 Netg
 
 开始条件：所列依赖任务完成且有验证记录；动手前核实所需工具和主平台。步骤中尚未确定的版本、接口、目录或工具须先写入下方决策记录，并同步受影响规范。依赖未完成时保持 planned；外部条件无法满足时改 blocked 并写具体原因。
 
-当前限制：固定 SDK v6.2.2604 中，OCC 生成路径的 region-name 表可能借用 `FaceDescriptor` 内部字符串；ASan 还确认 `Mesh::DeleteMesh()` 与紧随其后的 `Mesh::~Mesh()` 会重复释放 codim-1/2 名称。适配层不修改 SDK，通过地址匹配摘除描述符别名、在两段清理间清空已释放名称槽，最后析构 mesh；随后释放仅被 mesh 借用的 OCC 几何。此 workaround 已通过本机 ASan/UBSan、带仓库既有 suppressions 的 LeakSanitizer 全量 CTest、重复生成回归和 Release 回归；仍需三平台 CI，且 SDK 修复被实际消费后按 task 079 删除。边界映射表持久化属于后续网格业务范围，不阻塞本任务。
+兼容约束：固定 SDK v6.2.2604 中，OCC 生成路径的 region-name 表可能借用 `FaceDescriptor` 内部字符串；ASan 还确认 `Mesh::DeleteMesh()` 与紧随其后的 `Mesh::~Mesh()` 会重复释放 codim-1/2 名称。适配层不修改 SDK，通过地址匹配摘除描述符别名、在两段清理间清空已释放名称槽，最后析构 mesh；随后释放仅被 mesh 借用的 OCC 几何。workaround 已通过 macOS ASan/UBSan、带仓库既有 suppressions 的 LeakSanitizer 全量 CTest、重复生成回归、Release 回归及三平台 CI。SDK 修复进入实际消费基线后按 task 079 删除该特例。边界映射表持久化属于后续网格业务范围，不阻塞本任务。
 
 ## 实施步骤
 
@@ -59,7 +59,8 @@ native/mesh/（include/panta/mesh/ 公共契约 + src/netgen/ 适配器，与 ge
 
 - [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 - [x] macOS 上完成名称所有权审计；调用侧 workaround 通过 ASan/UBSan、LeakSanitizer 全量 CTest、重复生成/释放和 Release Netgen 回归。
-- [ ] 新 workaround 经 Linux、Windows 与 macOS CI 验证；SDK 修复进入消费基线后由 task 079 移除特例并再次验证正常 `Ng_DeleteMesh`。
+- [x] 新 workaround 经 Linux、Windows 与 macOS CI 验证（commit `376f338`）。
+- [x] SDK 特例已登记为 `COMPAT`，后续移除与正常 `Ng_DeleteMesh` 回归由 [task 079](079-remove-netgen-mesh-cleanup-workaround.md) 跟踪；该 SDK 修复不属于本任务完成条件。
 
 ## 验证计划与结果
 
@@ -80,6 +81,7 @@ native/mesh/（include/panta/mesh/ 公共契约 + src/netgen/ 适配器，与 ge
 | 2026-09-24 | `cargo sanitize`（macOS arm64） | 通过：ASan/UBSan 全量 CTest 57/57，TSan 全量 CTest 44/44；两组均包含 NetgenMesher 6/6 和三次成功生成/销毁用例。LSan 使用仓库 suppression 清单抑制第三方栈帧，自有未抑制问题为零；该结果不单独证明 Netgen 内部没有泄漏。 |
 | 2026-09-24 | `ctest --test-dir target/native/release -R NetgenMesher --output-on-failure`；`cargo test --locked --workspace` | 通过：Release NetgenMesher 6/6；Cargo workspace 聚合 CTest 57/57，Rust 单测与文档测试通过。 |
 | 2026-09-24 | `cargo format --check`；`env -u CARGO_MAKEFLAGS cargo lint --check` | 通过：格式检查及 lint 入口 8 个阶段（Clippy、machete、CMake、native/QML metadata、qmllint、clang-tidy、include-cleaner、cppcheck）均通过。当前环境需清除父 Cargo 的 `CARGO_MAKEFLAGS`，否则嵌套 runner 无法绑定 jobserver TCP listener。 |
+| 2026-09-24 | GitHub Actions CI，[commit checks](https://github.com/Yuki-Nagori/panta/commit/376f3384b9331cb2727a6edccd0f51ec4875fad9/checks) | 维护者确认 commit `376f338` 的三平台 CI 全绿；覆盖本 workaround 与重复生成销毁测试。 |
 
 ## 风险与回退
 
@@ -93,9 +95,9 @@ native/mesh/（include/panta/mesh/ 公共契约 + src/netgen/ 适配器，与 ge
 - 2026-09-20（API 选型）：nglib v1 的 OCC 生成流程 + libnglib 同源 C++ 头读取（区域=体单元域号、边界=FD `SurfNr`，压缩为 0 起连续 ID）；不从 Python 示例推断 C++ 签名，全部以本地 SDK 头与实测为准。制品符号位于 `namespace nglib` 而头文件声明在全局——按制品 ABI 把 nglib 头包含进 namespace 后限定调用；`mystdlib.h` 的 `using namespace std` 是 netgen 头的上游契约，污染仅限适配器 TU。
 - 2026-09-20（缺陷与取舍）：`Ng_DeleteMesh` 在 OCC 网格化对象上触发上游清理缺陷（证据见验证表）；当时暂以进程生命周期保留 mesh，并等待 038 重固定 SDK。该临时策略已于 2026-09-24 被调用侧 workaround 取代；方向归一化在转换层完成（`invert_tets` 未生效实测），不改变 IR 契约。
 - 2026-09-24：run 36001859191 三平台 NetgenMesher / MeshIr 与消费 CTest 通过；CI 收尾不再是阻塞项。维护者同意尝试不修改 SDK 的调用侧修复。ASan 精确定位 `DeleteMesh()` 与 `Mesh::~Mesh()` 对 codim-1/2 名称的双重释放；在摘除描述符别名并于两阶段清理间清空对应槽位后，macOS ASan/UBSan、带既有第三方 suppressions 的 LeakSanitizer、重复生成和 Release 测试均通过。
-- 2026-09-24：workaround 仍依赖固定 SDK 的 `Mesh` 内部清理实现，因此保持 `in-progress`，待新变更三平台 CI 验证；未来 SDK 修复必须由项目实际消费，随后 task 079 移除 workaround 并做最终回归。
+- 2026-09-24：维护者确认 commit `376f338` 的三平台 CI 全绿，任务 010 验收完成并转 `done`。SDK 自身缺陷仍由调用侧 workaround 覆盖；项目消费修复版 SDK 后，task 079 移除特例并验证普通 `Ng_DeleteMesh`。
 - 多区域/内部面几何（fuse/glue/compound 语义）与边界映射表持久化归网格业务任务，不作为本任务剩余验收项。
 
 ## 完成摘要
 
-核心功能与平台消费验收已完成：macOS 本机验证、run 36001859191 三平台 NetgenMesher/MeshIr 测试均通过。调用侧 workaround 已通过 macOS sanitizer、重复生成与 Release 回归，剩余验收是本次改动的三平台 CI；SDK 正式修复并进入消费基线后由 task 079 清理该特例。边界映射表持久化由后续网格业务任务承接。
+任务 010 已完成：小型体网格到 Mesh IR 的验收通过；调用侧 workaround 通过 macOS sanitizer、重复生成和 Release 回归，commit `376f338` 三平台 CI 全绿。SDK 缺陷修复进入消费基线前保留该兼容特例，由 task 079 跟踪移除与回归。边界映射表持久化由后续网格业务任务承接。

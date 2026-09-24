@@ -57,7 +57,7 @@
 | 编号 | 处理 | 检查结论与剩余条件 |
 |---|---|---|
 | [007](007-vtk-quick-viewport.md) | 保留 in-progress | 三平台 CI 修复和 CTest 通过不证明硬件窗口渲染。仍需实际 WebGPU 窗口验收空视口/测试球体，以及 resize、高 DPI、隐藏恢复、关闭重开和资源释放。 |
-| [010](010-netgen-adapter-smoke.md) | 改为 blocked | 网格生成、IR、边界映射与三平台 NetgenMesher/MeshIr 测试均通过；固定 Netgen v6.2.2604 对 OCC mesh 调用 `Ng_DeleteMesh` 可复现 invalid free。解除条件是 038 提供含上游修复的新 SDK，并完成安全销毁及生命周期回归。 |
+| [010](010-netgen-adapter-smoke.md) | 盘点时改为 blocked | 当时已有网格生成、IR、边界映射与三平台 NetgenMesher/MeshIr 测试；固定 Netgen v6.2.2604 对 OCC mesh 调用 `Ng_DeleteMesh` 可复现 invalid free。此后调用侧 workaround 经三平台 CI 验证，状态已更新为 done，SDK 特例的移除由 task 079 跟踪。 |
 | [031](031-prebuilt-native-dependencies.md) | 保留 in-progress | manifest 与校验/缓存路径已落地，run 360018 提供三平台 SDK 消费和测试证据。仍需 007/009/010 安装运行时分发闭环、Linux glibc 有效基线，以及消费侧 SBOM/provenance 自动化。 |
 | [038](038-native-sdk-artifact-production.md) | 保留 in-progress | VTK WebGPU 与 OCCT/Netgen 三平台 Release 管线和归档已验证；仍需 OCCT/Netgen manifest/生产链最终复核、消费集成冒烟、Linux glibc 基线及 SBOM/provenance。 |
 | [023](023-cross-platform-paths.md) | 保留 in-progress | Rust 路径规则与 macOS C++ host 测试已有证据；Windows junction、UNC 行为及 C++ PathHost 三平台验证记录仍缺。 |
@@ -90,7 +90,8 @@
 - 2026-09-24：按逐项验收和证据审查更新 010/058 状态，校正 task-index 中 007/010 的过期总览；未用三平台 CI 通过替代真窗口、全覆盖率或完整矩阵验收。
 - 2026-09-24：CI run 36001859191 为本轮已关闭 CI 任务提供三平台证据；提交范围限定为 task、索引与规范性文档。
 - 2026-09-24：用户要求简化过长时间线；将合并重复逐轮日志纳入本任务范围，保留关键根因、代表性 run 和最新状态证据。
+- 2026-09-24（后续状态）：维护者确认 commit `376f338` 的三平台 CI 全绿，调用侧 workaround 验收通过；task 010 因而从盘点时的 blocked 更新为 done，task-index 已同步。原盘点结论保留为当时快照。
 
 ## 完成摘要
 
-完成 14 个既有进行中任务的状态审计：058 已完成，010 因 Netgen OCC mesh 销毁的上游缺陷阻塞，其余 12 项保留进行中并明确剩余验收条件。相关 SDK CI 任务 070/071/075 也根据 run 36001859191 关闭；QML 新增性能场景规则由任务 078 补入规范。审计中冗长的排障时间线已按阶段整合并保留关键证据。所有状态已同步任务索引；本次提交范围仅为文档。
+完成 14 个既有进行中任务的状态审计：058 已完成，010 在盘点时因 Netgen OCC mesh 销毁缺陷阻塞，其余 12 项保留进行中并明确剩余验收条件。后续维护者确认 commit `376f338` 三平台 CI 全绿，task 010 更新为 done；workaround 清理由 task 079 跟踪。相关 SDK CI 任务 070/071/075 也根据 run 36001859191 关闭；QML 新增性能场景规则由任务 078 补入规范。审计中冗长的排障时间线已按阶段整合并保留关键证据。所有状态已同步任务索引；本次提交范围仅为文档。
