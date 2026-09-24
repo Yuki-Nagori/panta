@@ -1,6 +1,6 @@
 # 070 — GoogleTest 三平台 SDK 制品 CI
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[019 GTest 测试配置与规则](019-gtest-native-testing.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)、[038 native SDK 制品生产](038-native-sdk-artifact-production.md)
 - 优先级：P1
@@ -64,12 +64,12 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 
 ## 验收标准
 
-- [ ] workflow 仅手动触发，三平台各产出独立 SDK 归档和 SHA256。
-- [ ] SDK 固定到指定上游 commit；包内含所需头文件、静态库、CMake config、BSD-3-Clause license 和来源元数据。
-- [ ] 每个平台的 SDK 自检均成功完成 configure、compile、link 和 smoke test 后才允许上传 artifacts / Release。
-- [ ] Release 默认不发布；启用发布时由单一 job 全量替换 `sdk-googletest-1.18.0` 资产。
-- [ ] 普通 CI 和当前本地 Cargo 测试入口行为保持不变；后续消费任务可凭真实资产 URL/SHA256 登记 manifest。
-- [ ] 本任务和索引记录真实 workflow/本地验证结果，CI-only 限制如实注明。
+- [x] workflow 仅手动触发，三平台各产出独立 SDK 归档和 SHA256。
+- [x] SDK 固定到指定上游 commit；包内含所需头文件、静态库、CMake config、BSD-3-Clause license 和来源元数据。
+- [x] 每个平台的 SDK 自检均成功完成 configure、compile、link 和 smoke test 后才允许上传 artifacts / Release。
+- [x] Release 默认不发布；启用发布时由单一 job 全量替换 `sdk-googletest-1.18.0` 资产。
+- [x] 普通 CI 和当前本地 Cargo 测试入口行为保持不变；后续消费任务可凭真实资产 URL/SHA256 登记 manifest。
+- [x] 本任务和索引记录真实 workflow/本地验证结果，CI-only 限制如实注明。
 
 ## 验证计划与结果
 
@@ -77,7 +77,8 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 |---|---|---|---|
 | 2026-09-24 | macOS：`cargo format` | 仓库聚合格式入口通过 | 通过 |
 | 2026-09-24 | macOS：`actionlint .github/workflows/sdk-googletest.yml`；Ruby YAML parser | workflow 语法与 GitHub Actions 表达式通过静态检查 | 通过 |
-| — | Actions `workflow_dispatch` 三平台矩阵 | 三平台自检、打包与 artifacts 上传成功 | 尚未运行；需提交后手动触发 |
+| 2026-09-24 | Actions run [35972333653](https://github.com/Yuki-Nagori/panta/actions/runs/35972333653) `workflow_dispatch` | Linux/macOS/Windows 每个平台完成固定源码校验、SDK build/install、自检、package、artifact upload；Release 收口成功 | 全绿；Release `sdk-googletest-1.18.0` 已发布 |
+| 2026-09-24 | 下载三平台 Release 归档与 sidecar、`shasum -a 256`、`tar tzf` | 实际摘要与 GitHub Release API digest / sidecar 相同，归档内有 config、静态库、license | 通过；消费摘要记录在任务 071 与依赖固定清单 |
 
 ## 风险与回退
 
@@ -87,7 +88,8 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 
 - 2026-09-24：维护者决定 GoogleTest 由仓库自有 CI 构建、打包；不依赖上游提供不存在的预编译二进制包。
 - 2026-09-24：创建任务。
+- 2026-09-24：三平台 workflow run 35972333653 全绿并发布 `sdk-googletest-1.18.0`；所有矩阵 job 的 SDK 静态链接自检与发布 job 均通过。
 
 ## 完成摘要
 
-未完成。待实现 workflow 与自检工程，并取得三平台 CI 证据。
+已交付手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程。run 35972333653 的 macOS arm64、Linux x86_64、Windows x86_64 build/install、自检、打包和 Release 发布全部成功；三份归档均下载核对 SHA256 sidecar 与 GitHub API digest，并检查包含 `GTestConfig.cmake`、静态库、headers、metadata 和 BSD-3-Clause license。消费者接入由任务 071 负责。
