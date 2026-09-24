@@ -1,6 +1,7 @@
 // 左栏 Layers Dock；只呈现工具栏和页签，图层内容与动作待后续定义。
+pragma ComponentBehavior: Bound
+
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 PanelSurface {

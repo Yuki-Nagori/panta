@@ -101,6 +101,7 @@ ai-docs/
 | 065 | [VTK 视口缩放、右键旋转与方向过渡](task/065-vtk-zoom-and-cube-transition.md) | 应用平台扩展 | 007, 064 | done |
 | 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | done |
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |
+| 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
 
 ## 验证与质量扩展队列
 

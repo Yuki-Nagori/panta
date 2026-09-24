@@ -1,4 +1,6 @@
 // 工程 / 任务 Dock；上方列出工程和 STL，下方展示最新导入零件的任务。
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -73,17 +75,20 @@ PanelSurface {
             Layout.fillHeight: true
             spacing: 0
 
-            ScrollView {
+            ListView {
                 id: projectTree
                 objectName: "projectTreeSection"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.max(0, dockContent.height - (panel.projectOpen ? Theme.borderWidth : 0)) * 0.36
                 clip: true
-                contentWidth: availableWidth
-                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                model: panel.importedPartNames
+                reuseItems: true
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
 
-                ColumnLayout {
-                    width: projectTree.availableWidth
+                header: ColumnLayout {
+                    width: projectTree.width
                     spacing: 0
 
                     ColumnLayout {
@@ -141,37 +146,33 @@ PanelSurface {
                             }
                         }
                     }
+                }
 
-                    Repeater {
-                        model: panel.importedPartNames
+                delegate: Rectangle {
+                    id: importedPartEntry
+                    objectName: "importedPartEntry"
+                    required property var modelData
+                    required property int index
 
-                        delegate: Rectangle {
-                            id: importedPartEntry
-                            objectName: "importedPartEntry"
-                            required property var modelData
-                            required property int index
+                    width: projectTree.width
+                    height: Theme.controlHeight
+                    color: index === panel.importedPartNames.length - 1 ? Theme.colorSelected : "transparent"
 
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.spacingLarge * 2
+                        anchors.rightMargin: Theme.spacingSmall
+                        spacing: Theme.spacingSmall
+
+                        ThemedIcon {
+                            name: "mesh"
+                            iconSize: Theme.iconSizeSmall
+                        }
+                        ThemedLabel {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: Theme.controlHeight
-                            color: index === panel.importedPartNames.length - 1 ? Theme.colorSelected : "transparent"
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: Theme.spacingLarge * 2
-                                anchors.rightMargin: Theme.spacingSmall
-                                spacing: Theme.spacingSmall
-
-                                ThemedIcon {
-                                    name: "mesh"
-                                    iconSize: Theme.iconSizeSmall
-                                }
-                                ThemedLabel {
-                                    Layout.fillWidth: true
-                                    text: importedPartEntry.modelData
-                                    textSize: Theme.fontBody
-                                    elide: Text.ElideRight
-                                }
-                            }
+                            text: importedPartEntry.modelData
+                            textSize: Theme.fontBody
+                            elide: Text.ElideRight
                         }
                     }
                 }

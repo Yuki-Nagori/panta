@@ -10,12 +10,14 @@
 #include <QStandardPaths>
 #include <QString>
 #include <QUrl>
+#include <QtCore/qcontainerfwd.h>
 #include <QtCore/qtmetamacros.h>
 #include <cstddef>
 #include <memory>
 #include <qlogging.h>
 #include <rust/cxx.h>
 #include <string>
+#include <utility>
 
 namespace panta::bridge {
 
