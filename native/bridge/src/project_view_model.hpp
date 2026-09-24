@@ -5,6 +5,7 @@
 #pragma once
 
 #include "panta_ffi.h"
+#include <QStringList>
 #include <QUrl>
 #include <QtQml/qqmlregistration.h>
 #include <panta/visualization/mesh_source.hpp>
@@ -23,7 +24,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QString currentName READ currentName NOTIFY projectChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY projectChanged)
     Q_PROPERTY(QString lastCreatedPath READ lastCreatedPath NOTIFY projectCreated)
-    Q_PROPERTY(bool hasImportedPart READ hasImportedPart NOTIFY importsChanged)
+    Q_PROPERTY(QStringList importedPartNames READ importedPartNames NOTIFY importsChanged)
     Q_PROPERTY(QString importedPartName READ importedPartName NOTIFY importsChanged)
     Q_PROPERTY(QString importedAssetPath READ importedAssetPath NOTIFY importsChanged)
     Q_PROPERTY(QString importedMeshType READ importedMeshType NOTIFY importsChanged)
@@ -56,7 +57,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] const QString& currentPath() const;
     [[nodiscard]] const QString& currentName() const;
     [[nodiscard]] bool dirty() const;
-    [[nodiscard]] bool hasImportedPart() const;
+    /// 名称按 Rust 工程导入记录顺序排列；QML 只负责呈现，不派生领域状态。
+    [[nodiscard]] const QStringList& importedPartNames() const;
     [[nodiscard]] const QString& importedPartName() const;
     [[nodiscard]] const QString& importedAssetPath() const;
     [[nodiscard]] const QString& importedMeshType() const;
@@ -113,7 +115,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
   private:
     bool fail(const QString& boundaryError);
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
-    // 首期 QML 只展示最新导入项；Rust 工程服务仍保留完整记录列表。
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     static QString userMessageFor(const QString& errorCode);
@@ -126,7 +127,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     QString m_currentName;
     QString m_lastCreatedPath;
     bool m_dirty = false;
-    bool m_hasImportedPart = false;
+    QStringList m_importedPartNames;
     QString m_importedPartName;
     QString m_importedAssetPath;
     QString m_importedMeshType;

@@ -16,7 +16,7 @@ HTML 只保留标题、菜单、Ribbon、任务、视口和对话框状态模板
 JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结构。
 
 `homepage` 通过 New Project 任务入口演示新建项目弹窗；`open-project` 展示打开后的
-工程树和多选 STL 导入确认弹窗，尚未导入 STL 时不显示 Layers Dock；`imported-project`
+工程树、多选 STL 导入确认弹窗，以及空 Layers Dock（尚无导入时隐藏 Layers 页签行）；`imported-project`
 展示导入后的两个独立 Dock：上部工程 / 任务 Dock 内含工程树和零件任务两个分区，底部
 保留工具按钮与 Layers 图标页签，内容暂空。同一工程中可展示多个 STL 和当前选中零件
 的任务。这些页面只展示状态和交互边界，不写工程文件，也不声称已实现 STL 解析或视口渲染。

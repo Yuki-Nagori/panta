@@ -64,6 +64,7 @@ Qt 官方依据（2026-09-22，6.11.2）：[Image 与 sourceSize](https://doc.qt
 | `project-file.svg` | Mono | 工程文件 |
 | `media-video.svg` | Mono | 视频 |
 | `project-import.svg` | Mono | 导入 |
+| `layers.svg` | Mono | 工程图层页签 |
 | `domain-dual.svg` | Mono | 双层面 |
 | `geometry.svg` | Mono | 几何 |
 | `mesh.svg` | Mono | 网格 |

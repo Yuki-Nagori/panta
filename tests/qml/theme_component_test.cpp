@@ -234,6 +234,39 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(openRequested.count(), 2);
     }
 
+    void layers_tab_row_tracks_imported_parts() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QQuickWindow window;
+        QObject owner;
+        auto* panel = qobject_cast<QQuickItem*>(create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"), owner));
+        QVERIFY(panel != nullptr);
+        panel->setWidth(420);
+        panel->setHeight(260);
+        panel->setParentItem(window.contentItem());
+        window.resize(640, 480);
+        window.show();
+
+        auto* toolbar = visual_item(panel, QStringLiteral("layersToolbar"));
+        auto* tabRow = visual_item(panel, QStringLiteral("layersTabRow"));
+        auto* content = visual_item(panel, QStringLiteral("layersContent"));
+        QVERIFY(toolbar && tabRow && content);
+        QTRY_VERIFY(panel->isVisible());
+        QTRY_VERIFY(toolbar->property("visible").toBool());
+        QVERIFY(!tabRow->property("visible").toBool());
+        QVERIFY(content->property("visible").toBool());
+
+        panel->setProperty("importedPartNames", QStringList{QStringLiteral("sample.stl")});
+        QTRY_VERIFY(tabRow->property("visible").toBool());
+        QVERIFY(panel->isVisible());
+
+        panel->setProperty("importedPartNames", QStringList{});
+        QTRY_VERIFY(!tabRow->property("visible").toBool());
+        QVERIFY(toolbar->property("visible").toBool());
+        QVERIFY(content->property("visible").toBool());
+    }
+
     void button_font_size_reaches_its_label() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);

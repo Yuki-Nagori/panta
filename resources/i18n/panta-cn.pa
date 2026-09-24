@@ -583,3 +583,45 @@ label:
 label:
   src: Project '%1'
   tr: 工程“%1”
+
+study-tasks:
+  src: Study Tasks: %1
+  tr: Study 任务：%1
+
+[LayerPanelTitle]
+label:
+  src: Layers
+  tr: 图层
+
+[LayerAction]
+new:
+  src: New layer
+  tr: 新建图层
+
+open:
+  src: Open layer
+  tr: 打开图层
+
+validate:
+  src: Validate layer
+  tr: 验证图层
+
+edit:
+  src: Edit layer
+  tr: 编辑图层
+
+remove:
+  src: Remove layer
+  tr: 移除图层
+
+options:
+  src: Layer options
+  tr: 图层选项
+
+move:
+  src: Move layer
+  tr: 移动图层
+
+close-tools:
+  src: Close layer tools
+  tr: 关闭图层工具

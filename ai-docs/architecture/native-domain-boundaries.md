@@ -2,7 +2,7 @@
 
 [架构总览](README.md) · [分层规则](../standards/layering.md) · [任务 066](../task/066-native-domain-boundaries.md)
 
-更新日期：2026-09-23。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
+更新日期：2026-09-24。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
 
 ## 分层与调用
 
@@ -19,6 +19,18 @@ Rust 已提交的资产 / 显示配置 → CXX → C++ RenderScene / ViewportBac
 
 Rust 管理工程身份、单位、修订、引用、任务与成功提交，C++ 适配器负责实际调用重库、转换输入输出及管理 native 资源。CXX 声明受支持的类型和签名、生成胶水，不决定业务行为。调用流程不等同于 crate 依赖图；领域层通过自有后端接口接收能力，不反向依赖桥接 crate。
 
+Qt 是体量较大的原生 GUI 框架，在这条边界中单独作为**界面与平台运行时**看待，不与 OCCT / Netgen 的几何算法适配角色混为一谈。QML / Qt Quick 继续负责界面组合、布局、输入、动画和即时显示，使用 Qt scene graph、Controls、模型视图等已有的渲染与交互能力；C++ ViewModel / Controller 负责 Qt 对象生命周期、信号属性、模型 / 委托接口、线程亲和性、平台对话框及 QML 与服务 DTO 之间的类型适配。继续使用当前 Qt 基线和其已供给的界面、绘制及平台能力，包括 Qt 已有的高性能场景图和适用的绘图 / 可视化组件；不为语言统一而在 Rust 重写 Qt 的图形、事件循环或工具能力。
+
+Qt 边界不改变领域权威归属：工程身份与持久化、导入解析、单位 / 修订 / 引用规则、成功提交和业务任务由 Rust 服务管理；QML 表达展示与用户意图，C++ ViewModel / Controller 只做 Qt 适配并转发粗粒度命令。Rust 服务应按用例返回拥有内存的批量快照 / DTO；C++ 可把 DTO 映射为 Qt 属性或 `QAbstractItemModel` 角色供 QML 使用，但不能让 ViewModel 通过逐行 FFI 查询拼装业务对象，也不能把 Rust 领域状态藏入 QObject 或 QML 作为第二份权威数据。跨过 CXX 边界后，传给 Qt 的数据必须由 C++ 值对象或具有明确共享所有权的不可变快照承载；不能把借用的 Rust 缓冲区直接放进排队信号。跨线程信号参数须满足 Qt queued connection 的类型和生命周期要求，并按 Qt 要求注册元类型；具体 payload 大小时，在对应任务中确定复制、移动或共享快照策略。
+
+鼠标悬停、当前行高亮和即时交互反馈属于 Qt / QML / VTK 显示状态。若用户选择的实体将影响网格操作、边界条件或工程提交，稳定实体 ID、所属修订和引用有效性由 Rust 建模与校验；Qt 保留命中反馈并把完整、粗粒度的选择意图交给服务。选择意图应携带稳定实体 ID 集合、所属修订和选择模式（如替换、追加、移除或清空）；不能只把易变化的行号、显示索引或像素位置当成领域身份。纯显示高亮则无需因此升级为 Rust 领域状态。
+
+Qt 对象、GUI 事件循环和线程亲和性留在 C++。仅当 Rust 调用是有明确上界的内存内元数据操作、不包含文件 / 网络 I/O、格式解析、重库调用、网格生成或等待锁 / 后台任务，并且能证明在一个 GUI 帧预算内完成时，才可同步调用 Rust；默认要求在项目支持的最低配置上 p95 不超过 1 ms，未测量或超出预算时走异步路径。文件读取、格式解析、网格生成及其他不可预测耗时的用例应通过 Rust 后台任务执行，并以拥有内存的结果 DTO / 任务事件异步返回，通过 Qt 队列交付到 GUI 线程后更新 QObject/QML。GUI 线程不能同步等待长任务，后台任务不能访问 QObject；任务契约应定义取消何时生效及提交截止点，QML 只能表达取消意图，不能自行假设后台任务已停止。失败若保留旧状态，应继续暴露仍有效的旧快照 / 实体及其修订；具体由任务 / 领域服务定义，并拒绝过期修订提交。既有同步路径由对应功能任务跟踪迁移，不作为新增功能的默认模式。
+
+继续使用仓库当前固定版本已经链接的 Qt 运行时模块：Qt Core / Gui / Qml / Quick、Quick Controls、Quick Dialogs 和 Svg；Qt Quick scene graph 是界面渲染能力，当前视口的几何显示由 VTK 承担。继续使用 Qt Declarative / Tools 提供且仓库实际接入的开发工具（如 `qmllint`、`qmlformat`）。Qt Charts / Graphs、Qt 3D、WebEngine 等其他运行时模块不因属于 Qt 而默认获准；新增模块必须由实际产品任务说明能力需求、已有模块是否可满足、固定版本、构建 / 打包 / CI 成本、平台覆盖和线程 / 渲染边界。也不能只因存在 Rust 替代项就放弃适合的 Qt 实现。Rust 不依赖 Qt 类型、对象或事件循环。
+
+Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错误码、类别 / 严重级别及必要上下文（例如相关实体 ID 与修订）；不得只返回供界面解析的拼接文本。C++ ViewModel 将结构化字段适配为 Qt 属性 / 模型角色，并提供适合界面的本地化消息；QML 可按稳定错误码选择交互，但不得通过拆分、匹配错误文案来推断错误类型或领域状态。若操作失败但保留了旧状态，服务应继续返回当前有效的旧快照 / 实体及其修订，让界面能同时表达失败和仍可用的数据；错误 DTO 本身不取代该状态。
+
 “不直接链接 OCCT/Netgen”在此指 Rust 业务代码不得直接声明或调用重库 ABI、不得暴露其对象布局；桌面最终产物仍需链接重库。当前最终链接由 CMake 拥有，CXX 不消除链接和运行库部署要求。
 
 适配器对外使用小型值 DTO、连续数组或自有 opaque 所有者。大型 B-rep 无须强行完整复制到 Rust：未来由 C++ adapter 持有和释放 native shape，Rust 只保存 Shape/Face 的稳定领域 ID 与修订号。跨 FFI 只传 ID、修订和操作结果，不传裸句柄；修订不匹配时拒绝操作。当前 STEP 冒烟只返回摘要，没有持久 shape 服务。
@@ -27,6 +39,7 @@ Rust 管理工程身份、单位、修订、引用、任务与成功提交，C++
 
 | 内容 | 责任 | 不允许 |
 |---|---|---|
+| Qt Quick / QML 界面、窗口、输入、场景图渲染及 Qt 工具链 | Qt / QML 提供平台集成、事件循环、控件、布局、即时图形能力和开发检查工具；C++ ViewModel 适配 QObject 属性、信号和 Rust 值 DTO | Rust 依赖 Qt；ViewModel 或 QML 承担工程持久化、导入 / 几何解析、领域校验或重库算法；为迁移语言重写 Qt 已提供的图形 / 工具能力；无任务论证而新增 Qt 运行时模块 |
 | STEP 读取、拓扑操作、几何修复、几何三角化 | C++ adapter 调用 OCCT；Rust 决定修复选项和是否提交 | 适配层重写几何修复算法或自行决定领域提交 |
 | 网格生成、库提供的网格优化 | C++ adapter 调用 Netgen；Rust 选择参数、输入修订与任务策略 | 适配层维护独立于领域层的网格有效性规则 |
 | 异常归一化、类型转换、数组展开、索引起点与单元节点顺序转换 | C++ adapter，属于接口语义转换 | 对外泄漏 OCCT/Netgen 类型或未声明所有权的指针 |
@@ -47,7 +60,7 @@ Rust 管理工程身份、单位、修订、引用、任务与成功提交，C++
 | `RenderScene::mesh_path`、`CaeViewport::setMeshPath`、`VtkViewport::apply_state` / `update_mesh_actor` | 067 将其改为修订化 Mesh 显示快照；工程路径解析、I/O、导入提交归 Rust。此行记录 066 审计时的基线 |
 | `navigation/viewport_camera.cpp`：`ViewportCamera`、`ViewportCameraTransition` | 保留 C++：操作 VTK 相机，状态仅用于即时导航；数学虽可移植，但当前无独立 Rust 消费者，不增加每帧 FFI |
 | `navigation/viewport_input.cpp`：`classify_viewport_input` | 保留 C++：把 VTK 事件映射到本地动作。若将来支持可配置按键，Rust 管理偏好数据，C++ 使用一次下发的配置 |
-| `navigation/viewport_orientation.cpp`：`pick_cube_face`、`ViewportOrientation` | 保留 C++：方向控件的显示命中、坐标投影和 VTK 标记同步。工程实体选择的 ID、修订和引用校验未来归 Rust |
+| `navigation/viewport_orientation.cpp`：`pick_cube_face`、`ViewportOrientation` | 保留 C++：方向控件的显示命中反馈、坐标投影和 VTK 标记同步；影响工程操作的实体 ID、修订和引用校验未来归 Rust |
 | `vtk_viewport.cpp` 的 timer / refresh / camera / window 管理；`vtk_native_surface.*` | 保留 C++：Qt 线程、像素尺度、VTK/GPU 生命周期与平台窗口强耦合 |
 | `default_wordmark.cpp`：`create_default_wordmark`、`wordmark_color` | 保留显示模块：临时欢迎图形和装饰颜色，不是分析网格或物理场，不抽成 Rust 领域算法；最终设计仍由 053 决定 |
 

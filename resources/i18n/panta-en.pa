@@ -583,3 +583,45 @@ label:
 label:
   src: Project '%1'
   tr: Project '%1'
+
+study-tasks:
+  src: Study Tasks: %1
+  tr: Study Tasks: %1
+
+[LayerPanelTitle]
+label:
+  src: Layers
+  tr: Layers
+
+[LayerAction]
+new:
+  src: New layer
+  tr: New layer
+
+open:
+  src: Open layer
+  tr: Open layer
+
+validate:
+  src: Validate layer
+  tr: Validate layer
+
+edit:
+  src: Edit layer
+  tr: Edit layer
+
+remove:
+  src: Remove layer
+  tr: Remove layer
+
+options:
+  src: Layer options
+  tr: Layer options
+
+move:
+  src: Move layer
+  tr: Move layer
+
+close-tools:
+  src: Close layer tools
+  tr: Close layer tools

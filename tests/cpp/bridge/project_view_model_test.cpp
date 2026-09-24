@@ -87,6 +87,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
 
     ProjectViewModel view_model;
     ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    EXPECT_TRUE(view_model.importedPartNames().isEmpty());
     ASSERT_TRUE(view_model.inspectStl(sourcePath));
     EXPECT_TRUE(view_model.importPreviewReady());
     EXPECT_EQ(view_model.importPreviewName(), QStringLiteral("sample.stl"));
@@ -95,7 +96,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
 
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), true));
-    EXPECT_TRUE(view_model.hasImportedPart());
+    EXPECT_EQ(view_model.importedPartNames(), QStringList{QStringLiteral("sample.stl")});
     EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample.stl"));
     EXPECT_EQ(view_model.importedMeshType(), QStringLiteral("dual-domain"));
     EXPECT_EQ(view_model.importedUnits(), QStringLiteral("millimeters"));
@@ -107,10 +108,20 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
     EXPECT_EQ(mesh->vertices.size(), 3U);
     EXPECT_EQ(mesh->vertices[1], (std::array<double, 3>{1.0, 0.0, 0.0}));
 
+    const QString secondSourcePath =
+        QDir(fixture.path()).filePath(QStringLiteral("sample-second.stl"));
+    ASSERT_TRUE(QFile::copy(sourcePath, secondSourcePath));
+    ASSERT_TRUE(view_model.importStl(secondSourcePath, QStringLiteral("dual-domain"),
+                                     QStringLiteral("millimeters"), false));
+    EXPECT_EQ(view_model.importedPartNames(),
+              QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl")}));
+    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample-second.stl"));
+
     ProjectViewModel reopened;
     ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
-    EXPECT_TRUE(reopened.hasImportedPart());
-    EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(reopened.importedPartNames(),
+              QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl")}));
+    EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample-second.stl"));
     EXPECT_EQ(reopened.importedAssetPath(), view_model.importedAssetPath());
     EXPECT_EQ(reopened.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
     const auto reopened_mesh = reopened.mesh_snapshot();
@@ -123,6 +134,10 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
     QSignalSpy mesh_changed(&view_model, &panta::visualization::MeshSource::meshChanged);
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), false));
+    EXPECT_EQ(view_model.importedPartNames(),
+              QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl"),
+                           QStringLiteral("sample.stl")}));
+    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample.stl"));
     EXPECT_EQ(mesh_changed.count(), 1);
     const auto replacement = view_model.mesh_snapshot();
     ASSERT_NE(replacement, nullptr);
@@ -131,7 +146,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
     ASSERT_TRUE(view_model.inspectStl(sourcePath));
     EXPECT_FALSE(view_model.inspectStl(sourcePath + QStringLiteral(".missing")));
     EXPECT_FALSE(view_model.importPreviewReady());
-    EXPECT_TRUE(view_model.hasImportedPart());
+    EXPECT_EQ(view_model.importedPartNames().size(), 3);
 }
 
 int main(int argc, char** argv) {

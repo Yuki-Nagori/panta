@@ -4,7 +4,7 @@
 - 阶段：应用平台扩展
 - 依赖：[055 QML 整理](055-qml-review-and-cleanup.md)、[007 原生视口](007-vtk-quick-viewport.md)
 - 优先级：P1
-- 负责人：Codex
+- 负责人：Yuki
 - 创建 / 更新：2026-09-22 / 2026-09-22
 
 ## 范围与目标

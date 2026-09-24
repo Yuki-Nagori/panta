@@ -15,6 +15,8 @@ ApplicationWindow {
     title: qsTr("panta")
     color: Theme.colorPanel
     readonly property bool projectOpen: projectModel.currentPath.length > 0
+    readonly property bool layersDockShown: layersPanel.dockOpen
+    readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
     property string activeRibbonTab: "start-learn"
 
@@ -34,6 +36,7 @@ ApplicationWindow {
         // 仅成功创建 / 打开时导航；改名、保存和失败不打断当前页签。
         onProjectCreated: shellWindow.selectRibbonTab("home")
         onProjectOpened: shellWindow.selectRibbonTab("home")
+        onProjectImported: layersPanel.dockOpen = true
     }
 
     NewProjectDialog {
@@ -88,6 +91,7 @@ ApplicationWindow {
 
             ColumnLayout {
                 id: leftColumn
+                readonly property real panelContentHeight: Math.max(0, height - (shellWindow.layersDockShown ? Theme.borderWidth : 0))
 
                 anchors.left: parent.left
                 anchors.top: parent.top
@@ -99,12 +103,14 @@ ApplicationWindow {
 
                 TasksPanel {
                     id: tasksPanel
+                    objectName: "tasksPanel"
 
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    Layout.fillHeight: !shellWindow.layersDockShown
+                    Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * (1 - Theme.layersPanelRatio) : 0
                     projectOpen: shellWindow.projectOpen
                     projectName: projectModel.currentName
-                    importedPartAvailable: projectModel.hasImportedPart
+                    importedPartNames: projectModel.importedPartNames
                     importedPartName: projectModel.importedPartName
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
@@ -114,16 +120,18 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Theme.borderWidth
+                    visible: shellWindow.layersDockShown
                     color: Theme.colorPanelLine
                 }
 
-                OutputPanel {
-                    id: outputPanel
-
+                LayersPanel {
+                    id: layersPanel
+                    objectName: "layersPanel"
                     Layout.fillWidth: true
-                    Layout.preferredHeight: leftColumn.height * Theme.outputPanelRatio
-                    errorText: projectModel.error.length > 0 ? projectModel.error : viewModel.error
-                    onCloseRequested: outputPanel.visible = false
+                    Layout.fillHeight: shellWindow.layersDockShown
+                    Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * Theme.layersPanelRatio : 0
+                    importedPartNames: projectModel.importedPartNames
+                    onCloseRequested: dockOpen = false
                 }
             }
 
@@ -167,9 +175,11 @@ ApplicationWindow {
                 anchors.leftMargin: Theme.spacingStrip
 
                 ThemedLabel {
-                    text: qsTr("Ready")
+                    Layout.fillWidth: true
+                    text: shellWindow.statusMessage.length > 0 ? shellWindow.statusMessage : qsTr("Ready")
                     textSize: Theme.fontSmall
-                    textColor: Theme.colorTextMuted
+                    textColor: shellWindow.statusMessage.length > 0 ? Theme.colorError : Theme.colorTextMuted
+                    elide: Text.ElideRight
                 }
             }
         }

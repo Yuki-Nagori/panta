@@ -69,17 +69,18 @@
 - [x] task、持久化决策和首期 HTML 状态参考已登记；homepage 新建项目弹窗已补齐。
 - [x] HTML 能表达 `.stl` 选择后的 Import 确认窗口，以及确认后的任务树和 STL 视口占位。
 - [x] HTML 展示左栏两个 Dock：工程 / 任务 Dock 内含工程树和所选 study 任务两个分区；导入后底部显示带工具按钮和 Layers 图标页签、内容留空的独立 Dock。
-- [x] HTML 展示同一 `.panta` 工程含多个 STL 零件，Import 文件选择支持多选并表达“追加到当前工程”；空工程状态不显示 Layers Dock。
+- [x] HTML 展示同一 `.panta` 工程含多个 STL 零件，Import 文件选择支持多选并表达“追加到当前工程”；空工程保留 Layers Dock 外框与工具栏，未导入时隐藏 Layers 页签行。
 - [x] 首期文件选择只接受 `.stl`，且格式集合可在不复制导入流程的情况下扩展。
 - [x] 取消 / 失败不修改工程；确认后 `.panta` 内有可重放 import record 和源资产引用。
 - [x] 重新打开工程可恢复导入记录、任务树和 STL 视口；版本 / 单位 / 尺寸错误可诊断。
+- [ ] 导入及工程服务错误通过结构化 DTO 跨 CXX 传递稳定错误码、类别和必要上下文；C++ 适配 Qt 展示字段与本地化消息，QML 不解析拼接错误文本。
 - [ ] QML / C++ / Rust 分层、静态检查、native 测试、真实窗口与视口生命周期验证通过。
 
 ## 验证计划与结果
 
 已验证文档 / HTML 的相对资源路径、无网络依赖、公共壳层复用、模板完整性和 `git diff --check`；运行时阶段已在现有 `target/native/debug` 验证 Rust、CXX、QML 和 native。当前已通过 `cargo test -p panta-core -p panta-ffi --locked`、`cargo build -p panta-launcher --locked`、`cargo lint qmllint --check`、`cargo lint clippy --check`、两份 `.pa` 的 DSL 检查与格式检查、QML / C++ 格式检查，以及 7 个选定的 native / QML / i18n 回归测试；真实窗口下的视口生命周期复核仍待手工验收。
 
-后续实现阶段在现有 `target/native/debug`、Qt 和 LLVM 基线下运行构建、QML lint、Rust/CXX 检查、导入单元 / 集成测试、四档缩放及 Cocoa 真窗口；不得用 HTML 预览替代 STL 解析或 VTK 生命周期验证。
+后续实现阶段在现有 `target/native/debug`、Qt 和 LLVM 基线下运行构建、QML lint、Rust/CXX 检查、导入单元 / 集成测试、四档缩放及 Cocoa 真窗口；不得用 HTML 预览替代 STL 解析或 VTK 生命周期验证。当前 `ProjectViewModel` 从 `rust::Error` 文本前缀提取错误码的实现只是过渡路径；按 [Qt / 原生领域边界](../architecture/native-domain-boundaries.md) 的结构化错误约定，在本任务剩余的导入诊断工作中迁移，并删除文本解析逻辑。
 
 ## 风险与工作记录
 
@@ -91,7 +92,8 @@
 - 2026-09-22：CXX `ProjectViewModel` 接入 STL 预检 / 导入 / 重开恢复，QML 接入 ImportDialog、任务树和视口资产路径；VTK 适配层增加 ASCII / 二进制 STL 到 `vtkPolyData` 的解析。
 - 2026-09-22：将跨页面的导航、建模、分析、结果、报告、帮助和单位文案归并到顶部公共 i18n 分类，删除已无引用的页面专用重复上下文；`.pa` 的同长度源文案限制通过公共子分类保持显式隔离。
 - 2026-09-22：尝试在现有 target 做无 Bridge 消融构建时发现旧生成 MOC 与配置切换不一致；未修改业务代码绕过，已恢复默认 Bridge=ON 构建配置并完成默认回归测试。
-- 2026-09-24：用户确认 HTML 参考后，按其布局要求完成左侧两个 Dock 的状态参考：工程树和零件任务位于同一上部 Dock 的上下分区；仅导入 STL 后显示底部 Layers Dock，保留工具按钮与单一 Layers 图标页签，图层内容留空。
+- 2026-09-24：按用户反馈，底部 Layers Dock 外框与工具栏保持显示；只有导入 STL 后显示带图标的 Layers 页签行，图层内容留空。
+- 2026-09-24：架构评审补充 Qt / Rust 结构化错误边界；现有 C++ ViewModel 仍解析 `rust::Error` 文本前缀，记录为本任务未完成的导入诊断迁移，不视作已满足该约定。
 
 ## 完成摘要
 

@@ -1,0 +1,4 @@
+<!-- Mono：Layers 页签；24 网格，堆叠平面以一个概念表达图层集合。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m4 7 8-3.5L20 7l-8 3.5L4 7Z"/><path d="m4 12 8 3.5 8-3.5M4 17l8 3.5 8-3.5"/>
+</svg>

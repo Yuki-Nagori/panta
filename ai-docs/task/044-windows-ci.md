@@ -4,7 +4,7 @@
 - 阶段：验证基础
 - 依赖：[018](018-cross-platform-ci.md)、[042](042-unified-llvm-toolchain.md)
 - 优先级：P1
-- 负责人：Codex
+- 负责人：Yuki
 - 创建 / 更新：2026-09-19 / 2026-09-19
 
 ## 目标与背景

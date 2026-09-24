@@ -17,7 +17,9 @@
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 #include "../../qml/quick_item_helpers.hpp"
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QIODevice>
 #include <QImage>
 #include <QPoint>
 #include <QPointF>
@@ -552,6 +554,78 @@ class ShellModuleLoadTest final : public QObject {
                                    .filePath(openExisting ? QStringLiteral("opened.png")
                                                           : QStringLiteral("created.png"))));
         }
+    }
+
+    void layers_tab_row_tracks_imports_and_reopened_projects() {
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* root = engine.rootObjects().constFirst();
+        auto* window = qobject_cast<QQuickWindow*>(root);
+        auto* project =
+            root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        auto* tasksPanel = root->findChild<QQuickItem*>(QStringLiteral("tasksPanel"));
+        auto* layersPanel = root->findChild<QQuickItem*>(QStringLiteral("layersPanel"));
+        auto* tabRow = root->findChild<QQuickItem*>(QStringLiteral("layersTabRow"));
+        auto* toolbar = root->findChild<QQuickItem*>(QStringLiteral("layersToolbar"));
+        auto* content = root->findChild<QQuickItem*>(QStringLiteral("layersContent"));
+        QVERIFY(window && project && tasksPanel && layersPanel && tabRow && toolbar && content);
+
+        window->showNormal();
+        window->resize(1440, 900);
+        QTRY_VERIFY(tasksPanel->isVisible());
+        QTRY_VERIFY(layersPanel->isVisible());
+        QTRY_VERIFY(toolbar->isVisible());
+        QTRY_VERIFY(content->isVisible());
+        QVERIFY(!tabRow->isVisible());
+
+        QVERIFY(project->createProject(QStringLiteral("Imported"), fixture.path()));
+        const QString importedProjectPath = project->currentPath();
+        const QString firstStlPath = fixture.filePath(QStringLiteral("first.stl"));
+        QFile firstStl(firstStlPath);
+        QVERIFY(firstStl.open(QIODevice::WriteOnly | QIODevice::Text));
+        QVERIFY(firstStl.write("solid sample\n"
+                               "facet normal 0 0 1\n"
+                               " outer loop\n"
+                               "  vertex 0 0 0\n"
+                               "  vertex 1 0 0\n"
+                               "  vertex 0 1 0\n"
+                               " endloop\n"
+                               "endfacet\n"
+                               "endsolid sample\n") > 0);
+        firstStl.close();
+        QVERIFY(project->inspectStl(firstStlPath));
+        QVERIFY(project->importStl(firstStlPath, QStringLiteral("dual-domain"),
+                                   QStringLiteral("millimeters"), false));
+        QTRY_VERIFY(tabRow->isVisible());
+        QTRY_VERIFY(tasksPanel->isVisible());
+        QTRY_COMPARE(visual_items(tasksPanel, QStringLiteral("importedPartEntry")).size(), 1);
+
+        const QString secondStlPath = fixture.filePath(QStringLiteral("second.stl"));
+        QVERIFY(QFile::copy(firstStlPath, secondStlPath));
+        QVERIFY(project->inspectStl(secondStlPath));
+        QVERIFY(project->importStl(secondStlPath, QStringLiteral("dual-domain"),
+                                   QStringLiteral("millimeters"), false));
+        QTRY_COMPARE(visual_items(tasksPanel, QStringLiteral("importedPartEntry")).size(), 2);
+        QVERIFY(tabRow->isVisible());
+        QVERIFY(tasksPanel->isVisible());
+        QVERIFY(project->saveProject());
+
+        QVERIFY(project->createProject(QStringLiteral("Empty"), fixture.path()));
+        QTRY_VERIFY(!tabRow->isVisible());
+        QTRY_VERIFY(layersPanel->isVisible());
+        QTRY_VERIFY(toolbar->isVisible());
+        QTRY_VERIFY(content->isVisible());
+        QTRY_VERIFY(tasksPanel->isVisible());
+
+        QVERIFY(project->openProject(importedProjectPath));
+        QTRY_VERIFY(tabRow->isVisible());
+        QTRY_COMPARE(visual_items(tasksPanel, QStringLiteral("importedPartEntry")).size(), 2);
+        QVERIFY(tasksPanel->isVisible());
     }
 #endif
 };

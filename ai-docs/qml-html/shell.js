@@ -192,8 +192,9 @@ if (document.body.classList.contains("project-workspace")) {
   const partTasks = document.querySelector(".output-panel");
   partTasks?.setAttribute("aria-label", "Part tasks");
   partTasks?.querySelector(".pane-close")?.remove();
-  if (document.getElementById("page-layers")) document.querySelector(".layer-panel")?.removeAttribute("hidden");
-  else document.querySelector(".task-workspace-dock")?.classList.add("task-workspace-full");
+  const layerPanel = document.querySelector(".layer-panel");
+  if (document.getElementById("page-layers")) layerPanel?.removeAttribute("hidden");
+  layerPanel?.querySelector(".layer-tabs")?.toggleAttribute("hidden", !document.getElementById("page-layer-tab"));
 }
 
 const closeDialog = (dialog) => {

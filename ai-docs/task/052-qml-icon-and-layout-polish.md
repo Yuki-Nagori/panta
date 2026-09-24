@@ -4,7 +4,7 @@
 - 阶段：应用平台扩展
 - 依赖：[029 组件库](029-qml-component-library.md)、[050 HTML 参考](050-qml-html-page-replica.md)
 - 优先级：P1
-- 负责人：Codex
+- 负责人：Yuki
 - 创建 / 更新：2026-09-22 / 2026-09-22
 
 ## 目标与范围

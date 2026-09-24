@@ -215,7 +215,6 @@ button:disabled { opacity: 0.42; }
 .layer-panel { flex: 1; border-top: 1px solid var(--color-panel-line); }
 .panel-content { flex: 1; min-height: 0; overflow: auto; }
 body.project-workspace .task-workspace-dock { flex: 0 0 56%; }
-body.project-workspace .task-workspace-dock.task-workspace-full { flex: 1; }
 body.project-workspace .tasks-panel { flex: 0 0 39%; }
 body.project-workspace .output-panel { flex: 1; }
 body.project-workspace .output-toolbar { display: none; }
@@ -248,6 +247,7 @@ body.project-workspace .output-panel > .pane-close { display: none; }
 .layer-toolbar .tool-button { width: 25px; height: 24px; padding: 1px; border: 1px solid transparent; }
 .layer-toolbar .tool-button:enabled:hover { border-color: var(--color-panel-line); }
 .layer-tabs { flex: 0 0 24px; display: flex; align-items: stretch; gap: 1px; padding-left: 3px; background: var(--color-chrome); border-bottom: 1px solid var(--color-panel-line); }
+.layer-tabs[hidden] { display: none; }
 .layer-tabs button { display: flex; align-items: center; gap: 4px; min-width: 38px; padding: 0 6px; color: var(--color-muted); font-size: var(--font-small); }
 .layer-tabs button .icon { width: 14px; height: 14px; }
 .layer-tabs button[aria-selected="true"] { color: var(--color-text); background: var(--color-panel); font-weight: 600; }

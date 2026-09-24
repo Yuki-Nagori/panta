@@ -72,7 +72,7 @@ QtObject {
     readonly property int logoWidth: 46
     readonly property real leftPanelRatio: 0.26
     readonly property int leftPanelMinimumWidth: 320
-    readonly property real outputPanelRatio: 0.42
+    readonly property real layersPanelRatio: 0.42
 
     // 圆角与线宽
     readonly property int radiusSmall: 3

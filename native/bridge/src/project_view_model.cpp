@@ -82,7 +82,7 @@ const QString& ProjectViewModel::currentName() const { return m_currentName; }
 
 bool ProjectViewModel::dirty() const { return m_dirty; }
 
-bool ProjectViewModel::hasImportedPart() const { return m_hasImportedPart; }
+const QStringList& ProjectViewModel::importedPartNames() const { return m_importedPartNames; }
 
 const QString& ProjectViewModel::importedPartName() const { return m_importedPartName; }
 
@@ -295,7 +295,13 @@ bool ProjectViewModel::applySnapshot(const panta::ffi::ProjectSnapshot& snapshot
 }
 
 void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports) {
-    bool nextHasImportedPart = false;
+    QStringList nextImportedPartNames;
+    const QDir projectDirectory(QFileInfo(m_currentPath).absolutePath());
+    for (std::size_t index = 0; index < imports.size(); ++index) {
+        const auto& imported = imports[index];
+        nextImportedPartNames.append(QString::fromUtf8(imported.source_name));
+    }
+
     QString nextPartName;
     QString nextAssetPath;
     QString nextMeshType;
@@ -305,9 +311,7 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
 
     if (imports.size() > 0) {
         const auto& imported = imports[imports.size() - 1];
-        nextHasImportedPart = true;
         nextPartName = QString::fromUtf8(imported.source_name);
-        const QDir projectDirectory(QFileInfo(m_currentPath).absolutePath());
         nextAssetPath = projectDirectory.filePath(QString::fromUtf8(imported.asset));
         nextMeshType = QString::fromUtf8(imported.mesh_type);
         nextUnits = QString::fromUtf8(imported.units);
@@ -321,11 +325,11 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
     }
 
     const bool changed =
-        m_hasImportedPart != nextHasImportedPart || m_importedPartName != nextPartName ||
+        m_importedPartNames != nextImportedPartNames || m_importedPartName != nextPartName ||
         m_importedAssetPath != nextAssetPath || m_importedMeshType != nextMeshType ||
         m_importedUnits != nextUnits || m_importedDimensions != nextDimensions ||
         m_importedTriangleCount != nextTriangleCount;
-    m_hasImportedPart = nextHasImportedPart;
+    m_importedPartNames = std::move(nextImportedPartNames);
     m_importedPartName = nextPartName;
     m_importedAssetPath = nextAssetPath;
     m_importedMeshType = nextMeshType;
@@ -363,17 +367,17 @@ QString ProjectViewModel::userMessageFor(const QString& errorCode) {
         return QStringLiteral("The selected project file does not exist.");
     }
     if (errorCode == QStringLiteral("project.invalid_file")) {
-        return QStringLiteral("Only .panta project files can be opened.");
+        return QStringLiteral("Choose a .panta project file.");
     }
     if (errorCode == QStringLiteral("project.file_not_local")) {
-        return QStringLiteral("Choose a local .panta project file.");
+        return QStringLiteral("Choose a project file on this device.");
     }
     if (errorCode == QStringLiteral("project.already_exists")) {
         return QStringLiteral("A project with this name already exists.");
     }
     if (errorCode == QStringLiteral("project.manifest_invalid") ||
         errorCode == QStringLiteral("project.unsupported_schema")) {
-        return QStringLiteral("The selected folder is not a supported panta project.");
+        return QStringLiteral("The selected project file is not supported.");
     }
     if (errorCode == QStringLiteral("project.no_project")) {
         return QStringLiteral("Open or create a project first.");
@@ -389,11 +393,10 @@ QString ProjectViewModel::userMessageFor(const QString& errorCode) {
     }
     if (errorCode == QStringLiteral("project.import_unsupported_mesh_type") ||
         errorCode == QStringLiteral("project.import_unsupported_units")) {
-        return QStringLiteral("Choose a supported mesh type and unit.");
+        return QStringLiteral("Choose valid STL import options.");
     }
     if (errorCode == QStringLiteral("project.import_source_changed")) {
-        return QStringLiteral(
-            "The STL file changed after preview. Review it again before importing.");
+        return QStringLiteral("The STL file changed after preview. Select it again.");
     }
     if (errorCode == QStringLiteral("project.import_parse_failed")) {
         return QStringLiteral("The selected STL file could not be read.");
