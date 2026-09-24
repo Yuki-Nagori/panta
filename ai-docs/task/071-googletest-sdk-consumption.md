@@ -33,10 +33,10 @@
 
 ## 前置条件与待决策
 
-- Release `sdk-googletest-1.18.0` 已包含三平台资产与 sidecar。下载测得归档 SHA256：
-  - macOS arm64：`f1c28c7121cd2b34beaa0fdbec660b32b2e45ba8d252f14073eb93e357c73579`
-  - Linux x86_64：`ae6bf4752d4e95893d81ce316efd0dc37c433b87cad243c87103f7c78bcf948f`
-  - Windows x86_64：`a395b0f227254509f7df1dbd562287556df8d5192c1a940d0cf06e6813c70f96`
+- Release `sdk-googletest-1.18.0` 已由修正版 workflow run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) 重产三平台资产与 sidecar。新归档 SHA256 与 sidecar 内容及 Release API digest 一致：
+  - macOS arm64：`654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`
+  - Linux x86_64：`4b4b1281828c095cda29fdc4e7b150d816296da2b2c1375a2a2326ebc68de5ae`
+  - Windows x86_64：`d070f6fbe77d1060033e8eb6bac97b7efba736db7b40fc50ef2ce9ce914c03ff`
 - 归档内包含 `GTestConfig.cmake`、静态库、headers、`panta-sdk.json` 和 BSD-3-Clause license。
 
 ## 实施步骤
@@ -85,6 +85,9 @@
 | 2026-09-24 | macOS：managed CMake configure `-DBUILD_TESTING=OFF`、`-DPANTA_ENABLE_FFI_TEST=OFF` | 不请求 GoogleTest，其他产品依赖正常配置 | 通过；cache 确认为 `BUILD_TESTING:BOOL=OFF`，configure 输出无 GoogleTest 供给步骤 |
 | 2026-09-24 | macOS：`cargo run --locked -p panta-tests -- toolchain` | 当前平台解析到固定 GoogleTest SDK config | 通过；解析为 `macos-arm64/lib/cmake/GTest/GTestConfig.cmake` |
 | 2026-09-24 | GitHub Actions run [35992062001](https://github.com/Yuki-Nagori/panta/actions/runs/35992062001)，Windows `cargo check and build` 与 sanitizer | 三平台固定 SDK consumer 链接与测试通过 | Windows 失败；`lld-link` 报 `testing::*`、`__mingw_vfprintf`、`__cxxabiv1` 未解析符号，输入为 MinGW `libgtest.a`，不兼容 MSVC ABI。修复和重产证据见任务 075 |
+| 2026-09-24 | GitHub Actions run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400)：下载三平台 `.sha256` sidecar，并与 Release API archive digest 对照 | 新制品摘要准确且 Release 资产完整 | 通过；三平台 sidecar 值逐一等于 Release API 对应 `.tar.gz` digest，已同步至 manifest 与本 task |
+| 2026-09-24 | macOS：更新三平台摘要后运行 `cargo test --locked --workspace` | staging 用新 manifest 摘要下载/接受当前平台 SDK，native 与 Rust 测试通过 | 通过；staging marker SHA256 为 `654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`，native CTest 56/56 |
+| 2026-09-24 | GitHub Actions run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) | 三平台 consumer CI 使用新 Release 摘要通过 | 该 run 的 commit `262ad8b` 尚未包含新 SHA；Windows 比较旧期望值与新资产 digest 后按设计拒绝，不能视为新 manifest 的消费者失败。下一次 push CI 待复验 |
 
 ## 风险与回退
 

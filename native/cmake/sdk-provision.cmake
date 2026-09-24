@@ -620,7 +620,7 @@ panta_sdk_declare_asset(
 
 panta_sdk_declare_version(googletest 1.18.0)
 # GoogleTest 1.18.0 测试专用静态 SDK（任务 070/071；workflow run
-# 35972333653 三平台构建、自检、打包与 Release 发布全绿）。上游 commit
+# 35999015400 三平台 MSVC 修正版构建、自检、打包与 Release 发布全绿）。上游 commit
 # 063de7e9578f82b369302001269680b4b1553359；C++17，Windows /MD；不含 gmock。
 panta_sdk_declare_asset(
   googletest
@@ -628,7 +628,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-macos-arm64.tar.gz
   SHA256
-  f1c28c7121cd2b34beaa0fdbec660b32b2e45ba8d252f14073eb93e357c73579
+  654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230
   PACKAGE
   GTest
   REQUIRED_TARGETS
@@ -644,7 +644,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-linux-x86_64.tar.gz
   SHA256
-  ae6bf4752d4e95893d81ce316efd0dc37c433b87cad243c87103f7c78bcf948f
+  4b4b1281828c095cda29fdc4e7b150d816296da2b2c1375a2a2326ebc68de5ae
   PACKAGE
   GTest
   REQUIRED_TARGETS
@@ -660,7 +660,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-windows-x86_64.tar.gz
   SHA256
-  a395b0f227254509f7df1dbd562287556df8d5192c1a940d0cf06e6813c70f96
+  d070f6fbe77d1060033e8eb6bac97b7efba736db7b40fc50ef2ce9ce914c03ff
   PACKAGE
   GTest
   REQUIRED_TARGETS

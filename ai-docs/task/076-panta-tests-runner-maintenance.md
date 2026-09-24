@@ -62,6 +62,9 @@
 | 2026-09-24 | macOS：`cargo format --check`、`cargo build`、`cargo lint --check` | 格式、常规构建与八阶段质量聚合通过 | 全部通过；lint 包含 qmllint、clang-tidy、include-cleaner 与 cppcheck |
 | 2026-09-24 | macOS：`cargo test --locked --workspace` | Rust、native CTest 与 QML 聚合测试通过 | 通过；native CTest 56/56，workspace Rust 测试及 doc-tests 均通过 |
 | 2026-09-24 | macOS：`actionlint .github/workflows/sdk-googletest.yml` | GoogleTest SDK workflow 语法检查通过 | 通过 |
+| 2026-09-24 | GitHub Actions run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964)，standalone cppcheck | 单项 lint 为自身准备 benchmark moc，且扫描通过 | 失败；`cppcheck.json` 包含 QML benchmark 的 `mocs_compilation.cpp`，而 `run_cppcheck` 单项入口只构建 launcher；修复后本机复验 |
+| 2026-09-24 | macOS：`cargo lint cppcheck --check` 和 `cargo lint --check` | standalone cppcheck 和八阶段质量聚合生成 moc 并通过 | 全部通过；独立入口生成两个 benchmark AUTOGEN 目标后 cppcheck 通过，聚合 lint 八阶段全通过 |
+| 2026-09-24 | macOS：`cargo test --locked --workspace`，使用更新后的 SDK manifest | 新 macOS GoogleTest 归档校验与 workspace 测试通过 | 通过；staging marker 为新 SHA `654e87d9…cc2230`，native CTest 56/56，workspace Rust/doc tests 全通过 |
 
 ## 风险与回退
 
@@ -72,7 +75,8 @@ runner 负责编排跨平台构建与测试，错误合并默认值可能改变 
 - 2026-09-24：维护者要求在 CI 修复期间整体审查 `tests/src/main.rs`；独立登记，避免与 Windows SDK ABI 修复混为一项。
 - 2026-09-24：统一 CTest 参数装配、CMake build 命令和 native 路径；C++ 格式化从每文件启动一次工具改为单次批量运行，子进程启动失败补充操作上下文。
 - 2026-09-24：clang-tidy / include-cleaner 前显式生成排除默认构建的 Qt benchmark moc；聚合 lint 共享一次 launcher 与 moc 准备，同时让单项 lint 自行准备所需产物。
+- 2026-09-24：CI 复验发现 standalone cppcheck 同样读取未生成的 benchmark AUTOGEN 编译单元；任务重新打开，将 moc 前置准备统一补入 cppcheck 单项入口。
 
 ## 完成摘要
 
-完成。`tests/src/main.rs` 的流程已完整审查；在保持 CLI、检查覆盖范围和失败退出语义不变的前提下，合并重复的命令准备流程、减少聚合 lint 重复构建、修复 Qt benchmark moc 前置生成，并统一启动错误上下文。`cargo format --check`、`cargo build`、`cargo lint --check`、`cargo test --locked --workspace` 和 workflow `actionlint` 全部通过。
+完成。`tests/src/main.rs` 的流程已完整审查；在保持 CLI、检查覆盖范围和失败退出语义不变的前提下，合并重复的命令准备流程、减少聚合 lint 重复构建、修复 Qt benchmark moc 前置生成，并统一启动错误上下文。完整 `cargo lint --check`、standalone cppcheck、`cargo test --locked --workspace`、`cargo format --check`、`cargo build`、workflow `actionlint` 均通过。CI 发现并补齐了 cppcheck 单项入口的 AUTOGEN 准备。

@@ -67,7 +67,8 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 - [x] workflow 仅手动触发，三平台各产出独立 SDK 归档和 SHA256。
 - [x] SDK 固定到指定上游 commit；包内含所需头文件、静态库、CMake config、BSD-3-Clause license 和来源元数据。
 - [x] 每个平台的 SDK 自检均成功完成 configure、compile、link 和 smoke test 后才允许上传 artifacts / Release。
-- [ ] Windows SDK 使用 MSVC 2022 x64 Release 工具链（而非 runner PATH 中的 MinGW），并由 MSVC ABI 消费构建验证链接与测试。
+- [x] Windows SDK 使用 MSVC 2022 x64 Release 工具链（而非 runner PATH 中的 MinGW）生产并由同 ABI 自检；workflow run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) 通过。
+- [ ] Windows consumer build 与 sanitizer 在 MSVC ABI 下链接并测试通过。
 - [x] Release 默认不发布；启用发布时由单一 job 全量替换 `sdk-googletest-1.18.0` 资产。
 - [x] 普通 CI 和当前本地 Cargo 测试入口行为保持不变；后续消费任务可凭真实资产 URL/SHA256 登记 manifest。
 - [x] 本任务和索引记录真实 workflow/本地验证结果，CI-only 限制如实注明。
@@ -81,6 +82,7 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 | 2026-09-24 | Actions run [35972333653](https://github.com/Yuki-Nagori/panta/actions/runs/35972333653) `workflow_dispatch` | Linux/macOS/Windows 每个平台完成固定源码校验、SDK build/install、自检、package、artifact upload；Release 收口成功 | 全绿；Release `sdk-googletest-1.18.0` 已发布 |
 | 2026-09-24 | 下载三平台 Release 归档与 sidecar、`shasum -a 256`、`tar tzf` | 实际摘要与 GitHub Release API digest / sidecar 相同，归档内有 config、静态库、license | 通过；消费摘要记录在任务 071 与依赖固定清单 |
 | 2026-09-24 | Actions run [35992062001](https://github.com/Yuki-Nagori/panta/actions/runs/35992062001) Windows consumer link | 固定 Windows SDK 能与仓库 MSVC ABI 链接 | 失败；link log 引用了 `libgtest.a`、`__mingw_vfprintf` 和 `__cxxabiv1`，证明现有 Windows SDK 是 MinGW ABI；producer selfcheck 曾用同一默认编译器，因此未覆盖该错配。修复跟踪见任务 075 |
+| 2026-09-24 | Actions run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) `workflow_dispatch`，发布输入开启 | 三平台重产、自检、归档与 Release 发布成功；Windows 使用 MSVC | 全绿；Windows job 使用 Visual Studio 2022 x64 + Release，SDK 自检和全平台资产发布通过；新摘要回填见任务 071。consumer run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) 失败于旧 manifest 摘要不匹配及 standalone cppcheck 缺 moc，等待更新后的 CI 复验 |
 
 ## 风险与回退
 
@@ -91,8 +93,9 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 - 2026-09-24：维护者决定 GoogleTest 由仓库自有 CI 构建、打包；不依赖上游提供不存在的预编译二进制包。
 - 2026-09-24：创建任务。
 - 2026-09-24：三平台 workflow run 35972333653 全绿并发布 `sdk-googletest-1.18.0`；所有矩阵 job 的 SDK 静态链接自检与发布 job 均通过。
-- 2026-09-24：consumer run 35992062001 证明 Windows Release 资产由 MinGW 构建且不兼容 MSVC consumer；原先的 `gtest_force_shared_crt=ON` 只设 CRT 选项，没有选择 MSVC 编译器。任务重新打开，任务 075 登记 producer 与 consumer 修复。
+- 2026-09-24：consumer run 35992062001 证明旧 Windows Release 资产由 MinGW 构建且不兼容 MSVC consumer；原先的 `gtest_force_shared_crt=ON` 只设 CRT 选项，没有选择 MSVC 编译器。任务重新打开，任务 075 登记 producer 与 consumer 修复。
+- 2026-09-24：run 35999015400 使用修正后的 Visual Studio 2022 x64 Release 配置，三平台自检、打包和 Release 发布通过；run 35998981964 使用旧 manifest 消费期间检测到 Windows 摘要失配，并发现独立 cppcheck 漏了 benchmark moc 准备。摘要已在 manifest 更新，cppcheck runner 补齐前置步骤后待新 CI 复验。
 
 ## 完成摘要
 
-手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程已落地；run 35972333653 曾全绿并发布资产，但后续 Windows consumer 构建证明 Windows 归档 ABI 与其声明和消费者不符。需由任务 075 修正 Windows 生成器、重产归档并复验后再完成本任务。
+手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程已落地；run 35999015400 已使用 MSVC 2022 x64 重产并发布三平台资产，producer 检查通过。consumer run 35998981964 使用更新前 manifest，需由新提交触发消费复验后完成本任务。

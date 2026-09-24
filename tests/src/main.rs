@@ -893,6 +893,7 @@ fn build_qml_benchmark_moc() -> Result<(), Box<dyn Error>> {
 
 fn run_cppcheck() -> Result<(), Box<dyn Error>> {
     build_launcher()?;
+    build_qml_benchmark_moc()?;
     scan_cppcheck()
 }
 

@@ -24,7 +24,7 @@
 ## 范围与非目标
 
 - Windows SDK 生产和自检使用明确的 MSVC 2022 x64 工具链及 Release 配置，确保生成物匹配消费者 ABI；同步记录修复后的产物校验和与三平台消费者 CI 结果。
-- clang-tidy / include-cleaner 在分析 QML benchmark 翻译单元前，确保对应 Qt moc 生成步骤已完成。
+- clang-tidy / include-cleaner / cppcheck 在分析 QML benchmark 翻译单元及 CMake autogen 单元前，确保对应 Qt moc 生成步骤已完成，包括单项 lint 命令。
 - 不改变 GoogleTest 上游版本、测试行为、QML benchmark 是否进入默认构建或 CI 性能门禁。
 - 不在此任务中修改已发布 SDK；修复后的 Windows Release 制品需要生产 workflow 重新验证并发布，manifest 只记录实际产物摘要。
 
@@ -36,7 +36,7 @@
 ## 实施步骤
 
 1. 修正 GoogleTest SDK Windows 生产与自检配置，明确选择 MSVC x64 和 Release。
-2. 为 clang-tidy 的 CMake compile database 中 `EXCLUDE_FROM_ALL` Qt benchmark 准备 moc 生成输出。
+2. 为静态扫描器的 CMake compile database 中 `EXCLUDE_FROM_ALL` Qt benchmark 准备 moc 生成输出；单项 lint 与聚合 lint 使用相同前置条件。
 3. 运行当前主机适用的 Cargo 聚合验证，记录未能在 macOS 本机复现的 Windows CI 限制。
 4. 通过 Windows SDK production workflow 产出并验证修正归档，更新 manifest 与消费证据；等待三平台 CI 全绿后完成 task。
 
@@ -56,9 +56,10 @@
 
 ## 验收标准
 
-- [ ] GoogleTest Windows 生产 archive 的库文件由 MSVC 2022 x64 在 Release 模式构建，SDK 自检使用同一 ABI 并链接、运行通过。
-- [ ] 新 Windows 归档的 checksum 与 manifest 一致，Windows consumer 构建 / sanitizer 链接不再出现 GTest 与 MinGW 运行时未解析符号。
-- [x] 两个 QML benchmark 的 moc 输出在 clang-tidy 与 include-cleaner 分析开始前可用，两个 lint 检查通过。
+- [x] GoogleTest Windows 生产 archive 的库文件由 MSVC 2022 x64 在 Release 模式构建，SDK 自检使用同一 ABI 并链接、运行通过。
+- [x] 三平台新归档 checksum 与 sidecar、Release API digest 和本地 manifest 一致。
+- [ ] Windows consumer 构建 / sanitizer 链接不再出现 GTest 与 MinGW 运行时未解析符号，且测试通过。
+- [ ] 两个 QML benchmark 的 moc 输出在 clang-tidy、include-cleaner、cppcheck 分析开始前可用，相关 CI 检查通过。
 - [x] 当前主机适用的 Cargo 聚合验证通过；Windows SDK manifest 与跨平台索引仍待新制品摘要。
 
 ## 验证计划与结果
@@ -68,8 +69,11 @@
 | 2026-09-24 | GitHub Actions run `35992062001`：查看 Windows linker 与 Ubuntu clang-tidy/includes 日志 | 确认失败符号和缺失输入 | 已确认：GTest 链接出现 `__mingw_vfprintf`、`__cxxabiv1` 与 `testing::*` 未解析符号；benchmark 报缺少源内 `.moc` include；push 包含 `da880de` 的 QML 改动，路径分类器触发代码 CI 正确 |
 | 2026-09-24 | 当前工作区：检查 GoogleTest workflow、SDK manifest、CMake compile database 与 benchmark target 属性 | 确认 Windows 目标 ABI 和 lint 生成依赖 | 已确认 workflow 设 Ninja 但未声明 MSVC 编译器；消费者调用 `lld-link`；两个 benchmark 使用 `EXCLUDE_FROM_ALL` 并仍在 clang-tidy compile database 中 |
 | 2026-09-24 | macOS：`actionlint .github/workflows/sdk-googletest.yml` | Windows producer workflow 语法通过 | 通过；明确使用 Visual Studio 2022 x64 生成器，并以 Release 配置 build/install；Windows 库名自检拒绝 MinGW `.a` |
-| 2026-09-24 | macOS：`cargo format --check`、`cargo build`、`cargo lint --check`、`cargo test --locked --workspace` | 当前平台聚合验证通过，两个 benchmark moc 在扫描前生成 | 全部通过；clang-tidy 与 include-cleaner 两阶段通过，native CTest 56/56 |
-| — | Windows SDK production workflow、更新 Release 资产 / manifest，以及修复后的三平台 consumer CI | MSVC Release SDK 发布且所有消费者链接通过 | 尚未运行；需要将 workflow 修复提交到远程后，由维护者显式启用发布并获取真实 checksum，不能在本地 macOS 证明 Windows ABI |
+| 2026-09-24 | macOS：`cargo format --check`、`cargo build`、`cargo lint --check`、`cargo test --locked --workspace` | 当前平台聚合验证通过，所有扫描器前两个 benchmark moc 已生成 | 全部通过；八阶段 lint 通过（含 clang-tidy、include-cleaner、cppcheck），新 manifest 对应 macOS SDK staging marker 命中，native CTest 56/56 |
+| 2026-09-24 | GitHub Actions run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) `workflow_dispatch`，发布输入开启 | MSVC Release SDK 通过自检并替换三平台 Release 资产 | 全绿；Windows 使用 Visual Studio 2022 x64；三平台 package 与 selfcheck 均成功 |
+| 2026-09-24 | 下载三个 `.sha256` sidecar 并与 Release API `digest` 对照 | 更新 manifest 的三平台归档摘要 | 一致；macOS `654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`，Linux `4b4b1281828c095cda29fdc4e7b150d816296da2b2c1375a2a2326ebc68de5ae`，Windows `d070f6fbe77d1060033e8eb6bac97b7efba736db7b40fc50ef2ce9ce914c03ff`；已更新固定清单 |
+| 2026-09-24 | CI run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) | 新 manifest 下三平台 consumer build、tests 与 sanitizer 通过，静态扫描器准备 benchmark moc | 失败且使用旧 commit/manifest：Windows 下载新 archive 的实际 SHA `d070f6…` 与旧预期值不同；Ubuntu 独立 cppcheck 命令未生成 benchmark `mocs_compilation.cpp`。manifest 已在本地更新，cppcheck 缺失前置步骤现修正并待复验 |
+| — | 包含新三平台 SHA 和 cppcheck 修复的下一次 consumer CI | Windows consumer 链接/测试、Ubuntu cppcheck 与其它 CI 通过 | 尚未运行；本地修改尚未提交/推送 |
 
 ## 风险与回退
 
@@ -79,8 +83,8 @@ Windows Release 归档与 SHA manifest 必须作为一个可审计的版本化�
 
 - 2026-09-24：根据 GitHub Actions run `35992062001` 登记 CI 修复；发现 Windows 归档和自检的编译器配置均未满足 manifest 声明的 MSVC ABI，lint 编译数据库收录了尚未生成 moc 的排除构建目标。
 - 2026-09-24：维护者要求整体审查 `tests/src/main.rs`，相关维护整理另登记为任务 076，避免将 runner 清理伪装成 CI 根因修复。
-- 2026-09-24：修复 SDK producer workflow 的 Windows 生成器与 Release 安装配置；Qt benchmark moc 在 clang-tidy 与 include-cleaner 前生成。macOS 聚合 lint 和 workspace tests 全部通过；Windows Release 资产尚未重产，不宣称 Windows consumer CI 已修复。
+- 2026-09-24：修复 SDK producer workflow 的 Windows 生成器与 Release 安装配置；run 35999015400 已在 MSVC ABI 下重产并发布三平台 SDK，sidecar 和 API digest 已核对且 manifest 已更新。run 35998981964 因旧 manifest 哈希和独立 cppcheck 未准备 moc 而失败；扩展修复范围并等待新的 consumer CI 复验。
 
 ## 完成摘要
 
-代码和本地主机可复现问题已修复，GitHub workflow actionlint、`cargo lint --check`（含两个 clang 相关阶段）以及 `cargo test --locked --workspace` 通过。任务保持 in-progress：Windows producer workflow 尚未在 Windows runner 运行，旧 Release 归档与 manifest SHA 仍未替换，需产出 MSVC x64 Release 归档并完成 consumer CI 后关闭。
+Windows producer workflow 已在 MSVC 2022 x64 Release 下通过，三平台 Release 资产已重产，manifest SHA 与各 sidecar / API digest 一致。Qt moc lint 和 macOS 聚合验证通过；run 35998981964 使用旧 manifest 并发现 standalone cppcheck 缺少 moc 准备。修复后需由包含新 manifest 和 cppcheck 前置步骤的 CI 复验，再关闭任务。
