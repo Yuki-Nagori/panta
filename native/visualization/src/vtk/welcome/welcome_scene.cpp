@@ -1,5 +1,7 @@
-#include "default_wordmark.hpp"
+#include "welcome_scene.hpp"
 
+#include <QByteArray>
+#include <QCoreApplication>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -7,17 +9,25 @@
 #include <map>
 #include <utility>
 #include <vector>
+#include <vtkBillboardTextActor3D.h>
+#include <vtkCamera.h>
 #include <vtkCellArray.h>
 #include <vtkNew.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkTextProperty.h>
 #include <vtkType.h>
 #include <vtkUnsignedCharArray.h>
 #include <vtkVectorText.h>
 
 namespace panta::visualization {
 namespace {
+
+constexpr int kWelcomeLabelFontSize = 50;
+constexpr double kWelcomeLabelVerticalPosition = -0.5;
 
 using Triangle = std::array<vtkIdType, 3>;
 using Edge = std::pair<vtkIdType, vtkIdType>;
@@ -28,7 +38,7 @@ struct EdgeUse {
     int count = 0;
 };
 
-// 欢迎图形的装饰色带，借用注塑云图的冷暖顺序；不映射物理量。
+// 品牌渐变沿字形从冷色过渡到暖色，不表示物理量或求解结果。
 std::array<unsigned char, 3> wordmark_color(double x, double y) {
     constexpr std::array<Point, 6> palette{{{24, 42, 146},
                                             {16, 132, 207},
@@ -52,7 +62,7 @@ std::array<unsigned char, 3> wordmark_color(double x, double y) {
 
 } // namespace
 
-vtkSmartPointer<vtkPolyData> create_default_wordmark() {
+vtkSmartPointer<vtkPolyData> create_welcome_wordmark() {
     vtkNew<vtkVectorText> source;
     source->SetText("panta");
     source->Update();
@@ -121,7 +131,7 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
     const auto offset = static_cast<vtkIdType>(vertices.size());
     points->SetNumberOfPoints(2 * offset);
     colors->SetNumberOfTuples(2 * offset);
-    constexpr double half_depth = 0.16;
+    constexpr double half_depth = 0.11;
     for (vtkIdType i = 0; i < offset; ++i) {
         const auto& vertex = vertices[i];
         points->SetPoint(i, vertex[0], vertex[1], -half_depth);
@@ -161,6 +171,62 @@ vtkSmartPointer<vtkPolyData> create_default_wordmark() {
     mesh->SetPolys(faces);
     mesh->GetPointData()->SetScalars(colors);
     return mesh;
+}
+
+WelcomeScene::~WelcomeScene() { detach(); }
+
+void WelcomeScene::attach(vtkRenderWindow* render_window) {
+    if (render_window == nullptr || renderer_ != nullptr) {
+        return;
+    }
+    render_window_ = render_window;
+    if (render_window_->GetNumberOfLayers() < 2) {
+        render_window_->SetNumberOfLayers(2);
+    }
+
+    renderer_ = vtkSmartPointer<vtkRenderer>::New();
+    renderer_->SetLayer(1);
+    renderer_->SetErase(false);
+    renderer_->InteractiveOff();
+    renderer_->SetViewport(0.0, 0.0, 1.0, 1.0);
+    auto* camera = renderer_->GetActiveCamera();
+    camera->SetPosition(0.0, 0.0, 10.0);
+    camera->SetFocalPoint(0.0, 0.0, 0.0);
+    camera->SetViewUp(0.0, 1.0, 0.0);
+    camera->SetParallelProjection(true);
+    camera->SetParallelScale(1.0);
+
+    text_actor_ = vtkSmartPointer<vtkBillboardTextActor3D>::New();
+    const QByteArray text = QCoreApplication::translate("ViewportWelcome", "Welcome!").toUtf8();
+    text_actor_->SetInput(text.constData());
+    // 第二层使用独立的平行相机，文字固定在视口下方且不参与场景拾取。
+    text_actor_->SetPosition(0.0, kWelcomeLabelVerticalPosition, 0.0);
+    text_actor_->PickableOff();
+    vtkNew<vtkTextProperty> property;
+    property->SetFontFamilyToArial();
+    property->SetFontSize(kWelcomeLabelFontSize);
+    property->SetColor(0.34, 0.34, 0.34);
+    property->SetJustificationToCentered();
+    property->SetVerticalJustificationToCentered();
+    text_actor_->SetTextProperty(property);
+    text_actor_->ForceOpaqueOn();
+    renderer_->AddActor(text_actor_);
+    render_window_->AddRenderer(renderer_);
+}
+
+void WelcomeScene::detach() {
+    if (render_window_ != nullptr && renderer_ != nullptr) {
+        render_window_->RemoveRenderer(renderer_);
+    }
+    text_actor_ = nullptr;
+    renderer_ = nullptr;
+    render_window_ = nullptr;
+}
+
+void WelcomeScene::set_visible(bool visible) {
+    if (text_actor_ != nullptr) {
+        text_actor_->SetVisibility(visible);
+    }
 }
 
 } // namespace panta::visualization

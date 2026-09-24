@@ -1,13 +1,12 @@
 // 欢迎字样的 CPU 几何验证：封闭实体、字孔拓扑和有效顶点色不依赖 GPU。
-#include "default_wordmark.hpp"
 #include "navigation/viewport_orientation.hpp"
 #include "panta/visualization/mesh_source.hpp"
 #include "surface_mesh.hpp"
+#include "welcome/welcome_scene.hpp"
 #include <QFile>
 #include <QIODevice>
 #include <QTemporaryDir>
 #include <QtCore/qtmetamacros.h>
-#include <QtTest/qbenchmark.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <algorithm>
@@ -39,17 +38,18 @@
 #include <vtkType.h>
 #include <vtkVectorText.h>
 
-class DefaultWordmarkTest final : public QObject {
+class WelcomeWordmarkTest final : public QObject {
     Q_OBJECT
 
   private slots:
     void creates_closed_colored_letters() {
-        const auto mesh = panta::visualization::create_default_wordmark();
+        const auto mesh = panta::visualization::create_welcome_wordmark();
         QVERIFY(mesh->GetNumberOfPoints() > 0);
         double bounds[6];
         mesh->GetBounds(bounds);
         QVERIFY(bounds[1] - bounds[0] > 2 * (bounds[3] - bounds[2]));
-        QVERIFY(bounds[5] - bounds[4] > 0.3);
+        QVERIFY(bounds[5] - bounds[4] > 0.2);
+        QVERIFY(std::abs((bounds[5] - bounds[4]) - 0.22) < 1e-6);
         for (std::size_t axis = 0; axis < 3; ++axis) {
             QVERIFY(std::abs(bounds[2 * axis] + bounds[2 * axis + 1]) < 1e-5);
         }
@@ -209,45 +209,6 @@ class DefaultWordmarkTest final : public QObject {
         QVERIFY(!orientation.cube_direction(940, 704, 1000, 800).has_value());
     }
 
-    // 基线：没有 overlay renderer 时，场景更新应在入口处快速返回。
-    void benchmarks_orientation_without_overlay() {
-        panta::visualization::ViewportOrientation orientation;
-        vtkNew<vtkCamera> camera;
-        QBENCHMARK { orientation.update(camera); }
-    }
-
-    // 对比基线：完整 overlay 更新只测 CPU 状态同步，不把 WebGPU 提交混入结果。
-    void benchmarks_orientation_overlay_update() {
-        panta::visualization::ViewportOrientation orientation;
-        vtkNew<vtkRenderWindow> render_window;
-        orientation.attach(render_window);
-        vtkNew<vtkCamera> camera;
-        camera->SetPosition(3.0, 4.0, 5.0);
-        camera->SetFocalPoint(0.0, 0.0, 0.0);
-        camera->SetViewUp(0.0, 0.0, 1.0);
-        orientation.update(camera);
-        QBENCHMARK { orientation.update(camera); }
-    }
-
-    void benchmarks_cube_face_pick() {
-        panta::visualization::ViewportOrientation orientation;
-        vtkNew<vtkRenderWindow> render_window;
-        render_window->SetSize(1000, 800);
-        orientation.attach(render_window);
-        vtkNew<vtkCamera> camera;
-        camera->SetPosition(0.0, 0.0, 5.0);
-        camera->SetFocalPoint(0.0, 0.0, 0.0);
-        camera->SetViewUp(0.0, 1.0, 0.0);
-        orientation.update(camera);
-        volatile int picked_direction = -1;
-        QBENCHMARK {
-            const auto picked = orientation.cube_direction(940, 704, 1000, 800);
-            picked_direction = picked.has_value() ? static_cast<int>(*picked) : -1;
-        }
-        QCOMPARE(picked_direction,
-                 static_cast<int>(panta::visualization::CubeDirection::PositiveZ));
-    }
-
     void creates_axis_and_direction_labels() {
         panta::visualization::ViewportOrientation orientation;
         vtkNew<vtkRenderWindow> render_window;
@@ -367,5 +328,5 @@ class DefaultWordmarkTest final : public QObject {
     }
 };
 
-QTEST_APPLESS_MAIN(DefaultWordmarkTest)
-#include "default_wordmark_test.moc"
+QTEST_APPLESS_MAIN(WelcomeWordmarkTest)
+#include "welcome_wordmark_test.moc"

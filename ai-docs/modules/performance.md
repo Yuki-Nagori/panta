@@ -36,13 +36,22 @@ PANTA_TEST_NATIVE_VIEWPORT=1 QT_QPA_PLATFORM=cocoa \
 
 ## 与质量门禁的关系
 
-任务 [065](../task/065-vtk-zoom-and-cube-transition.md) 提供 VTK 导航 CPU 基准（仓库根目录）：
+任务 [065](../task/065-vtk-zoom-and-cube-transition.md) 提供 VTK 导航 CPU 基准（不创建图形窗口或提交 GPU 帧）：
 
 ```sh
-cmake --build target/native/debug --target panta_viewport_navigation_benchmark --parallel 4
-target/native/debug/visualization/panta_viewport_navigation_benchmark
+cmake --build target/native/debug --target panta_viewport_navigation_cpu_benchmark --parallel 4
+target/native/debug/visualization/panta_viewport_navigation_cpu_benchmark
 ```
 
-单立方体场景，32 个循环变化的姿态；每项预热 1000 次，再采样 31 批、每批 1000 次。输出批次平均耗时的 p50 / p95，分解插值、方向标记同步、裁剪范围更新，并比较关闭标记更新与完整 CPU 过渡。结果不包括 Qt 调度、GPU 渲染和提交延迟。该 executable 不注册到 CTest，无绝对性能门槛；机器、Debug 配置及数字见任务记录。
+VTK WebGPU GPU-backed 基准与 CPU 目标并列维护，要求真实图形会话；测量场景状态更新至下一次 WebGPU 帧提交日志的间隔：
+
+```sh
+cmake --build target/native/debug --target panta_viewport_gpu_benchmark --parallel 4
+target/native/debug/visualization/panta_viewport_gpu_benchmark
+```
+
+真实 VTK WebGPU 原生窗口的 GPU 基准与该 CPU 微基准保持独立，由任务 [048](../task/048-performance-testing.md) 维护；GPU 基准通过 `VtkViewport` 触发场景更新，测量事件调度到 VTK 帧提交的间隔。VTK 当前没有跨平台 GPU 完成或屏幕呈现时间戳，所以该指标包含 CPU 调度与 VTK 提交开销，不等同于 GPU 内核执行时间或实际显示器呈现间隔。两个目标都是开发侧手动工具，不注册为 CTest 或 CI 门禁。
+
+单立方体场景，32 个循环变化的姿态；每项预热 1000 次，再采样 31 批、每批 1000 次。输出批次平均耗时的 p50 / p95，分解相机插值、变化姿态下的方向标记同步、无标记消融、稳定姿态同步、六面命中和裁剪范围重置，并比较无标记与完整 CPU 过渡。结果不包括 Qt 调度、GPU 渲染和提交延迟。该 executable 不注册到 CTest，无绝对性能门槛；机器、Debug 配置及数字见任务记录。
 
 `cargo quality` / CI 不运行本模块任何工具；`cargo sanitize`（内存错误）与覆盖率（执行面）回答"对不对、测没测到"，本模块回答"快不快、内存峰值在哪"。启动耗时的构建侧测量（入口耗时表）登记在任务 048 验证表，不进入 CI。

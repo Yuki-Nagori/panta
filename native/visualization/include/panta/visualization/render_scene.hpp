@@ -20,9 +20,9 @@ using SceneRevision = std::uint64_t;
 struct RenderScene {
     /// 状态版本：后端已应用的修订低于此值时必须重新应用。
     SceneRevision revision = 0;
-    /// 视口背景色（演示阶段的可恢复状态之一）。
-    QColor background{232, 238, 247};
-    /// 临时欢迎图形可见性；053 的最终字样设计仍为规划。
+    /// 视口背景基色（演示阶段的可恢复状态之一；VTK 以轻微渐变呈现）。
+    QColor background{248, 249, 250};
+    /// 默认欢迎字样可见性；为空 mesh 时由 VTK 适配器显示欢迎几何。
     bool primitive_visible = true;
     /// Rust 工程服务已校验的表面网格快照；为空时显示默认欢迎图形。
     std::shared_ptr<const SurfaceMeshSnapshot> mesh;

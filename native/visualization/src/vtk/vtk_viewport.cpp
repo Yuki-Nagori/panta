@@ -4,13 +4,13 @@
 /// 直接绘制到平台 surface，避免把 OpenGL/WebGPU 资源混入 scenegraph。
 #include "vtk_viewport.hpp"
 
-#include "default_wordmark.hpp"
 #include "mesh_source.hpp"
 #include "navigation/viewport_camera.hpp"
 #include "navigation/viewport_input.hpp"
 #include "navigation/viewport_orientation.hpp"
 #include "surface_mesh.hpp"
 #include "vtk_native_surface.hpp"
+#include "welcome/welcome_scene.hpp"
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QList>
@@ -59,11 +59,15 @@ namespace {
 Q_LOGGING_CATEGORY(viewport_log, "panta.viewport", QtWarningMsg)
 
 constexpr int kCameraTransitionDurationMs = 260;
+constexpr double kModelCameraFitMargin = 1.25;
+// Welcome 字标独立留出更大适配边距；导入模型继续使用标准视口边距。
+constexpr double kWelcomeCameraFitMargin = 2.25;
 
 using Vector3 = std::array<double, 3>;
 
 // 字样保持透视深度；按实际宽高比留出 25% 边距，窄窗口也不裁字。
-void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect) {
+void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect,
+                              double fit_margin) {
     double bounds[6];
     actor->GetBounds(bounds);
     constexpr double view_angle = 30.0;
@@ -72,7 +76,7 @@ void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, doub
     const double half_height = (bounds[3] - bounds[2]) / 2;
     const double half_depth = (bounds[5] - bounds[4]) / 2;
     const double distance =
-        1.25 * std::max(half_height, half_width / aspect) / std::tan(half_angle_radians) +
+        fit_margin * std::max(half_height, half_width / aspect) / std::tan(half_angle_radians) +
         half_depth;
     vtkCamera* camera = renderer->GetActiveCamera();
     const double* center = actor->GetCenter();
@@ -110,6 +114,7 @@ struct VtkViewport::Impl {
     vtkSmartPointer<vtkWebGPURenderer> renderer;
     vtkSmartPointer<vtkRenderWindowInteractor> interactor;
     vtkSmartPointer<vtkActor> primitive_actor;
+    WelcomeScene welcome_scene;
     ViewportOrientation orientation;
     QMetaObject::Connection window_visibility_connection;
     QMetaObject::Connection scene_graph_initialized_connection;
@@ -277,6 +282,8 @@ void VtkViewport::ensure_render_window() {
     impl_->render_window->SetHardwareWindow(impl_->hardware_window.get());
     impl_->render_window->SetSize(pixel_width, pixel_height);
     impl_->renderer = vtkSmartPointer<vtkWebGPURenderer>::New();
+    impl_->renderer->SetBackground2(0.98, 0.98, 0.98);
+    impl_->renderer->GradientBackgroundOn();
     impl_->primitive_actor = vtkSmartPointer<vtkActor>::New();
 
     update_mesh_actor();
@@ -284,6 +291,8 @@ void VtkViewport::ensure_render_window() {
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
     impl_->orientation.attach(impl_->render_window);
+
+    impl_->welcome_scene.attach(impl_->render_window);
 
 #if defined(Q_OS_MACOS)
     impl_->interactor = vtkSmartPointer<vtkCocoaRenderWindowInteractor>::New();
@@ -340,7 +349,7 @@ void VtkViewport::update_mesh_actor() {
     vtkSmartPointer<vtkPolyData> geometry;
     const bool imported_mesh = impl_->pending.mesh != nullptr;
     geometry =
-        imported_mesh ? make_surface_poly_data(*impl_->pending.mesh) : create_default_wordmark();
+        imported_mesh ? make_surface_poly_data(*impl_->pending.mesh) : create_welcome_wordmark();
 
     vtkNew<vtkPolyDataNormals> normals;
     normals->SetInputData(geometry);
@@ -364,10 +373,10 @@ void VtkViewport::update_mesh_actor() {
     }
     auto* material = impl_->primitive_actor->GetProperty();
     material->SetInterpolationToPhong();
-    material->SetAmbient(0.25);
-    material->SetDiffuse(0.75);
-    material->SetSpecular(0.32);
-    material->SetSpecularPower(36.0);
+    material->SetAmbient(0.22);
+    material->SetDiffuse(0.78);
+    material->SetSpecular(0.28);
+    material->SetSpecularPower(28.0);
     if (imported_mesh) {
         material->SetColor(0.72, 0.82, 0.94);
     }
@@ -556,13 +565,17 @@ void VtkViewport::sync_native_surface() {
             impl_->interactor->UpdateSize(pixel_size.width(), pixel_size.height());
         }
         configure_default_camera(impl_->renderer, impl_->primitive_actor,
-                                 static_cast<double>(pixel_size.width()) / pixel_size.height());
+                                 static_cast<double>(pixel_size.width()) / pixel_size.height(),
+                                 impl_->pending.mesh == nullptr ? kWelcomeCameraFitMargin
+                                                                : kModelCameraFitMargin);
     }
     impl_->orientation.update(impl_->renderer->GetActiveCamera());
     impl_->renderer->SetBackground(impl_->pending.background.redF(),
                                    impl_->pending.background.greenF(),
                                    impl_->pending.background.blueF());
     impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
+    impl_->welcome_scene.set_visible(impl_->pending.primitive_visible &&
+                                     impl_->pending.mesh == nullptr);
     impl_->render_window->Render();
     qCDebug(viewport_log) << "frame submitted" << pixel_size;
     impl_->applied_pixel_size = pixel_size;
@@ -582,6 +595,7 @@ void VtkViewport::destroy_render_window() {
     if (impl_->hardware_window != nullptr) {
         impl_->hardware_window->SetInteractor(nullptr);
     }
+    impl_->welcome_scene.detach();
     impl_->orientation.detach();
     if (impl_->render_window != nullptr) {
         impl_->render_window->Finalize();

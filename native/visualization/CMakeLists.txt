@@ -44,8 +44,8 @@ qt_add_qml_module(
   src/vtk/navigation/viewport_orientation.hpp
   src/vtk/surface_mesh.cpp
   src/vtk/surface_mesh.hpp
-  src/vtk/default_wordmark.cpp
-  src/vtk/default_wordmark.hpp
+  src/vtk/welcome/welcome_scene.cpp
+  src/vtk/welcome/welcome_scene.hpp
   src/vtk/vtk_native_surface.hpp)
 if(APPLE)
   target_sources(panta_visualization PRIVATE src/vtk/vtk_native_surface.mm)
@@ -95,14 +95,29 @@ vtk_module_autoinit(
   VTK::FiltersSources)
 
 if(BUILD_TESTING)
-  foreach(_test IN ITEMS default_wordmark_test viewport_navigation_test
-                         viewport_navigation_benchmark)
+  foreach(_test IN ITEMS welcome_wordmark_test welcome_scene_test viewport_navigation_test)
     add_executable(panta_${_test} ../../tests/cpp/visualization/${_test}.cpp)
     panta_native_defaults(panta_${_test})
     target_include_directories(panta_${_test} PRIVATE src/vtk)
     target_link_libraries(panta_${_test} PRIVATE panta_visualization Qt6::Test VTK::CommonDataModel)
   endforeach()
-  panta_add_qml_test(Visualization.DefaultWordmark panta_default_wordmark_test)
+  add_executable(panta_viewport_navigation_cpu_benchmark EXCLUDE_FROM_ALL
+                 ../../tests/cpp/visualization/viewport_navigation_cpu_benchmark.cpp)
+  panta_native_defaults(panta_viewport_navigation_cpu_benchmark)
+  target_include_directories(panta_viewport_navigation_cpu_benchmark PRIVATE src src/vtk)
+  target_link_libraries(
+    panta_viewport_navigation_cpu_benchmark
+    PRIVATE panta_visualization Qt6::Test VTK::CommonDataModel VTK::FiltersSources
+            VTK::RenderingCore)
+  # CPU/GPU 基准并列维护；GPU 目标复用真实 VtkViewport，但需可见原生窗口，手动运行。
+  add_executable(panta_viewport_gpu_benchmark EXCLUDE_FROM_ALL
+                 ../../tests/cpp/visualization/viewport_gpu_benchmark.cpp)
+  panta_native_defaults(panta_viewport_gpu_benchmark)
+  target_include_directories(panta_viewport_gpu_benchmark PRIVATE src/vtk)
+  target_link_libraries(panta_viewport_gpu_benchmark PRIVATE panta_visualization Qt6::Gui
+                                                             Qt6::Quick Qt6::Test)
+  panta_add_qml_test(Visualization.WelcomeWordmark panta_welcome_wordmark_test)
+  panta_add_qml_test(Visualization.WelcomeScene panta_welcome_scene_test)
   panta_add_qml_test(Visualization.ViewportNavigation panta_viewport_navigation_test)
-  # CPU 性能采样只作为开发侧入口，不注册 CI 时间门禁。
+  # CPU 基准显式手动构建；真实窗口 GPU 帧基准由性能任务单独跟进。
 endif()

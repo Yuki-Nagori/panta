@@ -61,8 +61,8 @@
 - `native/visualization/src/vtk/navigation/`：相机状态、输入映射和方向标记的职责归类与可测试实现。
 - `native/visualization/src/vtk/vtk_viewport.cpp`：GUI 事件、定时器和渲染刷新编排。
 - `tests/cpp/visualization/viewport_navigation_test.cpp`：导航行为测试。
-- `tests/cpp/visualization/viewport_navigation_benchmark.cpp`：独立开发侧消融与 CPU 基准；不注册 CTest 时间门禁。
-- `tests/cpp/visualization/default_wordmark_test.cpp`：保留几何与方向标记覆盖，清理失效命中假设。
+- `tests/cpp/visualization/viewport_navigation_cpu_benchmark.cpp`：独立开发侧消融与 CPU 基准；不注册 CTest 时间门禁。
+- `tests/cpp/visualization/welcome_wordmark_test.cpp`：保留字标几何与方向标记覆盖，清理失效命中假设。
 - `ai-docs/task-index.md`、本任务：同步状态与真实验证结果。
 
 ## 清理与兼容例外

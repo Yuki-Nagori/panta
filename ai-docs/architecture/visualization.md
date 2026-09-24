@@ -8,7 +8,7 @@ UI 使用 QML，3D 视口使用 C++ native Qt Quick component。VTK 是 V1 渲�
 
 VTK 采用 WebGPU render window；macOS 使用 `vtkCocoaHardwareWindow`/`vtkCocoaHardwareView` 暴露的原生 Cocoa view 与 Metal layer，再由原生视口桥接到 Qt Quick 窗口；Windows 使用 Qt Quick 原生 HWND 创建 VTK child window；Wayland 使用 Qt Quick 的 `wl_display`/`wl_compositor` 创建 `wl_subsurface`，再把该子 surface 交给 VTK。三端的 render window 均只绑定 `CaeViewport` 的原生区域，不把整个 Qt 顶层 surface 交给 VTK。三种嵌入（Cocoa 子视图、Win32 子 HWND、Wayland subsurface）都使原生渲染层位于 Qt Quick 内容之上：QML 元素无法叠放在视口区域上方，色标、工具栏等 overlay 必须避开视口矩形或另择承载方式；叠加与输入协调验证以此为前提。Qt Quick 不承载 VTK 的 OpenGL scenegraph 集成，`QQuickVTKItem` 不属于目标架构。第一里程碑的代码路径已落地，仍需在目标平台验证叠加、尺寸/高 DPI 同步和输入事件协调。
 
-当前临时欢迎图形为带厚度的小写 `panta` 网格，采用注塑云图风格的装饰顶点色；颜色没有物理量、单位或求解结果含义，不显示结果色标。几何生成、法线、材质和视口适配相机均封装在 VTK 适配器内。[053](../task/053-default-panta-wordmark.md) 已退回 planned，原方案不作为最终交付，后续重新设计实现；现阶段保留当前展示，圆环 STL 不接入应用。
+默认 Welcome 场景是 VTK 内生成的封闭立体小写 `panta` 字样，配有较浅挤出、冷暖过渡渐变和固定屏幕坐标的 `Welcome!` 文案。渐变纯属品牌装饰，不映射物理量或求解结果，也不显示结果色标；工程网格显示时 Welcome 文案隐藏。几何、装饰材质和文案集中在 `native/visualization/src/vtk/welcome/`，由 VTK 适配器管理资源并适配相机。[053](../task/053-default-panta-wordmark.md) 记录设计与真实窗口验收；圆环 STL 不接入应用。
 
 当前适配器在 GUI 事件循环中合并场景、相机和几何刷新；重复提交相同外观不渲染。滚轮围绕焦点缩放，右键拖动旋转，左键点击定位六面体；方向切换以四元数插值在 260 ms 内完成。定时器只在过渡期间运行，完成、用户接管、隐藏、尺寸重置或资源销毁时停表。祖先平移只同步原生区域位置。跨窗口时释放旧 surface/GPU 资源后按最新 CPU 状态重建；析构先断开条目自身的窗口回调，避免基类析构信号访问已释放状态。原生区域当前仍按轴对齐矩形映射，不支持任意 QML 旋转/裁剪叠加。
 

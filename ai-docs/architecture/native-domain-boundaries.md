@@ -62,7 +62,7 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 | `navigation/viewport_input.cpp`：`classify_viewport_input` | 保留 C++：把 VTK 事件映射到本地动作。若将来支持可配置按键，Rust 管理偏好数据，C++ 使用一次下发的配置 |
 | `navigation/viewport_orientation.cpp`：`pick_cube_face`、`ViewportOrientation` | 保留 C++：方向控件的显示命中反馈、坐标投影和 VTK 标记同步；影响工程操作的实体 ID、修订和引用校验未来归 Rust |
 | `vtk_viewport.cpp` 的 timer / refresh / camera / window 管理；`vtk_native_surface.*` | 保留 C++：Qt 线程、像素尺度、VTK/GPU 生命周期与平台窗口强耦合 |
-| `default_wordmark.cpp`：`create_default_wordmark`、`wordmark_color` | 保留显示模块：临时欢迎图形和装饰颜色，不是分析网格或物理场，不抽成 Rust 领域算法；最终设计仍由 053 决定 |
+| `welcome/welcome_scene.cpp`：`create_welcome_wordmark`、`wordmark_color`、`WelcomeScene` | 保留显示模块：Welcome 几何、品牌渐变和固定文案，不是分析网格或物理场，不抽成 Rust 领域算法；设计及验收见 053 |
 
 两套 STL 解析存在静态可见差异：Rust ASCII 路径取 `vertex` 后前三个数而不拒绝额外字段；C++ 路径要求该行恰好四个字段。Rust 用严格 UTF-8 解码，C++ 用 `QString::fromUtf8`。这里只记录源码差异，未新增运行用例证明某个完整文件的最终结果。迁移必须定义唯一接受规则并用同一组合法 / 非法输入回归；不能把当前任一宽松实现直接当作完整 STL 规范。
 

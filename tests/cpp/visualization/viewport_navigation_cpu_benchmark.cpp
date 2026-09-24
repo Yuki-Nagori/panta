@@ -1,4 +1,4 @@
-// 开发侧 CPU 消融基准：不注册为 CTest，不提交 GPU 渲染。
+// 开发侧 VTK 导航 CPU 消融基准；不创建图形窗口或提交 GPU 帧。
 #include "navigation/viewport_camera.hpp"
 #include "navigation/viewport_orientation.hpp"
 #include <QElapsedTimer>
@@ -52,7 +52,7 @@ template <typename Operation> TimingSummary measure_cpu_batches(Operation&& oper
 
 } // namespace
 
-class ViewportNavigationBenchmark final : public QObject {
+class ViewportNavigationCpuBenchmark final : public QObject {
     Q_OBJECT
 
   private slots:
@@ -90,6 +90,32 @@ class ViewportNavigationBenchmark final : public QObject {
         const auto overlay_sync = measure_cpu_batches(
             [&] { orientation.update(sample_cameras[frame_index++ % sample_cameras.size()]); });
 
+        panta::visualization::ViewportOrientation no_overlay_orientation;
+        const auto no_overlay_sync =
+            measure_cpu_batches([&] { no_overlay_orientation.update(camera); });
+
+        panta::visualization::ViewportOrientation steady_orientation;
+        vtkNew<vtkRenderWindow> steady_render_window;
+        steady_orientation.attach(steady_render_window);
+        steady_orientation.update(camera);
+        const auto steady_overlay_sync =
+            measure_cpu_batches([&] { steady_orientation.update(camera); });
+
+        panta::visualization::ViewportOrientation picking_orientation;
+        vtkNew<vtkRenderWindow> picking_window;
+        picking_window->SetSize(1000, 800);
+        picking_orientation.attach(picking_window);
+        vtkNew<vtkCamera> picking_camera;
+        picking_camera->SetPosition(0.0, 0.0, 5.0);
+        picking_camera->SetFocalPoint(0.0, 0.0, 0.0);
+        picking_camera->SetViewUp(0.0, 1.0, 0.0);
+        picking_orientation.update(picking_camera);
+        volatile int picked_direction = -1;
+        const auto cube_face_pick = measure_cpu_batches([&] {
+            const auto picked = picking_orientation.cube_direction(940, 704, 1000, 800);
+            picked_direction = picked.has_value() ? static_cast<int>(*picked) : -1;
+        });
+
         vtkNew<vtkCubeSource> cube;
         vtkNew<vtkPolyDataMapper> mapper;
         mapper->SetInputConnection(cube->GetOutputPort());
@@ -101,7 +127,7 @@ class ViewportNavigationBenchmark final : public QObject {
         render_window->AddRenderer(scene_renderer);
         const auto clipping_reset =
             measure_cpu_batches([&] { scene_renderer->ResetCameraClippingRange(); });
-        const auto without_overlay = measure_cpu_batches([&] {
+        const auto transition_without_overlay = measure_cpu_batches([&] {
             const auto pose =
                 panta::visualization::ViewportCamera::interpolate(start, target, next_progress());
             panta::visualization::ViewportCamera::apply(camera, pose);
@@ -121,20 +147,32 @@ class ViewportNavigationBenchmark final : public QObject {
                           << "camera interpolation=" << camera_pose.median_ns_per_operation << "/"
                           << camera_pose.p95_ns_per_operation
                           << ", overlay sync=" << overlay_sync.median_ns_per_operation << "/"
-                          << overlay_sync.p95_ns_per_operation
+                          << overlay_sync.p95_ns_per_operation << ", no overlay renderer update="
+                          << no_overlay_sync.median_ns_per_operation << "/"
+                          << no_overlay_sync.p95_ns_per_operation
+                          << ", steady overlay sync=" << steady_overlay_sync.median_ns_per_operation
+                          << "/" << steady_overlay_sync.p95_ns_per_operation
+                          << ", cube face pick=" << cube_face_pick.median_ns_per_operation << "/"
+                          << cube_face_pick.p95_ns_per_operation
                           << ", clipping reset=" << clipping_reset.median_ns_per_operation << "/"
-                          << clipping_reset.p95_ns_per_operation
-                          << ", without overlay=" << without_overlay.median_ns_per_operation << "/"
-                          << without_overlay.p95_ns_per_operation
+                          << clipping_reset.p95_ns_per_operation << ", transition without overlay="
+                          << transition_without_overlay.median_ns_per_operation << "/"
+                          << transition_without_overlay.p95_ns_per_operation
                           << ", full transition tick=" << full_tick.median_ns_per_operation << "/"
                           << full_tick.p95_ns_per_operation;
         QVERIFY(camera_pose_sink != 0.0);
         QVERIFY(camera_pose.median_ns_per_operation > 0.0);
         QVERIFY(overlay_sync.median_ns_per_operation > 0.0);
+        QVERIFY(no_overlay_sync.median_ns_per_operation > 0.0);
+        QVERIFY(steady_overlay_sync.median_ns_per_operation > 0.0);
+        QVERIFY(cube_face_pick.median_ns_per_operation > 0.0);
+        QCOMPARE(picked_direction,
+                 static_cast<int>(panta::visualization::CubeDirection::PositiveZ));
         QVERIFY(clipping_reset.median_ns_per_operation > 0.0);
+        QVERIFY(transition_without_overlay.median_ns_per_operation > 0.0);
         QVERIFY(full_tick.median_ns_per_operation > 0.0);
     }
 };
 
-QTEST_APPLESS_MAIN(ViewportNavigationBenchmark)
-#include "viewport_navigation_benchmark.moc"
+QTEST_APPLESS_MAIN(ViewportNavigationCpuBenchmark)
+#include "viewport_navigation_cpu_benchmark.moc"
