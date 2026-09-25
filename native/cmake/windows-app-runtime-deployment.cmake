@@ -58,6 +58,18 @@ function(panta_deploy_windows_app_runtime target qml_dir)
     endforeach()
   endforeach()
 
+  # Qt6Test：手动基准与测试 exe 和 app 同目录裸启时需要；windeployqt 按
+  # app 依赖推导不会包含它。非测试供给树没有该 DLL，跳过。
+  if(EXISTS "${QT_STAGING}/bin/Qt6Test.dll")
+    add_custom_command(
+      TARGET ${target}
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${QT_STAGING}/bin/Qt6Test.dll"
+              "$<TARGET_FILE_DIR:${target}>"
+      COMMENT "拷贝 Qt6Test.dll 到 $<TARGET_FILE_NAME:${target}> 目录"
+      VERBATIM)
+  endif()
+
   add_custom_command(
     TARGET ${target}
     POST_BUILD

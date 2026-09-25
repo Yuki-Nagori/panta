@@ -68,6 +68,7 @@ windeployqt 部署不全导致运行期 QML 模块缺失时，回退为文档化
 - 2026-09-26：创建任务。维护者在 Windows 验收裸启时触发系统"找不到 Qt6Qml.dll"对话框；确认仓库无任何运行库部署逻辑，选择 windeployqt POST_BUILD 方案（对比：手工枚举 DLL/插件脆弱，全局 PATH 指向 staging 脆弱）。
 - 2026-09-26：首轮部署后仍 0xC0000135——dumpbin 显示 exe 还依赖 14 个 VTK 共享库，增加 VTK staging bin 整目录拷贝；再裸启暴露 Dawn `EnsureFXC` 加载 d3dcompiler_47.dll 报 Error 87 后 SEH 崩溃（crash handler 落盘），补拷 System32 副本后主窗口创建成功。AGENTS 的 exe 路径以实际产出 `target/native/debug/panta-native.exe` 为准（文档写的 app/ 子目录是 .lib 位置）。
 - 2026-09-26：部署逻辑上移为 `native/cmake/windows-app-runtime-deployment.cmake` 的 `panta_deploy_windows_app_runtime`，DLL 目录按已供给 SDK 的 staging 自动枚举（递归 *.dll 去重），覆盖 occt `win64/vc14/bin`（48 个）、vtk `bin`（46 个）、netgen `bin`（3 个）；当前 exe 导入表尚无 OCCT/Netgen，但 063 STL 导入链路随时可能拉入，预覆盖避免裸启再次断链。维护者要求文件命名携带 windows 语义。
+- 2026-09-26：补拷 `Qt6Test.dll`——手动基准/测试 exe 与 app 同目录裸启时依赖它，windeployqt 按 app 依赖推导不会包含（四个基准 exe 裸启 0xC0000135 的根因）；带 staging 存在性守卫，非测试供给树跳过。
 
 ## 完成摘要
 
