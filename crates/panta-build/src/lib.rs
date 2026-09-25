@@ -81,7 +81,8 @@ fn ninja_asset() -> Option<ToolAsset> {
 }
 
 /// LLVM 官方发布资产。Windows 使用官方 NSIS 安装包：它包含 clang-cl、lld-link
-/// 与 clang-format，静默安装到 Cargo 的托管目录，不写入用户系统目录。
+/// 与 clang-format，静默安装到 Cargo 的托管目录，不写入用户系统目录；安装经
+/// RunAsInvoker 兼容层运行，非提权 shell 无需管理员权限。
 fn llvm_asset() -> Option<ToolAsset> {
     if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
         Some(ToolAsset {
@@ -772,8 +773,14 @@ fn extract(
         // Windows 的 LLVM tar.xz 归档由系统 tar 解包极慢（CI 实测超过
         // 20 分钟）；官方 NSIS 安装包包含同一套 clang-cl/lld/format，
         // 支持静默安装和自定义目录，避免依赖 runner 上额外的 7-Zip。
+        // 安装器清单要求 requireAdministrator，非提权 shell 直接启动报
+        // os error 740；RunAsInvoker 兼容层覆盖清单按当前用户运行。安装
+        // 目标在 target 托管树内，唯一需要系统权限的卸载注册表项与快捷
+        // 方式在静默模式下写入失败不阻断安装；已提权进程（CI runner）
+        // 行为不变。
         let mut command = Command::new(archive);
         command
+            .env("__COMPAT_LAYER", "RunAsInvoker")
             .arg("/S")
             .arg(format!("/D={}", destination.display()));
         return run_tool_command(

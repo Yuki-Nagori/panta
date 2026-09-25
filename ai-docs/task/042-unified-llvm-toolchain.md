@@ -124,6 +124,9 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 - 2026-09-18：从 Windows clang-cl 规划开始评审；维护者明确要求三平台统一 LLVM。
 - 2026-09-19：任务文件重命名为 `042-unified-llvm-toolchain.md`；固定 LLVM 22.1.7，macOS/Linux 使用 clang++，Windows 使用 clang-cl；Cargo provision、CXX、CMake、CI、质量工具与文档同步实现，无兼容层。
 - 2026-09-21：维护者确认实施步骤 6 的选型为 LLVM 自带 sanitizer（ASan+UBSan 主组合三平台、TSan 仅官方支持平台），工具矩阵由 runner `cargo sanitize` 固化，Windows 的 UBSan 子集与 TSan 缺口按官方文档注明理由；不引入 Valgrind 等独立检测工具。
+- 2026-09-25：本地非提权 shell 安装 LLVM 时报 os error 740（NSIS 安装器清单为 requireAdministrator，CI 的提权 runner 不受影响）。`extract()` 以 `__COMPAT_LAYER=RunAsInvoker` 启动安装器，覆盖清单按当前用户运行；`/D=` 目标在 target 托管树内，静默模式下卸载注册表项与快捷方式写入失败不阻断安装。资产 URL 与 SHA 不变，已提权进程行为不变；本机 Windows 重跑 toolchain 供给与 lint 编译步骤通过（`panta_benchmark_moc` 聚合目标生成四个基准 moc）。
+- 2026-09-25：Windows 本地首次全量 clang-tidy 暴露 4 个 Ubuntu CI 门禁不可见的平台性告警（warnings-as-errors）：`vtk_native_surface.cpp` HWND 整数转指针（performance-no-int-to-ptr，Win32 惯用法）、`step_import_test.cpp` 与 `netgen_mesher_test.cpp` 的 Windows 专用宏缺括号（bugprone-macro-parentheses）、`mesh_ir_benchmark.cpp` 经 MSVC STL 分配器的 exception-escape。均与本次暂存改动无关；处置（NOLINT/检查豁免/代码修正）留待本任务收口三平台 lint 证据时统一处理。
+- 2026-09-25：Windows 本地 includes/cppcheck 同样暴露平台缺口：includes 仅 `vtk_native_surface.cpp` 的 Win32 符号直接包含告警；cppcheck 的 `unusedFunction` 大量误报（QtTest 槽、cxxbridge 生成码），并定位到 `tests/src/main.rs` 的 `--suppress=unusedFunction:{target_root}/*` 以正斜杠拼接而 Windows 报告路径为反斜杠，目标树抑制整体失配——修复该 runner 抑制（分隔符归一化）与 QtTest 槽误报的豁免策略，随三平台 lint 证据收口一并处理。
 
 ## 完成摘要
 
