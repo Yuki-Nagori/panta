@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <panta/visualization/render_scene.hpp>
 #include <qtestsupport_gui.h>
