@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 #include <panta/visualization/render_scene.hpp>
+#include <qtestsupport_core.h>
 #include <qtestsupport_gui.h>
 #include <utility>
 #include <vector>

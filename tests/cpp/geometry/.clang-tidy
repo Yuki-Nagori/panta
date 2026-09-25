@@ -1,0 +1,5 @@
+# 夹具目录经命令行 -D 宏注入（裸路径含 /，为 cppcheck 兼容特意不加引号，
+# 测试内经字符串化宏还原）；其无源位置触发 bugprone-macro-parentheses，
+# 无法用 NOLINT 抑制。本目录内关闭该检查，其余继承父级配置。
+InheritParentConfig: true
+Checks: '-bugprone-macro-parentheses'

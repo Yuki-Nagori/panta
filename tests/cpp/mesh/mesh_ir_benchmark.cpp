@@ -8,7 +8,10 @@
 #include <panta/mesh/mesh_ir.hpp>
 #include <ratio>
 
-int main() try {
+// 函数级 try 已 catch (const std::exception&) 全量兜底；MSVC STL 的
+// _Throw_bad_array_new_length 是间接抛出，bugprone-exception-escape 无法
+// 建模其被捕获，换任何写法均误报，此处显式豁免。
+int main() try {  // NOLINT(bugprone-exception-escape)
     constexpr std::size_t kCount = 10'000;
     constexpr std::size_t kSamples = 21;
     panta::mesh::NativeTetMeshDto mesh;

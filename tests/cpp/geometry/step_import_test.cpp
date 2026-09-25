@@ -12,8 +12,8 @@ namespace {
 namespace fs = std::filesystem;
 
 #ifndef PANTA_STRINGIFY
-#define PANTA_STRINGIFY_(value) #value
-#define PANTA_STRINGIFY(value) PANTA_STRINGIFY_(value)
+#define PANTA_STRINGIFY_(value) (#value)
+#define PANTA_STRINGIFY(value) (PANTA_STRINGIFY_(value))
 #endif
 
 using panta::geometry::import_step_summary;

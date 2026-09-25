@@ -127,6 +127,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 - 2026-09-25：本地非提权 shell 安装 LLVM 时报 os error 740（NSIS 安装器清单为 requireAdministrator，CI 的提权 runner 不受影响）。`extract()` 以 `__COMPAT_LAYER=RunAsInvoker` 启动安装器，覆盖清单按当前用户运行；`/D=` 目标在 target 托管树内，静默模式下卸载注册表项与快捷方式写入失败不阻断安装。资产 URL 与 SHA 不变，已提权进程行为不变；本机 Windows 重跑 toolchain 供给与 lint 编译步骤通过（`panta_benchmark_moc` 聚合目标生成四个基准 moc）。
 - 2026-09-25：Windows 本地首次全量 clang-tidy 暴露 4 个 Ubuntu CI 门禁不可见的平台性告警（warnings-as-errors）：`vtk_native_surface.cpp` HWND 整数转指针（performance-no-int-to-ptr，Win32 惯用法）、`step_import_test.cpp` 与 `netgen_mesher_test.cpp` 的 Windows 专用宏缺括号（bugprone-macro-parentheses）、`mesh_ir_benchmark.cpp` 经 MSVC STL 分配器的 exception-escape。均与本次暂存改动无关；处置（NOLINT/检查豁免/代码修正）留待本任务收口三平台 lint 证据时统一处理。
 - 2026-09-25：Windows 本地 includes/cppcheck 同样暴露平台缺口：includes 仅 `vtk_native_surface.cpp` 的 Win32 符号直接包含告警；cppcheck 的 `unusedFunction` 大量误报（QtTest 槽、cxxbridge 生成码），并定位到 `tests/src/main.rs` 的 `--suppress=unusedFunction:{target_root}/*` 以正斜杠拼接而 Windows 报告路径为反斜杠，目标树抑制整体失配——修复该 runner 抑制（分隔符归一化）与 QtTest 槽误报的豁免策略，随三平台 lint 证据收口一并处理。
+- 2026-09-26：上条 4 项 clang-tidy 告警全部修复——宏替换列表按检查建议加括号（字符串化宏加括号语义不变）；`mesh_ir_benchmark` 的 main 保留函数级 try 并显式豁免（重构为内部 try/catch 实测仍误报，检查器无法建模 MSVC STL `_Throw_bad_array_new_length` 的间接抛出）；`vtk_native_surface` 的 HWND 转换收进命名契约函数 `qt_native_handle_to_void`（原 NOLINTNEXTLINE 挂错行从未生效）。`tests/cpp/geometry|mesh` 目录级 `.clang-tidy` 关闭 bugprone-macro-parentheses（夹具路径 -D 宏无源位置无法 NOLINT）。clang-tidy 阶段本地转绿；includes/cppcheck 两项仍待处理。
 
 ## 完成摘要
 

@@ -6,8 +6,8 @@
 #include <panta/mesh/netgen_mesher.hpp>
 
 #ifndef PANTA_STRINGIFY
-#define PANTA_STRINGIFY_(value) #value
-#define PANTA_STRINGIFY(value) PANTA_STRINGIFY_(value)
+#define PANTA_STRINGIFY_(value) (#value)
+#define PANTA_STRINGIFY(value) (PANTA_STRINGIFY_(value))
 #endif
 
 namespace {
