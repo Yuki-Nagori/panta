@@ -34,14 +34,15 @@ elseif(WIN32)
     NO_DEFAULT_PATH REQUIRED)
   panta_require_sdk("vtk" _panta_app_vtk_staging)
   add_custom_command(
-    TARGET panta_native_app POST_BUILD
-    COMMAND
-      "${PANTA_WINDEPLOYQT_EXECUTABLE}" --no-translations --qmldir
-      "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "$<TARGET_FILE:panta_native_app>"
+    TARGET panta_native_app
+    POST_BUILD
+    COMMAND "${PANTA_WINDEPLOYQT_EXECUTABLE}" --no-translations --qmldir
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "$<TARGET_FILE:panta_native_app>"
     COMMENT "部署 Qt 运行库到 panta-native.exe 目录"
     VERBATIM)
   add_custom_command(
-    TARGET panta_native_app POST_BUILD
+    TARGET panta_native_app
+    POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${_panta_app_vtk_staging}/bin"
             "$<TARGET_FILE_DIR:panta_native_app>"
     COMMENT "拷贝 VTK SDK 运行库到 panta-native.exe 目录"
@@ -50,10 +51,10 @@ elseif(WIN32)
   # d3dcompiler_47.dll 在应用目录：仅存在 System32 副本时其 LoadLibraryEx
   # 报 Error 87、WebGPU 设备创建失败并崩溃；Windows 10/11 系统目录必有。
   add_custom_command(
-    TARGET panta_native_app POST_BUILD
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy "$ENV{windir}/System32/d3dcompiler_47.dll"
-      "$<TARGET_FILE_DIR:panta_native_app>"
+    TARGET panta_native_app
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy "$ENV{windir}/System32/d3dcompiler_47.dll"
+            "$<TARGET_FILE_DIR:panta_native_app>"
     COMMENT "拷贝 d3dcompiler_47.dll 到 panta-native.exe 目录"
     VERBATIM)
 endif()

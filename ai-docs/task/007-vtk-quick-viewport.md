@@ -78,6 +78,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | Linux/Windows bridge 与 CI 排障 | Linux 使用 Wayland `wl_subsurface`，Windows 使用 child HWND；修复 Wayland 开发依赖/模块发现及 Windows 缺 VTK DLL（`0xC0000135`）导致的 QML 测试启动问题。Windows 修复由 run [35510679878](https://github.com/Yuki-Nagori/panta/actions/runs/35510679878) 验证，CTest 27/27。 |
 | 2026-09-20 | macOS 生命周期、更新策略与边界复审 | 尺寸未变或隐藏时跳过重复 render，显示恢复时补帧；VTK/Dawn 依赖收为 PRIVATE，surface 清理与 bridge 关闭构建均回归通过。此类自动化与离屏证据不替代实际窗口生命周期验收。 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`：三平台 native CTest | 通过：Linux 56/56、macOS ASan/UBSan 56/56、Windows 54/54。验证 SDK 消费与 QML/native 自动化回归，不代表真实图形窗口验收完成。 |
+| 2026-09-26 | Windows 11 真实窗口交互验收（维护者手动操作 + SendInput 自动化双确认）：右键拖拽旋转、滚轮缩放 | 通过前发现缺陷：Windows 分支误用 `vtkGenericRenderWindowInteractor`（不接入平台消息流，子 HWND 的鼠标消息从未送达交互观察者）；改为 `vtkWin32RenderWindowInteractor` 后，子窗口（类 `vtkWin32`，1262×680）右键拖拽与滚轮缩放均改变渲染画面，维护者确认操作可用。配套运行库裸启部署见任务 083。 |
 
 ## 风险与回退
 
@@ -90,6 +91,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 2026-09-19–20：038 发布三平台 WebGPU SDK 后，新增 Cocoa、Wayland、Win32 surface bridge 并恢复 `App.qml` 的实际视口；修复 macOS surface 生命周期、坐标/DPR 和控件层叠问题。
 - 2026-09-20：确认锁定的 VTK 9.7.0 不含上游后续版本的 `GUISupportQtWebGPU`；当前继续使用硬件窗口桥接，SDK 升级再评估官方集成路线。
 - 待验收：实际窗口下 resize、高 DPI、隐藏恢复、关闭重开、输入协调和资源释放；自动化 CTest 不替代这些图形验收。
+- 2026-09-26：Windows 真实窗口交互验收发现并修复 interactor 选型缺陷；剩余待验收为 resize、高 DPI、隐藏恢复、关闭重开与资源释放。
 
 ## 完成摘要
 

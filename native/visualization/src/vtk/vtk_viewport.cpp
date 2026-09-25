@@ -44,6 +44,8 @@
 #include <vtkProperty.h>
 #if defined(Q_OS_MACOS)
 #include <vtkCocoaRenderWindowInteractor.h>
+#elif defined(Q_OS_WIN)
+#include <vtkWin32RenderWindowInteractor.h>
 #else
 #include <vtkGenericRenderWindowInteractor.h>
 #endif
@@ -296,6 +298,11 @@ void VtkViewport::ensure_render_window() {
 
 #if defined(Q_OS_MACOS)
     impl_->interactor = vtkSmartPointer<vtkCocoaRenderWindowInteractor>::New();
+#elif defined(Q_OS_WIN)
+    // 子 HWND 是原生窗口，鼠标消息由 Win32 消息泵送达；Win32 interactor
+    // 自装 WndProc 把 WM_* 翻译成交互事件。Generic 变体不接入任何平台
+    // 消息流，仅适合测试进程内手动 InvokeEvent 的场景。
+    impl_->interactor = vtkSmartPointer<vtkWin32RenderWindowInteractor>::New();
 #else
     impl_->interactor = vtkSmartPointer<vtkGenericRenderWindowInteractor>::New();
 #endif
