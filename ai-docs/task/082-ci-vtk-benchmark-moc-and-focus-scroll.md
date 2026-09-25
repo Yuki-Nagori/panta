@@ -1,11 +1,11 @@
 # 082 — CI 修复：VTK benchmark moc 前置与标题条焦点滚动
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[048 性能基线与性能测试体系](048-performance-testing.md)、[076 Cargo 测试与质量 runner 维护](076-panta-tests-runner-maintenance.md)、[029 QML 组件库](029-qml-component-library.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-25 / 2026-09-25
+- 创建 / 更新：2026-09-25 / 2026-09-26
 
 ## 目标与背景
 
@@ -60,16 +60,19 @@ commit `3af54c2` 之后 CI main 出现 4 个失败 job（run [36037663181](https
 
 ## 验收标准
 
-- [ ] `cargo lint clang-tidy --check`、`cargo lint includes --check`、`cargo lint cppcheck --check` 在未构建 benchmark 主目标的工作树上通过。
-- [ ] `cargo test --locked --workspace` 通过（含 `Qml.ShellModuleLoads`）。
-- [ ] CI main push run 三平台 check、四个 lint、coverage、sanitizer 全部成功。
-- [ ] 任务与索引状态一致，验证证据已记录。
+- [x] `cargo lint clang-tidy --check`、`cargo lint includes --check`、`cargo lint cppcheck --check` 在未构建 benchmark 主目标的工作树上通过。
+- [x] `cargo test --locked --workspace` 通过（含 `Qml.ShellModuleLoads`）。
+- [x] CI main push run 三平台 check、四个 lint、coverage、sanitizer 全部成功。
+- [x] 任务与索引状态一致，验证证据已记录。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| — | 待填写 | 待填写 | 未执行 |
+| 2026-09-26 | Windows：`cargo format --check` | 聚合格式通过 | 首轮暴露手排 CMake 与 cmake-format 输出不一致（3 文件）及 cmake-lint C0113/R0913，修复后通过 |
+| 2026-09-26 | Windows：`cargo lint --check`（聚合） | 八阶段通过 | 前 5 阶段（clippy/machete/cmake/native+qmllint）全过，lint 编译步骤实际经 `panta_benchmark_moc` 生成四个基准 moc——082 核心缺陷（缺 moc）在本地复验消除；clang-tidy 后的 Windows 平台性发现与本次改动无关，登记于 task 042 |
+| 2026-09-26 | Windows：探针注入 `qml/Panels/TopChromePanel.qml` 嵌套告警 | 严格 qmllint 门禁失败 | 通过：`UnqualifiedAccess`（warning 级）使 all_qmllint 非零退出，还原后通过；`UnusedImports` 以 Error 级报出 |
+| 2026-09-26 | GitHub Actions run [36168258843](https://github.com/Yuki-Nagori/panta/actions/runs/36168258843)（commit `e6c63e1`，含本任务全部改动） | 三平台 check、四 lint、coverage、sanitizer、format 全部成功 | 全部 success：三平台 check/build/test、clang-tidy/includes/cppcheck/qmllint/cmake/clippy、rust 与 native coverage、三平台 sanitizer；验收标准 1–3 的权威证据 |
 
 ## 风险与回退
 
@@ -85,4 +88,4 @@ commit `3af54c2` 之后 CI main 出现 4 个失败 job（run [36037663181](https
 
 ## 完成摘要
 
-未完成。
+完成。commit `7a8c6f0` 交付：moc 前置从 runner 硬编码名单改为 `panta_benchmark_moc` CMake 聚合目标（消除 clang-tidy/includes/cppcheck 缺 moc 失败）、`HorizontalToolStrip` childrenRect 补滚动修复 macOS 焦点回滚竞态、Dialogs qmllint 提示清理；commit `1b40e35` 追加 qmllint 严格门禁（`.qmllint.ini`，warning 即失败——该部分的 CI 确认随下次 push 带入，本地已探针验证）。CI run [36168258843](https://github.com/Yuki-Nagori/panta/actions/runs/36168258843) 三平台与全部适用门禁绿灯。Windows 本地 clang-tidy/includes/cppcheck 的平台性缺口与 082 无关，由 task 042 跟踪。
