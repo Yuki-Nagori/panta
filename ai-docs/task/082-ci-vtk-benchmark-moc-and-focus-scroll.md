@@ -50,6 +50,7 @@ commit `3af54c2` 之后 CI main 出现 4 个失败 job（run [36037663181](https
 - `tests/src/main.rs`（现存）
 - `qml/Components/Composites/HorizontalToolStrip.qml`（现存）
 - `qml/Components/Composites/DialogTitleBar.qml`、`qml/Dialogs/NewProjectDialog.qml`、`qml/Dialogs/ImportDialog.qml`（现存）
+- `qml/.qmllint.ini`（新建，qmllint 严格门禁配置）
 - `tests/cpp/app/shell_module_load_test.cpp`（现存）
 - `ai-docs/task-index.md` 与本任务
 
@@ -79,7 +80,8 @@ commit `3af54c2` 之后 CI main 出现 4 个失败 job（run [36037663181](https
 
 - 2026-09-25：创建任务。4 个失败 job 根因定位：3 个 lint 失败源于 048 新增的 EXCLUDE_FROM_ALL VTK benchmark 目标未纳入 moc 前置生成；macOS 失败暴露 `HorizontalToolStrip` 焦点滚动在 polish 前读旧几何且不重触发的竞态（该 commit 未改 QML，属既有缺陷被时序暴露）。
 - 2026-09-25：review 时把 autogen 目标名单从 runner 挪进 CMake（顶层空聚合 `panta_benchmark_moc` + 各基准定义处 `add_dependencies`）。理由：runner 硬编码名单正是本次漂移的成因，按“CMake 拥有 native 构建图”的分层规则，新增手动基准时的登记点应与基准声明同文件；runner 只保留聚合名。
-- 2026-09-25：顺带清理 qmllint 的既有提示（Dialogs 的 unqualified access、DialogTitleBar 未用 import）；CI 门禁对 warning 级本不放行失败，属质量卫生，经维护者要求并入本任务。本地 format --check 首轮暴露手排 CMake 与 cmake-format 输出不一致，已由修复模式重写并以 --check 复验；cmake-lint 补 `add_custom_target` 的 COMMENT 并将下载函数收敛为 3 参数（R0913）。
+- 2026-09-25：顺带清理 qmllint 的既有提示（Dialogs 的 unqualified access、DialogTitleBar 未用 import）；此前门禁对 warning 级告警不失败，属质量卫生，经维护者要求并入本任务。
+- 2026-09-26：qmllint 门禁升级为严格模式：新增 `qml/.qmllint.ini`（`MaxWarnings=0` 使 warning 级告警即失败，`UnusedImports` 从 info 提升为 error）。配置文件的向上目录发现与告警失败行为均经探针注入实测（嵌套文件注入 UnqualifiedAccess 后 all_qmllint 以非零退出，还原后通过）；当前 QML 树零告警为基线。本地 format --check 首轮暴露手排 CMake 与 cmake-format 输出不一致，已由修复模式重写并以 --check 复验；cmake-lint 补 `add_custom_target` 的 COMMENT 并将下载函数收敛为 3 参数（R0913）。
 
 ## 完成摘要
 
