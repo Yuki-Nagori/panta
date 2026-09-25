@@ -34,6 +34,7 @@ const RERUN_ENVS: &[&str] = &[
     "CMAKE",
     "PANTA_USE_SYSTEM_TOOLS",
     "PANTA_TOOL_CACHE_ROOT",
+    "PANTA_QT_MIRROR",
     "CC",
     "CXX",
     "CLANG_FORMAT",

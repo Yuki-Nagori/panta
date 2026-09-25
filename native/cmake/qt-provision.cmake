@@ -4,6 +4,10 @@
 # SHA256 于 2026-09-16 下载实测记录于此，下载与缓存均强校验；升级 Qt 时
 # 同步更新三平台的 URL/SHA 并回写 ai-docs/standards/dependency-acquisition.md。
 # 解包使用 `cmake -E tar`（内建 libarchive 支持 7z，三平台零额外工具）。
+# 下载来源：官方 download.qt.io 失败（连接中断/超时/哈希不符）时自动回退
+# 清华 TUNA 镜像；PANTA_QT_MIRROR（镜像站点根或 qtsdkrepository 仓库根，
+# 如 https://mirrors.tuna.tsinghua.edu.cn/qt）可把其他镜像插到最前。
+# SHA256 校验与来源无关，始终强制。
 # 供给结果缓存在 QT_PROVISION_DIR（默认构建树 qt/；任务 041 起由
 # build.rs 传入 target/panta-deps/qt，跨 profile 与 presets 共享）。
 # 模块构成：qtbase + qtdeclarative（005）与 qttools（034，含 lrelease，
@@ -24,9 +28,7 @@ set(QT_STAGING "${QT_PROVISION_DIR}/staging")
 set(QT_EXTRACTED "${QT_PROVISION_DIR}/extracted")
 
 if(APPLE)
-  set(_qt_repo
-      "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.clang_64"
-  )
+  set(_qt_repo_path "mac_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.clang_64")
   set(_qt_archives
       "6.11.2-0-202608131016qtbase-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|9592f84f7e26d532c5c56824d1da7c9214a766cb0a17beb5af71022bcfbcd271"
       "6.11.2-0-202608131016qtdeclarative-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|ceb8e3f3830531a52de5007ef3f50ffc5525021feb132ee322f59583eb2903cf"
@@ -34,9 +36,8 @@ if(APPLE)
       "6.11.2-0-202608131016qtsvg-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|c52f6cec6ce4b52ca017e0046345a85d33b2b73e0f6a93474bb7a60f8e829317"
   )
 elseif(WIN32)
-  set(_qt_repo
-      "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6112/qt6_6112_msvc2022_64/qt.qt6.6112.win64_msvc2022_64"
-  )
+  set(_qt_repo_path
+      "windows_x86/desktop/qt6_6112/qt6_6112_msvc2022_64/qt.qt6.6112.win64_msvc2022_64")
   set(_qt_archives
       "6.11.2-0-202608131017qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|fd984b7264361b4dd3fd2a417702ca1258e4086268f2ee6a69b9a393d9c3f6bb"
       "6.11.2-0-202608131017qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5591ca564c1a9299a45a15b6b1d324c86e0aaed7cf6c47b7e6fe464aecae2587"
@@ -44,9 +45,7 @@ elseif(WIN32)
       "6.11.2-0-202608131017qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|417f44499c835b2303f3ff78043179bb23442f33d5d2816fbf7e8dbf275b1c89"
   )
 elseif(UNIX)
-  set(_qt_repo
-      "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.linux_gcc_64"
-  )
+  set(_qt_repo_path "linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.linux_gcc_64")
   set(_qt_archives
       "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
       "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
@@ -63,12 +62,86 @@ else()
   message(FATAL_ERROR "Qt 预编译供给暂不支持平台：${CMAKE_SYSTEM_NAME}（记录到 dependency-acquisition.md 再扩展）")
 endif()
 
+# 下载来源顺序：官方源先行；PANTA_QT_MIRROR 设置时插到最前——接受两种
+# 取值：镜像站点根（如 https://mirrors.tuna.tsinghua.edu.cn/qt，自动补
+# /online/qtsdkrepository）或已含 qtsdkrepository 的完整仓库根。
+set(_qt_source_roots "https://download.qt.io/online/qtsdkrepository"
+                     "https://mirrors.tuna.tsinghua.edu.cn/qt/online/qtsdkrepository")
+if(DEFINED ENV{PANTA_QT_MIRROR} AND NOT "$ENV{PANTA_QT_MIRROR}" STREQUAL "")
+  set(_qt_mirror_root "$ENV{PANTA_QT_MIRROR}")
+  string(REGEX REPLACE "/$" "" _qt_mirror_root "${_qt_mirror_root}")
+  if(NOT _qt_mirror_root MATCHES "qtsdkrepository")
+    string(APPEND _qt_mirror_root "/online/qtsdkrepository")
+  endif()
+  list(PREPEND _qt_source_roots "${_qt_mirror_root}")
+endif()
+# 一轮 configure 内回退成功过的来源，后续归档直接优先使用。
+set(_qt_preferred_root "")
+
+# 校验/下载/解包单个 "归档名|SHA256" 条目：残件哈希不符即删并重下；按
+# 来源顺序下载（STATUS 捕获失败回退下一来源，EXPECTED_HASH 全程强校验）；
+# 解包到 workdir 后即删归档，缓存只保留解包树与调用方维护的指纹。成功
+# 来源经 PARENT_SCOPE 回传为后续归档的优先来源。
+function(panta_qt_fetch_extract entry repo_path workdir)
+  string(REPLACE "|" ";" _kv "${entry}")
+  list(GET _kv 0 _archive_name)
+  list(GET _kv 1 _archive_sha)
+  set(_archive_path "${QT_PROVISION_DIR}/archives/${_archive_name}")
+  if(EXISTS "${_archive_path}")
+    file(SHA256 "${_archive_path}" _archive_actual)
+    if(NOT _archive_actual STREQUAL _archive_sha)
+      file(REMOVE "${_archive_path}")
+      message(STATUS "Qt 归档校验不符，已删除并重新下载：${_archive_name}")
+    endif()
+  endif()
+  if(NOT EXISTS "${_archive_path}")
+    set(_order "${_qt_source_roots}")
+    if(_qt_preferred_root)
+      list(REMOVE_ITEM _order "${_qt_preferred_root}")
+      list(PREPEND _order "${_qt_preferred_root}")
+    endif()
+    set(_last_status "未尝试任何来源")
+    foreach(_root IN LISTS _order)
+      message(STATUS "下载 Qt 归档：${_archive_name}（${_root}）")
+      file(
+        DOWNLOAD "${_root}/${repo_path}/${_archive_name}" "${_archive_path}"
+        STATUS _download_status
+        INACTIVITY_TIMEOUT 120
+        TIMEOUT 900
+        EXPECTED_HASH SHA256=${_archive_sha})
+      list(GET _download_status 0 _download_code)
+      if(_download_code EQUAL 0)
+        set(_qt_preferred_root
+            "${_root}"
+            PARENT_SCOPE)
+        break()
+      endif()
+      file(REMOVE "${_archive_path}")
+      set(_last_status "${_download_status}")
+    endforeach()
+    if(NOT EXISTS "${_archive_path}")
+      message(FATAL_ERROR "Qt 归档下载失败：${_archive_name}；末次状态 ${_last_status}；"
+                          "可设置 PANTA_QT_MIRROR 指向其他镜像后重试")
+    endif()
+  endif()
+  message(STATUS "解包 Qt 归档：${_archive_name}")
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive_path}"
+    WORKING_DIRECTORY "${workdir}"
+    RESULT_VARIABLE _extract_result)
+  if(NOT _extract_result EQUAL 0)
+    message(FATAL_ERROR "Qt 归档解包失败（${_extract_result}）：${_archive_name}")
+  endif()
+  # 解包成功即删归档，避免与解包树在缓存中长期双份；staging 损坏时按
+  # 调用方指纹或探测文件重新走本流程。
+  file(REMOVE "${_archive_path}")
+endfunction()
+
 file(MAKE_DIRECTORY "${QT_PROVISION_DIR}/archives" "${QT_EXTRACTED}" "${QT_STAGING}")
 foreach(entry IN LISTS _qt_archives)
   string(REPLACE "|" ";" _kv "${entry}")
   list(GET _kv 0 _archive_name)
   list(GET _kv 1 _archive_sha)
-  set(_archive_path "${QT_PROVISION_DIR}/archives/${_archive_name}")
   set(_extract_marker "${QT_EXTRACTED}/${_archive_name}.sha256")
   # 已按同一哈希解包且 staging 仍完整则跳过（归档发布即删，复用不依赖
   # 归档）；指纹不符（升级归档或清空 staging）才重新下载/解包，老缓存只补
@@ -79,85 +152,21 @@ foreach(entry IN LISTS _qt_archives)
       continue()
     endif()
   endif()
-  if(EXISTS "${_archive_path}")
-    file(SHA256 "${_archive_path}" _archive_actual)
-    if(NOT _archive_actual STREQUAL _archive_sha)
-      file(REMOVE "${_archive_path}")
-      message(STATUS "Qt 归档校验不符，已删除并重新下载：${_archive_name}")
-    endif()
-  endif()
-  if(NOT EXISTS "${_archive_path}")
-    message(STATUS "下载 Qt 预编译包：${_archive_name}")
-    file(
-      DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
-      INACTIVITY_TIMEOUT 120
-      TIMEOUT 900
-      EXPECTED_HASH SHA256=${_archive_sha})
-    # file(DOWNLOAD) 的哈希不符是延迟错误（configure 会继续跑完）：立即
-    # 复验并 FATAL，防止错误哈希进入解包指纹、污染后续缓存判定。
-    file(SHA256 "${_archive_path}" _archive_actual)
-    if(NOT _archive_actual STREQUAL _archive_sha)
-      file(REMOVE "${_archive_path}")
-      message(FATAL_ERROR "Qt 归档 SHA256 不符（下载结果）：${_archive_name}"
-                          " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，" "请核对 manifest 与上游资产")
-    endif()
-  endif()
-  message(STATUS "解包 Qt 预编译包：${_archive_name}")
-  execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive_path}"
-    WORKING_DIRECTORY "${QT_STAGING}"
-    RESULT_VARIABLE _extract_result)
-  if(NOT _extract_result EQUAL 0)
-    message(FATAL_ERROR "Qt 归档解包失败（${_extract_result}）：${_archive_name}")
-  endif()
+  panta_qt_fetch_extract("${entry}" "${_qt_repo_path}" "${QT_STAGING}")
   file(WRITE "${_extract_marker}" "${_archive_sha}\n")
-  # 归档只服务本次下载校验与解包；解包记指纹后即删，避免归档与解包树
-  # 在缓存中长期双份；staging 损坏时按指纹重新下载。
-  file(REMOVE "${_archive_path}")
 endforeach()
 
 if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.73")
   foreach(entry IN LISTS _qt_runtime_archives)
-    string(REPLACE "|" ";" _kv "${entry}")
-    list(GET _kv 0 _archive_name)
-    list(GET _kv 1 _archive_sha)
-    set(_archive_path "${QT_PROVISION_DIR}/archives/${_archive_name}")
-    if(EXISTS "${_archive_path}")
-      file(SHA256 "${_archive_path}" _archive_actual)
-      if(NOT _archive_actual STREQUAL _archive_sha)
-        file(REMOVE "${_archive_path}")
-        message(STATUS "Qt ICU 归档校验不符，已删除并重新下载：${_archive_name}")
-      endif()
-    endif()
-    if(NOT EXISTS "${_archive_path}")
-      message(STATUS "下载 Qt ICU 预编译包：${_archive_name}")
-      file(
-        DOWNLOAD "${_qt_repo}/${_archive_name}" "${_archive_path}"
-        INACTIVITY_TIMEOUT 120
-        TIMEOUT 900
-        EXPECTED_HASH SHA256=${_archive_sha})
-      file(SHA256 "${_archive_path}" _archive_actual)
-      if(NOT _archive_actual STREQUAL _archive_sha)
-        file(REMOVE "${_archive_path}")
-        message(FATAL_ERROR "Qt ICU 归档 SHA256 不符（下载结果）：${_archive_name}"
-                            " 预期 ${_archive_sha}，实际 ${_archive_actual}；归档已删除，" "请核对 manifest 与上游资产")
-      endif()
-    endif()
-    message(STATUS "解包 Qt ICU 预编译包：${_archive_name}")
-    execute_process(
-      COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive_path}"
-      WORKING_DIRECTORY "${QT_STAGING}/lib"
-      RESULT_VARIABLE _extract_result)
-    if(NOT _extract_result EQUAL 0)
-      message(FATAL_ERROR "Qt ICU 归档解包失败（${_extract_result}）：${_archive_name}")
-    endif()
-    # 与主归档同策略：解包成功即删，库损坏时按 staging 探测重新下载。
-    file(REMOVE "${_archive_path}")
+    panta_qt_fetch_extract("${entry}" "${_qt_repo_path}" "${QT_STAGING}/lib")
   endforeach()
 endif()
 
-unset(_qt_repo)
+unset(_qt_repo_path)
 unset(_qt_archives)
+unset(_qt_source_roots)
+unset(_qt_mirror_root)
+unset(_qt_preferred_root)
 unset(_archive_path)
 unset(_archive_name)
 unset(_archive_sha)
