@@ -79,6 +79,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | macOS 生命周期、更新策略与边界复审 | 尺寸未变或隐藏时跳过重复 render，显示恢复时补帧；VTK/Dawn 依赖收为 PRIVATE，surface 清理与 bridge 关闭构建均回归通过。此类自动化与离屏证据不替代实际窗口生命周期验收。 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`：三平台 native CTest | 通过：Linux 56/56、macOS ASan/UBSan 56/56、Windows 54/54。验证 SDK 消费与 QML/native 自动化回归，不代表真实图形窗口验收完成。 |
 | 2026-09-26 | Windows 11 真实窗口交互验收（维护者手动操作 + SendInput 自动化双确认）：右键拖拽旋转、滚轮缩放 | 通过前发现缺陷：Windows 分支误用 `vtkGenericRenderWindowInteractor`（不接入平台消息流，子 HWND 的鼠标消息从未送达交互观察者）；改为 `vtkWin32RenderWindowInteractor` 后，子窗口（类 `vtkWin32`，1262×680）右键拖拽与滚轮缩放均改变渲染画面，维护者确认操作可用。配套运行库裸启部署见任务 083。 |
+| 2026-09-26 | Windows 11；`panta_viewport_gpu_benchmark` 真实窗口 WebGPU 帧提交（30 预热 + 3×60 帧） | 测量通过（p50/p95 = 3.037/3.8864 ms，数字登记于任务 048）；但全部用例通过后进程在退出清理阶段 0xC0000005 崩溃（栈落在 QTest 崩溃处理器，指向 WebGPU/Dawn 资源释放顺序）。"资源释放/关闭重开"验收项确认存在真实缺陷，修复为 007 剩余工作 |
 
 ## 风险与回退
 

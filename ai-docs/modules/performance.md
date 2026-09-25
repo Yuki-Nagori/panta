@@ -50,7 +50,7 @@ cmake --build target/native/debug --target panta_viewport_gpu_benchmark --parall
 target/native/debug/visualization/panta_viewport_gpu_benchmark
 ```
 
-真实 VTK WebGPU 原生窗口的 GPU 基准与该 CPU 微基准保持独立，由任务 [048](../task/048-performance-testing.md) 维护；GPU 基准通过 `VtkViewport` 触发场景更新，测量事件调度到 VTK 帧提交的间隔。VTK 当前没有跨平台 GPU 完成或屏幕呈现时间戳，所以该指标包含 CPU 调度与 VTK 提交开销，不等同于 GPU 内核执行时间或实际显示器呈现间隔。两个目标都是开发侧手动工具，不注册为 CTest 或 CI 门禁。
+真实 VTK WebGPU 原生窗口的 GPU 基准与该 CPU 微基准保持独立，由任务 [048](../task/048-performance-testing.md) 维护；GPU 基准通过 `VtkViewport` 触发场景更新，测量事件调度到 VTK 帧提交的间隔。VTK 当前没有跨平台 GPU 完成或屏幕呈现时间戳，所以该指标包含 CPU 调度与 VTK 提交开销，不等同于 GPU 内核执行时间或实际显示器呈现间隔。两个目标都是开发侧手动工具，不注册为 CTest 或 CI 门禁。Windows 构建树的 exe 直接位于 `target/native/debug/` 根（无 `visualization/` 子目录），Qt/VTK 依赖 DLL 由任务 083 的部署步骤与 staging 拷贝提供，裸启即可运行。
 
 单立方体场景，32 个循环变化的姿态；每项预热 1000 次，再采样 31 批、每批 1000 次。输出批次平均耗时的 p50 / p95，分解相机插值、变化姿态下的方向标记同步、无标记消融、稳定姿态同步、六面命中和裁剪范围重置，并比较无标记与完整 CPU 过渡。结果不包括 Qt 调度、GPU 渲染和提交延迟。该 executable 不注册到 CTest，无绝对性能门槛；机器、Debug 配置及数字见任务记录。
 
