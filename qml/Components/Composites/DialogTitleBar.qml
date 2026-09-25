@@ -1,6 +1,5 @@
 // 无边框对话框标题栏：提供系统级移动尝试、键盘焦点和关闭语义。
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 Rectangle {

@@ -100,6 +100,9 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qml_gpu_benchmark)
   target_link_libraries(panta_qml_gpu_benchmark PRIVATE panta_shell Qt6::Gui Qt6::Qml Qt6::Test
                                                         Qt6::Quick)
+  # 手动基准的 moc 登记给 lint 前置聚合（native 顶层 panta_benchmark_moc）。
+  add_dependencies(panta_benchmark_moc panta_qml_cpu_benchmark_autogen
+                   panta_qml_gpu_benchmark_autogen)
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。
   find_program(

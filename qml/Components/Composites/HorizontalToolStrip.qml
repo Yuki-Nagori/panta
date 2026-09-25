@@ -41,6 +41,15 @@ Flickable {
     }
     onWidthChanged: scheduleEnsureFocusedVisible()
     onContentWidthChanged: scheduleEnsureFocusedVisible()
+    // contentWidth 只反映内容根宽度绑定；嵌套布局把子项移到最终位置发生在
+    // 之后的 polish，childrenRect 变化时必须再滚一次，否则会用旧几何计算
+    // 滚动位置且不再重触发（聚焦项停留在视口外）。
+    Connections {
+        target: strip.contentRoot
+        function onChildrenRectChanged() {
+            strip.scheduleEnsureFocusedVisible();
+        }
+    }
     Connections {
         target: strip.Window.window
         function onActiveFocusItemChanged() {

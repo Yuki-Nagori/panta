@@ -123,7 +123,7 @@ Window {
                         Layout.preferredHeight: Theme.controlHeight
                         placeholderText: qsTranslate("NewProjectDialog", "My Project")
                         Accessible.name: qsTranslate("NewProjectDialog", "Project name")
-                        invalid: projectModel.errorCode === "project.empty_name" || projectModel.errorCode === "project.invalid_name"
+                        invalid: dialog.projectModel.errorCode === "project.empty_name" || dialog.projectModel.errorCode === "project.invalid_name"
                         onAccepted: dialog.submit()
                     }
 
@@ -143,7 +143,7 @@ Window {
                             placeholderText: qsTranslate("NewProjectDialog", "Choose a folder")
                             Accessible.name: qsTranslate("NewProjectDialog", "Project location")
                             selectByMouse: true
-                            invalid: projectModel.errorCode === "project.location_empty" || projectModel.errorCode === "project.location_not_absolute"
+                            invalid: dialog.projectModel.errorCode === "project.location_empty" || dialog.projectModel.errorCode === "project.location_not_absolute"
                         }
                         ThemedToolButton {
                             Layout.preferredWidth: 92
@@ -160,7 +160,7 @@ Window {
 
                 ThemedLabel {
                     Layout.fillWidth: true
-                    visible: projectModel.error.length > 0
+                    visible: dialog.projectModel.error.length > 0
                     text: dialog.errorMessage()
                     textSize: Theme.fontSmall
                     textColor: Theme.colorError
@@ -215,12 +215,12 @@ Window {
     FolderDialog {
         id: folderDialog
         title: qsTranslate("NewProjectDialog", "Choose Project Location")
-        currentFolder: projectModel.defaultLocationUrl
+        currentFolder: dialog.projectModel.defaultLocationUrl
         onAccepted: {
-            const selectedPath = projectModel.localPath(selectedFolder);
+            const selectedPath = dialog.projectModel.localPath(selectedFolder);
             if (selectedPath.length > 0) {
                 locationField.text = selectedPath;
-                projectModel.clearError();
+                dialog.projectModel.clearError();
             }
         }
     }

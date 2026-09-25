@@ -164,7 +164,7 @@ Window {
                     }
                     ThemedLabel {
                         Layout.fillWidth: true
-                        text: projectModel.importPreviewReady && dialog.sourcePath.length > 0 ? projectModel.importPreviewDimensions + " " + unitsCombo.currentText.toLowerCase() : qsTranslate("ImportDialogStatus", "Select an STL file")
+                        text: dialog.projectModel.importPreviewReady && dialog.sourcePath.length > 0 ? dialog.projectModel.importPreviewDimensions + " " + unitsCombo.currentText.toLowerCase() : qsTranslate("ImportDialogStatus", "Select an STL file")
                         textSize: Theme.fontBody
                         textColor: Theme.colorTextMuted
                     }
@@ -188,7 +188,7 @@ Window {
 
                 ThemedLabel {
                     Layout.fillWidth: true
-                    visible: projectModel.error.length > 0
+                    visible: dialog.projectModel.error.length > 0
                     text: dialog.errorMessage()
                     textSize: Theme.fontSmall
                     textColor: Theme.colorError
@@ -223,7 +223,7 @@ Window {
                         Layout.preferredHeight: Theme.controlHeight
                         text: qsTranslate("DialogAction", "OK")
                         highlighted: true
-                        enabled: dialog.sourcePath.length > 0 && projectModel.importPreviewReady
+                        enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
@@ -249,11 +249,11 @@ Window {
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTranslate("ImportDialogFile", "STL files (*.stl)")]
         onAccepted: {
-            const selectedPath = projectModel.localPath(selectedFile);
+            const selectedPath = dialog.projectModel.localPath(selectedFile);
             if (!selectedPath)
                 return;
             dialog.sourcePath = selectedPath;
-            projectModel.inspectStl(selectedPath);
+            dialog.projectModel.inspectStl(selectedPath);
         }
     }
 }

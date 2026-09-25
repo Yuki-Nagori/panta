@@ -94,6 +94,13 @@ add_subdirectory(geometry)
 # Mesh IR 与 Netgen 适配（任务 010）：netgen 侧依赖 OCCT targets，
 # 在 geometry 之后加入构建图。
 add_subdirectory(mesh)
+# lint 的 moc 前置聚合（任务 082）：EXCLUDE_FROM_ALL 的手动基准目标不进默认
+# 构建，但 clang-tidy / cppcheck 的编译数据库引用其 AUTOMOC 产物；各基准
+# 定义处必须把对应 _autogen 目标登记到 panta_benchmark_moc，否则 standalone
+# lint 在未构建基准的工作树上缺 moc 失败。
+if(BUILD_TESTING)
+  add_custom_target(panta_benchmark_moc COMMENT "生成手动基准 AUTOMOC 产物")
+endif()
 # VTK 原生视口核心（任务 007）：bridge 经 Panta.Bridge 注册 CaeViewport；
 # 诊断构建（AppNoBridge）不带 VTK。
 if(PANTA_ENABLE_BRIDGE_MODULE)

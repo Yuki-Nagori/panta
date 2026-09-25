@@ -281,9 +281,18 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(quickActions->width() >= quickActions->implicitWidth());
         QVERIFY(searchGroup->mapToItem(quickActions->parentItem(), QPointF()).x() >=
                 quickActions->x() + quickActions->width());
-        const QPointF focusedPosition = search->mapToItem(strip, QPointF());
-        QVERIFY(focusedPosition.x() >= -1);
-        QVERIFY(focusedPosition.x() + search->width() <= strip->width() + 1);
+        const auto searchVisible = [&] {
+            const QPointF position = search->mapToItem(strip, QPointF());
+            return position.x() >= -1 && position.x() + search->width() <= strip->width() + 1;
+        };
+        // 焦点回滚要等 polish 与两轮 callLater 收敛；按最终几何断言，字段
+        // 与上方窗口循环的诊断一致，避免 CI 失败时无数值可查。
+        QTRY_VERIFY2(searchVisible(),
+                     qPrintable(QStringLiteral("search x=%1 w=%2 strip=%3 scroll=%4")
+                                    .arg(search->mapToItem(strip, QPointF()).x())
+                                    .arg(search->width())
+                                    .arg(strip->width())
+                                    .arg(strip->property("contentX").toDouble())));
         animationButton->setProperty("text", originalText);
         QTest::qWait(50);
 

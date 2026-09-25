@@ -130,6 +130,7 @@ ai-docs/
 | 071 | [GoogleTest SDK 消费接入](task/071-googletest-sdk-consumption.md) | 验证基础 | 070, 031 | done |
 | 075 | [CI 修复：Windows GoogleTest ABI 与 Qt benchmark lint](task/075-ci-windows-gtest-and-qt-lint.md) | 验证基础 | 070, 071, 046 | done |
 | 076 | [Cargo 测试与质量 runner 维护](task/076-panta-tests-runner-maintenance.md) | 验证基础 | 011, 043 | done |
+| 082 | [CI 修复：VTK benchmark moc 前置与标题条焦点滚动](task/082-ci-vtk-benchmark-moc-and-focus-scroll.md) | 验证基础 | 048, 076, 029 | in-progress |
 
 ## 仓库与文档维护
 

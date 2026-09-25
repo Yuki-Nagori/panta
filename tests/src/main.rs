@@ -341,7 +341,7 @@ fn lint(tool: Option<&str>, check: bool) -> Result<(), Box<dyn Error>> {
             build_launcher()?;
             eprintln!("cargo lint [5/8] qmllint");
             run_qmllint()?;
-            build_qml_benchmark_moc()?;
+            build_benchmark_moc()?;
             eprintln!("cargo lint [6/8] clang-tidy");
             scan_clang_tidy(false, check)?;
             eprintln!("cargo lint [7/8] include-cleaner");
@@ -808,7 +808,7 @@ fn provision_qml_format(root: &Path, target_root: &Path) -> Result<(), Box<dyn E
 
 fn run_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error>> {
     build_launcher()?;
-    build_qml_benchmark_moc()?;
+    build_benchmark_moc()?;
     scan_clang_tidy(includes_only, check)
 }
 
@@ -879,21 +879,17 @@ fn scan_clang_tidy(includes_only: bool, check: bool) -> Result<(), Box<dyn Error
     }
 }
 
-/// QML benchmark 默认不构建，但仍在 clang-tidy 编译数据库中且包含 moc 输出。
-fn build_qml_benchmark_moc() -> Result<(), Box<dyn Error>> {
+/// 手动基准目标默认不构建，但仍在 clang-tidy 编译数据库中且包含 moc 输出；
+/// 登记清单由 native 构建图的 panta_benchmark_moc 聚合目标维护。
+fn build_benchmark_moc() -> Result<(), Box<dyn Error>> {
     let mut command = cmake_build_command()?;
-    command.args([
-        "--target",
-        "panta_qml_cpu_benchmark_autogen",
-        "panta_qml_gpu_benchmark_autogen",
-        "--parallel",
-    ]);
-    run("生成 QML benchmark moc", command)
+    command.args(["--target", "panta_benchmark_moc", "--parallel"]);
+    run("生成手动基准 moc", command)
 }
 
 fn run_cppcheck() -> Result<(), Box<dyn Error>> {
     build_launcher()?;
-    build_qml_benchmark_moc()?;
+    build_benchmark_moc()?;
     scan_cppcheck()
 }
 
