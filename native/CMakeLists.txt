@@ -62,6 +62,9 @@ qt_policy(SET QTP0005 NEW)
 # Netgen 供应用例引擎，GoogleTest 仅供 BUILD_TESTING；固定制品见
 # dependency-acquisition.md，不回退系统库或源码获取。
 include(cmake/sdk-provision.cmake)
+# Windows 开发裸启运行库部署（任务 083）：依赖 qt-provision 的 QT_STAGING
+# 与 sdk-provision 的登记属性，须在两者之后 include。
+include(cmake/windows-app-runtime-deployment.cmake)
 
 if(BUILD_TESTING)
   add_test(

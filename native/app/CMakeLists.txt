@@ -21,42 +21,9 @@ if(UNIX)
   target_link_libraries(panta_native_app PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 elseif(WIN32)
   target_link_libraries(panta_native_app PRIVATE ws2_32 userenv ntdll)
-  # 真实窗口验收直接裸启 exe（AGENTS 验收流程）：链接后把运行库部署到
-  # exe 目录，不依赖手工 PATH。Qt 系由托管 windeployqt 覆盖（DLL、平台/
-  # QML 插件与 Qt QML 模块；qmldir 指向仓库 QML 源供推导 Qt 模块集——
-  # app 目标没有可扫描的源文件，见上方说明；Windows 的 qmlimportscanner
-  # 不依赖平台 ICU）；VTK SDK 为共享库，整 bin 目录随包拷贝，新增 DLL
-  # 无需改本文件。
-  find_program(
-    PANTA_WINDEPLOYQT_EXECUTABLE
-    NAMES windeployqt
-    PATHS "${QT_STAGING}/bin"
-    NO_DEFAULT_PATH REQUIRED)
-  panta_require_sdk("vtk" _panta_app_vtk_staging)
-  add_custom_command(
-    TARGET panta_native_app
-    POST_BUILD
-    COMMAND "${PANTA_WINDEPLOYQT_EXECUTABLE}" --no-translations --qmldir
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "$<TARGET_FILE:panta_native_app>"
-    COMMENT "部署 Qt 运行库到 panta-native.exe 目录"
-    VERBATIM)
-  add_custom_command(
-    TARGET panta_native_app
-    POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${_panta_app_vtk_staging}/bin"
-            "$<TARGET_FILE_DIR:panta_native_app>"
-    COMMENT "拷贝 VTK SDK 运行库到 panta-native.exe 目录"
-    VERBATIM)
-  # Dawn 的 HLSL 编译（native/d3d/PlatformFunctions.cpp EnsureFXC）要求
-  # d3dcompiler_47.dll 在应用目录：仅存在 System32 副本时其 LoadLibraryEx
-  # 报 Error 87、WebGPU 设备创建失败并崩溃；Windows 10/11 系统目录必有。
-  add_custom_command(
-    TARGET panta_native_app
-    POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy "$ENV{windir}/System32/d3dcompiler_47.dll"
-            "$<TARGET_FILE_DIR:panta_native_app>"
-    COMMENT "拷贝 d3dcompiler_47.dll 到 panta-native.exe 目录"
-    VERBATIM)
+  # 真实窗口验收直接裸启 exe（AGENTS 验收流程）：部署机制与覆盖范围见
+  # cmake/windows-app-runtime-deployment.cmake 头注。
+  panta_deploy_windows_app_runtime(panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml")
 endif()
 if(PANTA_ENABLE_BRIDGE_MODULE)
   # main.cpp 的进程级 crash handler 已在上方链接 FFI；这里仅追加 Bridge/VTK
