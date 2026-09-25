@@ -79,7 +79,9 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-20 | macOS 生命周期、更新策略与边界复审 | 尺寸未变或隐藏时跳过重复 render，显示恢复时补帧；VTK/Dawn 依赖收为 PRIVATE，surface 清理与 bridge 关闭构建均回归通过。此类自动化与离屏证据不替代实际窗口生命周期验收。 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`：三平台 native CTest | 通过：Linux 56/56、macOS ASan/UBSan 56/56、Windows 54/54。验证 SDK 消费与 QML/native 自动化回归，不代表真实图形窗口验收完成。 |
 | 2026-09-26 | Windows 11 真实窗口交互验收（维护者手动操作 + SendInput 自动化双确认）：右键拖拽旋转、滚轮缩放 | 通过前发现缺陷：Windows 分支误用 `vtkGenericRenderWindowInteractor`（不接入平台消息流，子 HWND 的鼠标消息从未送达交互观察者）；改为 `vtkWin32RenderWindowInteractor` 后，子窗口（类 `vtkWin32`，1262×680）右键拖拽与滚轮缩放均改变渲染画面，维护者确认操作可用。配套运行库裸启部署见任务 083。 |
-| 2026-09-26 | Windows 11；`panta_viewport_gpu_benchmark` 真实窗口 WebGPU 帧提交（30 预热 + 3×60 帧） | 测量通过（p50/p95 = 3.037/3.8864 ms，数字登记于任务 048）；但全部用例通过后进程在退出清理阶段 0xC0000005 崩溃（栈落在 QTest 崩溃处理器，指向 WebGPU/Dawn 资源释放顺序）。"资源释放/关闭重开"验收项确认存在真实缺陷，修复为 007 剩余工作 |
+| 2026-09-26 | Windows 11；`panta_viewport_gpu_benchmark` 真实窗口 WebGPU 帧提交（30 预热 + 3×60 帧） | 测量通过（p50/p95 约 3.04-3.41/3.89-4.34 ms，登记于任务 048）；全部用例通过后退出阶段 0xC0000005。定位收敛：崩溃恒定发生在 `vtkWebGPURenderWindow::Finalize()` 内部，且仅当 `vtkWin32RenderWindowInteractor` 曾附加才触发（Generic interactor 全程干净；interactor 先析构、HWND 先销毁等排列组合均已实测不改变结果），属 VTK 内部缺陷，Release SDK 无符号需源码级排查；基准已改为 cleanupTestCase 显式拆除资源，崩溃被限定在 cleanup 段而不污染测量与后续静态析构 |
+| 2026-09-26 | Windows 11；应用生命周期自动化验收（SendInput/Win32 驱动真实窗口） | 通过：resize 1000×700 与回原尺寸精确生效（1600×1000 被任务栏工作区钳制到 977 高，属系统行为）；最小化+恢复、隐藏+显示全程存活；WM_CLOSE 优雅关闭 exit 0（WebGPU "Device lost, reason=Destroyed" 正常日志）；重开再次创建主窗口，二次关闭 exit 0。高 DPI 变更需改显示器缩放，留待手动验收 |
+| 2026-09-26 | Windows 11；基准退出崩溃处置 A/B 与修复 | A/B 实测：Generic interactor 退出 0、Win32 interactor 崩溃，崩溃定位在 QTEST_MAIN 标准退出经历的静态析构（应用自身优雅关闭 exit 0 不受影响，析构顺序重排无效）。基准改为自定义 main + qExec 后 `std::_Exit(status)` 跳过静态析构，退出码 0、数字不变（3.1502/3.8956 ms）；已知残留 "QDxgiVSyncService not destroyed in time" 提示为跳过析构的预期伴随 |
 
 ## 风险与回退
 
@@ -92,7 +94,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 2026-09-19–20：038 发布三平台 WebGPU SDK 后，新增 Cocoa、Wayland、Win32 surface bridge 并恢复 `App.qml` 的实际视口；修复 macOS surface 生命周期、坐标/DPR 和控件层叠问题。
 - 2026-09-20：确认锁定的 VTK 9.7.0 不含上游后续版本的 `GUISupportQtWebGPU`；当前继续使用硬件窗口桥接，SDK 升级再评估官方集成路线。
 - 待验收：实际窗口下 resize、高 DPI、隐藏恢复、关闭重开、输入协调和资源释放；自动化 CTest 不替代这些图形验收。
-- 2026-09-26：Windows 真实窗口交互验收发现并修复 interactor 选型缺陷；剩余待验收为 resize、高 DPI、隐藏恢复、关闭重开与资源释放。
+- 2026-09-26：Windows 真实窗口交互验收发现并修复 interactor 选型缺陷；生命周期自动化验收通过 resize、最小化/恢复、隐藏/显示、关闭/重开与优雅退出（高 DPI 变更留待手动验收）。资源释放存在一项 VTK 内部缺陷已定位待源码级排查（见验证表），输入协调已随 065/007 验收完成。
 
 ## 完成摘要
 

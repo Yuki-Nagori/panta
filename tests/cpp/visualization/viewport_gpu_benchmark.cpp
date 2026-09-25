@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <panta/visualization/render_scene.hpp>
 #include <qtestsupport_gui.h>
@@ -77,8 +78,12 @@ class ViewportGpuBenchmark final : public QObject {
 
   private:
     QQuickWindow window_;
-    QQuickItem viewport_parent_{window_.contentItem()};
-    panta::visualization::VtkViewport viewport_{&viewport_parent_};
+    // 指针而非直接成员：VTK/WebGPU 资源必须在事件循环仍活跃的
+    // cleanupTestCase 显式拆除（与应用侧 QML 引擎拆除同序）；作为成员会在
+    // qExec 之后的静态析构期释放，与 Win32 interactor 遗留状态冲突触发
+    // 0xC0000005（任务 007 A/B 实测）。
+    QQuickItem* viewport_parent_ = nullptr;
+    panta::visualization::VtkViewport* viewport_ = nullptr;
 
     bool submit_scene_update(int frame_index) {
         const int previous_count = static_cast<int>(submitted_frame_times.size());
@@ -89,7 +94,7 @@ class ViewportGpuBenchmark final : public QObject {
         QEventLoop wait_loop;
         frame_wait_loop = &wait_loop;
         QTimer::singleShot(kFrameWaitTimeoutMs, &wait_loop, &QEventLoop::quit);
-        viewport_.apply_state(scene);
+        viewport_->apply_state(scene);
         wait_loop.exec();
         frame_wait_loop = nullptr;
         if (static_cast<int>(submitted_frame_times.size()) == previous_count) {
@@ -124,9 +129,11 @@ class ViewportGpuBenchmark final : public QObject {
             QSKIP("VTK WebGPU benchmark requires a visible native graphics session");
         }
 
-        viewport_parent_.setSize(QSizeF(1000, 700));
-        viewport_.setSize(QSizeF(1000, 700));
-        QSignalSpy initialized(&viewport_, &panta::visualization::VtkViewport::sceneInitialized);
+        viewport_parent_ = new QQuickItem(window_.contentItem());
+        viewport_ = new panta::visualization::VtkViewport(viewport_parent_);
+        viewport_parent_->setSize(QSizeF(1000, 700));
+        viewport_->setSize(QSizeF(1000, 700));
+        QSignalSpy initialized(viewport_, &panta::visualization::VtkViewport::sceneInitialized);
         window_.resize(1000, 700);
         window_.show();
         if (!QTest::qWaitForWindowExposed(&window_)) {
@@ -173,6 +180,13 @@ class ViewportGpuBenchmark final : public QObject {
             previous_handler = nullptr;
         }
         QLoggingCategory::setFilterRules(QString());
+        // 显式按应用侧同序拆除 VTK/WebGPU 资源：事件循环仍活跃时先行释放，
+        // 避免拖到 qExec 之后的静态析构期与 Win32 interactor 遗留状态冲突。
+        delete viewport_;
+        viewport_ = nullptr;
+        delete viewport_parent_;
+        viewport_parent_ = nullptr;
+        QTest::qWait(50);
     }
 };
 
