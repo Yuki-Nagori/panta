@@ -5,8 +5,11 @@
 #pragma once
 
 #include "panta_ffi.h"
+#include <QMap>
 #include <QStringList>
+#include <QTimer>
 #include <QUrl>
+#include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 #include <panta/visualization/mesh_source.hpp>
 #include <rust/cxx.h>
@@ -37,6 +40,15 @@ class ProjectViewModel : public panta::visualization::MeshSource {
         QString importPreviewDimensions READ importPreviewDimensions NOTIFY importPreviewChanged)
     Q_PROPERTY(quint64 importPreviewTriangleCount READ importPreviewTriangleCount NOTIFY
                    importPreviewChanged)
+    /// 打开的视口文档（含 Welcome）；元素为 {id, kind, state, title, message}，
+    /// 顺序即页签顺序。QML 只投影，不另存可分歧的副本。
+    Q_PROPERTY(QVariantList openDocuments READ openDocuments NOTIFY documentsChanged)
+    /// 当前活动文档 ID；视口内容的唯一选择状态。空串表示全部关闭（空白视口）。
+    Q_PROPERTY(QString activeDocumentId READ activeDocumentId NOTIFY activeDocumentChanged)
+    /// 活动文档标题（Welcome / 导入名）；空串表示无活动文档。
+    Q_PROPERTY(QString activeDocumentTitle READ activeDocumentTitle NOTIFY activeDocumentChanged)
+    /// 导入记录稳定 ID，与 importedPartNames 按下标一一对应。
+    Q_PROPERTY(QStringList importedPartIds READ importedPartIds NOTIFY importsChanged)
 
   public:
     explicit ProjectViewModel(QObject* parent = nullptr);
@@ -102,6 +114,27 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 预检 STL 元数据供导入对话框展示，不改变当前工程。
     Q_INVOKABLE bool inspectStl(const QString& path);
 
+    /// 激活一个就绪文档（Welcome 或已就绪导入页签）；Loading/Failed 文档
+    /// 不可激活。同步 UI 操作，不经 Rust Flow。
+    Q_INVOKABLE void activateDocument(const QString& documentId);
+
+    /// 关闭文档：仅结束本次运行期视图，不删 ImportRecord / 资产、不设
+    /// dirty。关闭 Loading 文档会先请求取消对应 attempt。
+    Q_INVOKABLE void closeDocument(const QString& documentId);
+
+    /// 工程树点击入口：已就绪记录直接激活；未打开记录创建 Loading 页签并
+    /// 经 073 只读激活异步加载，成功后自动激活；失败保留 Failed 页签。
+    Q_INVOKABLE void openImportRecord(const QString& recordId);
+
+    /// 拖拽重排的提交入口；from/to 为 openDocuments 下标。
+    Q_INVOKABLE void moveDocument(int fromIndex, int toIndex);
+
+    QVariantList openDocuments() const;
+    QString activeDocumentId() const;
+    QString activeDocumentTitle() const;
+    QStringList importedPartIds() const;
+    [[nodiscard]] bool placeholder_visible() const override;
+
   signals:
     void errorChanged();
     void projectChanged();
@@ -111,14 +144,35 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void importsChanged();
     void projectImported(const QString& path);
     void importPreviewChanged();
+    void documentsChanged();
+    void activeDocumentChanged();
 
   private:
+    /// 打开的视口文档条目；Welcome 与导入记录共用一套生命周期。
+    struct DocumentEntry {
+        QString id;
+        QString kind; // "welcome" | "import"
+        QString state; // "ready" | "loading" | "failed"
+        QString title;
+        QString message; // Failed 态的用户可读原因
+    };
+
     bool fail(const QString& boundaryError);
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     static QString userMessageFor(const QString& errorCode);
     static bool toBoundaryText(const QString& text, std::string* out, QString* error);
+
+    std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> pull_service_mesh() const;
+    int document_index(const QString& documentId) const;
+    void activate_ready_document(int index);
+    void reset_documents();
+    void remove_document(int index);
+    void begin_import_activation(const QString& recordId);
+    void drain_activations();
+    void sync_activation_poll();
+    void emit_documents_changed();
 
     QString m_defaultLocation;
     QString m_error;
@@ -128,6 +182,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     QString m_lastCreatedPath;
     bool m_dirty = false;
     QStringList m_importedPartNames;
+    QStringList m_importedPartIds;
     QString m_importedPartName;
     QString m_importedAssetPath;
     QString m_importedMeshType;
@@ -138,6 +193,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     QString m_importPreviewName;
     QString m_importPreviewDimensions;
     quint64 m_importPreviewTriangleCount = 0;
+    QVector<DocumentEntry> m_documents;
+    QString m_activeDocumentId;
+    QMap<QString, std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>> m_documentMeshes;
+    QMap<QString, quint64> m_activationAttempts;
+    QTimer m_activationPoll;
     rust::Box<panta::ffi::ProjectService> m_service;
 };
 

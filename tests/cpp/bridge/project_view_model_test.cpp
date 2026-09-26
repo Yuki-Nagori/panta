@@ -11,6 +11,7 @@
 #include <QString>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtTest/qtest.h>
 #include <array>
 #include <gtest/gtest.h>
@@ -154,4 +155,114 @@ int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
+}
+
+
+TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 1 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n"),
+              0);
+    source.close();
+
+    ProjectViewModel view_model;
+    QSignalSpy documentsChanged(&view_model, &ProjectViewModel::documentsChanged);
+    QSignalSpy activeChanged(&view_model, &ProjectViewModel::activeDocumentChanged);
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+
+    // 进入工程工作区：默认只有就绪 Welcome 且为活动文档。
+    EXPECT_EQ(view_model.openDocuments().size(), 1);
+    const auto welcome = view_model.openDocuments().front().toMap();
+    EXPECT_EQ(welcome[QStringLiteral("id")].toString(), QStringLiteral("welcome"));
+    EXPECT_EQ(welcome[QStringLiteral("state")].toString(), QStringLiteral("ready"));
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("welcome"));
+    EXPECT_EQ(view_model.activeDocumentTitle(), QStringLiteral("Welcome"));
+    EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
+
+    // 导入成功：自动新增并激活就绪导入页签，快照复用导入产物。
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
+                                     QStringLiteral("millimeters"), false));
+    ASSERT_EQ(view_model.openDocuments().size(), 2);
+    const auto imported = view_model.openDocuments()[1].toMap();
+    EXPECT_EQ(imported[QStringLiteral("id")].toString(), QStringLiteral("import-1"));
+    EXPECT_EQ(imported[QStringLiteral("state")].toString(), QStringLiteral("ready"));
+    EXPECT_EQ(imported[QStringLiteral("title")].toString(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
+    EXPECT_EQ(view_model.activeDocumentTitle(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(activeChanged.count(), 2);
+    EXPECT_NE(view_model.mesh_snapshot(), nullptr);
+
+    // 关闭非活动 Welcome：不改变当前视口。
+    documentsChanged.clear();
+    view_model.closeDocument(QStringLiteral("welcome"));
+    EXPECT_EQ(documentsChanged.count(), 1);
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
+    EXPECT_NE(view_model.mesh_snapshot(), nullptr);
+
+    // 关闭活动导入页签：无就绪邻位，回到 Welcome（空串并非 Welcome 场景）。
+    view_model.closeDocument(QStringLiteral("import-1"));
+    EXPECT_EQ(view_model.openDocuments().size(), 0);
+    EXPECT_EQ(view_model.activeDocumentId(), QString{});
+    EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
+}
+
+TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 2 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n"),
+              0);
+    source.close();
+
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(view_model.saveProject());
+
+    ProjectViewModel reopened;
+    ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
+    // 重开工程只保留 Welcome 页签；不继承旧会话活动文档。
+    EXPECT_EQ(reopened.openDocuments().size(), 1);
+    EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
+    EXPECT_EQ(reopened.mesh_snapshot(), nullptr);
+
+    // 点击工程树未打开记录：Loading 页签先建立，激活仍由成功结果驱动。
+    reopened.openImportRecord(QStringLiteral("import-1"));
+    ASSERT_EQ(reopened.openDocuments().size(), 2);
+    const auto loading = reopened.openDocuments()[1].toMap();
+    EXPECT_EQ(loading[QStringLiteral("id")].toString(), QStringLiteral("import-1"));
+    EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
+    QTRY_COMPARE(loading[QStringLiteral("state")].toString(), QStringLiteral("ready"));
+    QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
+    QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
+    EXPECT_EQ(reopened.mesh_snapshot()->vertices.size(), 3U);
+
+    // 未知记录同步拒绝，不建页签。
+    const auto before = reopened.openDocuments().size();
+    reopened.openImportRecord(QStringLiteral("import-99"));
+    EXPECT_EQ(reopened.openDocuments().size(), before);
 }

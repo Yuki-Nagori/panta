@@ -21,6 +21,9 @@ class MeshSource : public QObject {
     using QObject::QObject;
     ~MeshSource() override = default;
     [[nodiscard]] virtual std::shared_ptr<const SurfaceMeshSnapshot> mesh_snapshot() const = 0;
+    /// 无网格时是否显示占位字样（Welcome 场景）。返回 false 表示空白视口，
+    /// 后端不得用占位内容填充；文档视图据此区分 Welcome 与全关闭。
+    [[nodiscard]] virtual bool placeholder_visible() const { return true; }
 
   signals:
     void meshChanged();

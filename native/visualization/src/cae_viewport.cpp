@@ -58,6 +58,9 @@ void CaeViewport::setMeshSource(QObject* source) {
 
 void CaeViewport::refresh_mesh() {
     impl_->scene.mesh = impl_->mesh_source ? impl_->mesh_source->mesh_snapshot() : nullptr;
+    // 占位可见性由数据源语义决定（Welcome 页签 vs 全关闭空白视口）。
+    impl_->scene.primitive_visible =
+        impl_->mesh_source ? impl_->mesh_source->placeholder_visible() : true;
     ++impl_->scene.revision;
     impl_->backend->apply_state(impl_->scene);
 }
