@@ -113,7 +113,6 @@ ApplicationWindow {
                     importedPartNames: projectModel.importedPartNames
                     importedPartIds: projectModel.importedPartIds
                     importedPartName: projectModel.importedPartName
-                    openDocuments: projectModel.openDocuments
                     activeDocumentId: projectModel.activeDocumentId
                     activeDocumentTitle: projectModel.activeDocumentTitle
                     onOpenImportRequested: recordId => projectModel.openImportRecord(recordId)

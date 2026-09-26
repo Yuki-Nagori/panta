@@ -16,8 +16,6 @@ PanelSurface {
     property var importedPartIds: []
     property string activeDocumentId: ""
     property string activeDocumentTitle: ""
-    // 活动文档标题投影数据源；选中底色与检查器标题共用该状态。
-    property var openDocuments: []
     property bool importedPartAvailable: importedPartNames.length > 0
     property string importedPartName: ""
     readonly property var importedTaskItems: [
