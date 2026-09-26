@@ -30,16 +30,9 @@ Item {
     // moveDocument，避免模型重建打断手势。非拖拽时与 documents 同步。
     property var order: []
     property string draggedId: ""
-    // 松手后正在播归位动画的页签；期间保持置顶，避免沉入邻页签下方。
-    property string settlingId: ""
     // 拖拽中页签的 x（bar 坐标）；槽位绑定它实现指针跟随。
     property real dragX: 0
     readonly property bool dragging: draggedId !== ""
-    onSettlingIdChanged: {
-        if (settlingId === "" && settleTimer.running) {
-            settleTimer.stop();
-        }
-    }
     onDocumentsChanged: {
         if (dragging) {
             // 拖拽中模型被外部改变（工程切换等）：放弃手势并回同步。
@@ -62,13 +55,21 @@ Item {
         return order.indexOf(id);
     }
 
-    Timer {
-        id: settleTimer
-        interval: Theme.documentTabAnimationDuration
-        onTriggered: bar.settlingId = ""
-    }
-
     Component.onCompleted: sync_order()
+
+    // 重排位移差动画（对应 HTML 的 animateTabX）：order 变化后，把每个
+    // 委托「当前视觉位置 − 新槽位」记为 visualOffset，再由 Behavior 平滑
+    // 归零——与 HTML 的 insertBefore + 差值动画完全同构。
+    onOrderChanged: {
+        for (let i = 0; i < tabRepeater.count; ++i) {
+            const item = tabRepeater.itemAt(i);
+            if (!item || item.isDragged) {
+                continue;
+            }
+            const target = slot_x(slot_of(item.documentId));
+            item.visualOffset = item.x - target;
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -111,22 +112,26 @@ Item {
                 readonly property string tabState: doc.state ?? "ready"
                 readonly property bool isActive: documentId === bar.activeDocumentId
                 readonly property bool isDragged: documentId === bar.draggedId
-                readonly property bool isSettling: documentId === bar.settlingId
-                readonly property bool elevated: isDragged || isSettling
-                // 拖拽中页签脱离槽位跟随指针；其余页签绑定槽位并动画让位。
-                y: 2
-                x: isDragged ? bar.dragX : bar.slot_x(bar.slot_of(documentId))
-                Behavior on x {
+                // 让位 / 归位位移差：order 重排后由 bar 层写入「当前视觉位置
+                // − 新槽位」，Behavior 平滑归零（HTML animateTabX 的同构实现）。
+                property real visualOffset: 0
+                Behavior on visualOffset {
                     enabled: !tab.isDragged && !bar.reducedMotion
                     NumberAnimation {
                         duration: Theme.documentTabAnimationDuration
                         easing.type: Easing.OutQuad
                     }
                 }
+                // 拖拽中页签脱离槽位跟随指针；其余页签绑定槽位 + 位移差。
+                y: 2
+                x: isDragged ? bar.dragX
+                             : bar.slot_x(bar.slot_of(documentId)) + visualOffset
 
                 width: Theme.documentTabWidth
                 height: Theme.documentTabBarHeight - 2 - 3
-                z: tab.elevated ? 2 : tab.isActive ? 1 : 0
+                // 拖拽或让位 / 归位动画期间保持置顶，避免沉入邻页签下方。
+                z: tab.isDragged || Math.abs(visualOffset) > 0.5 ? 2
+                                                                 : tab.isActive ? 1 : 0
 
                 Rectangle {
                     anchors.fill: parent
@@ -143,17 +148,20 @@ Item {
                     y: tab.height - Theme.documentTabRadius
                     width: Theme.documentTabRadius
                     height: Theme.documentTabRadius
+                    z: 2
                     ShapePath {
                         fillColor: Theme.colorPanel
                         strokeColor: "transparent"
+                        strokeWidth: 0
                         startX: Theme.documentTabRadius
                         startY: 0
-                        PathArc {
+                        PathCubic {
                             x: 0
                             y: Theme.documentTabRadius
-                            radiusX: Theme.documentTabRadius
-                            radiusY: Theme.documentTabRadius
-                            direction: PathArc.Counterclockwise
+                            control1X: Theme.documentTabRadius
+                            control1Y: Theme.documentTabRadius * 0.5522847498
+                            control2X: Theme.documentTabRadius * 0.5522847498
+                            control2Y: Theme.documentTabRadius
                         }
                         PathLine {
                             x: Theme.documentTabRadius
@@ -171,17 +179,20 @@ Item {
                     y: tab.height - Theme.documentTabRadius
                     width: Theme.documentTabRadius
                     height: Theme.documentTabRadius
+                    z: 2
                     ShapePath {
                         fillColor: Theme.colorPanel
                         strokeColor: "transparent"
+                        strokeWidth: 0
                         startX: 0
                         startY: 0
-                        PathArc {
+                        PathCubic {
                             x: Theme.documentTabRadius
                             y: Theme.documentTabRadius
-                            radiusX: Theme.documentTabRadius
-                            radiusY: Theme.documentTabRadius
-                            direction: PathArc.Clockwise
+                            control1X: Theme.documentTabRadius * 0.5522847498
+                            control1Y: 0
+                            control2X: Theme.documentTabRadius
+                            control2Y: Theme.documentTabRadius * 0.5522847498
                         }
                         PathLine {
                             x: 0
@@ -368,9 +379,19 @@ Item {
         }
         const from = bar.documents.findIndex(entry => entry.id === bar.draggedId);
         const to = order.indexOf(bar.draggedId);
-        settlingId = bar.draggedId;
+        const releaseX = bar.dragX;
+        const releasedId = bar.draggedId;
         bar.draggedId = "";
         sync_order();
+        // 松手归位：给被拖委托写入「松手位置 − 新槽位」的位移差，由
+        // Behavior 平滑归零（reducedMotion 时直接就位）。
+        for (let i = 0; i < tabRepeater.count; ++i) {
+            const item = tabRepeater.itemAt(i);
+            if (item !== null && item.documentId === releasedId) {
+                item.visualOffset = releaseX - slot_x(to);
+                break;
+            }
+        }
         if (from >= 0 && to >= 0 && from !== to) {
             moveDocument(from, to);
         }
