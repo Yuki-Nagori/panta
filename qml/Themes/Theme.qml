@@ -26,6 +26,10 @@ QtObject {
     readonly property color colorRibbonTop: "#e1e1e1"
     readonly property color colorRibbonBottom: "#919191"
     readonly property color colorCloseHover: "#e81123"
+    // 视口文档页签（080）：标签带灰、带上缘线与缺口过渡色。
+    readonly property color colorDocumentBand: "#e7e4e1"
+    readonly property color colorDocumentBandLine: "#c8c4c0"
+    readonly property color colorDocumentHover: "#f0eeec"
 
     // 字号（逻辑像素）
     readonly property int fontTitle: 13
@@ -72,9 +76,6 @@ QtObject {
     readonly property int documentTabCloseSize: 19
     readonly property int documentTabDragThreshold: 4
     readonly property int documentTabAnimationDuration: 150
-    readonly property color colorDocumentBand: "#e7e4e1"
-    readonly property color colorDocumentBandLine: "#c8c4c0"
-    readonly property color colorDocumentHover: "#f0eeec"
     readonly property int panelToolbarHeight: 32
     readonly property int titlebarMinimumContentWidth: 1100
     readonly property int toolTipDelay: 600
