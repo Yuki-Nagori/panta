@@ -131,7 +131,7 @@ ai-docs/
 | 075 | [CI 修复：Windows GoogleTest ABI 与 Qt benchmark lint](task/075-ci-windows-gtest-and-qt-lint.md) | 验证基础 | 070, 071, 046 | done |
 | 076 | [Cargo 测试与质量 runner 维护](task/076-panta-tests-runner-maintenance.md) | 验证基础 | 011, 043 | done |
 | 082 | [CI 修复：VTK benchmark moc 前置与标题条焦点滚动](task/082-ci-vtk-benchmark-moc-and-focus-scroll.md) | 验证基础 | 048, 076, 029 | done |
-| 083 | [Windows 开发裸启应用的 Qt 运行库部署](task/083-windows-app-runtime-deployment.md) | 应用平台扩展 | 005, 042 | in-progress |
+| 083 | [Windows 开发裸启应用的 Qt 运行库部署](task/083-windows-app-runtime-deployment.md) | 应用平台扩展 | 005, 042 | done |
 
 ## 仓库与文档维护
 
