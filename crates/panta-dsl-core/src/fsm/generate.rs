@@ -41,8 +41,10 @@ pub fn generate_rust(document: &FsmDocument) -> String {
         "// 有限状态机（FSM）'{}'：由 panta-dsl-core 从 .pa 声明确定性生成；",
         document.name
     );
-    out.push_str("// 请勿手工修改。
-");
+    out.push_str(
+        "// 请勿手工修改。
+",
+    );
     out.push_str("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(super) enum State {\n");
     for fsm_state in &document.states {
         let _ = writeln!(out, "    {},", fsm_state.name);

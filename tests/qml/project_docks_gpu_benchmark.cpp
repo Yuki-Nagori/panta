@@ -41,7 +41,7 @@ constexpr int kSampleCount = 3;
 constexpr int kWarmupFrameCount = 30;
 constexpr std::array kItemCounts = {0, 1, 100, 1000};
 
-enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both };
+enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, DocTabs };
 
 struct Scenario {
     const char* name;
@@ -102,6 +102,9 @@ class ProjectDocksGpuBenchmark final : public QObject {
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
+    QQmlComponent m_documentTabBarComponent{
+        &m_engine,
+        QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
 
     QObject* create(QQmlComponent& component, const QVariantMap& properties, QObject& owner,
                     const QPoint& position, const QSize& size) {
@@ -160,7 +163,23 @@ class ProjectDocksGpuBenchmark final : public QObject {
         const QVariantMap names_property{{QStringLiteral("importedPartNames"), names}};
         QQuickItem* tasks_item = nullptr;
         QQuickItem* layers_item = nullptr;
-        if (scenario.panels == Panels::Empty) {
+        QQuickItem* document_bar = nullptr;
+        if (scenario.panels == Panels::DocTabs) {
+            QVariantList documents;
+            for (int index = 0; index < scenario.item_count; ++index) {
+                documents.append(
+                    QVariantMap{{QStringLiteral("id"), QStringLiteral("doc-%1").arg(index)},
+                                {QStringLiteral("kind"), QStringLiteral("import")},
+                                {QStringLiteral("state"), QStringLiteral("ready")},
+                                {QStringLiteral("title"), QStringLiteral("part_%1.stl").arg(index)},
+                                {QStringLiteral("message"), QString{}}});
+            }
+            document_bar = qobject_cast<QQuickItem*>(
+                create(m_documentTabBarComponent,
+                       QVariantMap{{QStringLiteral("documents"), documents},
+                                   {QStringLiteral("activeDocumentId"), QStringLiteral("doc-0")}},
+                       owner, QPoint(0, 0), QSize(1000, 39)));
+        } else if (scenario.panels == Panels::Empty) {
             create(m_emptyComponent, {}, owner, QPoint(0, 0), QSize(440, 700));
         } else {
             if (scenario.panels == Panels::Tasks || scenario.panels == Panels::Both) {
@@ -181,6 +200,27 @@ class ProjectDocksGpuBenchmark final : public QObject {
             }
         }
         QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        if (scenario.panels == Panels::DocTabs) {
+            // 页签条可见并完成一帧合成即视为该场景有效。
+            QVERIFY(document_bar != nullptr);
+            QVERIFY(measure_frame_intervals(kWarmupFrameCount).size() == kWarmupFrameCount);
+            std::vector<double> intervals;
+            intervals.reserve(static_cast<std::size_t>(kFrameCountPerSample) * kSampleCount);
+            for (int sample = 0; sample < kSampleCount; ++sample) {
+                const auto sample_intervals = measure_frame_intervals(kFrameCountPerSample);
+                if (sample_intervals.size() != kFrameCountPerSample) {
+                    return;
+                }
+                intervals.insert(intervals.end(), sample_intervals.begin(), sample_intervals.end());
+            }
+            const auto summary = percentiles(std::move(intervals));
+            qInfo().nospace() << "QML GPU frame presentation (" << api_name << ", " << scenario.name
+                              << ", " << scenario.item_count << " document tabs, " << kSampleCount
+                              << " x " << kFrameCountPerSample
+                              << " frames; p50/p95 ms per frame): " << summary[0] << "/"
+                              << summary[1];
+            return;
+        }
         QCOMPARE(static_cast<int>(owner.children().size()),
                  scenario.panels == Panels::Both ? 2 : 1);
         QQuickItem* tree = tasks_item == nullptr
@@ -252,7 +292,10 @@ class ProjectDocksGpuBenchmark final : public QObject {
     }
 
     void measures_visible_frame_presentation_ablation() {
-        std::vector<Scenario> cases{{"empty", Panels::Empty, 0}};
+        std::vector<Scenario> cases{{"empty", Panels::Empty, 0},
+                                    {"document tabs", Panels::DocTabs, 1},
+                                    {"document tabs", Panels::DocTabs, 8},
+                                    {"document tabs", Panels::DocTabs, 24}};
         for (const int item_count : kItemCounts) {
             cases.push_back({"tasks", Panels::Tasks, item_count});
             cases.push_back({"layers", Panels::Layers, item_count});

@@ -66,6 +66,15 @@ QtObject {
     readonly property int paneCloseSize: 20
     readonly property int tabSlideDuration: 120
     readonly property int tabSegmentWidth: 96
+    readonly property int documentTabWidth: 130
+    readonly property int documentTabBarHeight: 39
+    readonly property int documentTabRadius: 8
+    readonly property int documentTabCloseSize: 19
+    readonly property int documentTabDragThreshold: 4
+    readonly property int documentTabAnimationDuration: 150
+    readonly property color colorDocumentBand: "#e7e4e1"
+    readonly property color colorDocumentBandLine: "#c8c4c0"
+    readonly property color colorDocumentHover: "#f0eeec"
     readonly property int panelToolbarHeight: 32
     readonly property int titlebarMinimumContentWidth: 1100
     readonly property int toolTipDelay: 600

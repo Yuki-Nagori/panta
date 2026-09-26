@@ -34,6 +34,9 @@ namespace {
 
 constexpr int kSampleCount = 31;
 constexpr int kItemCounts[] = {0, 1, 100, 1000};
+// 文档页签代表性规模：单页签（Welcome 态）、少量打开、多页签滚动。
+constexpr int kDocumentTabCounts[] = {1, 8, 24};
+constexpr int kDocumentSwitchRounds = 32;
 
 enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both };
 
@@ -87,6 +90,9 @@ class QmlPerformanceBenchmark final : public QObject {
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
+    QQmlComponent m_documentTabBarComponent{
+        &m_engine,
+        QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
 
     QObject* create(QQmlComponent& component, const QVariantMap& properties, QObject& owner) {
         QObject* object = component.createWithInitialProperties(properties);
@@ -148,6 +154,64 @@ class QmlPerformanceBenchmark final : public QObject {
         return {elapsed, task_model_rows, task_delegate_rows, layers_tab_visible};
     }
 
+    /// 文档页签的输入集合；全部就绪 + 每第 7 个失败态，覆盖状态渲染分支。
+    QVariantList make_documents(int count) const {
+        QVariantList documents;
+        documents.reserve(count);
+        for (int index = 0; index < count; ++index) {
+            const bool failed = index > 0 && index % 7 == 6;
+            documents.append(QVariantMap{
+                {QStringLiteral("id"), QStringLiteral("doc-%1").arg(index)},
+                {QStringLiteral("kind"),
+                 index == 0 ? QStringLiteral("welcome") : QStringLiteral("import")},
+                {QStringLiteral("state"),
+                 failed ? QStringLiteral("failed") : QStringLiteral("ready")},
+                {QStringLiteral("title"), failed ? QStringLiteral("broken_%1.stl").arg(index)
+                                                 : QStringLiteral("part_%1.stl").arg(index)},
+                {QStringLiteral("message"), QString{}}});
+        }
+        return documents;
+    }
+
+    QStringList document_ids(int count) const {
+        QStringList ids;
+        ids.reserve(count);
+        for (int index = 0; index < count; ++index) {
+            ids.append(QStringLiteral("doc-%1").arg(index));
+        }
+        return ids;
+    }
+
+    /// 构造 + 活动文档切换消融；realized 关闭钮数量用于验证委托真实建立。
+    Sample measure_document_tabs(int count, int switches) {
+        QObject owner;
+        QElapsedTimer timer;
+        timer.start();
+
+        const QStringList ids = document_ids(count);
+        const auto properties = QVariantMap{
+            {QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+            {QStringLiteral("documents"), make_documents(count)},
+            {QStringLiteral("activeDocumentId"), ids.isEmpty() ? QString{} : ids.constFirst()}};
+        QObject* bar_object = create(m_documentTabBarComponent, properties, owner);
+        if (bar_object == nullptr) {
+            QTest::qFail(qPrintable(m_documentTabBarComponent.errorString()), __FILE__, __LINE__);
+            return {};
+        }
+        if (auto* bar = owner.findChild<QQuickItem*>(QStringLiteral("documentTabBar"))) {
+            for (int round = 0; round < switches; ++round) {
+                bar->setProperty("activeDocumentId", ids[round % ids.size()]);
+            }
+        }
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        const qint64 elapsed = timer.nsecsElapsed();
+        auto* bar_item = owner.findChild<QQuickItem*>(QStringLiteral("documentTabBar"));
+        const int realized_closes =
+            static_cast<int>(visual_items(bar_item, QStringLiteral("documentTabClose")).size());
+        return {elapsed, realized_closes, realized_closes, false};
+    }
+
     void verify_sample(Panels panels, int expected_rows, const Sample& sample) {
         const bool includes_tasks = panels == Panels::Tasks || panels == Panels::Both;
         const bool includes_layers = panels == Panels::Layers || panels == Panels::Both;
@@ -207,12 +271,33 @@ class QmlPerformanceBenchmark final : public QObject {
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
     }
 
+    std::vector<Scenario> document_tab_scenarios() {
+        std::vector<Scenario> scenarios;
+        scenarios.reserve(std::size(kDocumentTabCounts));
+        for (const int count : kDocumentTabCounts) {
+            const int switches = count > 1 ? kDocumentSwitchRounds : 0;
+            scenarios.push_back(
+                {QStringLiteral("viewport document tabs"),
+                 QString::fromLatin1(count > 1 ? "construct + switch" : "construct"), count,
+                 [this, count, switches] { return measure_document_tabs(count, switches); },
+                 [this, count](const Sample& sample) {
+                     // 每个页签一个关闭钮 + 活动页签圆弧件，验证委托真实建立。
+                     QCOMPARE(sample.task_model_rows, count);
+                     QVERIFY(sample.task_delegate_rows >= count);
+                 }});
+        }
+        return scenarios;
+    }
+
     void measures_registered_scenarios() {
         const std::array<std::pair<Panels, const char*>, 4> cases = {{{Panels::Empty, "empty"},
                                                                       {Panels::Tasks, "tasks"},
                                                                       {Panels::Layers, "layers"},
                                                                       {Panels::Both, "both"}}};
         for (const Scenario& scenario : project_dock_scenarios(cases)) {
+            run_scenario(scenario);
+        }
+        for (const Scenario& scenario : document_tab_scenarios()) {
             run_scenario(scenario);
         }
     }

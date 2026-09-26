@@ -111,7 +111,12 @@ ApplicationWindow {
                     projectOpen: shellWindow.projectOpen
                     projectName: projectModel.currentName
                     importedPartNames: projectModel.importedPartNames
+                    importedPartIds: projectModel.importedPartIds
                     importedPartName: projectModel.importedPartName
+                    openDocuments: projectModel.openDocuments
+                    activeDocumentId: projectModel.activeDocumentId
+                    activeDocumentTitle: projectModel.activeDocumentTitle
+                    onOpenImportRequested: recordId => projectModel.openImportRecord(recordId)
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
                     onNewProjectRequested: newProjectDialog.open()
@@ -149,6 +154,7 @@ ApplicationWindow {
                 id: viewportPane
 
                 meshSource: projectModel
+                reducedMotion: viewModel.reducedMotion
                 anchors.left: workspaceSplit.right
                 anchors.right: parent.right
                 anchors.top: parent.top

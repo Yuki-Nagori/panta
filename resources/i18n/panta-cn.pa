@@ -319,10 +319,6 @@ search-placeholder:
   src: Enter a keyword or phrase
   tr: 请输入关键字或短语
 
-[ViewportPane]
-model:
-  src: Model
-  tr: 模型
 
 [IconActionNewDocument]
 label:
@@ -625,3 +621,8 @@ move:
 close-tools:
   src: Close layer tools
   tr: 关闭图层工具
+
+[ProjectViewModel]
+welcome:
+  src: Welcome
+  tr: 欢迎

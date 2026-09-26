@@ -20,6 +20,9 @@ class ShellViewModel : public QObject {
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     /// 最近一次面向用户的错误摘要；空串表示无错误。
     Q_PROPERTY(QString error READ error WRITE setError NOTIFY errorChanged)
+    /// 系统减少动态效果偏好（QStyleHints::reduceMotion）；动画型组件
+    /// 据此跳过位移动画（080 文档页签）。
+    Q_PROPERTY(bool reducedMotion READ reducedMotion NOTIFY reducedMotionChanged)
 
   public:
     explicit ShellViewModel(QObject* parent = nullptr);
@@ -32,6 +35,9 @@ class ShellViewModel : public QObject {
     [[nodiscard]] auto error() const -> const QString&;
     void setError(const QString& message);
 
+    /// 系统减少动态效果偏好；每次读取即时查询 QStyleHints。
+    [[nodiscard]] bool reducedMotion() const;
+
     /// 命令：推进修订计数并同步刷新说明文字。
     Q_INVOKABLE void tick();
 
@@ -39,6 +45,7 @@ class ShellViewModel : public QObject {
     void captionChanged();
     void countChanged();
     void errorChanged();
+    void reducedMotionChanged();
 
   private:
     QString m_caption;

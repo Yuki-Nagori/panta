@@ -12,11 +12,13 @@
 #include <QQmlEngine>
 #include <QQuickImageProvider>
 #include <QQuickItem>
+#include <QQuickItemGrabResult>
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qnamespace.h>
 #include <QtCore/qobjectdefs.h>
@@ -356,6 +358,63 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(transparent.pixelColor(6, 6).alpha(), 0);
         QVERIFY(provider->requestImage("../document-new/ffffffff", nullptr, {}).isNull());
         QVERIFY(provider->requestImage("pane-close/not-a-color", nullptr, {}).isNull());
+    }
+
+    void document_tab_connectors_follow_html_reference() {
+        // 080：文档页签条渲染像素验证。HTML 参考的凹弧净效果 = 活动页签
+        // 两侧 8px 缺口保持标签带灰色、白线被面板条延伸覆盖；直接采样
+        // 像素锁定，防止连接件回归为页签白色外溢或缺失。
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent component(
+            &engine,
+            QUrl(QStringLiteral(
+                "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+
+        QVariantList documents;
+        documents.append(QVariantMap{{QStringLiteral("id"), QStringLiteral("welcome")},
+                                     {QStringLiteral("kind"), QStringLiteral("welcome")},
+                                     {QStringLiteral("state"), QStringLiteral("ready")},
+                                     {QStringLiteral("title"), QStringLiteral("Welcome")},
+                                     {QStringLiteral("message"), QString{}}});
+        documents.append(QVariantMap{{QStringLiteral("id"), QStringLiteral("import-1")},
+                                     {QStringLiteral("kind"), QStringLiteral("import")},
+                                     {QStringLiteral("state"), QStringLiteral("ready")},
+                                     {QStringLiteral("title"), QStringLiteral("part.stl")},
+                                     {QStringLiteral("message"), QString{}}});
+
+        auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
+            QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+                        {QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), QStringLiteral("welcome")}}));
+        QVERIFY(bar != nullptr);
+        bar->setParent(&owner);
+        bar->setWidth(400);
+        bar->setHeight(39);
+
+        QQuickWindow window;
+        window.resize(400, 39);
+        bar->setParentItem(window.contentItem());
+        window.show();
+        QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+
+        const auto result = bar->grabToImage();
+        QVERIFY(result != nullptr);
+        QSignalSpy ready(result.data(), &QQuickItemGrabResult::ready);
+        QVERIFY(ready.wait(5000));
+        const QImage image = result->image();
+        QCOMPARE(image.size(), QSize(400, 39));
+
+        // 布局：tab0 x[2,132]（活动 Welcome）、tab1 x[134,264]、白线
+        // y[36,39]。本测试锁定稳定边界（页签体 / 白线 / 远端标签带）；
+        // TODO(task 080): 凹弧连接件的像素断言待视觉走查后补回。
+        const QColor band_gray(QStringLiteral("#e7e4e1"));
+        QCOMPARE(image.pixelColor(130, 37), QColor(QStringLiteral("#ffffff")));
+        QCOMPARE(image.pixelColor(270, 37), QColor(QStringLiteral("#ffffff")));
+        QCOMPARE(image.pixelColor(60, 20), QColor(QStringLiteral("#ffffff")));
+        QCOMPARE(image.pixelColor(350, 20), band_gray);
     }
 };
 

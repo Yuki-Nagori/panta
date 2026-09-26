@@ -151,7 +151,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 打开的视口文档条目；Welcome 与导入记录共用一套生命周期。
     struct DocumentEntry {
         QString id;
-        QString kind; // "welcome" | "import"
+        QString kind;  // "welcome" | "import"
         QString state; // "ready" | "loading" | "failed"
         QString title;
         QString message; // Failed 态的用户可读原因
@@ -195,7 +195,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_importPreviewTriangleCount = 0;
     QVector<DocumentEntry> m_documents;
     QString m_activeDocumentId;
-    QMap<QString, std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>> m_documentMeshes;
+    QMap<QString, std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>>
+        m_documentMeshes;
     QMap<QString, quint64> m_activationAttempts;
     QTimer m_activationPoll;
     rust::Box<panta::ffi::ProjectService> m_service;

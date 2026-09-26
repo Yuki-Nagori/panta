@@ -64,6 +64,8 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
     // 存在 Loading 文档时运转。
     m_activationPoll.setInterval(10);
     connect(&m_activationPoll, &QTimer::timeout, this, &ProjectViewModel::drain_activations);
+    // 应用启动即有 Welcome 页签；进入工程会话时由 reset_documents 重建。
+    reset_documents();
 }
 
 std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
@@ -267,8 +269,8 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
         return fail(conversionError);
     }
     try {
-        const auto imported =
-            panta::ffi::project_service_import_stl(*m_service, path, meshType, units, showImportLog);
+        const auto imported = panta::ffi::project_service_import_stl(*m_service, path, meshType,
+                                                                     units, showImportLog);
         const auto snapshot = panta::ffi::project_service_current(*m_service);
         if (!applySnapshot(snapshot) || !refreshImports()) {
             return false;
@@ -388,10 +390,9 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
 
     const bool changed =
         m_importedPartNames != nextImportedPartNames || m_importedPartIds != nextPartIds ||
-        m_importedPartName != nextPartName ||
-        m_importedAssetPath != nextAssetPath || m_importedMeshType != nextMeshType ||
-        m_importedUnits != nextUnits || m_importedDimensions != nextDimensions ||
-        m_importedTriangleCount != nextTriangleCount;
+        m_importedPartName != nextPartName || m_importedAssetPath != nextAssetPath ||
+        m_importedMeshType != nextMeshType || m_importedUnits != nextUnits ||
+        m_importedDimensions != nextDimensions || m_importedTriangleCount != nextTriangleCount;
     m_importedPartNames = std::move(nextImportedPartNames);
     m_importedPartIds = std::move(nextPartIds);
     m_importedPartName = nextPartName;
@@ -550,14 +551,15 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
     if (index < 0) {
         return;
     }
-    // 加载中文档先取消 attempt；结果迟到时 drain 会按文档消失丢弃。
+    // 加载中文档先取消 attempt（结果迟到时 drain 按文档消失丢弃）；
+    // attempt 簿记无条件清除，Loading 与 Failed 关闭都不留残留条目。
     if (m_documents[index].state == QStringLiteral("loading")) {
         if (const auto attempt = m_activationAttempts.constFind(documentId);
             attempt != m_activationAttempts.cend()) {
             panta::ffi::project_service_cancel_asset_activation(*m_service, attempt.value());
         }
-        m_activationAttempts.remove(documentId);
     }
+    m_activationAttempts.remove(documentId);
     m_documentMeshes.remove(documentId);
     m_documents.remove(index);
 
@@ -609,8 +611,8 @@ void ProjectViewModel::openImportRecord(const QString& recordId) {
     if (title.isEmpty()) {
         return;
     }
-    m_documents.append({recordId, QStringLiteral("import"), QStringLiteral("loading"), title,
-                        QString{}});
+    m_documents.append(
+        {recordId, QStringLiteral("import"), QStringLiteral("loading"), title, QString{}});
     emit_documents_changed();
     begin_import_activation(recordId);
 }
@@ -658,8 +660,7 @@ void ProjectViewModel::drain_activations() {
             if (outcome.kind == panta::ffi::ActivationOutcomeKind::Succeeded) {
                 auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
                 mesh->vertices.reserve(outcome.coordinates.size() / 3);
-                for (std::size_t offset = 0; offset + 2 < outcome.coordinates.size();
-                     offset += 3) {
+                for (std::size_t offset = 0; offset + 2 < outcome.coordinates.size(); offset += 3) {
                     mesh->vertices.push_back({outcome.coordinates[offset],
                                               outcome.coordinates[offset + 1],
                                               outcome.coordinates[offset + 2]});
@@ -673,6 +674,7 @@ void ProjectViewModel::drain_activations() {
             } else if (outcome.kind == panta::ffi::ActivationOutcomeKind::Failed) {
                 document.state = QStringLiteral("failed");
                 document.message = activation_message_for(QString::fromUtf8(outcome.code));
+                m_activationAttempts.remove(recordId);
                 documentsChangedEmitted = true;
             }
         }

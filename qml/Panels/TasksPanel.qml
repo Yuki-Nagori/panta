@@ -11,6 +11,13 @@ PanelSurface {
     property bool projectOpen: false
     property string projectName: ""
     property var importedPartNames: []
+    // 稳定导入记录 ID，与 importedPartNames 按下标对应；行点击即请求
+    // 打开 / 激活对应视口文档（080）。
+    property var importedPartIds: []
+    property string activeDocumentId: ""
+    property string activeDocumentTitle: ""
+    // 活动文档标题投影数据源；选中底色与检查器标题共用该状态。
+    property var openDocuments: []
     property bool importedPartAvailable: importedPartNames.length > 0
     property string importedPartName: ""
     readonly property var importedTaskItems: [
@@ -52,6 +59,10 @@ PanelSurface {
     signal closeRequested
     signal openProjectRequested
     signal newProjectRequested
+    signal openImportRequested(string recordId)
+
+    // 检查器标题跟随活动导入文档；无活动导入时回退最新记录名。
+    readonly property string activePartTitle: activeDocumentTitle !== "" ? activeDocumentTitle : importedPartName
 
     implicitWidth: Theme.leftPanelMinimumWidth
 
@@ -154,9 +165,23 @@ PanelSurface {
                     required property var modelData
                     required property int index
 
+                    readonly property string recordId: panel.importedPartIds[index] ?? ""
+                    // 选中底色跟随活动文档投影：让所选 STL 与检查器标题可互相对照。
+                    readonly property bool isActiveDocument: recordId !== "" && recordId === panel.activeDocumentId
+
                     width: projectTree.width
                     height: Theme.controlHeight
-                    color: index === panel.importedPartNames.length - 1 ? Theme.colorSelected : "transparent"
+                    color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : "transparent"
+
+                    HoverHandler {
+                        id: partHover
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    }
+                    TapHandler {
+                        id: partTap
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: panel.openImportRequested(importedPartEntry.recordId)
+                    }
 
                     RowLayout {
                         anchors.fill: parent
@@ -217,7 +242,7 @@ PanelSurface {
                             }
                             ThemedLabel {
                                 Layout.fillWidth: true
-                                text: qsTranslate("ProjectTaskItem", "Study Tasks: %1").arg(panel.importedPartName)
+                                text: qsTranslate("ProjectTaskItem", "Study Tasks: %1").arg(panel.activePartTitle)
                                 textSize: Theme.fontBody
                                 elide: Text.ElideRight
                             }
@@ -227,7 +252,7 @@ PanelSurface {
                     ThemedToolButton {
                         Layout.fillWidth: true
                         Layout.leftMargin: Theme.spacingMedium
-                        text: qsTranslate("ImportTask", "Part (%1)").arg(panel.importedPartName)
+                        text: qsTranslate("ImportTask", "Part (%1)").arg(panel.activePartTitle)
                         iconName: "project-file"
                         contentAlignLeft: true
                         contentColor: Theme.colorText

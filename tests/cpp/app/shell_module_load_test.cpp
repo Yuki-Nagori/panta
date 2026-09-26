@@ -158,6 +158,14 @@ class ShellModuleLoadTest final : public QObject {
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
         QVERIFY2(root->findChild<QObject*>(QStringLiteral("caeViewport")) != nullptr,
                  "CaeViewport is missing from Panta.Shell");
+        // 视口文档页签（080）：单实例；应用启动即有 Welcome 活动页签，
+        // 由 placeholder 语义显示启动欢迎字样。
+        auto* document_bar = root->findChild<QQuickItem*>(QStringLiteral("documentTabBar"));
+        QVERIFY2(document_bar != nullptr, "DocumentTabBar is missing from Panta.Shell");
+        const auto documents = document_bar->property("documents").toList();
+        QVERIFY2(documents.size() == 1, "startup shell must show exactly the Welcome tab");
+        QVERIFY2(document_bar->property("activeDocumentId").toString() == QStringLiteral("welcome"),
+                 "Welcome tab must be active at startup");
 #endif
 
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
