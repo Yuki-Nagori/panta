@@ -27,6 +27,7 @@
 #include <QtTest/qtestcase.h>
 #include <icon_provider.hpp>
 #include <qtestsupport_core.h>
+#include <qtestsupport_gui.h>
 
 namespace {
 
@@ -368,9 +369,8 @@ class ThemeComponentTest final : public QObject {
         panta::install_icon_provider(engine);
         QObject owner;
         QQmlComponent component(
-            &engine,
-            QUrl(QStringLiteral(
-                "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+            &engine, QUrl(QStringLiteral(
+                         "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
 
         QVariantList documents;

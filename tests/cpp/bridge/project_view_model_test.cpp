@@ -15,6 +15,7 @@
 #include <QtTest/qtest.h>
 #include <array>
 #include <gtest/gtest.h>
+#include <qtestcase.h>
 
 using panta::bridge::ProjectViewModel;
 
@@ -274,7 +275,6 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
 }
 
-
 TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
@@ -310,7 +310,8 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
     QTRY_COMPARE(reopened.openDocuments().size(), 2);
     QTRY_COMPARE(reopened.openDocuments()[1].toMap()[QStringLiteral("state")].toString(),
                  QStringLiteral("failed"));
-    EXPECT_FALSE(reopened.openDocuments()[1].toMap()[QStringLiteral("message")].toString().isEmpty());
+    EXPECT_FALSE(
+        reopened.openDocuments()[1].toMap()[QStringLiteral("message")].toString().isEmpty());
     EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
     EXPECT_EQ(reopened.mesh_snapshot(), nullptr);
 

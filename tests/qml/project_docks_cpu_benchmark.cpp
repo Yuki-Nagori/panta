@@ -183,7 +183,8 @@ class QmlPerformanceBenchmark final : public QObject {
     }
 
     /// 构造 + 活动文档切换消融；realized 关闭钮数量用于验证委托真实建立。
-    Sample measure_document_tabs(int count, int switches) {
+    /// 单页签场景无切换；多页签场景做 kDocumentSwitchRounds 轮激活切换。
+    Sample measure_document_tabs(int count) {
         QObject owner;
         QElapsedTimer timer;
         timer.start();
@@ -199,6 +200,7 @@ class QmlPerformanceBenchmark final : public QObject {
             return {};
         }
         if (auto* bar = owner.findChild<QQuickItem*>(QStringLiteral("documentTabBar"))) {
+            const int switches = count > 1 ? kDocumentSwitchRounds : 0;
             for (int round = 0; round < switches; ++round) {
                 bar->setProperty("activeDocumentId", ids[round % ids.size()]);
             }
@@ -275,11 +277,10 @@ class QmlPerformanceBenchmark final : public QObject {
         std::vector<Scenario> scenarios;
         scenarios.reserve(std::size(kDocumentTabCounts));
         for (const int count : kDocumentTabCounts) {
-            const int switches = count > 1 ? kDocumentSwitchRounds : 0;
             scenarios.push_back(
                 {QStringLiteral("viewport document tabs"),
                  QString::fromLatin1(count > 1 ? "construct + switch" : "construct"), count,
-                 [this, count, switches] { return measure_document_tabs(count, switches); },
+                 [this, count] { return measure_document_tabs(count); },
                  [this, count](const Sample& sample) {
                      // 每个页签一个关闭钮 + 活动页签圆弧件，验证委托真实建立。
                      QCOMPARE(sample.task_model_rows, count);

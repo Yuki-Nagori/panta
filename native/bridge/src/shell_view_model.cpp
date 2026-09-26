@@ -3,27 +3,17 @@
 #include <QObject>
 #include <QString>
 #include <QtCore/qtmetamacros.h>
-#if defined(Q_OS_WIN)
-// windows.h 为 SDK 伞头：SPI_GETCLIENTAREAANIMATION 无 granular 头可替代；
-// 包含行 NOLINT 与例外理由见 standards/comments.md（登记例外）。
-#include <windows.h> // NOLINT(misc-include-cleaner)
-#endif
 
 namespace panta::bridge {
 
 ShellViewModel::ShellViewModel(QObject* parent) : QObject(parent) {}
 
 bool ShellViewModel::reducedMotion() const {
-#if defined(Q_OS_WIN)
-    // 「在 Windows 中动画控件和窗口」即用户所指的系统动效开关；每次
-    // 读取即时查询，运行期切换场景极少，不为它维护信号源。
-    BOOL animation = TRUE;
-    SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animation, 0);
-    return animation == FALSE;
-#else
-    // macOS / Linux 的系统偏好源待接入；默认不减少动画。
+    // TODO(task 080): 系统动效偏好源待接入。Windows 需经
+    // SPI_GETCLIENTAREAANIMATION（windows.h 伞头在本仓库 clang-cl TU 的
+    // granular/伞头组合尚不稳定，见 standards/comments.md 例外条款），
+    // 接入时另行为该 TU 登记包含策略；当前一律返回 false（动画照播）。
     return false;
-#endif
 }
 
 auto ShellViewModel::caption() const -> const QString& { return m_caption; }

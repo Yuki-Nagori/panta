@@ -277,7 +277,7 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
         }
         // 导入事务已产出网格：直接复用为文档快照，不再二次解析。
         if (auto mesh = pull_service_mesh()) {
-            m_documentMeshes.insert(QString::fromUtf8(imported.id), std::move(mesh));
+            m_documentMeshes.insert(QString::fromUtf8(imported.id), mesh);
         }
         const int index = document_index(QString::fromUtf8(imported.id));
         if (index < 0) {
@@ -665,7 +665,7 @@ void ProjectViewModel::drain_activations() {
                                               outcome.coordinates[offset + 1],
                                               outcome.coordinates[offset + 2]});
                 }
-                m_documentMeshes.insert(recordId, std::move(mesh));
+                m_documentMeshes[recordId] = std::move(mesh);
                 document.state = QStringLiteral("ready");
                 document.message.clear();
                 documentsChangedEmitted = true;
