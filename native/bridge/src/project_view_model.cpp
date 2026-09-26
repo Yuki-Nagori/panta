@@ -77,10 +77,8 @@ ProjectViewModel::mesh_snapshot() const {
 }
 
 bool ProjectViewModel::placeholder_visible() const {
-    if (m_currentPath.isEmpty()) {
-        // 未进入工程工作区时保留启动欢迎字样。
-        return true;
-    }
+    // Welcome 文档激活即显示占位字样；全部关闭后视口留白（含未打开
+    // 工程的启动态——维护者确认的预期行为）。
     for (const auto& document : m_documents) {
         if (document.id == m_activeDocumentId) {
             return document.kind == QStringLiteral("welcome");

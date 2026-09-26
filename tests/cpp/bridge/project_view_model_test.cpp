@@ -275,6 +275,22 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
 }
 
+TEST(ProjectViewModelTest, ClosingLastTabFlipsPlaceholderVisibility) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+
+    // Welcome 活动时占位字样可见。
+    EXPECT_TRUE(view_model.placeholder_visible());
+    view_model.closeDocument(QStringLiteral("welcome"));
+
+    // 全部关闭：占位隐藏（空白视口），且无活动文档。
+    EXPECT_FALSE(view_model.placeholder_visible());
+    EXPECT_TRUE(view_model.activeDocumentId().isEmpty());
+    EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
+}
+
 TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());

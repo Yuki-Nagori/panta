@@ -6,6 +6,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Shapes
 
 Item {
     id: bar
@@ -29,9 +30,16 @@ Item {
     // moveDocument，避免模型重建打断手势。非拖拽时与 documents 同步。
     property var order: []
     property string draggedId: ""
+    // 松手后正在播归位动画的页签；期间保持置顶，避免沉入邻页签下方。
+    property string settlingId: ""
     // 拖拽中页签的 x（bar 坐标）；槽位绑定它实现指针跟随。
     property real dragX: 0
     readonly property bool dragging: draggedId !== ""
+    onSettlingIdChanged: {
+        if (settlingId === "" && settleTimer.running) {
+            settleTimer.stop();
+        }
+    }
     onDocumentsChanged: {
         if (dragging) {
             // 拖拽中模型被外部改变（工程切换等）：放弃手势并回同步。
@@ -52,6 +60,12 @@ Item {
     }
     function slot_of(id) {
         return order.indexOf(id);
+    }
+
+    Timer {
+        id: settleTimer
+        interval: Theme.documentTabAnimationDuration
+        onTriggered: bar.settlingId = ""
     }
 
     Component.onCompleted: sync_order()
@@ -97,6 +111,8 @@ Item {
                 readonly property string tabState: doc.state ?? "ready"
                 readonly property bool isActive: documentId === bar.activeDocumentId
                 readonly property bool isDragged: documentId === bar.draggedId
+                readonly property bool isSettling: documentId === bar.settlingId
+                readonly property bool elevated: isDragged || isSettling
                 // 拖拽中页签脱离槽位跟随指针；其余页签绑定槽位并动画让位。
                 y: 2
                 x: isDragged ? bar.dragX : bar.slot_x(bar.slot_of(documentId))
@@ -110,33 +126,72 @@ Item {
 
                 width: Theme.documentTabWidth
                 height: Theme.documentTabBarHeight - 2 - 3
-                z: tab.isActive ? 1 : 0
+                z: tab.elevated ? 2 : tab.isActive ? 1 : 0
 
                 Rectangle {
                     anchors.fill: parent
                     radius: Theme.documentTabRadius
                     color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : "transparent"
                 }
-                // 左右凹弧连接件：白色矩形带顶部外侧圆角，标签带灰从
-                // 圆角切口透出——白线经凹弧平滑上弯进入页签（HTML 参考
-                // 的浏览器式过渡）。随拖拽同步移动。
-                Rectangle {
+                // 左右凹弧连接件：QML 无伪元素与 box-shadow，用 Shape
+                // 画内凹弧——面板色填充弧与右/下边之间的区域，标签带灰
+                // 从弧外左上透出，白线经凹弧平滑上弯进入页签。随拖拽
+                // 同步移动。
+                Shape {
                     visible: tab.isActive
                     x: -Theme.documentTabRadius
                     y: tab.height - Theme.documentTabRadius
                     width: Theme.documentTabRadius
                     height: Theme.documentTabRadius
-                    topLeftRadius: Theme.documentTabRadius
-                    color: Theme.colorPanel
+                    ShapePath {
+                        fillColor: Theme.colorPanel
+                        strokeColor: "transparent"
+                        startX: Theme.documentTabRadius
+                        startY: 0
+                        PathArc {
+                            x: 0
+                            y: Theme.documentTabRadius
+                            radiusX: Theme.documentTabRadius
+                            radiusY: Theme.documentTabRadius
+                            direction: PathArc.Counterclockwise
+                        }
+                        PathLine {
+                            x: Theme.documentTabRadius
+                            y: Theme.documentTabRadius
+                        }
+                        PathLine {
+                            x: Theme.documentTabRadius
+                            y: 0
+                        }
+                    }
                 }
-                Rectangle {
+                Shape {
                     visible: tab.isActive
                     x: tab.width
                     y: tab.height - Theme.documentTabRadius
                     width: Theme.documentTabRadius
                     height: Theme.documentTabRadius
-                    topRightRadius: Theme.documentTabRadius
-                    color: Theme.colorPanel
+                    ShapePath {
+                        fillColor: Theme.colorPanel
+                        strokeColor: "transparent"
+                        startX: 0
+                        startY: 0
+                        PathArc {
+                            x: Theme.documentTabRadius
+                            y: Theme.documentTabRadius
+                            radiusX: Theme.documentTabRadius
+                            radiusY: Theme.documentTabRadius
+                            direction: PathArc.Clockwise
+                        }
+                        PathLine {
+                            x: 0
+                            y: Theme.documentTabRadius
+                        }
+                        PathLine {
+                            x: 0
+                            y: 0
+                        }
+                    }
                 }
 
                 MouseArea {
@@ -311,6 +366,7 @@ Item {
         }
         const from = bar.documents.findIndex(entry => entry.id === bar.draggedId);
         const to = order.indexOf(bar.draggedId);
+        settlingId = bar.draggedId;
         bar.draggedId = "";
         sync_order();
         if (from >= 0 && to >= 0 && from !== to) {
