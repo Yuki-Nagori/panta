@@ -145,6 +145,9 @@ Item {
                     hoverEnabled: true
                     cursorShape: bar.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                     acceptedButtons: Qt.LeftButton
+                    // 拖拽一经启动不容 Flickable 抢抓，否则移动事件中断、
+                    // 页签表现为凭空消失；标签带滚动由页签外空白区承担。
+                    preventStealing: true
                     onPressed: mouse => {
                         const p = bar.mapFromItem(tab, mouse.x, mouse.y);
                         bar.begin_press(tab.documentId, p.x, p.y);
@@ -284,7 +287,8 @@ Item {
         if (!bar.dragging) {
             return;
         }
-        bar.dragX = pointerX - internal.grabOffset;
+        // 钳制在标签带内：越界时页签贴边停留（重排判定仍用原始指针位）。
+        bar.dragX = Math.max(0, Math.min(pointerX - internal.grabOffset, bar.width - Theme.documentTabWidth));
         const draggedIndex = order.indexOf(bar.draggedId);
         if (draggedIndex < 0) {
             return;
