@@ -82,7 +82,7 @@ Rust 工作区由 `panta-import` 承担统一的**导入服务契约**，不要�
 
 格式分发以显式声明或扩展名为入口，再由实际解析器验证内容；扩展名本身不保证格式有效。各格式返回结构化错误，公共流程只决定是否提交，不吞掉 OCCT / STL 的专门诊断。新的导入格式在有端到端使用者时才加入路由、bridge 和测试；若新增本构、网格生成或格式修复算法，仍调用相应重库或另立明确的轻量功能任务。
 
-异步 Flow 的职责见 [Flow 与 Rust 状态机规划](../modules/flow-state-machines.md)。首个消费者 [080](../task/080-qml-viewport-document-tabs.md) 只读激活已提交的 STL 视口资产，由 Rust 校验工程代次、记录身份和迟到结果，不改写工程；未来写入型导入由 `panta-core` 协调工程提交和任务生命周期。Flow parser 复用已有 `panta-dsl-core`，生成产物不进入运行期解析；实施由 [073](../task/073-flow-dsl-and-import-state-machine.md) 与真实消费者推进，不追加已完成 067 的同步 STL 状态机改造。
+异步 FSM 的职责见 [FSM 与 Rust 状态机规划](../modules/fsm.md)。首个消费者 [080](../task/080-qml-viewport-document-tabs.md) 只读激活已提交的 STL 视口资产，由 Rust 校验工程代次、记录身份和迟到结果，不改写工程；未来写入型导入由 `panta-core` 协调工程提交和任务生命周期。FSM parser 复用已有 `panta-dsl-core`，生成产物不进入运行期解析；实施由 [073](../task/073-fsm-dsl-and-import-state-machine.md) 与真实消费者推进，不追加已完成 067 的同步 STL 状态机改造。
 
 ## OCCT / Netgen 当前边界
 

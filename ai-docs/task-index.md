@@ -103,7 +103,7 @@ ai-docs/
 | 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | done |
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |
 | 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
-| 073 | [Flow DSL 与首个异步 STL 视口资源激活](task/073-flow-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | planned |
+| 073 | [FSM DSL 与首个异步 STL 视口资源激活](task/073-fsm-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | in-progress |
 | 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
 | 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073 | in-progress |
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | planned |
@@ -143,7 +143,7 @@ ai-docs/
 | 021 | [重要模块说明与后续任务规划](task/021-important-module-planning.md) | 文档维护 | — | done |
 | 028 | [QML 原子组件与主题 DSL 规划](task/028-qml-theme-planning.md) | 文档维护 | — | done |
 | 066 | [重库适配边界与 Rust 领域模块规划](task/066-native-domain-boundaries.md) | 架构与规范 | 065 | done |
-| 072 | [Flow DSL 与 Rust 状态机方案评估](task/072-flow-state-machine-planning.md) | 架构与文档准备 | 008, 066, 067 | done |
+| 072 | [FSM DSL 与 Rust 状态机方案评估](task/072-flow-state-machine-planning.md) | 架构与文档准备 | 008, 066, 067 | done |
 | 077 | [进行中任务状态盘点](task/077-active-task-status-audit.md) | 文档维护 | — | done |
 | 078 | [QML 性能基准登记规范](task/078-qml-performance-benchmark-policy.md) | 文档维护 | 069, 048 | done |
 
@@ -159,7 +159,7 @@ ai-docs/
 
 014 已完成最小 Python/uv 质量工具环境：仅锁定 cmakelang 并供 `cargo format` 调用，不接入 Python 运行时/API，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 
-Flow 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [073 实施规划](task/073-flow-dsl-and-import-state-machine.md) 跟踪：复用 034/035 的 DSL 内核，首个消费者是 [080](task/080-qml-viewport-document-tabs.md) 的只读 STL 视口资源激活，不改写工程或修订。后续 STEP 等写入型导入事务另行登记消费者并冻结提交边界；不追加 067 同步 STL 改造，也不阻塞当前 M0 主线。
+FSM 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [073 实施规划](task/073-fsm-dsl-and-import-state-machine.md) 跟踪：复用 034/035 的 DSL 内核，首个消费者是 [080](task/080-qml-viewport-document-tabs.md) 的只读 STL 视口资源激活，不改写工程或修订。后续 STEP 等写入型导入事务另行登记消费者并冻结提交边界；不追加 067 同步 STL 改造，也不阻塞当前 M0 主线。
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 

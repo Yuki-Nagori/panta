@@ -3,6 +3,7 @@
 //! 与任务 023 的跨平台路径/逻辑资源引用；任务 057 增加了 `.panta` 主文件的
 //! schema 1 清单契约，完整工程资产模型和撤销/重做仍按后续任务接入。
 
+mod fsm;
 pub mod path;
 pub mod project;
 pub mod task;

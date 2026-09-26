@@ -14,7 +14,7 @@
 | Mesh IR、Netgen 与质量 | [网格](mesh.md) | 本仓库 |
 | VTK、视口与字段 | [可视化](visualization.md) | 本仓库 |
 | Rust、工程与持久化 | [应用平台与存储](application-and-storage.md) | 本仓库 |
-| Flow DSL 与 Rust 状态机 | [Flow 编译期声明与事务设计](../modules/flow-state-machines.md) | 本仓库；后续规划 |
+| FSM DSL 与 Rust 状态机 | [FSM 编译期声明与事务设计](../modules/fsm.md) | 本仓库；后续规划 |
 | 材料、Study 与 Python | [分析配置与自动化](study-and-automation.md) | 本仓库 |
 | 进程、事件与数据交换 | [求解器接入](solver-integration.md) | 本仓库客户端 |
 | 物理求解引擎 | [[External / 非本仓库] MoldSolver](external-moldsolver.md) | 外部仓库 |

@@ -258,6 +258,7 @@ dependencies = [
 name = "panta-core"
 version = "0.1.0"
 dependencies = [
+ "panta-dsl-core",
  "panta-import",
  "panta-mesh",
  "serde",

@@ -1,0 +1,63 @@
+version: 1
+kind: fsm
+name: open-saved-stl
+initial: Idle
+
+// 只读激活状态机（073/080）：按 ImportRecord ID 读取并解析已提交的
+// STL 资产，产出可释放的网格快照；不写清单、不推进 revision / dirty。
+
+states:
+  Idle: active
+  LoadingAsset: active
+  Parsing: active
+  Ready: terminal
+  Failed: terminal
+  Cancelled: terminal
+  Expired: terminal
+transitions:
+  begin:
+    from: Idle
+    on: open-requested
+    to: LoadingAsset
+    guard: record-valid
+  spawn-failed:
+    from: Idle
+    on: fail
+    to: Failed
+  asset-read:
+    from: LoadingAsset
+    on: asset-read
+    to: Parsing
+  read-failed:
+    from: LoadingAsset
+    on: fail
+    to: Failed
+  parse-completed:
+    from: Parsing
+    on: parse-succeeded
+    to: Ready
+    guard: session-current
+  parse-failed:
+    from: Parsing
+    on: fail
+    to: Failed
+  cancel-before-read:
+    from: Idle
+    on: cancel-acknowledged
+    to: Cancelled
+  cancel-while-loading:
+    from: LoadingAsset
+    on: cancel-acknowledged
+    to: Cancelled
+  cancel-while-parsing:
+    from: Parsing
+    on: cancel-acknowledged
+    to: Cancelled
+  expire-while-loading:
+    from: LoadingAsset
+    on: generation-invalidated
+    to: Expired
+  expire-while-parsing:
+    from: Parsing
+    on: generation-invalidated
+    to: Expired

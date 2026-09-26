@@ -1,6 +1,6 @@
 # Panta `.pa` DSL 规则
 
-更新日期：2026-09-24。状态：现有 parser / formatter 支持 language、variables、theme（任务 034/035）；Flow 扩展仍为规划（任务 073），当前工具不接受 `kind: flow`。
+更新日期：2026-09-26。状态：现有 parser / formatter 支持 language、variables、theme（任务 034/035）；FSM 扩展已由任务 073 落地独立 schema：`panta-dslc check / format` 按头部 kind 分发接受 `kind: fsm`，生成物由消费者 build.rs 写入 `OUT_DIR`。
 
 适用于所有 Panta DSL 文本：变量、Theme、国际化字典和后续 Artifact 域。`.pa` 是面向人读写的源码；国际化构建时由 Rust 生成临时 Qt TS，再由锁定的预编译 QtTools 生成 QM。运行时不解析 `.pa`。
 
@@ -85,11 +85,11 @@ Qt 运行时按 context + ID 或 source 精确查 QM，不做隐式全局字符�
 
 解析器限制字节数、token 数、嵌套深度、声明数和表达式操作量；禁止 import、文件访问、网络、shell、eval、任意 XML 或代码执行。未知必需版本和未知 kind 直接拒绝，不保留未登记兼容分支。新增域先增加 schema、夹具和格式化规则，再扩展公共 grammar。
 
-### Flow 域准备（未实现）
+### FSM 域
 
-后续 `kind: flow` 遵循 [Flow 设计](../modules/flow-state-machines.md)，由 [073](../task/073-flow-dsl-and-import-state-machine.md) 在真实异步导入消费者就绪后实施。以下为该扩展的约束，语法示例与细节只在设计文档维护：
+`kind: fsm` 遵循 [FSM 设计](../modules/fsm.md)，已由 [073](../task/073-fsm-dsl-and-import-state-machine.md) 随首个真实消费者（panta-core 的 open-saved-stl 只读激活）实施。以下为该域的约束，语法细节与消费者布局见设计文档与 `panta-dsl-core::fsm`：
 
-- 复用公共 `.pa` parser / AST / formatter，沿用冒号与两格缩进，不接受 `kind = "flow"` 或内联对象数组方言。
-- 只声明状态、初态、终态、事件边与命名 guard，不声明表达式、动作、entry / exit、脚本或 I/O；未知字段必须拒绝。Flow 的 graph / terminal 标记不证明业务正确性。
+- 复用公共 `.pa` 冒号与两格缩进约定，独立 flow schema 入口；不引入内联对象数组方言。
+- 只声明状态、初态、终态、事件边与命名 guard，不声明表达式、动作、entry / exit、脚本或 I/O；未知字段必须拒绝。FSM 的 graph / terminal 标记不证明业务正确性。
 - `.pa` 是流程结构的唯一声明，Rust 是规则与副作用的唯一实现；测试验证两者一致。转移元数据必须保留 guard 对应边的关系。
-- Flow 只作构建输入，生成文件留在 `OUT_DIR`，不写源码树、不进入运行期加载或 Qt 解释路径。具体生成和失败策略遵守设计文档与仓库文件规范。
+- FSM 只作构建输入，生成文件留在 `OUT_DIR`，不写源码树、不进入运行期加载或 Qt 解释路径。具体生成和失败策略遵守设计文档与仓库文件规范。

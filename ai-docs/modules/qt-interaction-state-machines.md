@@ -1,12 +1,12 @@
 # Qt 交互状态机（规划）
 
-[模块导航](README.md) · [界面与桥接](../architecture/ui-and-bridge.md) · [Rust Flow](flow-state-machines.md) · [实施任务 074](../task/074-qt-interaction-state-machine.md)
+[模块导航](README.md) · [界面与桥接](../architecture/ui-and-bridge.md) · [Rust FSM](fsm.md) · [实施任务 074](../task/074-qt-interaction-state-machine.md)
 
 更新 / 官方资料查阅日期：2026-09-24，Qt 文档版本 6.11.2。本模块尚未实现；当前导入窗口仍由 QML 函数与属性组织交互。
 
 ## 决策与分工
 
-明确采用 Qt 自带的 `QStateMachine` 管理复杂 UI 交互，由 C++ ViewModel / 交互控制器持有，以导入窗口作为首个消费者。它是独立于 Rust Flow 的 UI 能力，不要求等待 `.pa` 生成器完成后才开始接入。
+明确采用 Qt 自带的 `QStateMachine` 管理复杂 UI 交互，由 C++ ViewModel / 交互控制器持有，以导入窗口作为首个消费者。它是独立于 Rust FSM 的 UI 能力，不要求等待 `.pa` 生成器完成后才开始接入。
 
 | 层次 | 负责内容 | 示例 |
 |---|---|---|
@@ -47,7 +47,7 @@ Qt State Machine 的 C++ 入口是 `Qt6::StateMachine`，也提供 `QtQml.StateM
 - 同一次服务调用只有一个完成来源。当前 `inspectStl` 会发出预览清空 / 更新通知，`importStl` 会发出工程 / 资产通知；这些属性信号只更新读模型，不能又和返回结果各推进一次交互。适配层统一给出关联完成回执，并区分 Rust 命令被拒绝、命令成功与后续展示刷新失败；不能把所有 `bool == false` 都当成“工程未提交，可以重试”。已提交但刷新失败只能重读展示，不能再次导入。
 - 状态进入只更新 UI 配置；业务命令必须来自明确接受的用户意图。初始化、组件重建和恢复快照不能自动再次导入、保存或取消。若实现用状态进入触发派发，必须消费一次性待发意图，恢复路径不创建该意图。
 - 文件选择、预览及导入回执分别携带可验证的请求 / 窗口会话关联；异步业务再关联 TaskId 与工程 generation。关闭重开、重新选文件和过时结果不得污染当前表单。若底层信号不带 ID，控制器需限制同时在途请求并建立可靠的关联，不能猜测它属于当前会话。
-- OK、Cancel、Esc、标题栏及系统关闭请求走同一控制器入口。等待提交期间只能按 Rust 能力请求取消或分离展示；Qt 的关闭 / stopped / finished 信号不得生成领域 `Cancelled / Committed`。原事务继续由 Rust 拥有者收尾，具体规则沿用 [Flow 事务设计](flow-state-machines.md)。
+- OK、Cancel、Esc、标题栏及系统关闭请求走同一控制器入口。等待提交期间只能按 Rust 能力请求取消或分离展示；Qt 的关闭 / stopped / finished 信号不得生成领域 `Cancelled / Committed`。原事务继续由 Rust 拥有者收尾，具体规则沿用 [FSM 事务设计](fsm.md)。
 - QObject parent 和有上下文的连接管理所有权，销毁前断开投递；计时器、延迟事件和回调不能引用已销毁的窗口。首期控制器及所需表单草稿由窗口之外的同一 ProjectViewModel 会话拥有，不能把 Rust 工程快照当作尚未提交的文件路径 / 选项草稿。普通窗口重建保留该服务会话，先读取当前业务快照，再结合仍有效的 UI 草稿恢复；主动关闭后清空还是保留草稿由交互契约明确。整个 ProjectViewModel / QQmlEngine 销毁后的服务延续不属于 074 首期承诺，027 与 073 按实际所有权另行衔接；不能跨引擎搬运 QObject / JS 值，也不能依靠 `QHistoryState` 充当业务恢复。
 - 交互属性只有控制器一个写入者，QML 以绑定消费；视觉状态不覆盖控制器的业务等待标志。表单字段有自己的明确所有者，避免 QState 属性赋值与 QML 绑定相互覆盖。
 

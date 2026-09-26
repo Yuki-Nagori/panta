@@ -10,13 +10,15 @@ pub use panta_import::{
 use panta_mesh::SurfaceMesh;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 mod import;
 mod storage;
-use import::map_import_error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use storage::write_manifest;
+
+pub use crate::fsm::open_saved_stl::{ActivationAttempt, Outcome, OutcomeKind};
 
 /// 当前范例工程清单的 schema 版本。
 pub const PROJECT_SCHEMA_VERSION: u32 = 2;
@@ -78,6 +80,7 @@ pub enum ProjectError {
     ImportParseFailed(String),
     ImportSourceChanged(String),
     ImportAssetCopyFailed(String),
+    ImportRecordMissing(String),
     Io(String),
 }
 
@@ -103,6 +106,7 @@ impl ProjectError {
             Self::ImportParseFailed(_) => "project.import_parse_failed",
             Self::ImportSourceChanged(_) => "project.import_source_changed",
             Self::ImportAssetCopyFailed(_) => "project.import_asset_copy_failed",
+            Self::ImportRecordMissing(_) => "project.import_record_missing",
             Self::Io(_) => "project.io",
         }
     }
@@ -125,6 +129,7 @@ impl ProjectError {
             | Self::ImportParseFailed(name)
             | Self::ImportSourceChanged(name)
             | Self::ImportAssetCopyFailed(name)
+            | Self::ImportRecordMissing(name)
             | Self::Io(name) => name.clone(),
             Self::UnsupportedSchema(schema) => schema.to_string(),
         }
@@ -147,11 +152,15 @@ impl std::error::Error for ProjectError {}
 /// 当前工程 service。其所有状态都由 Rust 拥有，C++ 仅持有 opaque Box。
 /// `path` 是稳定的 `.panta` 主文件身份；重命名命令只更新清单名称，不移动
 /// 工程目录或文件，避免把资产路径变更混入最小模型命令。
+///
+/// `generation` 是会话级运行期计数（create/open 各递增一次，不持久化），
+/// 与 `ImportRecord.id` / attempt 一起构成只读 FSM 激活的相关性键（073/080）。
 #[derive(Debug, Default)]
 pub struct ProjectService {
     current: Option<ProjectState>,
     import_session: StlImportSession,
     current_mesh: Option<SurfaceMesh>,
+    activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
 }
 
 impl ProjectService {
@@ -207,10 +216,15 @@ impl ProjectService {
         }
         self.current = Some(state);
         self.current_mesh = None;
+        self.activation.advance_generation();
         self.snapshot()
     }
 
     /// 打开既有 `.panta` 主文件并读取清单；不改变 cwd，也不接受其他扩展名。
+    ///
+    /// 打开只读清单，不解析任何导入资产：已保存 STL 的网格由
+    /// [`Self::begin_asset_activation`] 异步按需重建（080 文档页签），
+    /// 避免保留同步与异步两条重复加载路径。
     pub fn open(&mut self, path: &Path) -> Result<ProjectSnapshot, ProjectError> {
         if !path.is_absolute() || !path.is_file() {
             return Err(ProjectError::FileMissing(path.display().to_string()));
@@ -233,27 +247,6 @@ impl ProjectService {
             return Err(ProjectError::UnsupportedSchema(manifest.schema));
         }
         validate_name(&manifest.name)?;
-        let current_mesh = if let Some(import) = manifest.imports.last() {
-            let relative = Path::new(&import.asset);
-            if relative.is_absolute()
-                || relative
-                    .components()
-                    .any(|part| !matches!(part, std::path::Component::Normal(_)))
-            {
-                return Err(ProjectError::ManifestInvalid(
-                    "invalid import asset path".to_owned(),
-                ));
-            }
-            let root = path.parent().ok_or_else(|| {
-                ProjectError::ManifestInvalid("missing project directory".to_owned())
-            })?;
-            Some(
-                panta_import::load_stl_asset(&root.join(relative), &import.units)
-                    .map_err(map_import_error)?,
-            )
-        } else {
-            None
-        };
         self.current = Some(ProjectState {
             path: path.to_path_buf(),
             name: manifest.name,
@@ -261,8 +254,9 @@ impl ProjectService {
             dirty: false,
             imports: manifest.imports,
         });
-        self.current_mesh = current_mesh;
+        self.current_mesh = None;
         self.import_session.clear();
+        self.activation.advance_generation();
         self.snapshot()
     }
 
@@ -303,6 +297,45 @@ impl ProjectService {
             .ok_or(ProjectError::NoProject)
     }
 
+    /// 按 `ImportRecord.id` 发起只读资产激活（073 首个 FSM 消费者）。
+    ///
+    /// 记录不存在或无工程时同步失败；同会话同记录的在飞 attempt 去重复用。
+    /// 结果经 [`Self::drain_asset_activations`] 拉取；加载不修改
+    /// revision / dirty，也不写任何存储。
+    pub fn begin_asset_activation(
+        &mut self,
+        import_id: &str,
+    ) -> Result<ActivationAttempt, ProjectError> {
+        let state = self.current.as_ref().ok_or(ProjectError::NoProject)?;
+        let record = state
+            .imports
+            .iter()
+            .find(|record| record.id == import_id)
+            .ok_or_else(|| ProjectError::ImportRecordMissing(import_id.to_owned()))?;
+        let root = state
+            .path
+            .parent()
+            .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
+        let asset_path = resolve_asset_path(root, &record.asset)?;
+        Ok(self.activation.begin(
+            &record.id,
+            crate::fsm::open_saved_stl::ActivationRequest {
+                asset_path,
+                units: record.units.clone(),
+            },
+        ))
+    }
+
+    /// 请求取消一次在飞激活；`Cancelled` 终态由 worker 在安全检查点确认。
+    pub fn cancel_asset_activation(&mut self, attempt: u64) -> bool {
+        self.activation.cancel(attempt)
+    }
+
+    /// 拉取当前会话已完成的激活结果；旧代次结果已在 Rust 侧释放。
+    pub fn drain_asset_activations(&mut self) -> Vec<Outcome> {
+        self.activation.drain()
+    }
+
     fn snapshot(&self) -> Result<ProjectSnapshot, ProjectError> {
         self.current
             .as_ref()
@@ -314,6 +347,22 @@ impl ProjectService {
             })
             .ok_or(ProjectError::NoProject)
     }
+}
+
+/// 校验清单内的工程相对资产引用并解析为绝对路径；拒绝绝对路径与
+/// `..` 等非普通分量，防止清单注入越出工程包目录。
+fn resolve_asset_path(root: &Path, relative: &str) -> Result<PathBuf, ProjectError> {
+    let relative_path = Path::new(relative);
+    if relative_path.is_absolute()
+        || relative_path
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err(ProjectError::ManifestInvalid(
+            "invalid import asset path".to_owned(),
+        ));
+    }
+    Ok(root.join(relative_path))
 }
 
 fn validate_name(name: &str) -> Result<(), ProjectError> {

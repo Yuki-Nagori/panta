@@ -66,7 +66,7 @@ TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
     EXPECT_EQ(empty.errorCode(), QStringLiteral("project.no_project"));
 }
 
-TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
+TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
 
@@ -124,9 +124,10 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestAsset) {
     EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample-second.stl"));
     EXPECT_EQ(reopened.importedAssetPath(), view_model.importedAssetPath());
     EXPECT_EQ(reopened.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
+    // 打开工程只读清单（073/080）：已保存网格须经只读 FSM 激活异步恢复，
+    // 重开后视口快照为空；记录投影与修订不变。
     const auto reopened_mesh = reopened.mesh_snapshot();
-    ASSERT_NE(reopened_mesh, nullptr);
-    EXPECT_EQ(reopened_mesh->vertices, mesh->vertices);
+    EXPECT_EQ(reopened_mesh, nullptr);
 
     ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
     ASSERT_GT(source.write("vertex 0 0 0\nvertex 2 0 0\nvertex 0 1 0\n"), 0);

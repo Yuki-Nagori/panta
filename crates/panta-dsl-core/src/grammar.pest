@@ -31,7 +31,7 @@ quoted = { "\"" ~ ("\\\"" | "\\\\" | (!"\"" ~ !newline ~ ANY))* ~ "\"" }
 
 integer = @{ ASCII_DIGIT+ }
 boolean = @{ "true" | "false" }
-kind_name = @{ "language" | "theme" | "variables" }
+kind_name = @{ "language" | "theme" | "variables" | "fsm" }
 section_name = @{ "values" }
 status_name = @{ "finished" | "unfinished" | "vanished" }
 type_name = @{ "bool" | "int" | "real" | "string" | "resource" }
@@ -48,3 +48,22 @@ scalar = @{ (!newline ~ ANY)* }
 indent = _{ "  " }
 hws = _{ " " | "\t" }
 newline = _{ "\r\n" | "\n" }
+
+// FSM 声明（073）：独立入口 fsm_document；顶层仅 version/kind/name/initial
+// 与 states/transitions 两节，沿用两格缩进与 kebab-case 约定。
+fsm_document = { SOI ~ fsm_line* ~ EOI }
+fsm_line = { blank | comment_line | version | kind | fsm_name | fsm_initial | fsm_states_header | fsm_state_decl | fsm_transitions_header | fsm_transition_decl | fsm_transition_field }
+fsm_name = { hws* ~ "name" ~ hws* ~ ":" ~ hws* ~ fsm_kebab ~ hws* ~ newline? }
+fsm_initial = { hws* ~ "initial" ~ hws* ~ ":" ~ hws* ~ fsm_state_name ~ hws* ~ newline? }
+fsm_states_header = { hws* ~ "states" ~ hws* ~ ":" ~ hws* ~ newline? }
+fsm_state_decl = { fsm_indent ~ fsm_state_name ~ hws* ~ ":" ~ hws* ~ fsm_state_kind ~ hws* ~ newline? }
+fsm_transitions_header = { hws* ~ "transitions" ~ hws* ~ ":" ~ hws* ~ newline? }
+fsm_transition_decl = { fsm_indent ~ fsm_kebab ~ hws* ~ ":" ~ hws* ~ newline }
+fsm_transition_field = { fsm_indent2 ~ fsm_field_name ~ hws* ~ ":" ~ hws* ~ fsm_field_value ~ hws* ~ newline? }
+fsm_state_kind = @{ "active" | "terminal" }
+fsm_field_name = @{ "from" | "on" | "to" | "guard" }
+fsm_field_value = { fsm_state_name | fsm_kebab }
+fsm_state_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
+fsm_kebab = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "-")* }
+fsm_indent = _{ "  " }
+fsm_indent2 = _{ "    " }

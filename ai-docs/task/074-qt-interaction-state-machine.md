@@ -15,7 +15,7 @@
 
 ## 必读
 
-- [Qt 交互状态机设计](../modules/qt-interaction-state-machines.md)、[Flow 与 Rust 状态机](../modules/flow-state-machines.md)、[界面与桥接](../architecture/ui-and-bridge.md)
+- [Qt 交互状态机设计](../modules/qt-interaction-state-machines.md)、[FSM 与 Rust 状态机](../modules/fsm.md)、[界面与桥接](../architecture/ui-and-bridge.md)
 - [Qt](../standards/qt.md)、[QML](../standards/qml.md)、[分层规则](../standards/layering.md)、[依赖获取](../standards/dependency-acquisition.md)
 - [CMake](../standards/cmake.md)、[注释](../standards/comments.md)、[测试](../standards/testing.md)、[验证与评审](../standards/validation-and-review.md)
 - [文档](../standards/documentation.md)、[仓库文件](../standards/repository-hygiene.md)、[代码生命周期](../standards/code-lifecycle.md)、[提交规范](../standards/commits.md)
@@ -28,7 +28,7 @@
 
 交互契约同时约束命令接受到 Qt 转移完成之间的重复点击、同步返回与属性信号的唯一完成来源、提交后展示刷新失败，以及同一服务会话内的窗口重建。相应服务适配只区分已有 Rust 调用结果与展示刷新结果，不在 Qt 增加业务裁决。
 
-不建立全局 UI 巨型状态机，不迁移 hover / pressed / 颜色 / 简单页签绑定，不从 `.pa` 生成 Qt 状态图，不引入 SCXML 文档或另一个 Rust FSM 库。Qt 状态机不承担解析、写盘、业务 guard、工程恢复或后台线程调度；本任务也不把同步 STL 路径改成 Rust Flow。
+不建立全局 UI 巨型状态机，不迁移 hover / pressed / 颜色 / 简单页签绑定，不从 `.pa` 生成 Qt 状态图，不引入 SCXML 文档或另一个 Rust FSM 库。Qt 状态机不承担解析、写盘、业务 guard、工程恢复或后台线程调度；本任务也不把同步 STL 路径改成 Rust FSM。
 
 ## 前置条件与任务关系
 

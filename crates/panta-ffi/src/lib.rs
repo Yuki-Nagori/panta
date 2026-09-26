@@ -149,6 +149,34 @@ pub mod bridge {
         pub value: String,
     }
 
+    /// 只读资产激活终态种类（073/080）。`Expired` 仅用于可观测性，
+    /// UI 不得依据它更新任何文档状态。
+    pub enum ActivationOutcomeKind {
+        Succeeded = 0,
+        Failed = 1,
+        Cancelled = 2,
+        Expired = 3,
+    }
+
+    /// begin 返回的运行期相关性句柄；generation 是会话级计数（create/open
+    /// 递增），不是工程 revision，也不持久化。
+    pub struct ActivationAttempt {
+        pub attempt: u64,
+        pub generation: u64,
+    }
+
+    /// 一次激活的终态结果。coordinates 仅在 Succeeded 时非空（每三角形
+    /// 9 个 f64）；C++ 复制进自身文档快照后即释放 CXX 缓冲区。
+    pub struct ActivationOutcome {
+        pub attempt: u64,
+        pub generation: u64,
+        pub import_id: String,
+        pub kind: ActivationOutcomeKind,
+        pub code: String,
+        pub detail: String,
+        pub coordinates: Vec<f64>,
+    }
+
     unsafe extern "C++" {
         include!("panta/ffi.hpp");
 
@@ -243,6 +271,20 @@ pub mod bridge {
             source: String,
         ) -> Result<StlImportPreview>;
         fn project_service_mesh_snapshot(service: &ProjectService) -> Result<SurfaceMeshSnapshot>;
+
+        /// 只读资产激活（073 首个 FSM 消费者）：按稳定 ImportRecord ID
+        /// 异步读取并解析已提交 STL；结果只在会话仍有效时发布。
+        fn project_service_begin_asset_activation(
+            service: &mut ProjectService,
+            import_id: &str,
+        ) -> Result<ActivationAttempt>;
+        fn project_service_cancel_asset_activation(
+            service: &mut ProjectService,
+            attempt: u64,
+        ) -> bool;
+        fn project_service_drain_asset_activations(
+            service: &mut ProjectService,
+        ) -> Vec<ActivationOutcome>;
         fn mesh_validate_tet(data: TetMeshData) -> TetMeshValidation;
 
         /// 崩溃信号处理器安装（任务 047，panta_foundation::crash 的 FFI 面）：
@@ -672,6 +714,25 @@ fn mesh_validate_tet(data: bridge::TetMeshData) -> bridge::TetMeshValidation {
     }
 }
 
+/// SurfaceMesh → 扁平坐标缓冲；分配失败以稳定文本错误返回。
+fn mesh_coordinates(mesh: &panta_mesh::SurfaceMesh) -> Result<Vec<f64>, String> {
+    let mut coordinates = Vec::new();
+    let values = mesh
+        .triangles
+        .len()
+        .checked_mul(9)
+        .ok_or("mesh snapshot coordinate count overflow")?;
+    coordinates
+        .try_reserve_exact(values)
+        .map_err(|error| format!("mesh snapshot allocation failed: {error}"))?;
+    for triangle in &mesh.triangles {
+        for point in triangle {
+            coordinates.extend_from_slice(point);
+        }
+    }
+    Ok(coordinates)
+}
+
 fn project_service_mesh_snapshot(
     service: &ProjectService,
 ) -> Result<bridge::SurfaceMeshSnapshot, String> {
@@ -679,26 +740,86 @@ fn project_service_mesh_snapshot(
         .service
         .current()
         .map_err(|error| error.to_string())?;
-    let mut coordinates = Vec::new();
-    if let Some(mesh) = service.service.current_mesh() {
-        let values = mesh
-            .triangles
-            .len()
-            .checked_mul(9)
-            .ok_or("mesh snapshot coordinate count overflow")?;
-        coordinates
-            .try_reserve_exact(values)
-            .map_err(|error| format!("mesh snapshot allocation failed: {error}"))?;
-        for triangle in &mesh.triangles {
-            for point in triangle {
-                coordinates.extend_from_slice(point);
-            }
-        }
-    }
+    let coordinates = match service.service.current_mesh() {
+        Some(mesh) => mesh_coordinates(mesh)?,
+        None => Vec::new(),
+    };
     Ok(bridge::SurfaceMeshSnapshot {
         coordinates,
         revision: snapshot.revision,
     })
+}
+
+fn project_service_begin_asset_activation(
+    service: &mut ProjectService,
+    import_id: &str,
+) -> Result<bridge::ActivationAttempt, String> {
+    service
+        .service
+        .begin_asset_activation(import_id)
+        .map(|attempt| bridge::ActivationAttempt {
+            attempt: attempt.attempt,
+            generation: attempt.generation,
+        })
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_cancel_asset_activation(service: &mut ProjectService, attempt: u64) -> bool {
+    service.service.cancel_asset_activation(attempt)
+}
+
+fn project_service_drain_asset_activations(
+    service: &mut ProjectService,
+) -> Vec<bridge::ActivationOutcome> {
+    service
+        .service
+        .drain_asset_activations()
+        .into_iter()
+        .map(|outcome| {
+            // 坐标跨越所有权边界时才转换；分配失败把本次结果降级为带稳定
+            // 错误码的 Failed，不发布无负载的假成功。
+            let (kind, code, detail, coordinates) = match outcome.mesh {
+                Some(mesh) => match mesh_coordinates(&mesh) {
+                    Ok(coordinates) => (
+                        bridge::ActivationOutcomeKind::Succeeded,
+                        outcome.code,
+                        outcome.detail,
+                        coordinates,
+                    ),
+                    Err(detail) => (
+                        bridge::ActivationOutcomeKind::Failed,
+                        "project.mesh_allocation_failed".to_owned(),
+                        detail,
+                        Vec::new(),
+                    ),
+                },
+                None => (
+                    activation_kind(outcome.kind),
+                    outcome.code,
+                    outcome.detail,
+                    Vec::new(),
+                ),
+            };
+            bridge::ActivationOutcome {
+                attempt: outcome.attempt,
+                generation: outcome.generation,
+                import_id: outcome.import_id,
+                kind,
+                code,
+                detail,
+                coordinates,
+            }
+        })
+        .collect()
+}
+
+fn activation_kind(kind: panta_core::project::OutcomeKind) -> bridge::ActivationOutcomeKind {
+    match kind {
+        panta_core::project::OutcomeKind::Succeeded => bridge::ActivationOutcomeKind::Succeeded,
+        panta_core::project::OutcomeKind::Failed => bridge::ActivationOutcomeKind::Failed,
+        panta_core::project::OutcomeKind::Cancelled => bridge::ActivationOutcomeKind::Cancelled,
+        panta_core::project::OutcomeKind::Expired => bridge::ActivationOutcomeKind::Expired,
+    }
 }
 
 fn project_snapshot(snapshot: panta_core::project::ProjectSnapshot) -> bridge::ProjectSnapshot {
@@ -1188,6 +1309,81 @@ mod tests {
     }
 
     #[test]
+    fn project_activation_bridge_admits_cancels_and_drains_outcomes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!("panta-ffi-act-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+        let source = root.join("part.stl");
+        let original = b"solid part
+vertex 0 0 0
+vertex 1 0 0
+vertex 0 2 0
+endsolid
+";
+        fs::write(&source, original)?;
+
+        let mut service = project_service_new();
+        let created =
+            project_service_create(&mut service, root.display().to_string(), "Demo".to_owned())?;
+        crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".to_owned(),
+            "millimeters".to_owned(),
+            false,
+        )?;
+
+        // 未知记录在提交边界同步拒绝；未知 attempt 取消返回 false。
+        let missing = match crate::project_service_begin_asset_activation(&mut service, "import-99")
+        {
+            Ok(attempt) => panic!("unknown record admitted as attempt {}", attempt.attempt),
+            Err(error) => error,
+        };
+        assert!(missing.contains("project.import_record_missing"));
+        assert!(!crate::project_service_cancel_asset_activation(
+            &mut service,
+            u64::MAX
+        ));
+
+        let attempt = crate::project_service_begin_asset_activation(&mut service, "import-1")?;
+        assert!(attempt.attempt > 0);
+        assert!(crate::project_service_cancel_asset_activation(
+            &mut service,
+            attempt.attempt
+        ));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let outcome = loop {
+            let drained = crate::project_service_drain_asset_activations(&mut service);
+            if let Some(outcome) = drained.into_iter().next() {
+                break outcome;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "activation outcome did not arrive in time"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(outcome.attempt, attempt.attempt);
+        assert_eq!(outcome.generation, attempt.generation);
+        assert_eq!(outcome.import_id, "import-1");
+        assert!(
+            outcome.kind == bridge::ActivationOutcomeKind::Succeeded
+                || outcome.kind == bridge::ActivationOutcomeKind::Cancelled,
+            "小文件激活终态只可能是成功（先完成）或取消（先命中检查点）"
+        );
+        if outcome.kind == bridge::ActivationOutcomeKind::Succeeded {
+            // 单三角形：9 个 f64 坐标必须完整过桥。
+            assert_eq!(outcome.coordinates.len(), 9);
+        } else {
+            assert!(outcome.coordinates.is_empty(), "取消不得携带坐标负载");
+        }
+        let _ = created;
+        fs::remove_dir_all(&root)?;
+        Ok(())
+    }
+
+    #[test]
     fn project_stl_bridge_preserves_preview_commit_and_snapshot_state()
     -> Result<(), Box<dyn std::error::Error>> {
         let root = std::env::temp_dir().join(format!("panta-ffi-stl-{}", std::process::id()));
@@ -1267,9 +1463,11 @@ mod tests {
 
         let mut reopened = project_service_new();
         project_service_open(&mut reopened, created.path)?;
+        // 打开工程只读清单；已保存网格必须经只读激活按需恢复（073/080），
+        // 这里验证修订投影不变且坐标为空（未激活）。
         let restored = crate::project_service_mesh_snapshot(&reopened)?;
         assert_eq!(restored.revision, snapshot.revision);
-        assert_eq!(restored.coordinates, snapshot.coordinates);
+        assert!(restored.coordinates.is_empty());
 
         let step_source = root.join("part.step");
         fs::write(&step_source, b"not a supported STL source")?;

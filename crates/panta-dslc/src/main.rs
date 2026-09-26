@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
 
-use panta_dsl_core::{Kind, emit_ts, format_source, parse};
+use panta_dsl_core::{Kind, SourceKind, emit_ts, format_source, fsm, parse, source_kind};
 
 fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
@@ -24,13 +24,16 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
         "check" | "validate" => {
             let input = required_path(&arguments, 1)?;
             let source = read_source(input)?;
-            parse(&source).map(|_| ())?;
+            validate_source(&source)?;
             Ok(())
         }
         "emit-ts" => {
             let input = required_path(&arguments, 1)?;
             let output = required_path(&arguments, 2)?;
             let source = read_source(input)?;
+            if source_kind(&source) == Some(SourceKind::Fsm) {
+                return Err("emit-ts requires kind: language".into());
+            }
             let document = parse(&source)?;
             if document.kind != Kind::Language {
                 return Err("emit-ts requires kind: language".into());
@@ -48,7 +51,10 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
             let input_index = usize::from(check) + 1;
             let input = required_path(&arguments, input_index)?;
             let source = read_source(input)?;
-            let formatted = format_source(&source)?;
+            let formatted = match source_kind(&source) {
+                Some(SourceKind::Fsm) => fsm::format_source(&source)?,
+                _ => format_source(&source)?,
+            };
             if check {
                 if formatted == source {
                     Ok(())
@@ -63,6 +69,15 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => Err(usage().into()),
     }
+}
+
+/// `check` 按头部 kind 行分流：fsm 走独立 schema，其余共用主 parser。
+fn validate_source(source: &str) -> Result<(), Box<dyn std::error::Error>> {
+    match source_kind(source) {
+        Some(SourceKind::Fsm) => fsm::parse(source).map(|_| ())?,
+        _ => parse(source).map(|_| ())?,
+    }
+    Ok(())
 }
 
 fn required_path(arguments: &[String], index: usize) -> Result<&Path, String> {
@@ -97,7 +112,7 @@ fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), Box<dyn std::err
 }
 
 fn usage() -> String {
-    "usage: panta-dslc check <input.pa> | emit-ts <input.pa> <output.ts> [locale] | format [--check] <input.pa>".to_owned()
+    "usage: panta-dslc check <input.pa> | emit-ts <input.pa> <output.ts> [locale] | format [--check] <input.pa>; kind: fsm is accepted by check/format".to_owned()
 }
 
 #[cfg(test)]
@@ -114,6 +129,9 @@ mod tests {
     const LANGUAGE_CANONICAL: &str = "version: 1\nkind: language\nlanguage: zh-CN\nsourcelanguage: en\n\n[App]\ntitle:\n  src: Hi\n  tr: Hi\n";
     const LANGUAGE_NEEDS_FORMAT: &str = "version: 1\nkind: language\nlanguage: cn\nsourcelanguage: en\n\n[App]\ntitle:\n  src: Hi\n  tr: Hi";
     const VARIABLES: &str = "version: 1\nkind: variables\n\nvalues:\n  spacing-small: real = 8\n";
+    // canonical 形态由 formatter 产出：字段序 from/on/to/guard。
+    const FSM_CANONICAL: &str = "version: 1\nkind: fsm\nname: demo-fsm\ninitial: Idle\n\nstates:\n  Idle: active\n  Done: terminal\ntransitions:\n  go:\n    from: Idle\n    on: advance\n    to: Done\n";
+    const FSM_NEEDS_FORMAT: &str = "version: 1\nkind: fsm\nname: demo-fsm\ninitial: Idle\n\nstates:\n  Idle: active\n  Done: terminal\ntransitions:\n  go:\n    to: Done\n    from: Idle\n    on: advance\n";
 
     /// 隔离临时目录：测试结束整体清理，避免触碰仓库工作区。
     struct TempDir {
@@ -178,6 +196,72 @@ mod tests {
                 Err(ref error) if error.to_string().contains("pa.")
             ),
             "坏字典必须带诊断失败"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn check_accepts_fsm_documents_and_reports_fsm_diagnostics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("check-fsm")?;
+        let input = dir.write("fsm.pa", FSM_CANONICAL)?;
+        run(vec!["check".to_owned(), input.display().to_string()])?;
+        run(vec!["validate".to_owned(), input.display().to_string()])?;
+
+        let broken = dir.write(
+            "fsm-broken.pa",
+            "version: 1\nkind: fsm\nname: broken\ninitial: A\n\nstates:\n  A: active\n  B: terminal\n\ntransitions:\n  go:\n    from: A\n    on: advance\n    to: Nowhere\n",
+        )?;
+        assert!(
+            matches!(
+                run(vec!["check".to_owned(), broken.display().to_string()]),
+                Err(ref error) if error.to_string().contains("pa.fsm_unknown_state")
+            ),
+            "坏 fsm 必须带 fsm 诊断"
+        );
+
+        // emit-ts 明确拒绝 fsm。
+        assert!(
+            matches!(
+                run(vec![
+                    "emit-ts".to_owned(),
+                    input.display().to_string(),
+                    dir.path.join("out.ts").display().to_string(),
+                ]),
+                Err(ref error) if error.to_string() == "emit-ts requires kind: language"
+            ),
+            "fsm 文档不得生成 TS"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn format_normalizes_fsm_field_order() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = TempDir::new("format-fsm")?;
+        let dirty = dir.write("fsm-dirty.pa", FSM_NEEDS_FORMAT)?;
+        run(vec!["format".to_owned(), dirty.display().to_string()])?;
+        assert_eq!(dir.read("fsm-dirty.pa")?, FSM_CANONICAL);
+
+        let clean = dir.write("fsm-clean.pa", FSM_CANONICAL)?;
+        run(vec!["format".to_owned(), clean.display().to_string()])?;
+        assert_eq!(dir.read("fsm-clean.pa")?, FSM_CANONICAL);
+
+        let check_clean = vec![
+            "format".to_owned(),
+            "--check".to_owned(),
+            clean.display().to_string(),
+        ];
+        run(check_clean)?;
+        assert!(
+            matches!(
+                run(vec![
+                    "format".to_owned(),
+                    "--check".to_owned(),
+                    dir.write("fsm-dirty2.pa", FSM_NEEDS_FORMAT)?.display().to_string(),
+                ]),
+                Err(ref error) if error.to_string().contains("requires formatting")
+            ),
+            "--check 对脏 fsm 必须非零"
         );
         Ok(())
     }

@@ -275,7 +275,8 @@ fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn st
     let mut reopened = ProjectService::new();
     reopened.open(&project_path)?;
     assert_eq!(reopened.imports()?, vec![record]);
-    assert_eq!(reopened.current_mesh(), service.current_mesh());
+    // 打开只读清单；已保存资产由只读激活按需恢复（见 activation.rs）。
+    assert!(reopened.current_mesh().is_none());
     Ok(())
 }
 
@@ -313,7 +314,7 @@ fn changed_preview_requires_review_and_failed_import_preserves_mesh()
     assert_eq!(service.current_mesh().cloned(), committed);
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
-    assert_eq!(reopened.current_mesh().cloned(), committed);
+    assert!(reopened.current_mesh().is_none());
 
     let second = fixture.root.join("second.stl");
     fs::write(&second, b"vertex 0 0 0\nvertex 3 0 0\nvertex 0 4 0\n")?;
@@ -337,7 +338,7 @@ fn changed_preview_requires_review_and_failed_import_preserves_mesh()
             .is_file()
     );
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
-    assert_eq!(reopened.current_mesh(), service.current_mesh());
+    assert!(reopened.current_mesh().is_none());
     Ok(())
 }
 

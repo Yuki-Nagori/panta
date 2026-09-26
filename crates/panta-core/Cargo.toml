@@ -13,9 +13,16 @@ serde_json.workspace = true
 panta-mesh.workspace = true
 panta-import.workspace = true
 
+[build-dependencies]
+panta-dsl-core.workspace = true
+
 [lints]
 workspace = true
 
 [[test]]
 name = "project"
 path = "../../tests/rust/project.rs"
+
+[[test]]
+name = "activation"
+path = "../../tests/rust/activation.rs"

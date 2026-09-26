@@ -57,8 +57,8 @@ Rust library 是唯一 parser/validator；C++/QML 不复制 grammar，也不把 
 
 V1 只支持声明式 `.pa` 数据和由编译器生成的 Qt TS 载荷，不提供 eval、脚本、import、网络、shell、字节码或任意 XML 注入。需要新 kind 时先增加 schema、诊断和夹具，再扩展 parser；不在公共 parser 里加入业务字段猜测或隐式兼容分支。
 
-## Flow 编译期扩展（规划）
+## FSM 编译期扩展
 
-`kind: flow` 的方案与实施门槛见 [Flow 与 Rust 状态机](flow-state-machines.md) 和 [073](../task/073-flow-dsl-and-import-state-machine.md)。当前 parser / CLI 尚不支持该 kind；它不是运行期 Artifact 快照或 Qt TS/QM 输入，而是由领域 crate 的 build.rs 调用本公共内核，生成 `OUT_DIR` 中的 Rust 状态、事件种类、guard 与转移元数据。
+`kind: fsm` 的方案与实施门槛见 [FSM 与 Rust 状态机](fsm.md) 和 [073](../task/073-fsm-dsl-and-import-state-machine.md)。已由 073 实施：`panta-dsl-core::fsm` 提供独立 schema / 校验 / 格式化 / 确定性生成，`panta-dslc check / format` 按头部 kind 分发；它不是运行期 Artifact 快照或 Qt TS/QM 输入，而是由领域 crate 的 build.rs 调用本公共内核，生成 `OUT_DIR` 中的 Rust 状态、事件种类、guard 与转移元数据（首个消费者为 panta-core 的 `fsm/open-saved-stl.pa`）。
 
-Flow 沿用 `.pa` 的冒号语法、诊断和 formatter，不在 `panta-import` 另建 parser。领域 Rust 实现 guard、payload、动作及失败处理，公共 DSL 内核不依赖领域 crate。导入准备归 import，工程提交与任务生命周期归 core；运行期不解释 Flow 文本，不从 `.pa` 生成业务副作用。
+FSM 沿用 `.pa` 的冒号语法、诊断和 formatter，不在 `panta-import` 另建 parser。领域 Rust 实现 guard、payload、动作及失败处理，公共 DSL 内核不依赖领域 crate。导入准备归 import，工程提交与任务生命周期归 core；运行期不解释 FSM 文本，不从 `.pa` 生成业务副作用。

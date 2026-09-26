@@ -13,7 +13,41 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
-struct PaParser;
+pub(crate) struct PaParser;
+
+pub mod fsm;
+
+/// 头部 `kind` 行判定的文档入口；`fsm` 由 [`fsm`] 模块解析。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceKind {
+    Language,
+    Theme,
+    Variables,
+    Fsm,
+}
+
+/// 扫描头部块（首个空行之前）的 `kind:` 行；无法判定时返回 `None`。
+pub fn source_kind(source: &str) -> Option<SourceKind> {
+    for line in source.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            break;
+        }
+        if trimmed.starts_with("//") {
+            continue;
+        }
+        if let Some(value) = trimmed.strip_prefix("kind:") {
+            return match value.trim() {
+                "language" => Some(SourceKind::Language),
+                "theme" => Some(SourceKind::Theme),
+                "variables" => Some(SourceKind::Variables),
+                "fsm" => Some(SourceKind::Fsm),
+                _ => None,
+            };
+        }
+    }
+    None
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -1325,7 +1359,7 @@ fn pest_diagnostic(error: PestError<Rule>, source: &str) -> Diagnostics {
     };
     Diagnostics::one("pa.syntax", error.to_string(), offset, source)
 }
-fn push_diagnostic(
+pub(crate) fn push_diagnostic(
     diagnostics: &mut Vec<Diagnostic>,
     code: &str,
     message: impl Into<String>,
@@ -1341,7 +1375,7 @@ fn push_diagnostic(
         column,
     });
 }
-fn source_position(source: &str, offset: usize) -> (usize, usize) {
+pub(crate) fn source_position(source: &str, offset: usize) -> (usize, usize) {
     let clamped = offset.min(source.len());
     let before = &source[..clamped];
     let line = before.bytes().filter(|byte| *byte == b'\n').count() + 1;

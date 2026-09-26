@@ -137,24 +137,95 @@ pub fn detect_format(path: &Path) -> Result<ImportFormat, ImportError> {
 }
 
 pub fn read_source(path: &Path) -> Result<SourceSnapshot, ImportError> {
-    if !path.is_absolute() || !path.is_file() {
-        return Err(ImportError::Missing(path.display().to_string()));
+    // 永不取消的同步入口：Cancelled 分支按构造不可达。
+    match read_source_checked(path, || false) {
+        Ok(snapshot) => Ok(snapshot),
+        Err(CheckedReadError::Failed(error)) => Err(error),
+        Err(CheckedReadError::Cancelled(_)) => {
+            unreachable!("a read that never checks cancellation cannot be cancelled")
+        }
     }
-    let format = detect_format(path)?;
+}
+
+/// 异步激活（073）使用的可取消读取错误：取消与读失败分开表达，
+/// 不混入共享的 [`ImportError`]。
+#[derive(Debug)]
+pub enum CheckedReadError {
+    Cancelled(String),
+    Failed(ImportError),
+}
+
+impl Display for CheckedReadError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for CheckedReadError {}
+
+/// 每个读取块（256 KiB）后查询一次取消检查点。
+const READ_CHUNK_BYTES: usize = 256 * 1024;
+
+/// 与 [`read_source`] 相同的读取契约，但分块执行并在每个检查点查询
+/// `is_cancelled`；取消与 I/O 失败分别返回，供异步激活流程在安全点停止。
+pub fn read_source_checked(
+    path: &Path,
+    is_cancelled: impl Fn() -> bool,
+) -> Result<SourceSnapshot, CheckedReadError> {
+    let read_failed = |error: std::io::Error| {
+        CheckedReadError::Failed(ImportError::Read(format!("{}: {error}", path.display())))
+    };
+    if !path.is_absolute() || !path.is_file() {
+        return Err(CheckedReadError::Failed(ImportError::Missing(
+            path.display().to_string(),
+        )));
+    }
+    let format = detect_format(path).map_err(CheckedReadError::Failed)?;
     let source_name = path
         .file_name()
         .and_then(|value| value.to_str())
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| ImportError::UnsupportedFormat(path.display().to_string()))?
+        .ok_or_else(|| {
+            CheckedReadError::Failed(ImportError::UnsupportedFormat(path.display().to_string()))
+        })?
         .to_owned();
-    let bytes = fs::read(path)
-        .map_err(|error| ImportError::Read(format!("{}: {error}", path.display())))?;
+    let mut file = fs::File::open(path).map_err(read_failed)?;
+    let expected = file.metadata().map_err(read_failed)?.len();
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(usize::try_from(expected).unwrap_or(usize::MAX))
+        .map_err(|error| {
+            CheckedReadError::Failed(ImportError::Read(format!(
+                "{}: allocation failed: {error}",
+                path.display()
+            )))
+        })?;
+    let mut chunk = vec![0u8; READ_CHUNK_BYTES];
+    loop {
+        if is_cancelled() {
+            return Err(CheckedReadError::Cancelled(path.display().to_string()));
+        }
+        let read = std::io::Read::read(&mut file, &mut chunk).map_err(read_failed)?;
+        if read == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&chunk[..read]);
+    }
     Ok(SourceSnapshot {
         path: path.to_path_buf(),
         source_name,
         format,
         bytes,
     })
+}
+
+/// 已提交工程资产的解析入口：STL 解析 + 记录单位换算到毫米。
+/// 与 [`read_source_checked`] 组合构成 073 只读激活的加载阶段；
+/// 解析本身不可中断，过期快照由调用方在完成边界释放。
+pub fn parse_stl_asset(snapshot: &SourceSnapshot, units: &str) -> Result<SurfaceMesh, ImportError> {
+    let mut mesh = parse_stl_snapshot(snapshot)?;
+    scale_mesh_mm(&mut mesh, LengthUnit::parse(units)?)?;
+    Ok(mesh)
 }
 
 /// 唯一的 STL 解析入口；几何格式尚无 native backend 时不得走此函数。
@@ -257,13 +328,6 @@ impl StlImportSession {
             mesh,
         })
     }
-}
-
-pub fn load_stl_asset(path: &Path, units: &str) -> Result<SurfaceMesh, ImportError> {
-    let input = read_source(path)?;
-    let mut mesh = parse_stl_snapshot(&input)?;
-    scale_mesh_mm(&mut mesh, LengthUnit::parse(units)?)?;
-    Ok(mesh)
 }
 
 fn scale_mesh_mm(mesh: &mut SurfaceMesh, units: LengthUnit) -> Result<(), ImportError> {
@@ -459,10 +523,11 @@ mod tests {
         let fixture = Fixture::new()?;
         let source = fixture.root.join("part.stl");
         fs::write(&source, b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n")?;
-        let mesh = load_stl_asset(&source, "centimeters")?;
+        let snapshot = read_source(&source)?;
+        let mesh = parse_stl_asset(&snapshot, "centimeters")?;
         assert_eq!(mesh.summary().dimensions, [20.0, 30.0, 0.0]);
         assert!(matches!(
-            load_stl_asset(&source, "yards"),
+            parse_stl_asset(&snapshot, "yards"),
             Err(ImportError::UnsupportedUnits(units)) if units == "yards"
         ));
 
@@ -473,9 +538,39 @@ mod tests {
                 f64::MAX / 2.0
             ),
         )?;
+        let scaled_snapshot = read_source(&source)?;
         assert!(matches!(
-            load_stl_asset(&source, "inches"),
+            parse_stl_asset(&scaled_snapshot, "inches"),
             Err(ImportError::CoordinateOverflow)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn checked_read_supports_cancellation_checkpoints() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = Fixture::new()?;
+        let source = fixture.root.join("part.stl");
+        let payload = b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n";
+        fs::write(&source, payload)?;
+        let snapshot = read_source_checked(&source, || false).map_err(|error| error.to_string())?;
+        assert_eq!(snapshot.bytes.len(), payload.len());
+
+        assert!(matches!(
+            read_source_checked(&source, || true),
+            Err(CheckedReadError::Cancelled(_))
+        ));
+        // 不存在的文件以 Failed(Missing) 表达，不冒充取消。
+        assert!(matches!(
+            read_source_checked(&fixture.root.join("absent.stl"), || false),
+            Err(CheckedReadError::Failed(ImportError::Missing(_)))
+        ));
+        // 未登记扩展名在读取前即拒绝（与 read_source 同一契约）；
+        // .step 能通过格式识别，拒绝发生在解析层，不属读取边界。
+        let unknown = fixture.root.join("part.obj");
+        fs::write(&unknown, b"anything")?;
+        assert!(matches!(
+            read_source_checked(&unknown, || false),
+            Err(CheckedReadError::Failed(ImportError::UnsupportedFormat(_)))
         ));
         Ok(())
     }
