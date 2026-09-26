@@ -94,7 +94,7 @@ Item {
     Flickable {
         id: scroller
         anchors.fill: parent
-        contentWidth: 2 * Theme.spacingXSmall + bar.documents.length * (Theme.documentTabWidth + Theme.spacingXSmall)
+        contentWidth: 2 * Theme.spacingTiny + bar.documents.length * (Theme.documentTabWidth + Theme.spacingTiny)
         clip: false
         interactive: contentWidth > width && !bar.dragging
         boundsBehavior: Flickable.StopAtBounds
