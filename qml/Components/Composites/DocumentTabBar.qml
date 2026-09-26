@@ -285,10 +285,12 @@ Item {
                     radius: 5
                     color: closeArea.containsMouse ? Theme.colorHover : "transparent"
 
-                    ThemedLabel {
+                    // 关闭图形复用全局 pane-close SVG，矢量居中不依赖字体。
+                    ThemedIcon {
                         anchors.centerIn: parent
-                        text: "×"
-                        textSize: 12
+                        name: "pane-close"
+                        iconSize: 12
+                        color: closeArea.containsMouse ? Theme.colorText : Theme.colorTextMuted
                     }
                     MouseArea {
                         id: closeArea
