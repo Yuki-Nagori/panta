@@ -63,11 +63,13 @@ Item {
     onOrderChanged: {
         for (let i = 0; i < tabRepeater.count; ++i) {
             const item = tabRepeater.itemAt(i);
-            if (!item || item.isDragged) {
+            // itemAt 返回 QQuickItem*，qmllint 无法解析 Repeater 委托的
+            // 动态属性（isDragged / documentId / visualOffset 运行时存在）。
+            if (!item || item.isDragged) { // qmllint disable missing-property
                 continue;
             }
-            const target = slot_x(slot_of(item.documentId));
-            item.visualOffset = item.x - target;
+            const target = slot_x(slot_of(item.documentId)); // qmllint disable missing-property
+            item.visualOffset = item.x - target; // qmllint disable missing-property
         }
     }
 
@@ -124,18 +126,17 @@ Item {
                 }
                 // 拖拽中页签脱离槽位跟随指针；其余页签绑定槽位 + 位移差。
                 y: 2
-                x: isDragged ? bar.dragX
-                             : bar.slot_x(bar.slot_of(documentId)) + visualOffset
+                x: isDragged ? bar.dragX : bar.slot_x(bar.slot_of(documentId)) + visualOffset
 
                 width: Theme.documentTabWidth
                 height: Theme.documentTabBarHeight - 2 - 3
                 // 拖拽或让位 / 归位动画期间保持置顶，避免沉入邻页签下方。
-                z: tab.isDragged || Math.abs(visualOffset) > 0.5 ? 2
-                                                                 : tab.isActive ? 1 : 0
+                z: tab.isDragged || Math.abs(visualOffset) > 0.5 ? 2 : tab.isActive ? 1 : 0
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: Theme.documentTabRadius
+                    topLeftRadius: Theme.documentTabRadius
+                    topRightRadius: Theme.documentTabRadius
                     color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : "transparent"
                 }
                 // 左右凹弧连接件：QML 无伪元素与 box-shadow，用 Shape
@@ -386,9 +387,9 @@ Item {
         // 松手归位：给被拖委托写入「松手位置 − 新槽位」的位移差，由
         // Behavior 平滑归零（reducedMotion 时直接就位）。
         for (let i = 0; i < tabRepeater.count; ++i) {
-            const item = tabRepeater.itemAt(i);
-            if (item !== null && item.documentId === releasedId) {
-                item.visualOffset = releaseX - slot_x(to);
+            const item = tabRepeater.itemAt(i); // qmllint disable missing-property
+            if (item !== null && item.documentId === releasedId) { // qmllint disable missing-property
+                item.visualOffset = releaseX - slot_x(to); // qmllint disable missing-property
                 break;
             }
         }
