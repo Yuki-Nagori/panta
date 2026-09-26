@@ -12,7 +12,13 @@
 
 #if defined(Q_OS_WIN)
 #include <vtkWin32HardwareWindow.h>
-#include <windows.h>
+// windef/winuser 是 HWND、SetWindowPos 等符号的 granular provider；伞头
+// windows.h 不能删除：它按 winnt → winbase → winuser 次序装配的宏与类型
+// 前提无法被拆分头重提供，单独删除后 granular 头直接编译失败（PSLIST_
+// HEADER 等）。保留伞头是登记例外，见 standards/comments.md。
+#include <windef.h>
+#include <windows.h> // NOLINT(misc-include-cleaner)
+#include <winuser.h>
 #elif defined(Q_OS_LINUX)
 #include <algorithm>
 #include <cstdint>

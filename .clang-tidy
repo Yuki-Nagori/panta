@@ -16,4 +16,8 @@ CheckOptions:
   # - Qt 框架头：QtGlobal 转发 qglobal 系聚合头；QTRY_* 依赖 qtest.h 宏内部。
   # - netgen 契约头：mystdlib.h 提供 `using namespace std`（ngarray/table 等
   #   遗留头的硬前提），其作用不可被追踪，禁止清理器删除或告警。
+  # 注意：IgnoreHeaders 会同时剥夺被豁免头的 provider 语义（其符号会被
+  # 误报为"无头直接提供"），只适用于符号本就无需 granular 追踪的聚合头。
+  # Windows SDK 伞头 windows.h 不走此表：它必须继续作为 provider，改在
+  # 包含行 NOLINT 并注明理由（见 standards/comments.md 例外条款）。
   misc-include-cleaner.IgnoreHeaders: 'QtGlobal;qglobal\.h;qtypes\.h;qminmax\.h;qnumeric\.h;qstringliteral\.h;qtest\.h;mystdlib\.h'

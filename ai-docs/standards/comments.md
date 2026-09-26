@@ -31,6 +31,10 @@ Python docstring 是对象定义中的首个字符串语句；PEP 257 区分摘�
   `using namespace std`）必须登记进 `.clang-tidy` 的
   `misc-include-cleaner.IgnoreHeaders`，禁止用 NOLINT 或 clang-format off
   在单个文件里长期规避。
+- 例外：IgnoreHeaders 会同时剥夺被豁免头的 provider 语义。对符号无法
+  granular 重提供的伞头（Windows SDK 的 `windows.h`，granular 拆分缺
+  winnt 链直接编译失败），在包含行用 `// NOLINT(misc-include-cleaner)`
+  并在上方注明不可拆分原因；该行是登记例外，不代表允许其他头照搬。
 
 ```cpp
 /// 将候选网格发布到当前工程。
