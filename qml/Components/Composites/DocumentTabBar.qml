@@ -28,7 +28,6 @@ Item {
     // 本地预览顺序：拖拽期间只改它并让邻居动画让位，松手一次性提交
     // moveDocument，避免模型重建打断手势。非拖拽时与 documents 同步。
     property var order: []
-    property var itemRegistry: ({})
     property string draggedId: ""
     // 拖拽中页签的 x（bar 坐标）；槽位绑定它实现指针跟随。
     property real dragX: 0
@@ -37,7 +36,6 @@ Item {
         if (dragging) {
             // 拖拽中模型被外部改变（工程切换等）：放弃手势并回同步。
             draggedId = "";
-            dragSurface.enabled = false;
         }
         sync_order();
     }
@@ -78,19 +76,6 @@ Item {
         color: "#ffffff"
     }
 
-    // 拖拽捕获面：覆盖整条标签带，仅在拖拽启动后启用；普通点击仍由
-    // 页签自身 MouseArea 完成目标判定。
-    MouseArea {
-        id: dragSurface
-        anchors.fill: parent
-        enabled: false
-        cursorShape: Qt.ClosedHandCursor
-        // 捕获面与 bar 同域，mouse.x 即 bar 坐标。
-        onPositionChanged: mouse => bar.drag_move(mouse.x)
-        onReleased: bar.finish_drag()
-        onCanceled: bar.finish_drag()
-    }
-
     Flickable {
         id: scroller
         anchors.fill: parent
@@ -112,12 +97,6 @@ Item {
                 readonly property string tabState: doc.state ?? "ready"
                 readonly property bool isActive: documentId === bar.activeDocumentId
                 readonly property bool isDragged: documentId === bar.draggedId
-                Component.onCompleted: bar.itemRegistry[documentId] = this
-                // 关闭中间页签时 Repeater 按索引收缩，幸存委托的
-                // documentId 会变化，映射必须同步刷新。
-                onDocumentIdChanged: if (documentId !== "")
-                    bar.itemRegistry[documentId] = this
-                Component.onDestruction: delete bar.itemRegistry[documentId]
                 // 拖拽中页签脱离槽位跟随指针；其余页签绑定槽位并动画让位。
                 y: 2
                 x: isDragged ? bar.dragX : bar.slot_x(bar.slot_of(documentId))
@@ -166,8 +145,22 @@ Item {
                     hoverEnabled: true
                     cursorShape: bar.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                     acceptedButtons: Qt.LeftButton
-                    onPressed: mouse => bar.begin_press(tab.documentId, mouse.x, mouse.y)
-                    onPositionChanged: mouse => bar.detect_drag(tab.documentId, mouse)
+                    onPressed: mouse => {
+                        const p = bar.mapFromItem(tab, mouse.x, mouse.y);
+                        bar.begin_press(tab.documentId, p.x, p.y);
+                    }
+                    // 按下期间 MouseArea 隐式抓取指针，移出边界仍持续收到
+                    // 移动；坐标换算到 bar 域后驱动阈值判定与拖拽跟随。
+                    onPositionChanged: mouse => {
+                        const p = bar.mapFromItem(tab, mouse.x, mouse.y);
+                        if (!bar.dragging) {
+                            bar.detect_drag(tab.documentId, p.x, p.y);
+                        } else {
+                            bar.drag_move(p.x);
+                        }
+                    }
+                    onReleased: bar.finish_drag()
+                    onCanceled: bar.finish_drag()
                     onClicked: mouse => {
                         if (!internal.suppressClick) {
                             bar.activateDocument(tab.documentId);
@@ -265,12 +258,12 @@ Item {
         internal.pressY = y;
         internal.suppressClick = false;
     }
-    function detect_drag(documentId, mouse) {
+    function detect_drag(documentId, pointerBarX, pressBarY) {
         if (internal.pressedId !== documentId || bar.dragging) {
             return;
         }
-        const dx = mouse.x - internal.pressX;
-        const dy = mouse.y - internal.pressY;
+        const dx = pointerBarX - internal.pressX;
+        const dy = pressBarY - internal.pressY;
         if (Math.max(Math.abs(dx), Math.abs(dy)) < Theme.documentTabDragThreshold) {
             return;
         }
@@ -278,16 +271,14 @@ Item {
             internal.pressedId = "";
             return;
         }
-        // 拖拽启动：非活动就绪页签立即激活；捕获面接管后续移动，
-        // 抑制回到起点时的误点击。
+        // 拖拽启动：非活动就绪页签立即激活；grabOffset 记录指针相对槽位
+        // 起点的偏移，使页签全程跟随指针不跳变；suppressClick 抑制松手
+        // 回到起点时的误点击。
         internal.suppressClick = true;
         bar.activateDocument(documentId);
         bar.draggedId = documentId;
-        const item = tab_item_at(bar.slot_of(documentId));
-        internal.grabOffset = item ? bar.mapFromItem(item, mouse.x, mouse.y).x : 0;
-        bar.dragX = bar.mapFromItem(item, 0, 0).x;
-        dragSurface.enabled = true;
-        dragSurface.grabMouse(); // qmllint disable missing-property
+        internal.grabOffset = pointerBarX - slot_x(slot_of(documentId));
+        bar.dragX = pointerBarX;
     }
     function drag_move(pointerX) {
         if (!bar.dragging) {
@@ -321,10 +312,5 @@ Item {
         if (from >= 0 && to >= 0 && from !== to) {
             moveDocument(from, to);
         }
-    }
-    // 委托注册表：documentId → 条目引用；qmllint 无法内联解析
-    // Repeater.itemAt 的动态委托类型，注册表同时避免 O(n) 查找。
-    function tab_item_at(documentId) {
-        return itemRegistry[documentId] ?? null;
     }
 }
