@@ -5,7 +5,7 @@
 - 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（WebGPU 硬件窗口制品已登记）
 - 优先级：P0
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-20
+- 创建 / 更新：2026-09-16 / 2026-09-28
 
 ## 前置条件已解除与历史阻塞
 
@@ -59,7 +59,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 
 ## 验收标准
 
-- [ ] 通过 cargo run 显示空视口与默认测试球体，VTK WebGPU 渲染错误不会静默表现为“已成功”。
+- [ ] 通过 `cargo run` 显示默认 Welcome 场景，并能呈现无模型的空视口状态；VTK WebGPU 渲染错误不会静默表现为“已成功”。
 - [ ] resize、高 DPI、隐藏/恢复和关闭/重开可用，记录平台与图形后端。
 - [ ] VTK 对象没有从 GUI/worker 任意修改，所用平台 WebGPU/hardware-window API 已对照 release 核实。
 - [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
@@ -95,6 +95,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 2026-09-20：确认锁定的 VTK 9.7.0 不含上游后续版本的 `GUISupportQtWebGPU`；当前继续使用硬件窗口桥接，SDK 升级再评估官方集成路线。
 - 待验收：实际窗口下 resize、高 DPI、隐藏恢复、关闭重开、输入协调和资源释放；自动化 CTest 不替代这些图形验收。
 - 2026-09-26：Windows 真实窗口交互验收发现并修复 interactor 选型缺陷；生命周期自动化验收通过 resize、最小化/恢复、隐藏/显示、关闭/重开与优雅退出（高 DPI 变更留待手动验收）。资源释放存在一项 VTK 内部缺陷已定位待源码级排查（见验证表），输入协调已随 065/007 验收完成。
+- 2026-09-28：任务 053 将默认测试球体替换为 Welcome 场景；本任务验收同步改为检查当前默认内容和无模型空视口，仍需完成真实窗口及图形生命周期验收。
 
 ## 完成摘要
 
