@@ -218,6 +218,64 @@ TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
     EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
 }
 
+TEST(ProjectViewModelTest, ReorderingAndClosingDocumentsPreservesActiveMeshSelection) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 1 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n"),
+              0);
+    source.close();
+
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+
+    view_model.activateDocument(QStringLiteral("import-1"));
+    const auto first_mesh = view_model.mesh_snapshot();
+    ASSERT_NE(first_mesh, nullptr);
+    view_model.activateDocument(QStringLiteral("import-2"));
+    const auto second_mesh = view_model.mesh_snapshot();
+    ASSERT_NE(second_mesh, nullptr);
+    ASSERT_NE(first_mesh.get(), second_mesh.get());
+
+    // 拖拽改变显示顺序时，活动身份及视口快照仍按稳定 ID 保持。
+    view_model.moveDocument(2, 0);
+    const auto reordered = view_model.openDocuments();
+    ASSERT_EQ(reordered.size(), 3);
+    EXPECT_EQ(reordered[0].toMap()[QStringLiteral("id")].toString(), QStringLiteral("import-2"));
+    EXPECT_EQ(reordered[1].toMap()[QStringLiteral("id")].toString(), QStringLiteral("welcome"));
+    EXPECT_EQ(reordered[2].toMap()[QStringLiteral("id")].toString(), QStringLiteral("import-1"));
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-2"));
+    EXPECT_EQ(view_model.mesh_snapshot().get(), second_mesh.get());
+
+    // 关闭非活动页签不改变场景；关闭活动页签优先激活右邻就绪文档。
+    view_model.closeDocument(QStringLiteral("welcome"));
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-2"));
+    EXPECT_EQ(view_model.mesh_snapshot().get(), second_mesh.get());
+    view_model.closeDocument(QStringLiteral("import-2"));
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
+    EXPECT_EQ(view_model.mesh_snapshot().get(), first_mesh.get());
+
+    view_model.closeDocument(QStringLiteral("import-1"));
+    EXPECT_TRUE(view_model.activeDocumentId().isEmpty());
+    EXPECT_TRUE(view_model.openDocuments().isEmpty());
+    EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
+}
+
 TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());

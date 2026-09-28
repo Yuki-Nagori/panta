@@ -595,6 +595,17 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(accessibleTab != nullptr);
         QCOMPARE(accessibleTab->role(), QAccessible::PageTab);
         QCOMPARE(accessibleTab->text(QAccessible::Name), QStringLiteral("sample.stl, import 1"));
+        QAccessibleInterface* accessibleSecondTab =
+            QAccessible::queryAccessibleInterface(secondTab);
+        QVERIFY(accessibleSecondTab != nullptr);
+        QCOMPARE(accessibleTab->state().selected, true);
+        QCOMPARE(accessibleSecondTab->state().selected, false);
+        bar->setProperty("activeDocumentId", QStringLiteral("import-2"));
+        QTRY_VERIFY(!accessibleTab->state().selected);
+        QTRY_VERIFY(accessibleSecondTab->state().selected);
+        bar->setProperty("activeDocumentId", QStringLiteral("import-1"));
+        QTRY_VERIFY(accessibleTab->state().selected);
+        QTRY_VERIFY(!accessibleSecondTab->state().selected);
 
         QSignalSpy activated(bar, SIGNAL(activateDocument(QString)));
         QCOMPARE(firstTab->property("activeFocusOnTab").toBool(), true);

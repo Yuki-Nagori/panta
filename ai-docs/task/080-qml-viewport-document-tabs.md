@@ -80,7 +80,7 @@
 
 - [x] 每次进入工程工作区时只有活动 `Welcome` 页签并显示现有默认 `panta` 3D 场景；打开新项目不继承旧工程活动文件页签。Welcome 和 STL 页签都有关闭按钮，旧 `Model / Mesh / Results` 视口类别条不再出现。
 - [x] 新导入成功后自动出现并激活一个 STL 页签；工程树点击同一稳定 ImportRecord ID 不会重复创建标签，点击未打开记录时先创建 Loading 页签，异步加载成功后激活。
-- [ ] 已打开页签之间切换时，单一 ViewModel 活动文档 ID、选中页签和 CaeViewport 场景始终对应；关闭非活动标签不改变当前视口，关闭活动标签按定义选择相邻页签；关闭全部标签后视口及标签栏为空白。
+- [x] 已打开页签之间切换时，ViewModel 活动文档 ID、PageTab 选中态与 CaeViewport 共用的数据源一致；关闭非活动标签不改变当前活动快照，关闭活动标签优先选右邻就绪页签；关闭全部标签后活动 ID、快照与页签模型为空。
 - [x] 同名 STL 页签显示序号以区分标签，并将完整来源名和序号作为 Qt PageTab 无障碍名称；就绪页签可用 Enter / Space 激活。
 - [x] 灰色标签带底边存在一条连续白色细线；活动标签上沿圆角完整，左右下角圆弧对称接入白线，交界无凸点、露底或错位；关闭图标视觉居中，hover / active 背景圆角为 5px，标签选中和各交互态无颜色分裂。
 - [ ] 页签可通过水平拖拽重排；拖动非活动标签时立即将其激活；拖动标签保持不透明、持续跟随指针且只沿 X 轴位移，跨越多个相邻标签期间拖拽不被中断，相邻标签平滑让位，松开后拖动标签动画归位；尊重减少动态效果偏好；垂直手势不触发重排，拖动关闭按钮不开始重排；重排后标签与其文档 ID、活动态及视口内容保持一致。
@@ -127,6 +127,7 @@
 | 2026-09-28 | `cargo test --locked --workspace` | 验证页签焦点导航、滚动可见、键盘激活及关闭操作 | 通过：CTest 63/63。QML 回归覆盖 PageTabList / PageTab / 关闭 Button 名称与角色、左右箭头导航并将目标滚入视区、Enter 和 Space 激活、Space 关闭；真窗口读屏验收仍待完成。 |
 | 2026-09-28 | `cargo lint` | 检查页签键盘交互、focus 与 accessibility QML | 完整 8 阶段通过，含 qmllint、clang-tidy、include-cleaner 与 cppcheck。 |
 | 2026-09-28 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check`；临时 `PantaPreview.app` 与 CUA AX 检查 | 验证新增 `DocumentTabBar` 翻译上下文可编译到 QM，并检查真窗口无障碍树 | build、format、差异检查通过；Cargo 聚合通过，CTest 63/63；lint 完整 8 阶段通过。QM 测试按 `DocumentTabBar + source` 命中新增中英文条目；AX 树暴露 PageTabList、Welcome PageTab 和 Close Welcome Button。真窗口截图捕获报 `SCStreamError -3811`，键盘焦点停在全局搜索框，焦点视觉与系统读屏操作仍未确认；临时 app 已关闭并清理。 |
+| 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 验证重排、切换、关闭时活动文档、辅助技术选中态和视口快照保持一致 | 通过：CTest 64/64。新增 ViewModel 回归重排稳定文档 ID 后活动 ID 和网格快照不变，关闭非活动页签不改快照，关闭活动页签转到右邻就绪文档，全部关闭后状态为空；QML 回归确认 `Accessible.selected` 随活动文档 ID 切换。format 与差异检查通过，lint 完整 8 阶段通过。 |
 
 ## 风险与回退
 
@@ -156,7 +157,8 @@
 - 2026-09-28：完善标签栏键盘交互和关闭控件可访问语义；左右键改变焦点并自动滚动到可视范围，Enter / Space 激活就绪页签，关闭按钮响应 Space 和辅助技术 press action。Cargo 聚合 CTest 63/63；真窗口读屏与焦点验收待完成。
 - 2026-09-28：页签键盘与可访问性改动通过完整 `cargo lint` 8 阶段检查。
 - 2026-09-28：在 `panta-en.pa` 与 `panta-cn.pa` 补充 `DocumentTabBar` 的页签名称、关闭、重复来源名和加载状态条目；扩展 QM 加载测试按 `DocumentTabBar + source` 验证中英文目录。Cargo 聚合 CTest 63/63，构建刷新后的 `panta_zh_CN.ts` 含对应上下文与译文。真窗口 AX 树已见 PageTabList / PageTab / 关闭按钮，但系统截图服务报错且键盘焦点未能进入页签，相关人工验收继续保持未完成。
+- 2026-09-28：新增 ViewModel 文档重排/关闭行为测试和 QML PageTab 选中态测试；重排后活动 ID 与快照稳定，关闭非活动标签不变，关闭活动标签选右邻就绪标签，切换活动 ID 同步更新 accessible selected。Cargo 聚合 CTest 64/64、format 和 lint 八阶段通过。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 快照释放、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。任务继续保持 `in-progress`：真实窗口读屏/焦点验收、VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、系统 reduced-motion 平台接线及后续性能证据仍未闭环；本地修改尚未 push，因此没有对应远端 CI 结果。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。任务继续保持 `in-progress`：真实窗口读屏/焦点验收、VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、系统 reduced-motion 平台接线及后续性能证据仍未闭环；本地新提交尚未 push，因此没有对应远端 CI 结果。
