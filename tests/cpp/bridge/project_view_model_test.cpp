@@ -14,6 +14,7 @@
 #include <QtTest/qtest.h>
 #include <array>
 #include <gtest/gtest.h>
+#include <memory>
 #include <qtestcase.h>
 
 using panta::bridge::ProjectViewModel;
@@ -277,6 +278,59 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     reopened.openImportRecord(QStringLiteral("import-1"));
     QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
+}
+
+TEST(ProjectViewModelTest, ClosedDocumentsReleaseTheirMeshSnapshotsAfterRepeatedSwitching) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 1 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n"),
+              0);
+    source.close();
+
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+    const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> first_snapshot =
+        view_model.mesh_snapshot();
+    ASSERT_FALSE(first_snapshot.expired());
+
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+    const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> second_snapshot =
+        view_model.mesh_snapshot();
+    ASSERT_FALSE(second_snapshot.expired());
+
+    for (int round = 0; round < 32; ++round) {
+        view_model.activateDocument(QStringLiteral("import-1"));
+        ASSERT_NE(view_model.mesh_snapshot(), nullptr);
+        view_model.activateDocument(QStringLiteral("import-2"));
+        ASSERT_NE(view_model.mesh_snapshot(), nullptr);
+    }
+    EXPECT_FALSE(first_snapshot.expired());
+    EXPECT_FALSE(second_snapshot.expired());
+
+    view_model.closeDocument(QStringLiteral("import-1"));
+    EXPECT_TRUE(first_snapshot.expired());
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-2"));
+    EXPECT_NE(view_model.mesh_snapshot(), nullptr);
+
+    view_model.closeDocument(QStringLiteral("import-2"));
+    EXPECT_TRUE(second_snapshot.expired());
+    EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("welcome"));
+    EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
 }
 
 TEST(ProjectViewModelTest, ClosingLastTabFlipsPlaceholderVisibility) {

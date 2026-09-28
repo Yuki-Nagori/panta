@@ -88,7 +88,8 @@
 - [x] 文件标签关闭只释放本次运行期视图数据，不删 ImportRecord / 资产、不设工程 dirty、不推进 revision；关闭 / 切换工程后所有旧 session 的页签、快照与结果失效。
 - [x] 工程树 STL 的选中底色与对应 Part/Study Tasks 标题易辨认；树层级、任务行图标与文字对齐清楚，相关块的分隔、字号和密度与新文档页签一致。
 - [x] 加载失败、取消、同记录重复请求、项目代次切换、旧 attempt 迟到成功 / 失败都有确定行为；旧结果不能覆盖当前视口或泄漏 mesh / VTK 资源。
-- [ ] 任意时刻最多一个 `CaeViewport`、一个 render window 和一套活动 VTK actor/mapper；关闭/切换重复循环后无旧 actor、回调、snapshot 或设备资源残留。
+- [x] 页签之间共用唯一的 `CaeViewport` 与 VTK render window；ViewModel 只保留仍打开的导入文档快照，重复切换不丢失已打开快照，关闭页签释放其独占快照。
+- [ ] 在真实 VTK 窗口重复切换与关闭页签后，确认没有旧 actor/mapper、回调、snapshot 或设备资源残留。
 - [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；记录内存高水位与切换/重载延迟，达到约定预算时行为明确，不发生无界增长。
 - [ ] QML 键盘 / 焦点 / 可访问名称可用；适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
 - [ ] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
@@ -120,6 +121,8 @@
 | 2026-09-28 | `cargo test --locked --workspace` | 验证同名来源的标签区分、PageTab 无障碍信息及键盘激活 | 通过：CTest 62/62。新增 QML 回归检查两个同名导入页签显示不同序号、Qt accessibility interface 暴露 PageTab 和完整名称、Enter 激活就绪页签；Space 使用相同处理分支。 |
 | 2026-09-28 | `cargo format --check` | 检查同名标签回归及 QML 行为修改的格式 | 通过。 |
 | 2026-09-28 | `cargo lint` | 静态检查本次 QML 与 C++ 回归 | 首轮 clang-tidy 因两个测试 API 缺少直接头文件失败；补齐 Qt accessibility 与键盘测试头文件后，完整 8 阶段通过，包括 qmllint、clang-tidy、include-cleaner 和 cppcheck。 |
+| 2026-09-28 | `cargo test --locked --workspace` | 验证打开文档快照跨切换保留并在关闭后释放 | 通过：CTest 63/63。新增 ProjectViewModel 回归在两个已就绪页签间重复切换 32 次，再分别关闭非活动和活动页签；弱引用确认关闭后独占 `SurfaceMeshSnapshot` 已释放。 |
+| 2026-09-28 | `cargo lint` | 静态检查快照释放生命周期回归 | 完整 8 阶段通过，包含 clang-tidy、include-cleaner 与 cppcheck。 |
 
 ## 风险与回退
 
@@ -145,7 +148,8 @@
 - 2026-09-28：将 `ThemeComponentTest` 的页签动画位置断言改为等待目标位置进入 0.1px 容差，删除固定 200ms sleep；完整 Cargo 聚合、ASan/UBSan、TSan、format 和 lint 本机通过。TSan 与 Miri 的平台边界和排除范围保留在当前 042 runner 契约中。
 - 2026-09-28：同名 STL 页签在显示标题前加当前同名页签序号，并通过 PageTab accessibility name 暴露完整来源名与序号；就绪页签响应 Enter / Space 与辅助技术 press action。新增 QML 回归确认可见消歧、无障碍角色/名称及 Enter 激活，Cargo 聚合通过。
 - 2026-09-28：补齐无障碍 QML 测试需要的 Qt 头文件后，`cargo lint` 完整 8 阶段通过，包含 clang-tidy、include-cleaner 和 cppcheck。
+- 2026-09-28：新增 ViewModel 快照所有权回归，验证两个就绪文档反复切换 32 次后仍保留各自快照，关闭页签后其独占 `SurfaceMeshSnapshot` 释放；Cargo 聚合 CTest 63/63。真实 VTK 窗口中的 actor/mapper 与设备资源循环释放仍需验收。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧，并支持就绪标签的 Enter / Space 激活。任务继续保持 `in-progress`：重复切换资源释放、代表性 STL 内存高水位/重载延迟、完整键盘焦点导航、系统 reduced-motion 接线及后续性能证据仍未闭环；本次本地修改尚未 push，因此没有对应远端 CI 结果。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧，并支持就绪标签的 Enter / Space 激活；ViewModel 快照在切换时保留、关闭时释放已有回归覆盖。任务继续保持 `in-progress`：真实 VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、完整键盘焦点导航、系统 reduced-motion 平台接线及后续性能证据仍未闭环；本地修改尚未 push，因此没有对应远端 CI 结果。
