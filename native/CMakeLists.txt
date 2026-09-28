@@ -15,6 +15,9 @@ option(PANTA_USE_SYSTEM_TOOLS "Use explicitly selected host tools instead of Car
 set(PANTA_LLVM_VERSION
     ""
     CACHE STRING "Expected managed LLVM version")
+if(APPLE AND PANTA_ENABLE_BRIDGE_MODULE)
+  enable_language(OBJCXX)
+endif()
 
 include(cmake/build-policy.cmake)
 
@@ -50,6 +53,11 @@ set(_panta_qt_components
     Svg)
 if(BUILD_TESTING)
   list(APPEND _panta_qt_components Test)
+endif()
+if(UNIX
+   AND NOT APPLE
+   AND PANTA_ENABLE_BRIDGE_MODULE)
+  list(APPEND _panta_qt_components DBus)
 endif()
 find_package(Qt6 6.11 REQUIRED COMPONENTS ${_panta_qt_components} PATHS "${QT_STAGING}"
                                           NO_DEFAULT_PATH)
@@ -107,6 +115,7 @@ endif()
 # VTK 原生视口核心（任务 007）：bridge 经 Panta.Bridge 注册 CaeViewport；
 # 诊断构建（AppNoBridge）不带 VTK。
 if(PANTA_ENABLE_BRIDGE_MODULE)
+  add_subdirectory(qt-adapter)
   add_subdirectory(visualization)
   add_subdirectory(bridge)
 endif()

@@ -4,6 +4,7 @@
 //! schema 1 清单契约，完整工程资产模型和撤销/重做仍按后续任务接入。
 
 mod fsm;
+pub mod language;
 pub mod path;
 pub mod project;
 pub mod task;

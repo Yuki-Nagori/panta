@@ -5,11 +5,11 @@
 - 依赖：[080](080-qml-viewport-document-tabs.md)、[086](086-qt-platform-adapter.md)、[002](002-dependency-baseline.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-09-28 / 2026-09-28
+- 创建 / 更新：2026-09-28 / 2026-09-29
 
 ## 目标与背景
 
-当前 Qt 基线没有统一的减少动态效果属性，因此 080 在 `native/qt-adapter` 读取 macOS、Windows 与 Linux 平台偏好，并向 QML 暴露稳定的 `SystemPreferences.reducedMotion`。维护者指出 Qt 6.12 提供 `QStyleHints::motionPreference`。在仓库 Qt 基线升级到包含该 API 的版本时，切换到 Qt 原生属性，避免继续维护平台专属查询和通知。
+当前 Qt 基线没有统一的减少动态效果属性，因此 `native/qt-adapter` 读取 macOS、Windows 与 Linux 平台偏好，由 Bridge `Settings.reducedMotion` 向 QML 暴露稳定属性。维护者指出 Qt 6.12 提供 `QStyleHints::motionPreference`。在仓库 Qt 基线升级到包含该 API 的版本时，切换到 Qt 原生属性，避免继续维护平台专属查询和通知。
 
 API 名称、引入版本、取值语义、变更通知以及三平台实际支持范围均须在开始实施时重新核对 Qt 官方文档和当前工具链；本任务不要求提前升级 Qt，也不把 Qt 6.12 视作当前基线。
 
@@ -24,7 +24,7 @@ API 名称、引入版本、取值语义、变更通知以及三平台实际支�
 包含：
 
 - 在 Qt 基线升级且该版本正式提供可用的 `motionPreference` 后，将 `native/qt-adapter` 的 reduced-motion 读取和变化通知改为 `QGuiApplication::styleHints()` 原生 API。
-- 保持 QML 可见的 `SystemPreferences.reducedMotion` 行为与绑定稳定；将 Qt 的偏好枚举明确映射到现有布尔语义。
+- 保持 QML 可见的 `Settings.reducedMotion` 行为与绑定稳定；将 Qt 的偏好枚举明确映射到现有布尔语义。
 - 删除被替代的平台专属查询、监听、源文件、框架/组件依赖和只服务这些实现的构建分支。
 - 更新 080、分层文档和本任务中的实现及验证记录。
 

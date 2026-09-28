@@ -7,13 +7,13 @@
 #include <QFileInfo>
 #include <QLatin1Char>
 #include <QObject>
-#include <QStandardPaths>
 #include <QString>
 #include <QUrl>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qtmetamacros.h>
 #include <cstddef>
 #include <memory>
+#include <panta/qt_adapter/standard_paths.hpp>
 #include <qlogging.h>
 #include <rust/cxx.h>
 #include <string>
@@ -26,7 +26,8 @@ namespace {
 constexpr auto kWelcomeDocumentId = "welcome";
 
 QString default_project_location() {
-    const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString documents =
+        panta::qt_adapter::standard_location(panta::qt_adapter::StandardLocation::Documents);
     return documents.isEmpty() ? QString{} : QDir(documents).filePath(QStringLiteral("panta"));
 }
 

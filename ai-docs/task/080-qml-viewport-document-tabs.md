@@ -1,6 +1,6 @@
 # 080 — 视口文档页签与 STL 按需激活
 
-- 状态：blocked
+- 状态：in-progress
 - 阶段：应用平台扩展
 - 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[086](086-qt-platform-adapter.md)
 - 优先级：P1
@@ -131,6 +131,7 @@
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`git diff HEAD --check` | 稳定拖拽换序后的动画终态断言 | 通过：CTest 64/64；将残留的固定 200ms 等待和精确浮点比较改为等待目标 x 坐标进入 0.1px 容差。format 与差异检查通过。 |
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`git diff HEAD --check` | 验证页签固定宽度、长标题省略和键盘导航后的可见范围 | 通过：CTest 64/64；QML 回归确认 tab 宽 130px、来源长标题已截断但完整文本仍进入无障碍名称，左右键将末尾 tab 的主体滚入可视区。首末活动页签圆弧在裁切边界处的像素检查仍待补。 |
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 检查首末活动页签滚动到边缘时的圆弧与白线像素 | 通过：CTest 64/64、format、lint 完整 8 阶段及差异检查通过；首个活动页签左下连接像素保持面板白色，末个活动页签滚到最右端时保留完整 8px 圆弧连接范围，圆弧外恢复标签带灰色，底部白线连续。 |
+| 2026-09-29 | macOS arm64，`cargo format`；`cargo build --locked` | 适配层完成后，根 QML 的 reduced-motion 绑定通过格式和构建 | 通过。`Settings` QML 类型可用，`Settings.reducedMotion` 编译接入 `ViewportPane`；真实窗口动画效果仍待验收。 |
 
 ## 风险与回退
 
@@ -164,9 +165,9 @@
 - 2026-09-28：拖拽换序动画断言移除固定 200ms 等待和精确浮点比较，改为等待 0.1px 容差；Cargo 聚合 CTest 64/64、format 和差异检查通过。
 - 2026-09-28：补页签宽度、长标题省略和末尾标签键盘滚动可见回归；完整来源仍保留在 PageTab/关闭按钮无障碍名称中。Cargo 聚合 CTest 64/64、format 和差异检查通过；圆弧贴近裁切边界仍需专项像素验收。
 - 2026-09-28：页签末端滚动范围增加 8px 圆弧余量，并新增首尾活动页签连接处的像素回归；Cargo 聚合 CTest 64/64、format 与 lint 完整 8 阶段通过，固定宽度、长标题、省略、2px 首项位置及边缘圆弧布局验收完成。
-- 2026-09-28：Qt 6.11 的 `QStyleHints` / `QAccessibilityHints` 未提供 reduced-motion 属性；采用平台适配：macOS `NSWorkspace.accessibilityDisplayShouldReduceMotion` 与选项变更通知，Windows `SPI_GETCLIENTAREAANIMATION` 与 `WM_SETTINGCHANGE`，Linux XDG Desktop Portal Settings v2 的 `org.freedesktop.appearance/reduced-motion` 与 `SettingChanged`。值未知或接口不可用时按无减少动态效果偏好处理，由 `SystemPreferences.reducedMotion` 明确注入视口页签。
-- 2026-09-29：按维护者要求先建立独立 Qt 平台服务适配层，再继续页签动画接线。系统平台查询及标准目录发现由 086 收拢；086 完成后恢复本任务。
+- 2026-09-28：Qt 6.11 的 `QStyleHints` / `QAccessibilityHints` 未提供 reduced-motion 属性；采用平台适配：macOS `NSWorkspace.accessibilityDisplayShouldReduceMotion` 与选项变更通知，Windows `SPI_GETCLIENTAREAANIMATION` 与 `WM_SETTINGCHANGE`，Linux XDG Desktop Portal Settings v2 的 `org.freedesktop.appearance/reduced-motion` 与 `SettingChanged`。值未知或接口不可用时按无减少动态效果偏好处理，由 Bridge `Settings.reducedMotion` 注入视口页签。
+- 2026-09-29：按维护者要求先建立独立 Qt 平台服务适配层，再继续页签动画接线。系统平台查询及标准目录发现由 086 收拢；086 已完成。根 QML 现使用 `Settings` 并将 `Settings.reducedMotion` 注入 ViewportPane 的页签动画。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。任务当前 blocked，解除条件为 086 完成并提供 Qt adapter API；之后继续真实窗口读屏/焦点验收、VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、系统 reduced-motion QML 接线及后续性能证据。当前本地提交尚未 push，因此没有对应远端 CI 结果。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API，任务恢复 in-progress；剩余真实窗口读屏/焦点验收、VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、reduced-motion 动画效果验收及后续性能证据。远端 CI 尚未覆盖此次本地改动。

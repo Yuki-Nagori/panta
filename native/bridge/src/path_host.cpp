@@ -5,7 +5,6 @@
 #include <QByteArray>
 #include <QDir>
 #include <QLatin1String>
-#include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QUrl>
 #include <QtCore/qnamespace.h>
@@ -13,6 +12,7 @@
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <panta/qt_adapter/standard_paths.hpp>
 #include <string>
 #include <vector>
 
@@ -20,20 +20,24 @@ namespace panta::bridge {
 
 std::unique_ptr<PathHost> PathHost::create(QString* error) {
     struct Location {
-        QStandardPaths::StandardLocation location;
+        panta::qt_adapter::StandardLocation location;
         panta::ffi::PathRootKind kind;
         const char* label;
     };
     const Location locations[] = {
-        {QStandardPaths::AppConfigLocation, panta::ffi::PathRootKind::UserConfig, "user-config"},
-        {QStandardPaths::AppDataLocation, panta::ffi::PathRootKind::AppData, "app-data"},
-        {QStandardPaths::CacheLocation, panta::ffi::PathRootKind::Cache, "cache"},
-        {QStandardPaths::TempLocation, panta::ffi::PathRootKind::Session, "session"},
+        {panta::qt_adapter::StandardLocation::UserConfig, panta::ffi::PathRootKind::UserConfig,
+         "user-config"},
+        {panta::qt_adapter::StandardLocation::AppData, panta::ffi::PathRootKind::AppData,
+         "app-data"},
+        {panta::qt_adapter::StandardLocation::Cache, panta::ffi::PathRootKind::Cache, "cache"},
+        {panta::qt_adapter::StandardLocation::Session, panta::ffi::PathRootKind::Session,
+         "session"},
     };
     std::vector<StandardRoot> roots;
     roots.reserve(std::size(locations));
     for (const auto& entry : locations) {
-        roots.push_back(StandardRoot{entry.kind, QStandardPaths::writableLocation(entry.location),
+        roots.push_back(StandardRoot{entry.kind,
+                                     panta::qt_adapter::standard_location(entry.location),
                                      QLatin1String(entry.label)});
     }
     return createWithStandardRoots(roots, error);

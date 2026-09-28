@@ -1,6 +1,6 @@
-/// 跨平台路径宿主适配（任务 023）：Qt 侧负责标准目录发现与注入、
-/// QString↔可往返 UTF-8 转换和 file URL 单次解码；工程引用规则与
-/// 包含检查全部在 Rust panta-core，边界不复制规则。
+/// 跨平台路径宿主适配（任务 023）：Qt adapter 负责标准目录发现，
+/// 本类型负责根类别映射与注入、QString↔可往返 UTF-8 转换和 file URL
+/// 单次解码。工程引用规则与包含检查全部在 Rust panta-core，边界不复制规则。
 ///
 /// 契约（modules/paths-and-runtime.md）：
 /// - 根类别由宿主显式注入，解析结果恒为绝对路径、与 cwd 无关；

@@ -10,9 +10,9 @@ QML/C++ 使用 context + ID 或 source 查找；`.pa` 保存条目 ID、English 
 
 ## 数据流与生命周期
 
-语言设置 → C++ 语言服务加载 `.pa` 编译得到的 QM → 安装 `QTranslator` → 刷新 QML 翻译绑定与 C++ 展示属性。运行时只查 QM，不解析 `.pa` 或 TS XML。使用 [QQmlEngine::retranslate](https://doc.qt.io/qt-6/qqmlengine.html#retranslate) 更新翻译绑定；C++ 缓存的字符串还需明确 NOTIFY/重新计算，不假定自动更新。语言切换无需销毁引擎或依赖热重载。
+语言设置 → Rust locale service 校验并暂存选择 → Bridge `Settings` 按构建命名规则找到 QM，Qt adapter 安装 `QTranslator` → Rust 提交当前 locale → Bridge 调用 [QQmlEngine::retranslate](https://doc.qt.io/qt-6/qqmlengine.html#retranslate) 更新翻译绑定。运行时只查 QM，不解析 `.pa` 或 TS XML。C++ 缓存的字符串还需明确 NOTIFY/重新计算，不假定自动更新。语言切换无需销毁引擎或依赖热重载。Rust 不接触 QTranslator、Qt 事件循环或 QM resource URL；QML 不直接操作 translator 或维护 locale 支持列表。
 
-未设置语言时使用英文；明确支持的区域语言按“完整 locale → 基础语言 → 英文”解析。缺少条目回退英文；用户主动选择的字典若损坏或加载失败，保留上一有效语言并显示错误。切换成功后才保存偏好。数字、日期显示可使用 locale；文件存储、DSL 数字字面量和协议编码保持语言无关。
+未设置语言时使用英文；显式语言选择只接受 Rust locale 注册表中的规范标识，未知标识拒绝且保留当前值。QM 中缺少单项译文时回退 English source；用户主动选择的字典若损坏或加载失败，保留上一有效语言并显示错误。切换成功后才保存偏好。若未来增加系统 locale 自动识别，其“完整 locale → 基础语言 → 英文”降级规则归 Rust 定义。数字、日期显示可使用 locale；文件存储、DSL 数字字面量和协议编码保持语言无关。
 
 服务错误保存稳定 code 与参数，展示层负责翻译，不以译文作为分支条件；现有错误字符串在 022 中梳理，未来跨语言服务按 008 的结构化错误契约接入。用户输入的名称、文件名及外部工具原始诊断不自动翻译。
 
@@ -47,4 +47,4 @@ open-file:
 
 同一 context 的 source-text 兼容查找采用最长 `src` 匹配：`ok ok` 先于 `ok`，重复 source 直接报错；不同且等长的 source 可以共存，因为它们不会同时匹配同一输入。正常 QML/C++ 路径始终用 context + ID 或完整 source 精确查找，避免在任意用户文本中替换短词。
 
-022 验证界面、占位参数、缺项回退、加载失败和语言偏好；完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。
+022 验证展示文案、占位参数、缺项回退、运行时加载失败与重翻译；语言偏好界面和持久化由 087/048 验收。完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。

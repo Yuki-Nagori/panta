@@ -210,6 +210,22 @@ pub mod bridge {
         fn task_service_recent_logs(service: &TaskService) -> Vec<TaskLogLine>;
         fn task_service_running(service: &TaskService) -> u32;
 
+        /// locale 标识和当前语言属于应用领域状态。C++ 先校验、安装 Qt
+        /// 字典，再提交当前 locale。
+        type LanguageService;
+
+        fn language_service_new() -> Box<LanguageService>;
+        fn language_service_supported_locales() -> Vec<String>;
+        fn language_service_current(service: &LanguageService) -> String;
+        fn language_service_validate(
+            service: &LanguageService,
+            candidate: String,
+        ) -> Result<String>;
+        fn language_service_commit(
+            service: &mut LanguageService,
+            candidate: String,
+        ) -> Result<String>;
+
         fn process(request: &FfiRequest) -> Result<FfiResponse>;
         fn panic_probe();
 
@@ -441,6 +457,51 @@ fn task_service_recent_logs(service: &TaskService) -> Vec<bridge::TaskLogLine> {
 
 fn task_service_running(service: &TaskService) -> u32 {
     u32::try_from(service.manager.running_tasks()).unwrap_or(u32::MAX)
+}
+
+/// Rust locale 服务的 CXX 封装；边界只传递 locale 字符串值。
+pub struct LanguageService {
+    service: panta_core::language::LanguageService,
+}
+
+fn language_service_new() -> Box<LanguageService> {
+    Box::new(LanguageService {
+        service: panta_core::language::LanguageService::default(),
+    })
+}
+
+fn language_service_supported_locales() -> Vec<String> {
+    panta_core::language::LanguageService::supported_locales()
+        .iter()
+        .map(|locale| (*locale).to_owned())
+        .collect()
+}
+
+fn language_service_current(service: &LanguageService) -> String {
+    service.service.current().as_str().to_owned()
+}
+
+fn language_service_validate(
+    service: &LanguageService,
+    candidate: String,
+) -> Result<String, String> {
+    service
+        .service
+        .validate(&candidate)
+        .map(|locale| locale.as_str().to_owned())
+        .map_err(|error| error.to_string())
+}
+
+fn language_service_commit(
+    service: &mut LanguageService,
+    candidate: String,
+) -> Result<String, String> {
+    let locale = service
+        .service
+        .validate(&candidate)
+        .map_err(|error| error.to_string())?;
+    service.service.commit(locale);
+    Ok(service.service.current().as_str().to_owned())
 }
 
 /// 路径服务的 FFI 包装（任务 023）：只做枚举/DTO 与错误文本映射，

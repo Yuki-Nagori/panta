@@ -23,6 +23,8 @@ qt_add_qml_module(
   SOURCES
   src/shell_view_model.hpp
   src/shell_view_model.cpp
+  src/settings.hpp
+  src/settings.cpp
   src/task_host.hpp
   src/task_host.cpp
   src/path_host.hpp
@@ -37,7 +39,8 @@ target_include_directories(panta_bridge PUBLIC src)
 # 传播到最终链接者（与 native/ffi 测试同规则）。
 target_include_directories(panta_bridge PUBLIC "${PANTA_FFI_INCLUDE_DIR}"
                                                "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
-target_link_libraries(panta_bridge PUBLIC Qt6::Core panta::visualization "${PANTA_FFI_STATIC_LIB}")
+target_link_libraries(panta_bridge PUBLIC Qt6::Core Qt6::Qml panta::visualization panta::qt_adapter
+                                          "${PANTA_FFI_STATIC_LIB}")
 if(UNIX)
   find_package(Threads REQUIRED)
   target_link_libraries(panta_bridge PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
@@ -81,4 +84,10 @@ if(BUILD_TESTING)
                                                                      Qt6::Test)
   gtest_discover_tests(panta_bridge_project_view_model_test DISCOVERY_MODE POST_BUILD
                        DISCOVERY_TIMEOUT 120)
+
+  add_executable(panta_bridge_settings_test ../../tests/cpp/bridge/settings_test.cpp)
+  panta_native_defaults(panta_bridge_settings_test)
+  target_link_libraries(panta_bridge_settings_test PRIVATE panta::bridge panta::i18n GTest::gtest
+                                                           Qt6::Test)
+  gtest_discover_tests(panta_bridge_settings_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
 endif()

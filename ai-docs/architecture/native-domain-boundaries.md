@@ -19,9 +19,9 @@ Rust 已提交的资产 / 显示配置 → CXX → C++ RenderScene / ViewportBac
 
 Rust 管理工程身份、单位、修订、引用、任务与成功提交，C++ 适配器负责实际调用重库、转换输入输出及管理 native 资源。CXX 声明受支持的类型和签名、生成胶水，不决定业务行为。调用流程不等同于 crate 依赖图；领域层通过自有后端接口接收能力，不反向依赖桥接 crate。
 
-Qt 是体量较大的原生 GUI 框架，在这条边界中单独作为**界面与平台运行时**看待，不与 OCCT / Netgen 的几何算法适配角色混为一谈。QML / Qt Quick 继续负责界面组合、布局、输入、动画和即时显示，使用 Qt scene graph、Controls、模型视图等已有的渲染与交互能力；C++ ViewModel / Controller 负责 Qt 对象生命周期、信号属性、模型 / 委托接口、线程亲和性、平台对话框及 QML 与服务 DTO 之间的类型适配。继续使用当前 Qt 基线和其已供给的界面、绘制及平台能力，包括 Qt 已有的高性能场景图和适用的绘图 / 可视化组件；不为语言统一而在 Rust 重写 Qt 的图形、事件循环或工具能力。
+Qt 是体量较大的原生 GUI 框架，在这条边界中单独作为**界面与平台运行时**看待，不与 OCCT / Netgen 的几何算法适配角色混为一谈。QML / Qt Quick 继续负责界面组合、布局、输入、动画和即时显示，使用 Qt scene graph、Controls、模型视图等已有的渲染与交互能力；C++ ViewModel / Controller 负责 Qt 对象生命周期、信号属性、模型 / 委托接口、线程亲和性、平台对话框及 QML 与服务 DTO 之间的类型适配。`native/qt-adapter` 集中标准目录、系统偏好等需要选择 Qt 平台 API 或操作系统 API 的服务，并以稳定值和 Qt 属性交给上层；该 target 不依赖 Rust、Bridge 或 VTK。Qt Quick 与 VTK hardware window 紧耦合的 surface 创建和同步仍由 Visualization 管理，避免把 VTK 窗口所有权抽到通用平台层。继续使用当前 Qt 基线和其已供给的界面、绘制及平台能力，包括 Qt 已有的高性能场景图和适用的绘图 / 可视化组件；不为语言统一而在 Rust 重写 Qt 的图形、事件循环或工具能力。
 
-Qt 边界不改变领域权威归属：工程身份与持久化、导入解析、单位 / 修订 / 引用规则、成功提交和业务任务由 Rust 服务管理；QML 表达展示与用户意图，C++ ViewModel / Controller 只做 Qt 适配并转发粗粒度命令。Rust 服务应按用例返回拥有内存的批量快照 / DTO；C++ 可把 DTO 映射为 Qt 属性或 `QAbstractItemModel` 角色供 QML 使用，但不能让 ViewModel 通过逐行 FFI 查询拼装业务对象，也不能把 Rust 领域状态藏入 QObject 或 QML 作为第二份权威数据。跨过 CXX 边界后，传给 Qt 的数据必须由 C++ 值对象或具有明确共享所有权的不可变快照承载；不能把借用的 Rust 缓冲区直接放进排队信号。跨线程信号参数须满足 Qt queued connection 的类型和生命周期要求，并按 Qt 要求注册元类型；具体 payload 大小时，在对应任务中确定复制、移动或共享快照策略。
+Qt 边界不改变领域权威归属：工程身份与持久化、导入解析、单位 / 修订 / 引用规则、成功提交、业务任务和支持 locale/当前 locale 状态由 Rust 服务管理；QML 表达展示与用户意图，C++ ViewModel / Controller 只做 Qt 适配并转发粗粒度命令。翻译目录和 locale 校验由 Rust 提供；Bridge `Settings` 将已校验 locale 映射到构建资源命名并请求 QML 重翻译，通用 Qt adapter 管理 `QTranslator` 安装/卸载。Rust 不引入 Qt 类型、事件循环或 QM 资源 URL。Rust 服务应按用例返回拥有内存的批量快照 / DTO；C++ 可把 DTO 映射为 Qt 属性或 `QAbstractItemModel` 角色供 QML 使用，但不能让 ViewModel 通过逐行 FFI 查询拼装业务对象，也不能把 Rust 领域状态藏入 QObject 或 QML 作为第二份权威数据。跨过 CXX 边界后，传给 Qt 的数据必须由 C++ 值对象或具有明确共享所有权的不可变快照承载；不能把借用的 Rust 缓冲区直接放进排队信号。跨线程信号参数须满足 Qt queued connection 的类型和生命周期要求，并按 Qt 要求注册元类型；具体 payload 大小时，在对应任务中确定复制、移动或共享快照策略。
 
 鼠标悬停、当前行高亮和即时交互反馈属于 Qt / QML / VTK 显示状态。若用户选择的实体将影响网格操作、边界条件或工程提交，稳定实体 ID、所属修订和引用有效性由 Rust 建模与校验；Qt 保留命中反馈并把完整、粗粒度的选择意图交给服务。选择意图应携带稳定实体 ID 集合、所属修订和选择模式（如替换、追加、移除或清空）；不能只把易变化的行号、显示索引或像素位置当成领域身份。纯显示高亮则无需因此升级为 Rust 领域状态。
 

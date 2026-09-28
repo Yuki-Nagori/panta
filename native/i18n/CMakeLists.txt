@@ -1,7 +1,7 @@
 # i18n 编译模块（任务 034）：消费 Cargo 生成的 TS（PANTA_I18N_TS_DIR，由
 # launcher build.rs 从 resources/i18n/*.pa 生成），用 Qt 供给的锁定 lrelease
 # 编译 QM 并嵌入资源。QM 是唯一运行期翻译输入；TS/QM 均为构建树产物，不入库。
-# 运行时加载与语言切换由 022 接入，此处只负责编译与资源入口（:/i18n/）。
+# 运行时翻译器由 086 接入；022 继续清理和验证 UI 文案与翻译覆盖。
 
 if(NOT DEFINED PANTA_I18N_TS_DIR)
   message(

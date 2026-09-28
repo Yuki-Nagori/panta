@@ -5,11 +5,11 @@
 - 依赖：[005](005-qt-qml-shell.md)（已完成）、[006](006-rust-cpp-boundary.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-17
+- 创建 / 更新：2026-09-16 / 2026-09-29
 
 ## 目标与背景
 
-建立与 cwd 无关的路径服务和逻辑资源引用，为工程搬迁和运行时提供可验证边界。Rust 路径服务、FFI DTO 与 Qt `PathHost` 已落地；任务保持 in-progress，剩余平台验收见下方清单与验证记录。
+建立与 cwd 无关的路径服务和逻辑资源引用，为工程搬迁和运行时提供可验证边界。Rust 路径服务、FFI DTO 与 Qt `PathHost` 已落地；任务 086 将标准目录发现从 Bridge 的直接 `QStandardPaths` 调用迁入 `native/qt-adapter`，不改变本任务的路径语义。任务保持 in-progress，剩余平台验收见下方清单与验证记录。
 
 ## 必读
 
@@ -80,7 +80,7 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 - 2026-09-17：依赖 005、006 均已完成且范围/验收明确，状态调整为 ready。
 - 2026-09-19：确认 macOS 上 `QStandardPaths::setTestModeEnabled(true)` 仍会落到用户 home 下的 `.qttest`，不适合作为受控环境的写入夹具；PathHost 测试统一通过 `createWithStandardRoots` 注入 `QTemporaryDir` 根，不改变生产路径发现和不可写目录拒绝语义。
 - 2026-09-17（实施）：落地分层——`panta-core::path` 定义根类别（project/user-config/app-data/cache/session/qrc）、逻辑资源引用（`scheme:/relative` 结构化，qrc 只读不落本机路径）、Rust 工程引用规则（拒绝空引用/NUL/绝对路径（含 Unix 上伪装成相对组件的 `C:` 盘符）/词法 `..` 越界/Windows 保留名/尾随点或空格组件）与三层解析（`resolve` 纯逻辑、`resolve_existing` 存在性 + canonical 根内包含（拒符号链接/junction 越界）、`resolve_write_target` 以最深现存祖先做包含检查（覆盖未创建目标））；根必须为绝对路径且由宿主显式注入，解析与 cwd 无关（结构保证）。FFI（panta-ffi）新增 `PathService` 句柄与 `PathRef` DTO，跨边界仅传可往返 UTF-8。C++ 侧 `native/bridge` 新增 `PathHost`：QStandardPaths 类别注入（user-config→AppConfigLocation、app-data→AppDataLocation、cache→CacheLocation、session→TempLocation）、QString→UTF-8 往返校验（不可往返即拒绝，非 Unicode 策略落在此处）、file URL 单次解码（QUrl::toLocalFile，qrc/其它 scheme 不当本机路径）。Rust 单测覆盖引用规则矩阵与 unix 符号链接越界；Windows junction 实测由 CI 平台补（本地仅 macOS）。
+- 2026-09-29：任务 086 将 `PathHost` 和 `ProjectViewModel` 的标准目录查询迁至 `panta::qt_adapter::standard_location`；类别映射、UTF-8 边界、根注入及错误语义保持不变。原有 QStandardPaths 行为验证仍适用于该 adapter 转发，平台覆盖缺口按本任务验收清单保留。
 
 ## 完成摘要
-
-未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵/大小写不折叠，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（QStandardPaths 注入映射——同时作为 013 的安装布局接口、注入时缺失目录自动创建 + 写探针验证可写、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 18+9、C++ 10 项，ctest 27/27），Rust 侧随 CI 三平台通过。待补：Windows junction 实测、UNC/C++ 侧三平台记录（PathHost 测试进 CI 归 011）。
+未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵/大小写不折叠，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（标准目录注入映射——同时作为 013 的安装布局接口、注入时缺失目录自动创建 + 写探针验证可写、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 18+9、C++ 10 项，ctest 27/27），Rust 侧随 CI 三平台通过。待补：Windows junction 实测、UNC/C++ 侧三平台记录（PathHost 测试进 CI 归 011）。

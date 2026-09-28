@@ -153,6 +153,7 @@ ApplicationWindow {
                 id: viewportPane
 
                 meshSource: projectModel
+                reducedMotion: Settings.reducedMotion
                 anchors.left: workspaceSplit.right
                 anchors.right: parent.right
                 anchors.top: parent.top

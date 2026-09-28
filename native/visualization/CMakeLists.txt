@@ -5,10 +5,6 @@
 # 模块链接显式最小集，其余依赖经 imported target 传递。
 panta_require_sdk("vtk" _vtk_staging)
 
-if(APPLE)
-  enable_language(OBJCXX)
-endif()
-
 # 先声明 STATIC 库，qt_add_qml_module 才会生成静态 plugin（与 bridge 同型）。
 # qt_add_qml_module 按 URI 自动创建别名 panta::visualization，无需手动。
 add_library(panta_visualization STATIC)

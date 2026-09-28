@@ -48,7 +48,10 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 ## 平台与配置
 
 - `qml/Themes/Theme.qml` 是 QML 唯一视觉 token 门面；`.pa` 的 variables / theme 按“基线 → 覆盖 → 校验 → C++/QML 快照”发布，不由 QML 直接解析。
+- `native/qt-adapter` 集中 Qt 封装的系统服务与操作系统 API（例如标准目录发现、系统偏好）；Bridge/ViewModel 消费稳定的 Qt 值/属性并对接 QML 或 Rust DTO，不直接承载 AppKit、Win32、D-Bus 等平台查询。该 target 不依赖 Rust、Bridge 或 VTK。
+- locale 支持集、校验和当前选择由 Rust 服务拥有；Qt adapter 管理 `QTranslator`，Bridge `Settings` 将 Rust locale 选择与 Qt resource 加载、QML 重翻译协调起来。Rust 不接触 Qt 类型、QML/Qt 事件循环或 QM resource URL；QML 不维护第二份 locale 列表。
 - surface 坐标、窗口尺寸、设备像素以及 Wayland/Win32/Cocoa 对象归 C++ 平台适配层，不搬入主题 token 或 Rust 逐帧路径。
+- Qt Quick 与 VTK hardware window 生命周期紧密耦合的原生 surface 代码归 `native/visualization`，不得为了平台 API 归类而让通用 Qt adapter 反向依赖 VTK。
 - 用户设置由 Rust 定义 schema、默认值和业务校验；C++/Qt adapter 调用 QSettings，QML 与领域 core 不依赖 QSettings。
 - 手写 unsafe 仅在登记的边界模块（当前 `panta-foundation::crash`），逐块说明安全前提；CXX 的 unsafe 声明与生成胶水按 FFI 规则审查，不扩散到业务调用方。
 - External MoldSolver 只经进程协议接入，不链接其 ABI。
