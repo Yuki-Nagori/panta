@@ -1,11 +1,11 @@
 # 080 — 视口文档页签与 STL 按需激活
 
-- 状态：in-progress
+- 状态：blocked
 - 阶段：应用平台扩展
-- 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)
+- 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[086](086-qt-platform-adapter.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-28
+- 创建 / 更新：2026-09-24 / 2026-09-29
 
 ## 目标与背景
 
@@ -164,7 +164,9 @@
 - 2026-09-28：拖拽换序动画断言移除固定 200ms 等待和精确浮点比较，改为等待 0.1px 容差；Cargo 聚合 CTest 64/64、format 和差异检查通过。
 - 2026-09-28：补页签宽度、长标题省略和末尾标签键盘滚动可见回归；完整来源仍保留在 PageTab/关闭按钮无障碍名称中。Cargo 聚合 CTest 64/64、format 和差异检查通过；圆弧贴近裁切边界仍需专项像素验收。
 - 2026-09-28：页签末端滚动范围增加 8px 圆弧余量，并新增首尾活动页签连接处的像素回归；Cargo 聚合 CTest 64/64、format 与 lint 完整 8 阶段通过，固定宽度、长标题、省略、2px 首项位置及边缘圆弧布局验收完成。
+- 2026-09-28：Qt 6.11 的 `QStyleHints` / `QAccessibilityHints` 未提供 reduced-motion 属性；采用平台适配：macOS `NSWorkspace.accessibilityDisplayShouldReduceMotion` 与选项变更通知，Windows `SPI_GETCLIENTAREAANIMATION` 与 `WM_SETTINGCHANGE`，Linux XDG Desktop Portal Settings v2 的 `org.freedesktop.appearance/reduced-motion` 与 `SettingChanged`。值未知或接口不可用时按无减少动态效果偏好处理，由 `SystemPreferences.reducedMotion` 明确注入视口页签。
+- 2026-09-29：按维护者要求先建立独立 Qt 平台服务适配层，再继续页签动画接线。系统平台查询及标准目录发现由 086 收拢；086 完成后恢复本任务。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。任务继续保持 `in-progress`：真实窗口读屏/焦点验收、VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、系统 reduced-motion 平台接线及后续性能证据仍未闭环；本地新提交尚未 push，因此没有对应远端 CI 结果。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。任务当前 blocked，解除条件为 086 完成并提供 Qt adapter API；之后继续真实窗口读屏/焦点验收、VTK/GPU 资源重复释放、代表性 STL 内存高水位/重载延迟、系统 reduced-motion QML 接线及后续性能证据。当前本地提交尚未 push，因此没有对应远端 CI 结果。

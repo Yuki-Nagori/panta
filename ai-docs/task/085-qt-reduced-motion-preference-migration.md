@@ -2,7 +2,7 @@
 
 - 状态：planned
 - 阶段：应用平台扩展
-- 依赖：[080](080-qml-viewport-document-tabs.md)、[002](002-dependency-baseline.md)
+- 依赖：[080](080-qml-viewport-document-tabs.md)、[086](086-qt-platform-adapter.md)、[002](002-dependency-baseline.md)
 - 优先级：P2
 - 负责人：Yuki
 - 创建 / 更新：2026-09-28 / 2026-09-28
