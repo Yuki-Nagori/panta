@@ -129,6 +129,7 @@
 | 2026-09-28 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check`；临时 `PantaPreview.app` 与 CUA AX 检查 | 验证新增 `DocumentTabBar` 翻译上下文可编译到 QM，并检查真窗口无障碍树 | build、format、差异检查通过；Cargo 聚合通过，CTest 63/63；lint 完整 8 阶段通过。QM 测试按 `DocumentTabBar + source` 命中新增中英文条目；AX 树暴露 PageTabList、Welcome PageTab 和 Close Welcome Button。真窗口截图捕获报 `SCStreamError -3811`，键盘焦点停在全局搜索框，焦点视觉与系统读屏操作仍未确认；临时 app 已关闭并清理。 |
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 验证重排、切换、关闭时活动文档、辅助技术选中态和视口快照保持一致 | 通过：CTest 64/64。新增 ViewModel 回归重排稳定文档 ID 后活动 ID 和网格快照不变，关闭非活动页签不改快照，关闭活动页签转到右邻就绪文档，全部关闭后状态为空；QML 回归确认 `Accessible.selected` 随活动文档 ID 切换。format 与差异检查通过，lint 完整 8 阶段通过。 |
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`git diff HEAD --check` | 稳定拖拽换序后的动画终态断言 | 通过：CTest 64/64；将残留的固定 200ms 等待和精确浮点比较改为等待目标 x 坐标进入 0.1px 容差。format 与差异检查通过。 |
+| 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`git diff HEAD --check` | 验证页签固定宽度、长标题省略和键盘导航后的可见范围 | 通过：CTest 64/64；QML 回归确认 tab 宽 130px、来源长标题已截断但完整文本仍进入无障碍名称，左右键将末尾 tab 的主体滚入可视区。首末活动页签圆弧在裁切边界处的像素检查仍待补。 |
 
 ## 风险与回退
 
@@ -160,6 +161,7 @@
 - 2026-09-28：在 `panta-en.pa` 与 `panta-cn.pa` 补充 `DocumentTabBar` 的页签名称、关闭、重复来源名和加载状态条目；扩展 QM 加载测试按 `DocumentTabBar + source` 验证中英文目录。Cargo 聚合 CTest 63/63，构建刷新后的 `panta_zh_CN.ts` 含对应上下文与译文。真窗口 AX 树已见 PageTabList / PageTab / 关闭按钮，但系统截图服务报错且键盘焦点未能进入页签，相关人工验收继续保持未完成。
 - 2026-09-28：新增 ViewModel 文档重排/关闭行为测试和 QML PageTab 选中态测试；重排后活动 ID 与快照稳定，关闭非活动标签不变，关闭活动标签选右邻就绪标签，切换活动 ID 同步更新 accessible selected。Cargo 聚合 CTest 64/64、format 和 lint 八阶段通过。
 - 2026-09-28：拖拽换序动画断言移除固定 200ms 等待和精确浮点比较，改为等待 0.1px 容差；Cargo 聚合 CTest 64/64、format 和差异检查通过。
+- 2026-09-28：补页签宽度、长标题省略和末尾标签键盘滚动可见回归；完整来源仍保留在 PageTab/关闭按钮无障碍名称中。Cargo 聚合 CTest 64/64、format 和差异检查通过；圆弧贴近裁切边界仍需专项像素验收。
 
 ## 完成摘要
 

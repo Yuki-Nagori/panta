@@ -557,12 +557,12 @@ class ThemeComponentTest final : public QObject {
                                {QStringLiteral("title"), title},
                                {QStringLiteral("message"), QString{}}};
         };
-        const QVariantList documents{document(QStringLiteral("welcome"), QStringLiteral("welcome"),
-                                              QStringLiteral("Welcome")),
-                                     document(QStringLiteral("import-1"), QStringLiteral("import"),
-                                              QStringLiteral("sample.stl")),
-                                     document(QStringLiteral("import-2"), QStringLiteral("import"),
-                                              QStringLiteral("sample.stl"))};
+        const QString longTitle = QStringLiteral("exceptionally-long-source-name.stl");
+        const QVariantList documents{
+            document(QStringLiteral("welcome"), QStringLiteral("welcome"),
+                     QStringLiteral("Welcome")),
+            document(QStringLiteral("import-1"), QStringLiteral("import"), longTitle),
+            document(QStringLiteral("import-2"), QStringLiteral("import"), longTitle)};
         auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
             QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
                         {QStringLiteral("documents"), documents},
@@ -586,13 +586,18 @@ class ThemeComponentTest final : public QObject {
         QQuickItem* secondTitle = visual_item(secondTab, QStringLiteral("documentTabTitle"));
         QVERIFY(firstTitle != nullptr);
         QVERIFY(secondTitle != nullptr);
-        QCOMPARE(firstTitle->property("text").toString(), QStringLiteral("1 · sample.stl"));
-        QCOMPARE(secondTitle->property("text").toString(), QStringLiteral("2 · sample.stl"));
+        QCOMPARE(firstTab->width(), 130.0);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(firstTab->x() - 134.0) < 0.1, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(secondTab->x() - 266.0) < 0.1, 10000);
+        QCOMPARE(firstTitle->property("text").toString(), QStringLiteral("1 · ") + longTitle);
+        QCOMPARE(secondTitle->property("text").toString(), QStringLiteral("2 · ") + longTitle);
+        QTRY_VERIFY(firstTitle->property("truncated").toBool());
+        QTRY_VERIFY(secondTitle->property("truncated").toBool());
 
         QAccessibleInterface* accessibleTab = QAccessible::queryAccessibleInterface(firstTab);
         QVERIFY(accessibleTab != nullptr);
         QCOMPARE(accessibleTab->role(), QAccessible::PageTab);
-        QCOMPARE(accessibleTab->text(QAccessible::Name), QStringLiteral("sample.stl, import 1"));
+        QCOMPARE(accessibleTab->text(QAccessible::Name), longTitle + QStringLiteral(", import 1"));
         QAccessibleInterface* accessibleSecondTab =
             QAccessible::queryAccessibleInterface(secondTab);
         QVERIFY(accessibleSecondTab != nullptr);
@@ -622,7 +627,7 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(accessibleClose != nullptr);
         QCOMPARE(accessibleClose->role(), QAccessible::Button);
         QCOMPARE(accessibleClose->text(QAccessible::Name),
-                 QStringLiteral("Close sample.stl, import 2"));
+                 QStringLiteral("Close ") + longTitle + QStringLiteral(", import 2"));
         QTest::keyClick(&window, Qt::Key_Left);
         QTRY_VERIFY(firstTab->hasActiveFocus());
         QTRY_VERIFY(scroller->property("contentX").toReal() > 0.0);
@@ -630,6 +635,8 @@ class ThemeComponentTest final : public QObject {
         QTest::keyClick(&window, Qt::Key_Right);
         QTRY_VERIFY(secondTab->hasActiveFocus());
         QTRY_VERIFY(scroller->property("contentX").toReal() > contentAfterLeft);
+        QTRY_VERIFY(secondTab->x() + secondTab->width() <=
+                    scroller->property("contentX").toReal() + scroller->width() + 0.1);
         QCOMPARE(activated.count(), 2);
         QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
         QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-2"));
