@@ -107,6 +107,7 @@ ai-docs/
 | 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
 | 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073 | in-progress |
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | planned |
+| 085 | [Qt reduced-motion 原生属性迁移](task/085-qt-reduced-motion-preference-migration.md) | 应用平台扩展 | 080, 002 | planned |
 
 ## 验证与质量扩展队列
 
