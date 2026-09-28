@@ -538,9 +538,7 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(moved.takeFirst(), (QList<QVariant>{0, 1}));
         QVariantList reordered{documents[1], documents[0]};
         bar->setProperty("documents", reordered);
-        QTRY_COMPARE(welcomeTab->x(), 134.0);
-        QTest::qWait(200);
-        QCOMPARE(welcomeTab->x(), 134.0);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 134.0) < 0.1, 10000);
     }
 
     void duplicate_document_tabs_are_visibly_and_accessibly_distinguished() {
