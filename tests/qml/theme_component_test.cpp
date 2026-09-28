@@ -28,6 +28,7 @@
 #include <icon_provider.hpp>
 #include <qaccessible.h>
 #include <qaccessible_base.h>
+#include <qpoint.h>
 #include <qtestkeyboard.h>
 #include <qtestmouse.h>
 #include <qtestsupport_core.h>
@@ -652,6 +653,79 @@ class ThemeComponentTest final : public QObject {
         QTest::keyClick(&window, Qt::Key_Space);
         QCOMPARE(closed.count(), 1);
         QCOMPARE(closed.takeFirst().at(0).toString(), QStringLiteral("import-2"));
+    }
+
+    void document_tab_scroll_preserves_active_edge_connectors() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent component(
+            &engine, QUrl(QStringLiteral(
+                         "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+
+        const auto document = [](const QString& id, const QString& kind, const QString& title) {
+            return QVariantMap{{QStringLiteral("id"), id},
+                               {QStringLiteral("kind"), kind},
+                               {QStringLiteral("state"), QStringLiteral("ready")},
+                               {QStringLiteral("title"), title},
+                               {QStringLiteral("message"), QString{}}};
+        };
+        const QVariantList documents{document(QStringLiteral("welcome"), QStringLiteral("welcome"),
+                                              QStringLiteral("Welcome")),
+                                     document(QStringLiteral("import-1"), QStringLiteral("import"),
+                                              QStringLiteral("one.stl")),
+                                     document(QStringLiteral("import-2"), QStringLiteral("import"),
+                                              QStringLiteral("two.stl"))};
+        auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
+            QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+                        {QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), QStringLiteral("welcome")}}));
+        QVERIFY(bar != nullptr);
+        bar->setParent(&owner);
+        bar->setWidth(240);
+        bar->setHeight(39);
+
+        QQuickWindow window;
+        window.resize(240, 39);
+        bar->setParentItem(window.contentItem());
+        window.show();
+        QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+
+        const QColor bandGray(QStringLiteral("#e7e4e1"));
+        const QColor panelWhite(QStringLiteral("#ffffff"));
+        const auto grab = [bar]() {
+            const auto result = bar->grabToImage();
+            if (!result) {
+                return QImage{};
+            }
+            QSignalSpy ready(result.data(), &QQuickItemGrabResult::ready);
+            if (!ready.wait(5000)) {
+                return QImage{};
+            }
+            return result->image();
+        };
+
+        const QImage firstImage = grab();
+        QCOMPARE(firstImage.size(), QSize(240, 39));
+        QVERIFY(firstImage.pixelColor(0, 34).lightness() > bandGray.lightness());
+
+        bar->setProperty("activeDocumentId", QStringLiteral("import-2"));
+        QQuickItem* scroller = visual_item(bar, QStringLiteral("documentTabScroller"));
+        QQuickItem* lastTab = visual_item(bar, QStringLiteral("documentTab-import-2"));
+        QVERIFY(scroller != nullptr);
+        QVERIFY(lastTab != nullptr);
+        const qreal endContentX = scroller->property("contentWidth").toReal() - scroller->width();
+        scroller->setProperty("contentX", endContentX);
+        QTRY_VERIFY(qAbs(scroller->property("contentX").toReal() - endContentX) < 0.1);
+        const QPointF lastTabPosition = lastTab->mapToItem(bar, 0, 0);
+        QVERIFY(qAbs(lastTabPosition.x() + lastTab->width() - 232.0) < 0.1);
+
+        const QImage lastImage = grab();
+        QCOMPARE(lastImage.size(), QSize(240, 39));
+        QVERIFY(lastImage.pixelColor(234, 34).lightness() > bandGray.lightness());
+        QCOMPARE(lastImage.pixelColor(236, 34), bandGray);
+        QCOMPARE(lastImage.pixelColor(130, 37), panelWhite);
     }
 };
 

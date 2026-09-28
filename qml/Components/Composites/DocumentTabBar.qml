@@ -120,7 +120,7 @@ Item {
         id: scroller
         objectName: "documentTabScroller"
         anchors.fill: parent
-        contentWidth: 2 * Theme.spacingTiny + bar.documents.length * (Theme.documentTabWidth + Theme.spacingTiny)
+        contentWidth: 2 * Theme.spacingTiny + bar.documents.length * (Theme.documentTabWidth + Theme.spacingTiny) + Theme.documentTabRadius - 2 * Theme.spacingTiny
         clip: false
         interactive: contentWidth > width && !bar.dragging
         boundsBehavior: Flickable.StopAtBounds
