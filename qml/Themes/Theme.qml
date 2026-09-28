@@ -26,10 +26,11 @@ QtObject {
     readonly property color colorRibbonTop: "#e1e1e1"
     readonly property color colorRibbonBottom: "#919191"
     readonly property color colorCloseHover: "#e81123"
-    // 视口文档页签（080）：标签带灰、带上缘线与缺口过渡色。
     readonly property color colorDocumentBand: "#e7e4e1"
     readonly property color colorDocumentBandLine: "#c8c4c0"
     readonly property color colorDocumentHover: "#f0eeec"
+    readonly property color colorDocumentClosePressed: "#d5e3ef"
+    readonly property color colorDocumentWelcomeIcon: "#a83e47"
 
     // 字号（逻辑像素）
     readonly property int fontTitle: 13
@@ -66,14 +67,19 @@ QtObject {
     readonly property int iconSizeSmall: 16
     readonly property int iconSizeDefault: 18
     readonly property int iconSizeRibbon: 26
-    readonly property int iconSizeCaret: 12
+    readonly property int iconSizeCompact: 12
     readonly property int paneCloseSize: 20
     readonly property int tabSlideDuration: 120
     readonly property int tabSegmentWidth: 96
     readonly property int documentTabWidth: 130
     readonly property int documentTabBarHeight: 39
     readonly property int documentTabRadius: 8
+    readonly property int documentTabBottomLineHeight: 3
+    readonly property int documentTabContentInset: 11
     readonly property int documentTabCloseSize: 19
+    readonly property int documentTabCloseRightInset: 3
+    readonly property int documentTabCloseRadius: 5
+    readonly property int documentTabWelcomeIconSize: 17
     readonly property int documentTabDragThreshold: 4
     readonly property int documentTabAnimationDuration: 150
     readonly property int panelToolbarHeight: 32

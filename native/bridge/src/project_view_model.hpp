@@ -1,7 +1,7 @@
-/// 工程创建、打开和导入流程的 Qt 适配层。
+/// 工程服务的 Qt 适配层与运行期视口文档状态。
 ///
-/// 该类型只负责平台目录发现、Qt 字符串/URL 适配和用户可读错误；工程清单、
-/// 工程模型及创建/打开/保存命令由 Rust application service 持有。
+/// Rust application service 持有工程清单、导入记录和异步资产激活；
+/// 本类型持有当前打开的页签、活动 ID 与显示快照，并向 QML/视口投影状态。
 #pragma once
 
 #include "panta_ffi.h"
@@ -168,11 +168,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     int document_index(const QString& documentId) const;
     void activate_ready_document(int index);
     void reset_documents();
-    void remove_document(int index);
     void begin_import_activation(const QString& recordId);
     void drain_activations();
     void sync_activation_poll();
-    void emit_documents_changed();
 
     QString m_defaultLocation;
     QString m_error;

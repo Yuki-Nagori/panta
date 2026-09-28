@@ -30,8 +30,6 @@ PanelSurface {
             }
         }
 
-        // 文档页签替换旧 Model / Mesh / Results 类别条（080）：单一
-        // CaeViewport 由 ViewModel 活动文档驱动，页签只投影选择状态。
         DocumentTabBar {
             objectName: "documentTabBar"
             Layout.fillWidth: true

@@ -37,19 +37,20 @@ QString format_dimensions(double sizeX, double sizeY, double sizeZ, const QStrin
     return unit.isEmpty() ? values : values + QLatin1Char(' ') + unit;
 }
 
-/// 只读激活失败码 → 用户可读原因；与 panta-core fsm 激活失败码一一对应。
+// Rust 错误可能带冒号后的细节；用户消息只按稳定错误码选择。
 QString activation_message_for(const QString& code) {
-    if (code == QStringLiteral("project.asset_missing")) {
+    const QString errorCode = code.section(QLatin1Char(':'), 0, 0);
+    if (errorCode == QStringLiteral("project.asset_missing")) {
         return QStringLiteral("The saved STL asset is missing from the project package.");
     }
-    if (code == QStringLiteral("project.asset_unsupported_format")) {
+    if (errorCode == QStringLiteral("project.asset_unsupported_format")) {
         return QStringLiteral("The saved STL asset format is not supported.");
     }
-    if (code == QStringLiteral("project.import_unsupported_units")) {
+    if (errorCode == QStringLiteral("project.import_unsupported_units")) {
         return QStringLiteral("The saved STL asset uses unsupported units.");
     }
-    if (code == QStringLiteral("project.asset_read_failed") ||
-        code == QStringLiteral("project.asset_parse_failed")) {
+    if (errorCode == QStringLiteral("project.asset_read_failed") ||
+        errorCode == QStringLiteral("project.asset_parse_failed")) {
         return QStringLiteral("The saved STL asset could not be read.");
     }
     return QStringLiteral("The saved STL asset could not be opened.");
@@ -64,7 +65,6 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
     // 存在 Loading 文档时运转。
     m_activationPoll.setInterval(10);
     connect(&m_activationPoll, &QTimer::timeout, this, &ProjectViewModel::drain_activations);
-    // 应用启动即有 Welcome 页签；进入工程会话时由 reset_documents 重建。
     reset_documents();
 }
 
@@ -77,8 +77,7 @@ ProjectViewModel::mesh_snapshot() const {
 }
 
 bool ProjectViewModel::placeholder_visible() const {
-    // Welcome 文档激活即显示占位字样；全部关闭后视口留白（含未打开
-    // 工程的启动态——维护者确认的预期行为）。
+    // 占位字样由活动 Welcome 文档决定；全部关闭后视口留白。
     for (const auto& document : m_documents) {
         if (document.id == m_activeDocumentId) {
             return document.kind == QStringLiteral("welcome");
@@ -273,18 +272,19 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
         if (!applySnapshot(snapshot) || !refreshImports()) {
             return false;
         }
+        const QString recordId = QString::fromUtf8(imported.id);
         // 导入事务已产出网格：直接复用为文档快照，不再二次解析。
         if (auto mesh = pull_service_mesh()) {
-            m_documentMeshes.insert(QString::fromUtf8(imported.id), mesh);
+            m_documentMeshes.insert(recordId, mesh);
         }
-        const int index = document_index(QString::fromUtf8(imported.id));
+        int index = document_index(recordId);
         if (index < 0) {
-            m_documents.append({QString::fromUtf8(imported.id), QStringLiteral("import"),
-                                QStringLiteral("ready"), QString::fromUtf8(imported.source_name),
-                                QString{}});
-            emit_documents_changed();
+            index = static_cast<int>(m_documents.size());
+            m_documents.append({recordId, QStringLiteral("import"), QStringLiteral("ready"),
+                                QString::fromUtf8(imported.source_name), QString{}});
+            emit documentsChanged();
         }
-        activate_ready_document(document_index(QString::fromUtf8(imported.id)));
+        activate_ready_document(index);
         emit projectImported(m_importedAssetPath);
         return true;
     } catch (const rust::Error& failure) {
@@ -510,8 +510,6 @@ int ProjectViewModel::document_index(const QString& documentId) const {
     return -1;
 }
 
-void ProjectViewModel::emit_documents_changed() { emit documentsChanged(); }
-
 void ProjectViewModel::activate_ready_document(int index) {
     if (index < 0 || index >= m_documents.size()) {
         return;
@@ -535,7 +533,7 @@ void ProjectViewModel::reset_documents() {
     m_documents.append({QString::fromLatin1(kWelcomeDocumentId), QStringLiteral("welcome"),
                         QStringLiteral("ready"), tr("Welcome"), QString{}});
     m_activeDocumentId = QString::fromLatin1(kWelcomeDocumentId);
-    emit_documents_changed();
+    emit documentsChanged();
     emit activeDocumentChanged();
     emit meshChanged();
 }
@@ -549,8 +547,7 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
     if (index < 0) {
         return;
     }
-    // 加载中文档先取消 attempt（结果迟到时 drain 按文档消失丢弃）；
-    // attempt 簿记无条件清除，Loading 与 Failed 关闭都不留残留条目。
+    // 先取消加载，再清理簿记；旧 attempt 的结果不能命中新开的同 ID 页签。
     if (m_documents[index].state == QStringLiteral("loading")) {
         if (const auto attempt = m_activationAttempts.constFind(documentId);
             attempt != m_activationAttempts.cend()) {
@@ -583,7 +580,7 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
         emit meshChanged();
     }
     sync_activation_poll();
-    emit_documents_changed();
+    emit documentsChanged();
 }
 
 void ProjectViewModel::openImportRecord(const QString& recordId) {
@@ -595,23 +592,18 @@ void ProjectViewModel::openImportRecord(const QString& recordId) {
         } else if (m_documents[index].state == QStringLiteral("failed")) {
             m_documents[index].state = QStringLiteral("loading");
             m_documents[index].message.clear();
-            emit_documents_changed();
+            emit documentsChanged();
             begin_import_activation(recordId);
         }
         return;
     }
-    QString title;
-    for (int probe = 0; probe < m_importedPartIds.size(); ++probe) {
-        if (m_importedPartIds[probe] == recordId) {
-            title = m_importedPartNames.value(probe);
-        }
-    }
+    const QString title = m_importedPartNames.value(m_importedPartIds.indexOf(recordId));
     if (title.isEmpty()) {
         return;
     }
     m_documents.append(
         {recordId, QStringLiteral("import"), QStringLiteral("loading"), title, QString{}});
-    emit_documents_changed();
+    emit documentsChanged();
     begin_import_activation(recordId);
 }
 
@@ -623,6 +615,13 @@ void ProjectViewModel::begin_import_activation(const QString& recordId) {
         sync_activation_poll();
     } catch (const rust::Error& failure) {
         qWarning("ProjectViewModel activation begin failed: %s", failure.what());
+        const int index = document_index(recordId);
+        if (index >= 0) {
+            auto& document = m_documents[index];
+            document.state = QStringLiteral("failed");
+            document.message = activation_message_for(QString::fromUtf8(failure.what()));
+            emit documentsChanged();
+        }
     }
 }
 
@@ -632,7 +631,7 @@ void ProjectViewModel::moveDocument(int fromIndex, int toIndex) {
         return;
     }
     m_documents.move(fromIndex, toIndex);
-    emit_documents_changed();
+    emit documentsChanged();
 }
 
 void ProjectViewModel::drain_activations() {
@@ -641,12 +640,19 @@ void ProjectViewModel::drain_activations() {
         bool documentsChangedEmitted = false;
         for (const auto& outcome : outcomes) {
             const QString recordId = QString::fromUtf8(outcome.import_id);
+            // 同一记录可在关闭后重新打开；旧 attempt 的迟到结果不能
+            // 覆盖新页签，即使它们的 ImportRecord.id 相同。
+            const auto attempt = m_activationAttempts.constFind(recordId);
+            if (attempt == m_activationAttempts.cend() || attempt.value() != outcome.attempt) {
+                continue;
+            }
             const int index = document_index(recordId);
             if (index < 0) {
                 continue; // 页签已关闭：结果（含快照）就地丢弃。
             }
             if (outcome.kind == panta::ffi::ActivationOutcomeKind::Cancelled) {
                 // 关闭页签引发的取消：页签已不在；此处兜底移除残留。
+                m_activationAttempts.remove(recordId);
                 m_documents.remove(index);
                 documentsChangedEmitted = true;
                 continue;
@@ -666,6 +672,7 @@ void ProjectViewModel::drain_activations() {
                 m_documentMeshes[recordId] = std::move(mesh);
                 document.state = QStringLiteral("ready");
                 document.message.clear();
+                m_activationAttempts.remove(recordId);
                 documentsChangedEmitted = true;
                 // 激活仍由活动文档语义决定：成功后自动切到该文档。
                 activate_ready_document(index);
@@ -677,7 +684,7 @@ void ProjectViewModel::drain_activations() {
             }
         }
         if (documentsChangedEmitted) {
-            emit_documents_changed();
+            emit documentsChanged();
         }
         sync_activation_poll();
     } catch (const rust::Error& failure) {

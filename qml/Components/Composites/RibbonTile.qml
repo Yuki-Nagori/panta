@@ -60,14 +60,14 @@ ToolButton {
             }
             Item {
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: Theme.iconSizeCaret
+                width: Theme.iconSizeCompact
                 // 没有下拉时也占位，避免整列重新居中导致图标上下漂移。
                 height: Theme.ribbonCaretHeight
                 ThemedIcon {
                     anchors.centerIn: parent
                     visible: tile.showCaret
                     name: "caret-down"
-                    iconSize: Theme.iconSizeCaret
+                    iconSize: Theme.iconSizeCompact
                 }
             }
         }

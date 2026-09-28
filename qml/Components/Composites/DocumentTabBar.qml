@@ -1,7 +1,3 @@
-// 浏览器式视口文档页签（080）：130px 固定宽、可关闭、水平拖拽重排。
-// 交互契约移植自 ai-docs/qml-html：4px 启动阈值、垂直手势取消、拖动
-// 非活动就绪页签立即激活、中点换位 + 150ms 让位动画、拖动关闭按钮不
-// 触发重排；系统减少动态效果偏好下跳过位移动画。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -11,13 +7,13 @@ import QtQuick.Shapes
 Item {
     id: bar
 
-    implicitWidth: 200
+    implicitWidth: Theme.documentTabWidth + 2 * Theme.spacingTiny
     implicitHeight: Theme.documentTabBarHeight
 
     // ViewModel 投影：[{id, kind, state, title, message}]；顺序即页签顺序。
     property var documents: []
     property string activeDocumentId: ""
-    // 系统减少动态效果偏好；true 时不播让位 / 归位动画。
+    // 由宿主传入；true 时跳过页签位移动画。
     property bool reducedMotion: false
 
     signal activateDocument(string documentId)
@@ -26,26 +22,31 @@ Item {
 
     clip: true
 
-    // 本地预览顺序：拖拽期间只改它并让邻居动画让位，松手一次性提交
-    // moveDocument，避免模型重建打断手势。非拖拽时与 documents 同步。
+    // 委托身份在重排时保持稳定；源模型换序后只更新条目内容和槽位。
+    property var displayDocuments: []
+    // 拖拽时先预览顺序，松手再向 ViewModel 提交。
     property var order: []
     property string draggedId: ""
-    // 拖拽中页签的 x（bar 坐标）；槽位绑定它实现指针跟随。
+    // 拖拽中页签的 x（Flickable 内容坐标）。
     property real dragX: 0
     readonly property bool dragging: draggedId !== ""
     onDocumentsChanged: {
+        internal.pressedId = "";
         if (dragging) {
-            // 拖拽中模型被外部改变（工程切换等）：放弃手势并回同步。
             draggedId = "";
         }
-        sync_order();
+        sync_documents();
     }
 
-    function sync_order() {
+    function sync_documents() {
         const ids = [];
-        for (let i = 0; i < documents.length; ++i) {
-            ids.push(documents[i].id);
+        const byId = new Map();
+        for (const document of documents) {
+            ids.push(document.id);
+            byId.set(document.id, document);
         }
+        const sameIds = displayDocuments.length === ids.length && displayDocuments.every(entry => byId.has(entry.id));
+        displayDocuments = sameIds ? displayDocuments.map(entry => byId.get(entry.id)) : Array.from(documents);
         order = ids;
     }
     function slot_x(index) {
@@ -55,23 +56,7 @@ Item {
         return order.indexOf(id);
     }
 
-    Component.onCompleted: sync_order()
-
-    // 重排位移差动画（对应 HTML 的 animateTabX）：order 变化后，把每个
-    // 委托「当前视觉位置 − 新槽位」记为 visualOffset，再由 Behavior 平滑
-    // 归零——与 HTML 的 insertBefore + 差值动画完全同构。
-    onOrderChanged: {
-        for (let i = 0; i < tabRepeater.count; ++i) {
-            const item = tabRepeater.itemAt(i);
-            // itemAt 返回 QQuickItem*，qmllint 无法解析 Repeater 委托的
-            // 动态属性（isDragged / documentId / visualOffset 运行时存在）。
-            if (!item || item.isDragged) { // qmllint disable missing-property
-                continue;
-            }
-            const target = slot_x(slot_of(item.documentId)); // qmllint disable missing-property
-            item.visualOffset = item.x - target; // qmllint disable missing-property
-        }
-    }
+    Component.onCompleted: sync_documents()
 
     Rectangle {
         anchors.fill: parent
@@ -89,8 +74,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: 3
-        color: "#ffffff"
+        height: Theme.documentTabBottomLineHeight
+        color: Theme.colorPanel
     }
 
     Flickable {
@@ -103,35 +88,33 @@ Item {
 
         Repeater {
             id: tabRepeater
-            model: bar.documents.length
+            model: bar.displayDocuments.length
 
             Item {
                 id: tab
                 required property int index
+                objectName: "documentTab-" + documentId
 
-                readonly property var doc: bar.documents[index] ?? {}
+                readonly property var doc: bar.displayDocuments[index] ?? {}
                 readonly property string documentId: doc.id ?? ""
                 readonly property string tabState: doc.state ?? "ready"
                 readonly property bool isActive: documentId === bar.activeDocumentId
                 readonly property bool isDragged: documentId === bar.draggedId
-                // 让位 / 归位位移差：order 重排后由 bar 层写入「当前视觉位置
-                // − 新槽位」，Behavior 平滑归零（HTML animateTabX 的同构实现）。
-                property real visualOffset: 0
-                Behavior on visualOffset {
+                Behavior on x {
                     enabled: !tab.isDragged && !bar.reducedMotion
                     NumberAnimation {
+                        id: slideAnimation
                         duration: Theme.documentTabAnimationDuration
                         easing.type: Easing.OutQuad
                     }
                 }
-                // 拖拽中页签脱离槽位跟随指针；其余页签绑定槽位 + 位移差。
-                y: 2
-                x: isDragged ? bar.dragX : bar.slot_x(bar.slot_of(documentId)) + visualOffset
+                // HTML 标签带的 1px 上边框 + 2px 上内边距。
+                y: Theme.borderWidth + Theme.spacingTiny
+                x: isDragged ? bar.dragX : bar.slot_x(bar.slot_of(documentId))
 
                 width: Theme.documentTabWidth
-                height: Theme.documentTabBarHeight - 2 - 3
-                // 拖拽或让位 / 归位动画期间保持置顶，避免沉入邻页签下方。
-                z: tab.isDragged || Math.abs(visualOffset) > 0.5 ? 2 : tab.isActive ? 1 : 0
+                height: Theme.documentTabBarHeight - y - Theme.documentTabBottomLineHeight
+                z: tab.isDragged || slideAnimation.running ? 2 : tab.isActive ? 1 : 0
 
                 Rectangle {
                     anchors.fill: parent
@@ -139,15 +122,13 @@ Item {
                     topRightRadius: Theme.documentTabRadius
                     color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : "transparent"
                 }
-                // 左右凹弧连接件：QML 无伪元素与 box-shadow，用 Shape
-                // 画内凹弧——面板色填充弧与右/下边之间的区域，标签带灰
-                // 从弧外左上透出，白线经凹弧平滑上弯进入页签。随拖拽
-                // 同步移动。
+                // HTML 伪元素的 8px 圆角阴影只在圆弧外露出面板色；
+                // PathArc 保持真圆；与主体重叠 1px 避免抗锯齿接缝。
                 Shape {
                     visible: tab.isActive
                     x: -Theme.documentTabRadius
                     y: tab.height - Theme.documentTabRadius
-                    width: Theme.documentTabRadius
+                    width: Theme.documentTabRadius + Theme.borderWidth
                     height: Theme.documentTabRadius
                     z: 2
                     ShapePath {
@@ -156,51 +137,48 @@ Item {
                         strokeWidth: 0
                         startX: Theme.documentTabRadius
                         startY: 0
-                        PathCubic {
+                        PathArc {
                             x: 0
                             y: Theme.documentTabRadius
-                            control1X: Theme.documentTabRadius
-                            control1Y: Theme.documentTabRadius * 0.5522847498
-                            control2X: Theme.documentTabRadius * 0.5522847498
-                            control2Y: Theme.documentTabRadius
+                            radiusX: Theme.documentTabRadius
+                            radiusY: Theme.documentTabRadius
                         }
                         PathLine {
-                            x: Theme.documentTabRadius
+                            x: Theme.documentTabRadius + Theme.borderWidth
                             y: Theme.documentTabRadius
                         }
                         PathLine {
-                            x: Theme.documentTabRadius
+                            x: Theme.documentTabRadius + Theme.borderWidth
                             y: 0
                         }
                     }
                 }
                 Shape {
                     visible: tab.isActive
-                    x: tab.width
+                    x: tab.width - Theme.borderWidth
                     y: tab.height - Theme.documentTabRadius
-                    width: Theme.documentTabRadius
+                    width: Theme.documentTabRadius + Theme.borderWidth
                     height: Theme.documentTabRadius
                     z: 2
                     ShapePath {
                         fillColor: Theme.colorPanel
                         strokeColor: "transparent"
                         strokeWidth: 0
-                        startX: 0
+                        startX: Theme.borderWidth
                         startY: 0
-                        PathCubic {
-                            x: Theme.documentTabRadius
+                        PathArc {
+                            x: Theme.documentTabRadius + Theme.borderWidth
                             y: Theme.documentTabRadius
-                            control1X: Theme.documentTabRadius * 0.5522847498
-                            control1Y: 0
-                            control2X: Theme.documentTabRadius
-                            control2Y: Theme.documentTabRadius * 0.5522847498
+                            radiusX: Theme.documentTabRadius
+                            radiusY: Theme.documentTabRadius
+                            direction: PathArc.Counterclockwise
                         }
                         PathLine {
-                            x: 0
+                            x: Theme.borderWidth
                             y: Theme.documentTabRadius
                         }
                         PathLine {
-                            x: 0
+                            x: Theme.borderWidth
                             y: 0
                         }
                     }
@@ -208,29 +186,40 @@ Item {
 
                 MouseArea {
                     id: tabArea
+                    objectName: "documentTabDragArea"
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: bar.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    cursorShape: pressed && tab.isDragged ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                     acceptedButtons: Qt.LeftButton
-                    // 拖拽一经启动不容 Flickable 抢抓，否则移动事件中断、
-                    // 页签表现为凭空消失；标签带滚动由页签外空白区承担。
+                    // Flickable 抢抓会中断长距离拖动；空白区仍可滚动。
                     preventStealing: true
                     onPressed: mouse => {
-                        const p = bar.mapFromItem(tab, mouse.x, mouse.y);
+                        if (mouse.button !== Qt.LeftButton) {
+                            return;
+                        }
+                        const p = scroller.contentItem.mapFromItem(tab, mouse.x, mouse.y);
                         bar.begin_press(tab.documentId, p.x, p.y);
                     }
-                    // 按下期间 MouseArea 隐式抓取指针，移出边界仍持续收到
-                    // 移动；坐标换算到 bar 域后驱动阈值判定与拖拽跟随。
                     onPositionChanged: mouse => {
-                        const p = bar.mapFromItem(tab, mouse.x, mouse.y);
+                        if (!(mouse.buttons & Qt.LeftButton)) {
+                            return;
+                        }
+                        // 滚动后指针和槽位必须使用同一内容坐标系。
+                        const p = scroller.contentItem.mapFromItem(tab, mouse.x, mouse.y);
                         if (!bar.dragging) {
                             bar.detect_drag(tab.documentId, p.x, p.y);
                         } else {
                             bar.drag_move(p.x);
                         }
                     }
-                    onReleased: bar.finish_drag()
-                    onCanceled: bar.finish_drag()
+                    onReleased: mouse => {
+                        if (bar.dragging) {
+                            const p = scroller.contentItem.mapFromItem(tab, mouse.x, mouse.y);
+                            bar.drag_move(p.x);
+                        }
+                        bar.finish_drag(true);
+                    }
+                    onCanceled: bar.finish_drag(false)
                     onClicked: mouse => {
                         if (!internal.suppressClick) {
                             bar.activateDocument(tab.documentId);
@@ -239,8 +228,9 @@ Item {
                 }
 
                 Item {
+                    id: labelClip
                     anchors.left: parent.left
-                    anchors.leftMargin: 11
+                    anchors.leftMargin: Theme.documentTabContentInset
                     anchors.right: closeButton.left
                     anchors.rightMargin: Theme.spacingXSmall
                     anchors.verticalCenter: parent.verticalCenter
@@ -253,31 +243,32 @@ Item {
 
                         Rectangle {
                             visible: (tab.doc.kind ?? "") === "welcome"
-                            width: 17
-                            height: 17
-                            radius: 4
-                            // HTML 参考的砖红（#a83e47），非品牌红。
-                            color: "#a83e47"
+                            width: Theme.documentTabWelcomeIconSize
+                            height: Theme.documentTabWelcomeIconSize
+                            radius: Theme.documentTabRadius / 2
+                            color: Theme.colorDocumentWelcomeIcon
                             ThemedLabel {
                                 anchors.centerIn: parent
                                 text: "P"
-                                textSize: 11
+                                textSize: Theme.fontSmall
+                                textColor: Theme.colorPanel
+                                font.bold: true
                             }
                         }
                         BusyIndicator {
                             visible: tab.tabState === "loading"
-                            width: 16
-                            height: 16
+                            width: Theme.iconSizeSmall
+                            height: Theme.iconSizeSmall
                             running: visible
                         }
                         ThemedIcon {
                             visible: (tab.doc.kind ?? "") !== "welcome" && tab.tabState !== "loading"
                             name: "mesh"
-                            iconSize: 16
+                            iconSize: Theme.iconSizeSmall
                             color: tab.tabState === "failed" ? Theme.colorError : Theme.colorIcon
                         }
                         ThemedLabel {
-                            width: Math.min(implicitWidth, 66)
+                            width: Math.min(implicitWidth, Math.max(0, labelClip.width - (tab.doc.kind === "welcome" ? Theme.documentTabWelcomeIconSize : Theme.iconSizeSmall) - Theme.spacingMedium))
                             text: tab.doc.title ?? ""
                             textSize: Theme.fontBody
                             color: tab.tabState === "failed" ? Theme.colorError : tab.isActive ? Theme.colorText : Theme.colorTextMuted
@@ -290,19 +281,18 @@ Item {
                     id: closeButton
                     objectName: "documentTabClose"
                     anchors.right: parent.right
-                    anchors.rightMargin: 3
+                    anchors.rightMargin: Theme.documentTabCloseRightInset
                     anchors.verticalCenter: parent.verticalCenter
                     width: Theme.documentTabCloseSize
                     height: Theme.documentTabCloseSize
-                    radius: 5
-                    color: closeArea.containsMouse ? Theme.colorHover : "transparent"
+                    radius: Theme.documentTabCloseRadius
+                    color: closeArea.pressed ? Theme.colorDocumentClosePressed : closeArea.containsMouse ? Theme.colorHover : "transparent"
 
-                    // 关闭图形复用全局 pane-close SVG，矢量居中不依赖字体。
                     ThemedIcon {
                         anchors.centerIn: parent
                         name: "pane-close"
-                        iconSize: 12
-                        color: closeArea.containsMouse ? Theme.colorText : Theme.colorTextMuted
+                        iconSize: Theme.iconSizeCompact
+                        color: closeArea.containsMouse || closeArea.pressed ? Theme.colorText : tab.isActive ? Theme.colorIcon : Theme.colorTextMuted
                     }
                     MouseArea {
                         id: closeArea
@@ -330,12 +320,12 @@ Item {
         internal.pressY = y;
         internal.suppressClick = false;
     }
-    function detect_drag(documentId, pointerBarX, pressBarY) {
+    function detect_drag(documentId, pointerX, pointerY) {
         if (internal.pressedId !== documentId || bar.dragging) {
             return;
         }
-        const dx = pointerBarX - internal.pressX;
-        const dy = pressBarY - internal.pressY;
+        const dx = pointerX - internal.pressX;
+        const dy = pointerY - internal.pressY;
         if (Math.max(Math.abs(dx), Math.abs(dy)) < Theme.documentTabDragThreshold) {
             return;
         }
@@ -343,21 +333,33 @@ Item {
             internal.pressedId = "";
             return;
         }
-        // 拖拽启动：非活动就绪页签立即激活；grabOffset 记录指针相对槽位
-        // 起点的偏移，使页签全程跟随指针不跳变；suppressClick 抑制松手
-        // 回到起点时的误点击。
+        // 开始拖拽时保留指针在页签中的位置；否则越过阈值的首帧会跳位。
         internal.suppressClick = true;
-        bar.activateDocument(documentId);
+        const document = bar.documents.find(entry => entry.id === documentId);
+        if (document && document.state === "ready") {
+            bar.activateDocument(documentId);
+        }
+        let visualX = slot_x(slot_of(documentId));
+        for (let i = 0; i < tabRepeater.count; ++i) {
+            const item = tabRepeater.itemAt(i);
+            if (item && item.documentId === documentId) { // qmllint disable missing-property
+                visualX = item.x;
+                break;
+            }
+        }
+        internal.grabOffset = internal.pressX - visualX;
+        bar.dragX = visualX;
         bar.draggedId = documentId;
-        internal.grabOffset = pointerBarX - slot_x(slot_of(documentId));
-        bar.dragX = pointerBarX;
+        drag_move(pointerX);
     }
     function drag_move(pointerX) {
         if (!bar.dragging) {
             return;
         }
-        // 钳制在标签带内：越界时页签贴边停留（重排判定仍用原始指针位）。
-        bar.dragX = Math.max(0, Math.min(pointerX - internal.grabOffset, bar.width - Theme.documentTabWidth));
+        // 只显示当前可视区内的拖动标签；槽位判定使用未钳制的内容坐标。
+        const left = scroller.contentX;
+        const right = Math.max(left, left + scroller.width - Theme.documentTabWidth);
+        bar.dragX = Math.max(left, Math.min(pointerX - internal.grabOffset, right));
         const draggedIndex = order.indexOf(bar.draggedId);
         if (draggedIndex < 0) {
             return;
@@ -374,26 +376,17 @@ Item {
         next.splice(clamped, 0, bar.draggedId);
         order = next;
     }
-    function finish_drag() {
+    function finish_drag(commit) {
+        internal.pressedId = "";
         if (!bar.dragging) {
             return;
         }
         const from = bar.documents.findIndex(entry => entry.id === bar.draggedId);
         const to = order.indexOf(bar.draggedId);
-        const releaseX = bar.dragX;
-        const releasedId = bar.draggedId;
         bar.draggedId = "";
-        sync_order();
-        // 松手归位：给被拖委托写入「松手位置 − 新槽位」的位移差，由
-        // Behavior 平滑归零（reducedMotion 时直接就位）。
-        for (let i = 0; i < tabRepeater.count; ++i) {
-            const item = tabRepeater.itemAt(i); // qmllint disable missing-property
-            if (item !== null && item.documentId === releasedId) { // qmllint disable missing-property
-                item.visualOffset = releaseX - slot_x(to); // qmllint disable missing-property
-                break;
-            }
-        }
-        if (from >= 0 && to >= 0 && from !== to) {
+        if (!commit) {
+            sync_documents();
+        } else if (from >= 0 && to >= 0 && from !== to) {
             moveDocument(from, to);
         }
     }

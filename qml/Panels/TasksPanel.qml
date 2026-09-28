@@ -59,8 +59,8 @@ PanelSurface {
     signal newProjectRequested
     signal openImportRequested(string recordId)
 
-    // 检查器标题跟随活动导入文档；无活动导入时回退最新记录名。
-    readonly property string activePartTitle: activeDocumentTitle !== "" ? activeDocumentTitle : importedPartName
+    // Welcome 或空白视口没有对应导入记录，此时仍显示最近导入项。
+    readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 ? activeDocumentTitle : importedPartName
 
     implicitWidth: Theme.leftPanelMinimumWidth
 
@@ -164,7 +164,6 @@ PanelSurface {
                     required property int index
 
                     readonly property string recordId: panel.importedPartIds[index] ?? ""
-                    // 选中底色跟随活动文档投影：让所选 STL 与检查器标题可互相对照。
                     readonly property bool isActiveDocument: recordId !== "" && recordId === panel.activeDocumentId
 
                     width: projectTree.width
