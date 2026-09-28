@@ -419,6 +419,11 @@ class ThemeComponentTest final : public QObject {
         bar->setParentItem(window.contentItem());
         window.show();
         QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+
+        QAccessibleInterface* accessibleList = QAccessible::queryAccessibleInterface(bar);
+        QVERIFY(accessibleList != nullptr);
+        QCOMPARE(accessibleList->role(), QAccessible::PageTabList);
+        QCOMPARE(accessibleList->text(QAccessible::Name), QStringLiteral("Open documents"));
         QTest::mouseMove(&window, QPoint(350, 20));
 
         const auto result = bar->grabToImage();
@@ -566,11 +571,11 @@ class ThemeComponentTest final : public QObject {
                         {QStringLiteral("activeDocumentId"), QStringLiteral("import-1")}}));
         QVERIFY(bar != nullptr);
         bar->setParent(&owner);
-        bar->setWidth(400);
+        bar->setWidth(240);
         bar->setHeight(39);
 
         QQuickWindow window;
-        window.resize(400, 39);
+        window.resize(240, 39);
         bar->setParentItem(window.contentItem());
         window.show();
         QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
@@ -598,6 +603,39 @@ class ThemeComponentTest final : public QObject {
         QTest::keyClick(&window, Qt::Key_Return);
         QCOMPARE(activated.count(), 1);
         QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
+
+        QQuickItem* scroller = visual_item(bar, QStringLiteral("documentTabScroller"));
+        QVERIFY(scroller != nullptr);
+        secondTab->forceActiveFocus();
+        QSignalSpy closed(bar, SIGNAL(closeDocument(QString)));
+        QAccessibleInterface* accessibleClose = QAccessible::queryAccessibleInterface(
+            visual_item(secondTab, QStringLiteral("documentTabClose")));
+        QVERIFY(accessibleClose != nullptr);
+        QCOMPARE(accessibleClose->role(), QAccessible::Button);
+        QCOMPARE(accessibleClose->text(QAccessible::Name),
+                 QStringLiteral("Close sample.stl, import 2"));
+        QTest::keyClick(&window, Qt::Key_Left);
+        QTRY_VERIFY(firstTab->hasActiveFocus());
+        QTRY_VERIFY(scroller->property("contentX").toReal() > 0.0);
+        const qreal contentAfterLeft = scroller->property("contentX").toReal();
+        QTest::keyClick(&window, Qt::Key_Right);
+        QTRY_VERIFY(secondTab->hasActiveFocus());
+        QTRY_VERIFY(scroller->property("contentX").toReal() > contentAfterLeft);
+        QCOMPARE(activated.count(), 2);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-2"));
+        QTest::keyClick(&window, Qt::Key_Space);
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-2"));
+
+        QQuickItem* closeButton = visual_item(secondTab, QStringLiteral("documentTabClose"));
+        QVERIFY(closeButton != nullptr);
+        QCOMPARE(closeButton->property("activeFocusOnTab").toBool(), true);
+        closeButton->forceActiveFocus();
+        QTRY_VERIFY(closeButton->hasActiveFocus());
+        QTest::keyClick(&window, Qt::Key_Space);
+        QCOMPARE(closed.count(), 1);
+        QCOMPARE(closed.takeFirst().at(0).toString(), QStringLiteral("import-2"));
     }
 };
 

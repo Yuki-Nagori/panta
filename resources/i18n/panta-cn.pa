@@ -626,3 +626,24 @@ close-tools:
 welcome:
   src: Welcome
   tr: 欢迎
+
+[DocumentTabBar]
+open-documents:
+  src: Open documents
+  tr: 打开的文档
+
+close-document:
+  src: Close %1
+  tr: 关闭%1
+
+duplicate-import:
+  src: %1, import %2
+  tr: %1（第 %2 个导入）
+
+loading:
+  src: Loading
+  tr: 正在加载
+
+failed-to-load:
+  src: Failed to load
+  tr: 加载失败

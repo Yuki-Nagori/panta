@@ -20,6 +20,9 @@ Item {
     signal closeDocument(string documentId)
     signal moveDocument(int fromIndex, int toIndex)
 
+    Accessible.role: Accessible.PageTabList
+    Accessible.name: qsTr("Open documents")
+
     clip: true
 
     // 委托身份在重排时保持稳定；源模型换序后只更新条目内容和槽位。
@@ -72,6 +75,24 @@ Item {
         }
         return qsTr("%1, import %2").arg(document.title).arg(matches.findIndex(entry => entry.id === document.id) + 1);
     }
+    function focus_document(index) {
+        const tab = tabRepeater.itemAt(index);
+        const document = displayDocuments[index];
+        if (!tab || !document) {
+            return;
+        }
+        const left = tab.x;
+        const right = left + tab.width;
+        if (left < scroller.contentX) {
+            scroller.contentX = left;
+        } else if (right > scroller.contentX + scroller.width) {
+            scroller.contentX = right - scroller.width;
+        }
+        tab.forceActiveFocus();
+        if (document.state === "ready") {
+            bar.activateDocument(document.id);
+        }
+    }
 
     Component.onCompleted: sync_documents()
 
@@ -97,6 +118,7 @@ Item {
 
     Flickable {
         id: scroller
+        objectName: "documentTabScroller"
         anchors.fill: parent
         contentWidth: 2 * Theme.spacingTiny + bar.documents.length * (Theme.documentTabWidth + Theme.spacingTiny)
         clip: false
@@ -119,6 +141,7 @@ Item {
                 readonly property bool isDragged: documentId === bar.draggedId
                 Accessible.role: Accessible.PageTab
                 Accessible.name: bar.accessible_title(tab.doc)
+                Accessible.description: tab.tabState === "loading" ? qsTr("Loading") : tab.tabState === "failed" ? tab.doc.message ?? qsTr("Failed to load") : ""
                 Accessible.selected: tab.isActive
                 Accessible.onPressAction: {
                     if (tab.tabState === "ready") {
@@ -127,7 +150,14 @@ Item {
                 }
                 activeFocusOnTab: true
                 Keys.onPressed: event => {
-                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && tab.tabState === "ready") {
+                    if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                        const count = bar.displayDocuments.length;
+                        if (count > 0) {
+                            const direction = event.key === Qt.Key_Right ? 1 : -1;
+                            bar.focus_document((tab.index + direction + count) % count);
+                        }
+                        event.accepted = true;
+                    } else if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && tab.tabState === "ready") {
                         bar.activateDocument(tab.documentId);
                         event.accepted = true;
                     }
@@ -153,6 +183,8 @@ Item {
                     topLeftRadius: Theme.documentTabRadius
                     topRightRadius: Theme.documentTabRadius
                     color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : "transparent"
+                    border.width: tab.activeFocus ? Theme.borderWidth : 0
+                    border.color: Theme.colorIcon
                 }
                 // HTML 伪元素的 8px 圆角阴影只在圆弧外露出面板色；
                 // PathArc 保持真圆；与主体重叠 1px 避免抗锯齿接缝。
@@ -320,6 +352,19 @@ Item {
                     height: Theme.documentTabCloseSize
                     radius: Theme.documentTabCloseRadius
                     color: closeArea.pressed ? Theme.colorDocumentClosePressed : closeArea.containsMouse ? Theme.colorHover : "transparent"
+                    border.width: closeButton.activeFocus ? Theme.borderWidth : 0
+                    border.color: Theme.colorIcon
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: qsTr("Close %1").arg(bar.accessible_title(tab.doc))
+                    Accessible.onPressAction: bar.closeDocument(tab.documentId)
+                    activeFocusOnTab: true
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            bar.closeDocument(tab.documentId);
+                            event.accepted = true;
+                        }
+                    }
 
                     ThemedIcon {
                         anchors.centerIn: parent

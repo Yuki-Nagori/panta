@@ -626,3 +626,24 @@ close-tools:
 welcome:
   src: Welcome
   tr: Welcome
+
+[DocumentTabBar]
+open-documents:
+  src: Open documents
+  tr: Open documents
+
+close-document:
+  src: Close %1
+  tr: Close %1
+
+duplicate-import:
+  src: %1, import %2
+  tr: %1, import %2
+
+loading:
+  src: Loading
+  tr: Loading
+
+failed-to-load:
+  src: Failed to load
+  tr: Failed to load

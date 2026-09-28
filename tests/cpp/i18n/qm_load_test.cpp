@@ -48,6 +48,15 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QCOMPARE(translator.translate("ProcessTask", "Process Settings (Default)"),
              QStringLiteral("工艺设置（默认）"));
     QCOMPARE(translator.translate("DialogAction", "Cancel"), QStringLiteral("取消"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Open documents"),
+             QStringLiteral("打开的文档"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Close %1").arg(QStringLiteral("模型")),
+             QStringLiteral("关闭模型"));
+    QCOMPARE(translator.translate("DocumentTabBar", "%1, import %2")
+                 .arg(QStringLiteral("模型"), QStringLiteral("2")),
+             QStringLiteral("模型（第 2 个导入）"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Loading"), QStringLiteral("正在加载"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Failed to load"), QStringLiteral("加载失败"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {
@@ -65,6 +74,14 @@ void QmLoadTest::enBaselineDictionaryLoads() {
     QCOMPARE(translator.translate("UiCommonModeling", "Mesh"), QStringLiteral("Mesh"));
     QCOMPARE(translator.translate("ImportTask", "Create Mesh..."),
              QStringLiteral("Create Mesh..."));
+    QCOMPARE(translator.translate("DocumentTabBar", "Open documents"),
+             QStringLiteral("Open documents"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Close %1"), QStringLiteral("Close %1"));
+    QCOMPARE(translator.translate("DocumentTabBar", "%1, import %2"),
+             QStringLiteral("%1, import %2"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Loading"), QStringLiteral("Loading"));
+    QCOMPARE(translator.translate("DocumentTabBar", "Failed to load"),
+             QStringLiteral("Failed to load"));
 }
 
 QTEST_GUILESS_MAIN(QmLoadTest)
