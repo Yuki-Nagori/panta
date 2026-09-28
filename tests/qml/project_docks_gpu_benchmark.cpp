@@ -30,7 +30,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <icon_provider.hpp>
+#include <qtenvironmentvariables.h>
 #include <utility>
 #include <vector>
 
@@ -40,13 +42,17 @@ constexpr int kFrameCountPerSample = 60;
 constexpr int kSampleCount = 3;
 constexpr int kWarmupFrameCount = 30;
 constexpr std::array kItemCounts = {0, 1, 100, 1000};
+// 1000px 窗口中前 3 个页签始终可见；切换必须触发实际可见内容更新。
+constexpr int kVisibleDocumentSwitchCount = 3;
 
 enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, DocTabs };
+enum class TabWorkload : std::uint8_t { Static, Switch, CloseReopen };
 
 struct Scenario {
     const char* name;
     Panels panels;
     int item_count;
+    TabWorkload tab_workload = TabWorkload::Static;
 };
 
 QStringList make_names(int count) {
@@ -123,7 +129,8 @@ class ProjectDocksGpuBenchmark final : public QObject {
         return object;
     }
 
-    std::vector<double> measure_frame_intervals(int frame_count) {
+    std::vector<double> measure_frame_intervals(int frame_count,
+                                                const std::function<void()>& before_update = {}) {
         QElapsedTimer clock;
         clock.start();
         qint64 previous_frame = -1;
@@ -141,6 +148,9 @@ class ProjectDocksGpuBenchmark final : public QObject {
                 if (static_cast<int>(intervals.size()) >= frame_count) {
                     loop.quit();
                 } else {
+                    if (before_update) {
+                        before_update();
+                    }
                     m_window.update();
                 }
             },
@@ -164,8 +174,8 @@ class ProjectDocksGpuBenchmark final : public QObject {
         QQuickItem* tasks_item = nullptr;
         QQuickItem* layers_item = nullptr;
         QQuickItem* document_bar = nullptr;
+        QVariantList documents;
         if (scenario.panels == Panels::DocTabs) {
-            QVariantList documents;
             for (int index = 0; index < scenario.item_count; ++index) {
                 documents.append(
                     QVariantMap{{QStringLiteral("id"), QStringLiteral("doc-%1").arg(index)},
@@ -201,17 +211,49 @@ class ProjectDocksGpuBenchmark final : public QObject {
         }
         QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
         if (scenario.panels == Panels::DocTabs) {
-            // 页签条可见并完成一帧合成即视为该场景有效。
             QVERIFY(document_bar != nullptr);
-            QVERIFY(measure_frame_intervals(kWarmupFrameCount).size() == kWarmupFrameCount);
+            QCOMPARE(static_cast<int>(
+                         visual_items(document_bar, QStringLiteral("documentTabClose")).size()),
+                     scenario.item_count);
+            if (measure_frame_intervals(kWarmupFrameCount).size() != kWarmupFrameCount) {
+                return;
+            }
+            const QVariantList reduced_documents = documents.mid(1);
+            int update_index = 0;
+            const auto update_tabs = [&] {
+                if (scenario.tab_workload == TabWorkload::Switch) {
+                    document_bar->setProperty(
+                        "activeDocumentId",
+                        QStringLiteral("doc-%1").arg(update_index % kVisibleDocumentSwitchCount));
+                } else if (scenario.tab_workload == TabWorkload::CloseReopen) {
+                    const bool close_first = update_index % 2 == 0;
+                    document_bar->setProperty("documents",
+                                              close_first ? reduced_documents : documents);
+                    document_bar->setProperty("activeDocumentId", close_first
+                                                                      ? QStringLiteral("doc-1")
+                                                                      : QStringLiteral("doc-0"));
+                }
+                ++update_index;
+            };
             std::vector<double> intervals;
             intervals.reserve(static_cast<std::size_t>(kFrameCountPerSample) * kSampleCount);
             for (int sample = 0; sample < kSampleCount; ++sample) {
-                const auto sample_intervals = measure_frame_intervals(kFrameCountPerSample);
+                const auto sample_intervals = measure_frame_intervals(
+                    kFrameCountPerSample, scenario.tab_workload == TabWorkload::Static
+                                              ? std::function<void()>{}
+                                              : std::function<void()>{update_tabs});
                 if (sample_intervals.size() != kFrameCountPerSample) {
                     return;
                 }
                 intervals.insert(intervals.end(), sample_intervals.begin(), sample_intervals.end());
+            }
+            if (scenario.tab_workload != TabWorkload::Static) {
+                QCOMPARE(update_index, kFrameCountPerSample * kSampleCount);
+            }
+            if (scenario.tab_workload == TabWorkload::CloseReopen) {
+                QCOMPARE(document_bar->property("documents").toList().size(), scenario.item_count);
+                QCOMPARE(document_bar->property("activeDocumentId").toString(),
+                         QStringLiteral("doc-0"));
             }
             const auto summary = percentiles(std::move(intervals));
             qInfo().nospace() << "QML GPU frame presentation (" << api_name << ", " << scenario.name
@@ -292,14 +334,21 @@ class ProjectDocksGpuBenchmark final : public QObject {
     }
 
     void measures_visible_frame_presentation_ablation() {
-        std::vector<Scenario> cases{{"empty", Panels::Empty, 0},
-                                    {"document tabs", Panels::DocTabs, 1},
-                                    {"document tabs", Panels::DocTabs, 8},
-                                    {"document tabs", Panels::DocTabs, 24}};
-        for (const int item_count : kItemCounts) {
-            cases.push_back({"tasks", Panels::Tasks, item_count});
-            cases.push_back({"layers", Panels::Layers, item_count});
-            cases.push_back({"both", Panels::Both, item_count});
+        std::vector<Scenario> cases{
+            {"empty", Panels::Empty, 0},
+            {"document tabs static", Panels::DocTabs, 1},
+            {"document tabs static", Panels::DocTabs, 8},
+            {"document tabs static", Panels::DocTabs, 24},
+            {"document tabs switch", Panels::DocTabs, 8, TabWorkload::Switch},
+            {"document tabs switch", Panels::DocTabs, 24, TabWorkload::Switch},
+            {"document tabs close/reopen", Panels::DocTabs, 8, TabWorkload::CloseReopen},
+            {"document tabs close/reopen", Panels::DocTabs, 24, TabWorkload::CloseReopen}};
+        if (!qEnvironmentVariableIsSet("PANTA_BENCHMARK_DOCUMENT_TABS_ONLY")) {
+            for (const int item_count : kItemCounts) {
+                cases.push_back({"tasks", Panels::Tasks, item_count});
+                cases.push_back({"layers", Panels::Layers, item_count});
+                cases.push_back({"both", Panels::Both, item_count});
+            }
         }
         const char* api = graphics_api_name(m_window.rendererInterface()->graphicsApi());
         qInfo().nospace()

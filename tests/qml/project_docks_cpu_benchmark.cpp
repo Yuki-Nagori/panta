@@ -39,6 +39,7 @@ constexpr int kDocumentTabCounts[] = {1, 8, 24};
 constexpr int kDocumentSwitchRounds = 32;
 
 enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both };
+enum class DocumentTabWorkload : std::uint8_t { Construct, Switch, Close };
 
 struct Sample {
     qint64 elapsed_nanoseconds = 0;
@@ -182,35 +183,39 @@ class QmlPerformanceBenchmark final : public QObject {
         return ids;
     }
 
-    /// 构造 + 活动文档切换消融；realized 关闭钮数量用于验证委托真实建立。
-    /// 单页签场景无切换；多页签场景做 kDocumentSwitchRounds 轮激活切换。
-    Sample measure_document_tabs(int count) {
+    /// 单独计时构造、活动态更新和关闭后的模型更新；输入准备不计入耗时。
+    Sample measure_document_tabs(int count, DocumentTabWorkload workload) {
         QObject owner;
+        const QStringList ids = document_ids(count);
+        const QVariantList documents = make_documents(count);
+        const auto properties =
+            QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+                        {QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), ids.constFirst()}};
         QElapsedTimer timer;
         timer.start();
-
-        const QStringList ids = document_ids(count);
-        const auto properties = QVariantMap{
-            {QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
-            {QStringLiteral("documents"), make_documents(count)},
-            {QStringLiteral("activeDocumentId"), ids.isEmpty() ? QString{} : ids.constFirst()}};
         QObject* bar_object = create(m_documentTabBarComponent, properties, owner);
         if (bar_object == nullptr) {
             QTest::qFail(qPrintable(m_documentTabBarComponent.errorString()), __FILE__, __LINE__);
             return {};
         }
-        if (auto* bar = owner.findChild<QQuickItem*>(QStringLiteral("documentTabBar"))) {
-            const int switches = count > 1 ? kDocumentSwitchRounds : 0;
-            for (int round = 0; round < switches; ++round) {
-                bar->setProperty("activeDocumentId", ids[round % ids.size()]);
-            }
-        }
-
+        auto* bar = qobject_cast<QQuickItem*>(bar_object);
+        bar->setHeight(bar->implicitHeight());
         QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        if (workload != DocumentTabWorkload::Construct) {
+            timer.restart();
+            if (workload == DocumentTabWorkload::Switch) {
+                for (int round = 0; round < kDocumentSwitchRounds; ++round) {
+                    bar->setProperty("activeDocumentId", ids[round % ids.size()]);
+                }
+            } else {
+                bar->setProperty("documents", documents.mid(0, count - 1));
+            }
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        }
         const qint64 elapsed = timer.nsecsElapsed();
-        auto* bar_item = owner.findChild<QQuickItem*>(QStringLiteral("documentTabBar"));
         const int realized_closes =
-            static_cast<int>(visual_items(bar_item, QStringLiteral("documentTabClose")).size());
+            static_cast<int>(visual_items(bar, QStringLiteral("documentTabClose")).size());
         return {elapsed, realized_closes, realized_closes, false};
     }
 
@@ -255,8 +260,8 @@ class QmlPerformanceBenchmark final : public QObject {
             samples.push_back(static_cast<double>(sample.elapsed_nanoseconds) / 1000.0);
         }
         const Summary summary = summarize(std::move(samples));
-        qInfo().nospace() << "QML CPU construction (" << scenario.suite << ", " << scenario.name
-                          << ", " << scenario.input_count << " items, " << kSampleCount
+        qInfo().nospace() << "QML CPU workload (" << scenario.suite << ", " << scenario.name << ", "
+                          << scenario.input_count << " items, " << kSampleCount
                           << " samples; model/realized rows " << warmup.task_model_rows << "/"
                           << warmup.task_delegate_rows
                           << "; p50/p95 microseconds): " << summary.median_microseconds << "/"
@@ -275,17 +280,24 @@ class QmlPerformanceBenchmark final : public QObject {
 
     std::vector<Scenario> document_tab_scenarios() {
         std::vector<Scenario> scenarios;
-        scenarios.reserve(std::size(kDocumentTabCounts));
+        scenarios.reserve(std::size(kDocumentTabCounts) * 3);
         for (const int count : kDocumentTabCounts) {
-            scenarios.push_back(
-                {QStringLiteral("viewport document tabs"),
-                 QString::fromLatin1(count > 1 ? "construct + switch" : "construct"), count,
-                 [this, count] { return measure_document_tabs(count); },
-                 [this, count](const Sample& sample) {
-                     // 每个页签一个关闭钮 + 活动页签圆弧件，验证委托真实建立。
-                     QCOMPARE(sample.task_model_rows, count);
-                     QVERIFY(sample.task_delegate_rows >= count);
-                 }});
+            for (const auto [workload, label] :
+                 {std::pair{DocumentTabWorkload::Construct, "construct"},
+                  std::pair{DocumentTabWorkload::Switch, "switch 32 times"},
+                  std::pair{DocumentTabWorkload::Close, "close last"}}) {
+                if (count == 1 && workload != DocumentTabWorkload::Construct) {
+                    continue;
+                }
+                scenarios.push_back(
+                    {QStringLiteral("viewport document tabs"), QString::fromLatin1(label), count,
+                     [this, count, workload] { return measure_document_tabs(count, workload); },
+                     [count, workload](const Sample& sample) {
+                         const int expected =
+                             count - (workload == DocumentTabWorkload::Close ? 1 : 0);
+                         QCOMPARE(sample.task_model_rows, expected);
+                     }});
+            }
         }
         return scenarios;
     }

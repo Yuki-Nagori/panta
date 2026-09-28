@@ -73,6 +73,7 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 | 2026-09-18 | Rust 质量工具、QML formatter 与统一测试入口 | `cargo deny`、`cargo machete`、Rust fmt/clippy、QML 格式受控失败检查通过；聚合测试曾通过 101 项测试与 CTest 28/28。初始 Rust line 覆盖率为 74.21%，此历史基线不代表当前门禁。 |
 | 2026-09-18 | 覆盖率口径、阈值与受控失败 | 本地 Apple LLVM 与 rustc 插桩口径不一致，覆盖率以 CI 配套 `llvm-tools-preview` 为准。空测试集、失败用例及 100% 覆盖率阈值夹具均能使聚合入口失败；现行 gate 为函数 89% / 行 92%，launcher 按任务约定排除。 |
 | 2026-09-20–21 | Rust 跨平台行为测试与 `cargo ub-check` / Miri | crash 模块补齐后本地覆盖率达函数 89.18% / 行 93.84%；Miri 对纳入范围的纯 Rust crate 通过，已知进程/FFI/压力测试限制按任务说明排除或跳过。 |
+| 2026-09-28 | Miri 容量压力边界复核 | `crates/panta-dsl-core/tests/fsm.rs` 中精确上限和超限两个用例分别构造最多 512/513 条边。实测 Miri 在前者运行超过两分钟仍停在 Pest 解释执行，故与已有语言 DSL 容量压力用例同口径使用 `cfg_attr(miri, ignore)`；常规 `cargo test --locked --workspace` 继续覆盖阈值，其他 FSM 解析测试继续进入 Miri。复跑固定 nightly 的三 crate Miri 退出码 0，FSM 18/18 执行用例通过、2 个容量用例跳过。Pest/Miri 性能或容量阈值变化时复查此排除。 |
 | 2026-09-24 | `cargo coverage` gate 回归与修复（macOS arm64） | 复现失败 86.47% / 90.00% 后补充领域逻辑行为测试；修复后为函数 90.34%（402/445）、行 93.95%（4270/4545），未降低 89% / 92% 阈值。 |
 | 2026-09-24 | `cargo format --check`（uv 0.12.18 / Python 3.14.7） | 聚合 Rust、C++/CXX、CMake、QML 格式检查通过；升级固定 uv/Python 后，Seatbelt 内的 macOS 格式检查也通过。 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | 三平台测试、格式检查和 89% / 92% Rust gate 全绿。该结果不满足尚未实现的 Rust 100% 函数覆盖及 C++ line/branch 门禁目标。 |

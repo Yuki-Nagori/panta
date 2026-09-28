@@ -35,6 +35,7 @@
 - 视口区域始终复用一个 `CaeViewport` / native VTK render window；每个文档标签不创建独立 GPU 窗口、VTK interactor 或场景树。
 - 记录打开页签的网格快照、VTK 显示数据、取消工作和关闭操作的所有权；关闭文件标签后，其独占数据与渲染资源应能释放。
 - 新增或拆分 QML 组件时按 [QML 性能基准规范](../standards/qml.md#性能基准) 把组件加入 CPU / GPU 手动基准场景；在真实图形窗口比较切换和关闭行为。
+- 收敛本分支 CI 回归：Miri 大 STL 激活测试的解释执行耗时、macOS 页签动画时序断言，以及 Linux TSan 对未插桩 Rust `Mutex` 的跨语言误报；保留相应行为在 Rust、ASan/UBSan 和普通 QML 测试中的验证。
 
 不包含：
 
@@ -60,6 +61,7 @@
 4. 通过 ViewModel 暴露导入记录模型和单一活动文档 ID；QML 用一个视口和文档标签组件呈现状态；集成导入成功后的新页签激活，并同步整理工程树选中反馈与 Part / Study Tasks 检查器排版。
 5. 实现可测的资源保留/释放策略，处理项目代次失效、迟到结果、加载失败、重复点击、活动标签关闭与全标签关闭后的空白视口；删除旧 `Model / Mesh / Results` 视口切换路径和其仅由该路径使用的资源。
 6. 完成 Rust / ViewModel / QML 行为测试、CPU / GPU 手动性能场景和真窗口 VTK 生命周期验收，同步 063、068、073、QML 规范或架构中确需更新的契约与索引。
+7. 用 `gh` 核对失败作业与前次 Miri 日志，缩小激活测试样本且保持取消/去重/过期语义；修正动画断言等待；按 042 已登记的边界收窄 TSan 排除；为文档页签增加构造、切换、关闭的 CPU/GPU 消融场景并实测。
 
 ## 预计改动
 
@@ -104,7 +106,12 @@
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 聚合回归、格式、静态检查和差异空白检查通过 | 全部通过；CTest 62/62，包含页签像素、鼠标释放光标与重排回归；lint 完成 Clippy、依赖、CMake、qmllint、clang-tidy、include-cleaner、cppcheck。 |
 | 2026-09-28 | 分支整体评审后 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff main --check` | 清理后构建、回归与静态检查通过 | 构建、聚合测试（CTest 62/62）、格式及差异检查通过。lint 首次受沙箱 TCP 锁限制，授权重跑后完整 8 阶段通过；clang-tidy 首轮自动修复与同时编辑冲突，源码已修复并以串行重跑通过。 |
 | 2026-09-28 | 提交前 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、暂存差异检查 | 以本次提交内容复核代码、测试和文档 | 构建与格式检查通过；聚合测试 CTest 62/62；lint 完整 8 阶段通过。活动页签关闭按钮和资产丢失消息的新断言均通过；本次没有重新执行真窗口或手动性能基准。 |
-| — | CPU / GPU 基准 | 按以上验收验证实际实现 | 本次未重跑；原有记录不替代重跑证据 |
+| 2026-09-28 | `gh run view 36402570741 --job ... --log`，并对照 run 36265495455 的 Miri 作业 | 定位本分支远端失败 | 两次 Miri 都在 `tests/rust/activation.rs::duplicate_begin_reuses_in_flight_attempt` 的 35 万三角形样本处失败或卡顿，最新作业在约 9 分钟时被取消；macOS ASan/UBSan 是动画 `x` 尚为 `2.087...` 时断言等于 `2`；Linux TSan 仅两个 ViewModel 异步激活用例报告 Rust 未插桩 `Mutex` 结果队列竞态，属于 042 已登记边界。clang-tidy 作业成功，两个手动 benchmark 源文件都进入其编译数据库并接受静态检查，程序本身未作为 CI 性能门禁运行。 |
+| 2026-09-28 | `MIRIFLAGS=-Zmiri-disable-isolation CARGO_TARGET_DIR=target/miri cargo +nightly-2026-09-15 miri test --locked -p panta-core --test activation` | 缩小解释执行样本后仍覆盖成功、取消、去重和代次失效 | macOS arm64 本地 8/8 通过，约 6.93 秒；首次 2000 三角形仍在 10 秒等待限内失败，缩至 100 后通过；代次失效用例给故意分离的 worker 留出结束时间，避免测试进程退出时 Miri 报未结束线程。远端 CI 尚待新提交复跑。 |
+| 2026-09-28 | `MIRIFLAGS=-Zmiri-disable-isolation CARGO_TARGET_DIR=target/miri cargo +nightly-2026-09-15 miri test --locked -p panta-core -p panta-dsl-core -p panta-foundation` | 全量纯 Rust Miri；容量压力按 032 边界处理 | macOS arm64 退出码 0：`panta-core` 40 单测、8 激活及 15 工程集成测试通过；`panta-dsl-core` 单测、catalog、features 和 FSM 全部通过，features/FSM 各 2 个超大容量用例按登记跳过；`panta-foundation` 无测试。首次运行时 512 边容量用例在 Pest 解释执行超过两分钟仍未完成，故新增该两项跳过。`cargo ub-check` 的 rustup 安装步骤因本机沙箱禁止写 `~/.rustup` 无法执行，直接运行的是 runner 后续完全相同的 Miri 命令。 |
+| 2026-09-28 | `QT_QPA_PLATFORM=offscreen QT_QUICK_CONTROLS_STYLE=Basic target/native/debug/qml/panta_qml_cpu_benchmark` | 文档页签构造、32 次切换与关闭末项分别计时 | macOS 26.3.1 arm64、Qt 6.11.2、debug；1 次预热、31 次采样，最终源码重建后 3/3 通过。8 页签构造 p50/p95=974/1321 µs，切换=326/610 µs，关闭=910/1241 µs；24 页签分别为 2829/4823、482/2484、3165/5745 µs。仅为 QML CPU 更新成本，不推断 GPU 耗时。 |
+| 2026-09-28 | `PantaBenchmark.app` 临时 wrapper 启动 `PANTA_BENCHMARK_DOCUMENT_TABS_ONLY=1 QT_QUICK_CONTROLS_STYLE=Basic` 的 `panta_qml_gpu_benchmark` | 真实窗口下比较页签静态、可见页签切换、首项关闭/重开 | macOS 26.3.1 arm64、Qt 6.11.2、Metal、debug；真实 1000×700 窗口，30 帧预热，每场景 3×60 帧。8 页签静态 p50/p95=16.64/24.24 ms、切换=16.67/23.65 ms、关闭/重开=16.61/23.04 ms；24 页签分别为 16.67/23.76、16.67/22.86、16.67/17.64 ms。三项均通过，数值含垂直同步与窗口合成，不能据此称为 GPU 内核耗时或性能改进。 |
+| 2026-09-28 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo test --locked -p panta-dsl-core --test fsm`、`cargo format --check`、`cargo lint`、`cargo sanitize` | 完成前的聚合与 CI 失败路径复核 | build、format、lint 八阶段均通过；Cargo 聚合 CTest 62/62（含页签动画断言），普通 FSM 20/20（含容量阈值）；macOS ASan/UBSan 62/62、TSan 47/47。TSan 排除两项经 FFI 拉取 Rust 异步结果的测试，其余五个 ViewModel 用例继续执行。远端三平台 CI 尚需新提交触发确认。 |
 
 ## 风险与回退
 

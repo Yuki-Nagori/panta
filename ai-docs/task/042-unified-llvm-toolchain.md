@@ -24,7 +24,7 @@
 
 - **Windows ASan × 未插桩 CXX**：MSVC STL 的容器注解经 `detect_mismatch`（annotate_string/vector/optional）固化进目标文件，插桩对象 =1 与 panta_ffi 未插桩 C++ 对象 =0 在链接期 failifmismatch。按 STL 官方开关 `_DISABLE_STL_ANNOTATION` 在 sanitizer 树统一关闭注解（其文档场景即静态库混链），代价是 Windows 矩阵失去 STL 容器溢出检测；Rust 侧 C++ 维持不插桩口径。
 - **Windows ASan × 未插桩 Qt DLL**：clang ASan 在 Windows 用自有分配器，未插桩 Qt DLL 走 ucrt/RTL 堆，QML 引擎跨模块对象生命周期释放到错误堆触发 bad-free（abort，非报告，不可抑制）。Windows asan 组合经 runner 排除 `Qml.*`；纯自有 C++ 与 FFI 测试不受影响。
-- **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。tsan 组合经 runner 排除 `TaskHost.*`/`Ffi.*`（FFI 驱动 Rust 线程）与 `Qml.*`（第三方栈噪声），`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。
+- **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。tsan 组合经 runner 排除 `TaskHost.*`/`Ffi.*`（FFI 驱动 Rust 线程）、`Qml.*`（第三方栈噪声），以及 `ProjectViewModelTest` 中经 FFI 拉取 Rust 异步激活结果的两个用例。后两者在普通 CTest 和 ASan/UBSan 中运行，Rust 协调器另由 Miri 检查；其余五个 `ProjectViewModelTest` 仍由 TSan 执行。`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。升级为 Rust/C++ 双侧 TSan 插桩后复查排除项。
 
 ## 本轮修复范围（2026-09-19）
 
@@ -102,6 +102,7 @@ clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及�
 | 2026-09-19 | ABI 元数据夹具：改前 configure 失败；改后 `check-abi.cmake` 的 valid/runtime/iterator 三场景 | 通过；隔离供给检查后正例成功、两种错误覆盖均被拒绝；使用 Apple Clang，仅验证 CMake 元数据策略 |
 | 2026-09-19 | `gh run list --limit 5`，核对最近远程 CI | 最新可见 run 35356240701 为旧提交 6ae8ed3，结论 failure；不能将旧绿灯或本机系统旁路用作当前 LLVM 实现的三平台证据 |
 | 2026-09-21 | macOS arm64；`cargo sanitize`（托管 LLVM 22.1.7，asan-ubsan 与 tsan 两棵独立插桩树，完整 CTest） | 通过：两树各 49/49（asan-ubsan 约 20s，tsan 约 66s，TSan 初始化显著变慢）；LeakSanitizer 按官方文档显式 `detect_leaks=1`，第三方噪声按抑制清单处理 |
+| 2026-09-28 | macOS arm64；任务 080 修订后 `cargo sanitize` | ASan/UBSan 62/62，TSan 47/47；异步激活两例在 ASan/UBSan 运行，TSan 精确排除，其他五个 ViewModel 用例仍通过。Linux CI 的同组合结果待新提交复跑。 |
 | 2026-09-21 | 受控失败实证：托管 clang 分别构造 signed-overflow、heap-buffer-overflow、自有代码泄漏样本 | 均非零退出：UBSan 报 `signed integer overflow` exit 134（`-fno-sanitize-recover=undefined` 生效）；ASan 报 `heap-buffer-overflow` exit 134；LSan 在抑制清单生效下仍报自有泄漏 exit 1，证明清单不掩盖自有代码 |
 | 2026-09-21 | Linux x86_64 / Windows x64 sanitizer 与 CI `sanitize` 矩阵 | 未在本机运行；job 已接线（Windows 仅 ASan），等待当前提交的三平台 CI 证据，不宣称三平台等价 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`：macOS/Linux/Windows build and test jobs | 三平台构建与测试成功：Linux CTest 56/56、macOS ASan/UBSan CTest 56/56、Windows CTest 54/54。没有单独证明每个平台的 clean/incremental Debug/Release 和全部 SDK/ABI 组合，因此该验收项仍未完成。 |

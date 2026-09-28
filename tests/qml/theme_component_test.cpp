@@ -504,8 +504,7 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(bar, "drag_move", Q_ARG(QVariant, 60.0)));
         QVERIFY(welcomeTab->x() > 2.0);
         QVERIFY(QMetaObject::invokeMethod(bar, "finish_drag", Q_ARG(QVariant, true)));
-        QTest::qWait(200);
-        QCOMPARE(welcomeTab->x(), 2.0);
+        QTRY_COMPARE(welcomeTab->x(), 2.0);
 
         // 悬停移动不能复用上一次按下坐标；真实左键拖动才进入拖拽态。
         QTest::mouseMove(&window, QPoint(20, 20));

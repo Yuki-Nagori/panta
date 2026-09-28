@@ -31,6 +31,8 @@ impl Drop for Fixture {
 }
 
 const SAMPLE_STL: &[u8] = b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n";
+// Miri 逐条解释执行写入和解析；并发语义只要求 worker 在提交后的检查点仍在飞。
+const IN_FLIGHT_TRIANGLES: usize = if cfg!(miri) { 100 } else { 350_000 };
 
 fn import_sample_stl(
     service: &mut ProjectService,
@@ -196,7 +198,7 @@ fn cancel_request_terminates_as_cancelled() -> Result<(), Box<dyn std::error::Er
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
-    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, 350_000)?;
+    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, IN_FLIGHT_TRIANGLES)?;
 
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
@@ -218,7 +220,7 @@ fn project_switch_invalidates_in_flight_results() -> Result<(), Box<dyn std::err
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
-    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, 350_000)?;
+    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, IN_FLIGHT_TRIANGLES)?;
 
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
@@ -226,7 +228,7 @@ fn project_switch_invalidates_in_flight_results() -> Result<(), Box<dyn std::err
     // 切换工程（新会话代次）：旧 attempt 立即失效，结果不跨会话发布。
     reopened.create(&fixture.root, "Other")?;
     assert!(reopened.drain_asset_activations().is_empty());
-    std::thread::sleep(Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(if cfg!(miri) { 2_000 } else { 200 }));
     assert!(
         reopened.drain_asset_activations().is_empty(),
         "迟到成功不得覆盖新工程会话"
@@ -240,7 +242,7 @@ fn duplicate_begin_reuses_in_flight_attempt() -> Result<(), Box<dyn std::error::
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
-    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, 350_000)?;
+    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, IN_FLIGHT_TRIANGLES)?;
 
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
