@@ -5,11 +5,11 @@
 - 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-26
+- 创建 / 更新：2026-09-24 / 2026-09-28
 
 ## 目标与背景
 
-将 `ViewportPane.qml` 底部目前用于 `Model / Mesh / Results` 分类切换的 `PanelTabBar` 替换为浏览器式文档页签。每次进入已打开的工程工作区时默认创建并选中 `Welcome`，显示现有 VTK `panta` 立体字样；成功导入 STL 后自动打开对应页签。用户点击工程树中的 STL 时，已打开的导入记录直接切到现有页签；尚未打开的记录从 `.panta` 工程资产异步读取并解析，成功后建立页签并显示网格。活动页签 ID 是视口显示内容的唯一选择状态：ViewModel 同步向 QML 投影选中项并向单个 CaeViewport 提供对应场景；QML 不并行维护另一份可分歧的选择值。每个页签（含 Welcome）均有关闭按钮；关闭只是结束当前 UI 会话中的打开视图，不删除工程记录、不改工程 dirty 状态。关闭最后一个页签后视口留空，用户可再从工程树打开 STL。配套整理左侧工程树与 Part / Study Tasks 检查器的行高、图标尺寸、选择底色、标题分隔线、缩进和文字对齐，让用户清楚看见所选 STL 与当前任务检查器的对应关系；不改变原工程树和检查器的数据/命令语义。
+将 `ViewportPane.qml` 底部目前用于 `Model / Mesh / Results` 分类切换的 `PanelTabBar` 替换为浏览器式文档页签。每次进入已打开的工程工作区时默认创建并选中 `Welcome`，显示现有 VTK `panta` 立体字样；成功导入 STL 后自动打开对应页签。用户点击工程树中的 STL 时，已打开的导入记录直接切到现有页签；尚未打开的记录先建立 Loading 页签，再从 `.panta` 工程资产异步读取并解析，成功后激活并显示网格。活动页签 ID 是视口显示内容的唯一选择状态：ViewModel 同步向 QML 投影选中项并向单个 CaeViewport 提供对应场景；QML 不并行维护另一份可分歧的选择值。每个页签（含 Welcome）均有关闭按钮；关闭只是结束当前 UI 会话中的打开视图，不删除工程记录、不改工程 dirty 状态。关闭最后一个页签后视口留空，用户可再从工程树打开 STL。配套整理左侧工程树与 Part / Study Tasks 检查器的行高、图标尺寸、选择底色、标题分隔线、缩进和文字对齐，让用户清楚看见所选 STL 与当前任务检查器的对应关系；不改变原工程树和检查器的数据/命令语义。
 
 首次打开旧导入记录是本功能的异步领域操作：Rust 要按稳定导入 ID 解析工程资产并重建网格，操作可能受文件大小影响；工程切换、关闭待加载页签或快速连续选择还会产生取消和迟到结果。因此它作为 [073](073-fsm-dsl-and-import-state-machine.md) 的首个 FSM 消费者。纯粹激活已就绪页签、改变选中态和关闭非活动页签仍是同步 UI 操作，不经 FSM。
 
@@ -35,6 +35,7 @@
 - 视口区域始终复用一个 `CaeViewport` / native VTK render window；每个文档标签不创建独立 GPU 窗口、VTK interactor 或场景树。
 - 记录打开页签的网格快照、VTK 显示数据、取消工作和关闭操作的所有权；关闭文件标签后，其独占数据与渲染资源应能释放。
 - 新增或拆分 QML 组件时按 [QML 性能基准规范](../standards/qml.md#性能基准) 把组件加入 CPU / GPU 手动基准场景；在真实图形窗口比较切换和关闭行为。
+- 收敛本分支 CI 回归：Miri 大 STL 激活测试的解释执行耗时、macOS 页签动画时序断言，以及 Linux TSan 对未插桩 Rust `Mutex` 的跨语言误报；保留相应行为在 Rust、ASan/UBSan 和普通 QML 测试中的验证。
 
 不包含：
 
@@ -60,6 +61,7 @@
 4. 通过 ViewModel 暴露导入记录模型和单一活动文档 ID；QML 用一个视口和文档标签组件呈现状态；集成导入成功后的新页签激活，并同步整理工程树选中反馈与 Part / Study Tasks 检查器排版。
 5. 实现可测的资源保留/释放策略，处理项目代次失效、迟到结果、加载失败、重复点击、活动标签关闭与全标签关闭后的空白视口；删除旧 `Model / Mesh / Results` 视口切换路径和其仅由该路径使用的资源。
 6. 完成 Rust / ViewModel / QML 行为测试、CPU / GPU 手动性能场景和真窗口 VTK 生命周期验收，同步 063、068、073、QML 规范或架构中确需更新的契约与索引。
+7. 用 `gh` 核对失败作业与前次 Miri 日志，缩小激活测试样本且保持取消/去重/过期语义；修正动画断言等待；按 042 已登记的边界收窄 TSan 排除；为文档页签增加构造、切换、关闭的 CPU/GPU 消融场景并实测。
 
 ## 预计改动
 
@@ -76,15 +78,15 @@
 
 ## 验收标准
 
-- [ ] 每次进入工程工作区时只有活动 `Welcome` 页签并显示现有默认 `panta` 3D 场景；打开新项目不继承旧工程活动文件页签。Welcome 和 STL 页签都有关闭按钮，旧 `Model / Mesh / Results` 视口类别条不再出现。
-- [ ] 新导入成功后自动出现并激活一个 STL 页签；工程树点击同一稳定 ImportRecord ID 不会重复创建标签，点击未打开记录时先异步加载成功再打开。
+- [x] 每次进入工程工作区时只有活动 `Welcome` 页签并显示现有默认 `panta` 3D 场景；打开新项目不继承旧工程活动文件页签。Welcome 和 STL 页签都有关闭按钮，旧 `Model / Mesh / Results` 视口类别条不再出现。
+- [x] 新导入成功后自动出现并激活一个 STL 页签；工程树点击同一稳定 ImportRecord ID 不会重复创建标签，点击未打开记录时先创建 Loading 页签，异步加载成功后激活。
 - [ ] 已打开页签之间切换时，单一 ViewModel 活动文档 ID、选中页签和 CaeViewport 场景始终对应；标签名冲突时仍能区分对象；关闭非活动标签不改变当前视口，关闭活动标签按定义选择相邻页签；关闭全部标签后视口及标签栏为空白。
-- [ ] 灰色标签带底边存在一条连续白色细线；活动标签上沿圆角完整，左右下角圆弧对称接入白线，交界无凸点、露底或错位；关闭图标视觉居中，hover / active 背景圆角为 5px，标签选中和各交互态无颜色分裂。
+- [x] 灰色标签带底边存在一条连续白色细线；活动标签上沿圆角完整，左右下角圆弧对称接入白线，交界无凸点、露底或错位；关闭图标视觉居中，hover / active 背景圆角为 5px，标签选中和各交互态无颜色分裂。
 - [ ] 页签可通过水平拖拽重排；拖动非活动标签时立即将其激活；拖动标签保持不透明、持续跟随指针且只沿 X 轴位移，跨越多个相邻标签期间拖拽不被中断，相邻标签平滑让位，松开后拖动标签动画归位；尊重减少动态效果偏好；垂直手势不触发重排，拖动关闭按钮不开始重排；重排后标签与其文档 ID、活动态及视口内容保持一致。
 - [ ] 文档页签宽度固定为 130px，长标题以省略号截断；文档标签带内边距为 `2px 2px 0 2px`，首个 tab 左侧仍缩进 2px；滚动裁切不截掉首末活动标签的圆弧，其他 `.tabs` 使用处维持原有间距。
-- [ ] 文件标签关闭只释放本次运行期视图数据，不删 ImportRecord / 资产、不设工程 dirty、不推进 revision；关闭 / 切换工程后所有旧 session 的页签、快照与结果失效。
-- [ ] 工程树 STL 的选中底色与对应 Part/Study Tasks 标题易辨认；树层级、任务行图标与文字对齐清楚，相关块的分隔、字号和密度与新文档页签一致。
-- [ ] 加载失败、取消、同记录重复请求、项目代次切换、旧 attempt 迟到成功 / 失败都有确定行为；旧结果不能覆盖当前视口或泄漏 mesh / VTK 资源。
+- [x] 文件标签关闭只释放本次运行期视图数据，不删 ImportRecord / 资产、不设工程 dirty、不推进 revision；关闭 / 切换工程后所有旧 session 的页签、快照与结果失效。
+- [x] 工程树 STL 的选中底色与对应 Part/Study Tasks 标题易辨认；树层级、任务行图标与文字对齐清楚，相关块的分隔、字号和密度与新文档页签一致。
+- [x] 加载失败、取消、同记录重复请求、项目代次切换、旧 attempt 迟到成功 / 失败都有确定行为；旧结果不能覆盖当前视口或泄漏 mesh / VTK 资源。
 - [ ] 任意时刻最多一个 `CaeViewport`、一个 render window 和一套活动 VTK actor/mapper；关闭/切换重复循环后无旧 actor、回调、snapshot 或设备资源残留。
 - [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；记录内存高水位与切换/重载延迟，达到约定预算时行为明确，不发生无界增长。
 - [ ] QML 键盘 / 焦点 / 可访问名称可用；适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
@@ -93,13 +95,23 @@
 
 ## 验证计划与结果
 
-尚未实施。根目录按仓库锁定工具链执行 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check` 与 `cargo lint`。另外以受控后端测试每一终态、取消/迟到竞态和对象释放；用真实图形窗口验证 WebGPU 单视口替换数据及关闭释放，手动运行 069 CPU / GPU 基准，不把这些性能基准注册为 CI 时间门禁。
+根目录按仓库锁定工具链执行 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check` 与 `cargo lint`。另外以受控后端测试每一终态、取消/迟到竞态和对象释放；用真实图形窗口验证 WebGPU 单视口替换数据及关闭释放，手动运行 069 CPU / GPU 基准，不把这些性能基准注册为 CI 时间门禁。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-24 | `node --check ai-docs/qml-html/shell.js`、差异空白检查与交互源审阅 | Welcome 默认态、导入记录打开/去重、切换、关闭、全标签关闭后空白逻辑无语法/结构问题 | JS 语法与静态检查通过；本地浏览器预览未能打开，页面目视复核待后续真实窗口验收 |
 | 2026-09-25 | `node --check ai-docs/qml-html/shell.js`、`git diff HEAD --check`、页签拖拽静态断言 | 普通点击保留 tab 事件目标；非活动标签拖动时先激活；被拖标签不透明并跟随指针，只沿 X 轴移动；稳定指针捕获让重排可持续至松手；tab 固定 130px、长标题截断 | JS 语法、差异空白及目标静态断言通过；拖动阈值前不捕获指针，开始拖动后捕获稳定列表；实际浏览器拖拽未验收，本地 file URL 被浏览器安全策略拦截 |
-| — | Rust FSM、Cargo 聚合、真窗口和 CPU / GPU 基准 | 按以上验收验证实际实现 | 未实施 |
+| 2026-09-28 | [GitHub Actions run 36265495455](https://github.com/Yuki-Nagori/panta/actions/runs/36265495455) | 当前分支 CI 全绿 | Ubuntu 构建测试、native coverage/QML、sanitizer 三处因同一 `ThemeComponentTest::document_tab_connectors_follow_html_reference` 像素断言失败：`(60,20)` 为灰色文字像素，非白色页签背景；其他已运行检查成功，Miri 作业取消。待修复并重跑。 |
+| 2026-09-28 | `cargo build --locked`；临时 `PantaPreview.app` 真实窗口 | Welcome/导入页签与 GPU 网格可见；拖拽重排并归位 | 构建通过。真窗口显示白色 P、两侧页签圆弧；临时工程导入三角形 STL 后网格可见；保存 `.panta`、重开、双击树中 STL 后网格仍可见；两个页签拖动后换序并归位。 |
+| 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 聚合回归、格式、静态检查和差异空白检查通过 | 全部通过；CTest 62/62，包含页签像素、鼠标释放光标与重排回归；lint 完成 Clippy、依赖、CMake、qmllint、clang-tidy、include-cleaner、cppcheck。 |
+| 2026-09-28 | 分支整体评审后 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff main --check` | 清理后构建、回归与静态检查通过 | 构建、聚合测试（CTest 62/62）、格式及差异检查通过。lint 首次受沙箱 TCP 锁限制，授权重跑后完整 8 阶段通过；clang-tidy 首轮自动修复与同时编辑冲突，源码已修复并以串行重跑通过。 |
+| 2026-09-28 | 提交前 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、暂存差异检查 | 以本次提交内容复核代码、测试和文档 | 构建与格式检查通过；聚合测试 CTest 62/62；lint 完整 8 阶段通过。活动页签关闭按钮和资产丢失消息的新断言均通过；本次没有重新执行真窗口或手动性能基准。 |
+| 2026-09-28 | `gh run view 36402570741 --job ... --log`，并对照 run 36265495455 的 Miri 作业 | 定位本分支远端失败 | 两次 Miri 都在 `tests/rust/activation.rs::duplicate_begin_reuses_in_flight_attempt` 的 35 万三角形样本处失败或卡顿，最新作业在约 9 分钟时被取消；macOS ASan/UBSan 是动画 `x` 尚为 `2.087...` 时断言等于 `2`；Linux TSan 仅两个 ViewModel 异步激活用例报告 Rust 未插桩 `Mutex` 结果队列竞态，属于 042 已登记边界。clang-tidy 作业成功，两个手动 benchmark 源文件都进入其编译数据库并接受静态检查，程序本身未作为 CI 性能门禁运行。 |
+| 2026-09-28 | `MIRIFLAGS=-Zmiri-disable-isolation CARGO_TARGET_DIR=target/miri cargo +nightly-2026-09-15 miri test --locked -p panta-core --test activation` | 缩小解释执行样本后仍覆盖成功、取消、去重和代次失效 | macOS arm64 本地 8/8 通过，约 6.93 秒；首次 2000 三角形仍在 10 秒等待限内失败，缩至 100 后通过；代次失效用例给故意分离的 worker 留出结束时间，避免测试进程退出时 Miri 报未结束线程。远端 CI 尚待新提交复跑。 |
+| 2026-09-28 | `MIRIFLAGS=-Zmiri-disable-isolation CARGO_TARGET_DIR=target/miri cargo +nightly-2026-09-15 miri test --locked -p panta-core -p panta-dsl-core -p panta-foundation` | 全量纯 Rust Miri；容量压力按 032 边界处理 | macOS arm64 退出码 0：`panta-core` 40 单测、8 激活及 15 工程集成测试通过；`panta-dsl-core` 单测、catalog、features 和 FSM 全部通过，features/FSM 各 2 个超大容量用例按登记跳过；`panta-foundation` 无测试。首次运行时 512 边容量用例在 Pest 解释执行超过两分钟仍未完成，故新增该两项跳过。`cargo ub-check` 的 rustup 安装步骤因本机沙箱禁止写 `~/.rustup` 无法执行，直接运行的是 runner 后续完全相同的 Miri 命令。 |
+| 2026-09-28 | `QT_QPA_PLATFORM=offscreen QT_QUICK_CONTROLS_STYLE=Basic target/native/debug/qml/panta_qml_cpu_benchmark` | 文档页签构造、32 次切换与关闭末项分别计时 | macOS 26.3.1 arm64、Qt 6.11.2、debug；1 次预热、31 次采样，最终源码重建后 3/3 通过。8 页签构造 p50/p95=974/1321 µs，切换=326/610 µs，关闭=910/1241 µs；24 页签分别为 2829/4823、482/2484、3165/5745 µs。仅为 QML CPU 更新成本，不推断 GPU 耗时。 |
+| 2026-09-28 | `PantaBenchmark.app` 临时 wrapper 启动 `PANTA_BENCHMARK_DOCUMENT_TABS_ONLY=1 QT_QUICK_CONTROLS_STYLE=Basic` 的 `panta_qml_gpu_benchmark` | 真实窗口下比较页签静态、可见页签切换、首项关闭/重开 | macOS 26.3.1 arm64、Qt 6.11.2、Metal、debug；真实 1000×700 窗口，30 帧预热，每场景 3×60 帧。8 页签静态 p50/p95=16.64/24.24 ms、切换=16.67/23.65 ms、关闭/重开=16.61/23.04 ms；24 页签分别为 16.67/23.76、16.67/22.86、16.67/17.64 ms。三项均通过，数值含垂直同步与窗口合成，不能据此称为 GPU 内核耗时或性能改进。 |
+| 2026-09-28 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo test --locked -p panta-dsl-core --test fsm`、`cargo format --check`、`cargo lint`、`cargo sanitize` | 完成前的聚合与 CI 失败路径复核 | build、format、lint 八阶段均通过；Cargo 聚合 CTest 62/62（含页签动画断言），普通 FSM 20/20（含容量阈值）；macOS ASan/UBSan 62/62、TSan 47/47。TSan 排除两项经 FFI 拉取 Rust 异步结果的测试，其余五个 ViewModel 用例继续执行。远端三平台 CI 尚需新提交触发确认。 |
 
 ## 风险与回退
 
@@ -112,7 +124,16 @@
 - 2026-09-24：本任务只登记 HTML 原型和实现边界，不修改 QML 产品代码；打开标签的快照缓存上限需由真实 STL 基准决定。
 - 2026-09-25：完成 HTML 参考的标签切换、关闭、固定宽度与水平拖动跟手和邻项动画；普通点击不捕获指针，真实拖动才由稳定列表捕获，拖动开始时激活目标标签。QML、ViewModel、FSM 和资源生命周期仍待实施。
 - 2026-09-26：审计 063/068/073 现状后冻结契约（实施前置）。①相关性 DTO：ProjectService 新增会话级 `generation`（create/open 各递增，不持久化、不等于 revision）；`attempt` 为进程内单调 u64；信封为 `(generation, attempt, ImportRecord.id)`。②流程图 `open-saved-stl`：`Idle → LoadingAsset → Parsing → Ready`，终态 `Failed / Cancelled / Expired`；guard `record-valid` 在 begin 提交边界求值（拒绝时同步返回错误、不建 attempt、不落 Failed 终态），guard `session-current` 在完成边界求值；取消检查点为分块读取阶段与解析完成边界，`parse_stl` 本身不可中断（073 设计允许），边界 guard 拒绝即释放过期快照。③begin/去重：同 `(generation, record)` 的在飞 attempt 直接复用返回同一 id；终态后可重新 begin；generation 变更时协调器立即对在飞 attempt 投递 `generation-invalidated`，drain 再按当前 generation 过滤兜底，过期/迟到快照在 Rust 侧释放、不跨 FFI。④UI 语义：页签状态 `Loading / Ready / Failed`；点击未打开记录立即建 Loading 页签但不激活，成功后激活；失败保留 Failed 页签与上一个可见视口；Loading/Failed 页签不可被激活（拖拽仅重排），活动文档恒为 Ready；关闭 Loading 页签取消 attempt；关闭全部页签后视口空白（隐藏 welcome 字样，复用 `RenderScene.primitive_visible` 区分 Welcome 与空白）。⑤快照保留基线：所有打开 Ready 页签在 ViewModel 保留 CPU 快照（上限=打开页签数），单一 `CaeViewport`/VTK actor 切换；069 基准测量内存高水位与切换延迟后再评估预算逐出。⑥`open()` 不再同步重载最新导入网格（消除同步/异步双路径），`current_mesh` 仅由会话内 `import_stl` 产出，重开工程后视口为 Welcome。⑦ViewModel 是活动文档 ID 与视口快照唯一权威；工程树选中行为活动文档投影，Part 检查器标题跟随活动导入页签（无活动时回退最新记录，保持 068 其余语义）。
+- 2026-09-28：复核当前分支及 CI，追加本次收敛范围：修正 Ubuntu 像素测试误取文字颜色、对照 HTML 调整活动标签凹弧的几何和白线交界；审查并修复文档激活结果的 attempt 相关性与失败收敛、拖拽跟手等实际缺陷，精简偏离注释规范的逐句或不准确说明。所有修复以同一任务的行为验收和 Cargo 聚合入口为准。
+- 2026-09-28：用户反馈释放后页签未归位、右侧圆弧错位、左侧抗锯齿接缝、Welcome 图标文字颜色，以及悬停误触发拖动。拖动改为稳定委托与槽位坐标动画，释放/取消清理按下身份，移动期间校验左键状态；右侧圆弧改为反向 `PathArc`，左右连接处与主体重叠 1px。Theme 的重复 12px 图标尺寸合并，删除无效说明性注释。
+- 2026-09-28：用户反馈拖动释放后光标未恢复，光标形状现由当前 `MouseArea.pressed` 与当前页签拖动状态共同决定；QTest 覆盖悬停、左键拖动与释放后的形状。用户又发现 `.panta` 重开后双击 STL 不显示：排查出 `CaeViewport::refresh_mesh()` 把 Welcome 占位开关应用于网格 actor，已改为“有网格即显示，只有无网格时才看占位开关”。临时 `.panta` 在真窗口重开并双击 STL 后，网格实际显示。
+- 2026-09-28：用户反馈活动页签的关闭 X 在选中时丢失底色。按 HTML 参考区分关闭按钮悬停与按下态，确保活动和非活动页签均显示背景反馈；补 QML 鼠标事件回归，并重跑适用的 Cargo 入口。
+- 2026-09-28：用户进一步提供 `test_4 / mug.stl` 的重开场景，三角形 STL 的通过结果不足以证明该模型可显示。追加对真实模型的加载终态、页签激活及视口画面核查；如当前主机的 Documents 隐私权限阻止直接读文件，改由应用文件选择器复现并记录具体限制。
+- 2026-09-28：用户确认复现条件是先关闭 Welcome 再双击工程树中的 STL。真窗口核查表明资产激活成功、活动页签已切到 `mug.stl`，但 VTK 画面仍空白。空白态会先隐藏 actor；恢复网格时将 actor 可见性更新前移到相机裁剪范围计算之前，避免按隐藏场景重设裁剪面。补 ViewModel 从全部页签关闭后的重新激活回归；用户随后确认该场景已修复。诊断日志仅临时用于定位，不保留在提交中。
+- 2026-09-28：用户要求对当前分支相对 `main` 的完整差异做代码与注释评审。复核功能实现、测试、资源和任务记录的职责与一致性，删除死代码、临时诊断与逐句解释型注释；只修正与 080 行为相关且有证据的问题，再以 Cargo 聚合入口重新验收。
+- 2026-09-28：完整差异评审清理了 ViewModel 未实现声明与空转信号封装，统一激活失败码解析；页签模型同步按 ID 建索引以保持委托身份并避免逐项线性查找；移除历史性注释。审计时发现同名页签可见消歧、性能高水位、反复切换资源释放、键盘可访问性、系统减少动态效果接线及手动基准尚无完整证据，将相关验收项恢复为未完成，不以本地构建通过代替这些结论。
+- 2026-09-28：提交前复核分支完整差异和暂存边界；修正文档对 Loading 页签建立时机及 ViewModel 职责的不准确描述，补活动页签关闭按钮的悬停/按下回归，并将资产丢失测试改为验证具体用户消息。其余待验收项目保持 `in-progress`。
 
 ## 完成摘要
 
-未完成。HTML 交互参考已更新；QML、ViewModel、FSM、缓存/释放和性能验收仍待实施，任务保持 `in-progress`。
+核心实现已进入分支，CI 像素断言、圆弧、拖动及 STL actor 可见性已在本地修复并经过真窗口复核；远端 CI 尚待重新运行。系统 reduced-motion 偏好源尚未接入，CPU / GPU 基准本次未重跑，任务保持 `in-progress`。

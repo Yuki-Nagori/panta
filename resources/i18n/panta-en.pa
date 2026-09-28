@@ -319,10 +319,6 @@ search-placeholder:
   src: Enter a keyword or phrase
   tr: Enter a keyword or phrase
 
-[ViewportPane]
-model:
-  src: Model
-  tr: Model
 
 [IconActionNewDocument]
 label:
@@ -625,3 +621,8 @@ move:
 close-tools:
   src: Close layer tools
   tr: Close layer tools
+
+[ProjectViewModel]
+welcome:
+  src: Welcome
+  tr: Welcome

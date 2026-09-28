@@ -1,5 +1,4 @@
-/// ProjectViewModel 验收测试（任务 057）：Qt 字符串适配、Rust 工程服务命令
-/// 生命周期、清单创建/打开/保存和可恢复错误。
+/// ProjectViewModel 回归：工程命令、错误映射及任务 080 的视口文档生命周期。
 
 #include "panta/visualization/mesh_source.hpp"
 #include "project_view_model.hpp"
@@ -15,6 +14,7 @@
 #include <QtTest/qtest.h>
 #include <array>
 #include <gtest/gtest.h>
+#include <qtestcase.h>
 
 using panta::bridge::ProjectViewModel;
 
@@ -157,7 +157,6 @@ int main(int argc, char** argv) {
     return RUN_ALL_TESTS();
 }
 
-
 TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
@@ -211,7 +210,7 @@ TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
     EXPECT_NE(view_model.mesh_snapshot(), nullptr);
 
-    // 关闭活动导入页签：无就绪邻位，回到 Welcome（空串并非 Welcome 场景）。
+    // 关闭最后一个活动页签后进入空白视口。
     view_model.closeDocument(QStringLiteral("import-1"));
     EXPECT_EQ(view_model.openDocuments().size(), 0);
     EXPECT_EQ(view_model.activeDocumentId(), QString{});
@@ -256,7 +255,8 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     const auto loading = reopened.openDocuments()[1].toMap();
     EXPECT_EQ(loading[QStringLiteral("id")].toString(), QStringLiteral("import-1"));
     EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
-    QTRY_COMPARE(loading[QStringLiteral("state")].toString(), QStringLiteral("ready"));
+    QTRY_COMPARE(reopened.openDocuments()[1].toMap()[QStringLiteral("state")].toString(),
+                 QStringLiteral("ready"));
     QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
     EXPECT_EQ(reopened.mesh_snapshot()->vertices.size(), 3U);
@@ -265,4 +265,83 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     const auto before = reopened.openDocuments().size();
     reopened.openImportRecord(QStringLiteral("import-99"));
     EXPECT_EQ(reopened.openDocuments().size(), before);
+
+    // 关闭 Welcome 和网格页签后从空白视口重新打开，不依赖占位页签存在。
+    reopened.closeDocument(QStringLiteral("import-1"));
+    EXPECT_EQ(reopened.openDocuments().size(), 1);
+    EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
+    reopened.closeDocument(QStringLiteral("welcome"));
+    EXPECT_TRUE(reopened.openDocuments().isEmpty());
+    EXPECT_TRUE(reopened.activeDocumentId().isEmpty());
+    EXPECT_FALSE(reopened.placeholder_visible());
+    reopened.openImportRecord(QStringLiteral("import-1"));
+    QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
+    QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
+}
+
+TEST(ProjectViewModelTest, ClosingLastTabFlipsPlaceholderVisibility) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+
+    EXPECT_TRUE(view_model.placeholder_visible());
+    view_model.closeDocument(QStringLiteral("welcome"));
+
+    EXPECT_FALSE(view_model.placeholder_visible());
+    EXPECT_TRUE(view_model.activeDocumentId().isEmpty());
+    EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
+}
+
+TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid sample\n"
+                           "facet normal 0 0 1\n"
+                           " outer loop\n"
+                           "  vertex 0 0 0\n"
+                           "  vertex 1 0 0\n"
+                           "  vertex 0 1 0\n"
+                           " endloop\n"
+                           "endfacet\n"
+                           "endsolid sample\n"),
+              0);
+    source.close();
+
+    ProjectViewModel view_model;
+    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(view_model.saveProject());
+    const auto assetPath = view_model.importedAssetPath();
+
+    ProjectViewModel reopened;
+    ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
+
+    // 资产损坏 → 加载失败：页签保留 Failed 态并携带原因，视口保持 Welcome。
+    ASSERT_TRUE(QFile::rename(assetPath, assetPath + QStringLiteral(".bak")));
+    reopened.openImportRecord(QStringLiteral("import-1"));
+    QTRY_COMPARE(reopened.openDocuments().size(), 2);
+    QTRY_COMPARE(reopened.openDocuments()[1].toMap()[QStringLiteral("state")].toString(),
+                 QStringLiteral("failed"));
+    EXPECT_EQ(reopened.openDocuments()[1].toMap()[QStringLiteral("message")].toString(),
+              QStringLiteral("The saved STL asset is missing from the project package."));
+    EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
+    EXPECT_EQ(reopened.mesh_snapshot(), nullptr);
+
+    // 关闭 Failed 页签：释放激活簿记，页签栏回到仅 Welcome。
+    reopened.closeDocument(QStringLiteral("import-1"));
+    EXPECT_EQ(reopened.openDocuments().size(), 1);
+    EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
+
+    // 资产恢复后重新打开：新 attempt 加载成功并激活。
+    ASSERT_TRUE(QFile::rename(assetPath + QStringLiteral(".bak"), assetPath));
+    reopened.openImportRecord(QStringLiteral("import-1"));
+    QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
+    QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
+    EXPECT_EQ(reopened.mesh_snapshot()->vertices.size(), 3U);
 }

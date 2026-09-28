@@ -132,7 +132,7 @@ Rectangle {
                                 ThemedIcon {
                                     anchors.centerIn: parent
                                     name: "caret-right"
-                                    iconSize: Theme.iconSizeCaret
+                                    iconSize: Theme.iconSizeCompact
                                 }
                             }
                             TextField {

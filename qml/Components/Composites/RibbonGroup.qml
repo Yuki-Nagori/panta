@@ -53,7 +53,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: group.showCaret
                 name: "caret-down"
-                iconSize: Theme.iconSizeCaret
+                iconSize: Theme.iconSizeCompact
                 color: Theme.colorTextMuted
             }
         }

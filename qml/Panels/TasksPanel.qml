@@ -11,6 +11,11 @@ PanelSurface {
     property bool projectOpen: false
     property string projectName: ""
     property var importedPartNames: []
+    // 稳定导入记录 ID，与 importedPartNames 按下标对应；行点击即请求
+    // 打开 / 激活对应视口文档（080）。
+    property var importedPartIds: []
+    property string activeDocumentId: ""
+    property string activeDocumentTitle: ""
     property bool importedPartAvailable: importedPartNames.length > 0
     property string importedPartName: ""
     readonly property var importedTaskItems: [
@@ -52,6 +57,10 @@ PanelSurface {
     signal closeRequested
     signal openProjectRequested
     signal newProjectRequested
+    signal openImportRequested(string recordId)
+
+    // Welcome 或空白视口没有对应导入记录，此时仍显示最近导入项。
+    readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 ? activeDocumentTitle : importedPartName
 
     implicitWidth: Theme.leftPanelMinimumWidth
 
@@ -154,9 +163,22 @@ PanelSurface {
                     required property var modelData
                     required property int index
 
+                    readonly property string recordId: panel.importedPartIds[index] ?? ""
+                    readonly property bool isActiveDocument: recordId !== "" && recordId === panel.activeDocumentId
+
                     width: projectTree.width
                     height: Theme.controlHeight
-                    color: index === panel.importedPartNames.length - 1 ? Theme.colorSelected : "transparent"
+                    color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : "transparent"
+
+                    HoverHandler {
+                        id: partHover
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    }
+                    TapHandler {
+                        id: partTap
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: panel.openImportRequested(importedPartEntry.recordId)
+                    }
 
                     RowLayout {
                         anchors.fill: parent
@@ -217,7 +239,7 @@ PanelSurface {
                             }
                             ThemedLabel {
                                 Layout.fillWidth: true
-                                text: qsTranslate("ProjectTaskItem", "Study Tasks: %1").arg(panel.importedPartName)
+                                text: qsTranslate("ProjectTaskItem", "Study Tasks: %1").arg(panel.activePartTitle)
                                 textSize: Theme.fontBody
                                 elide: Text.ElideRight
                             }
@@ -227,7 +249,7 @@ PanelSurface {
                     ThemedToolButton {
                         Layout.fillWidth: true
                         Layout.leftMargin: Theme.spacingMedium
-                        text: qsTranslate("ImportTask", "Part (%1)").arg(panel.importedPartName)
+                        text: qsTranslate("ImportTask", "Part (%1)").arg(panel.activePartTitle)
                         iconName: "project-file"
                         contentAlignLeft: true
                         contentColor: Theme.colorText

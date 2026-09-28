@@ -28,7 +28,7 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 |---|---|---|
 | 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
 | 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface` |
-| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`DocumentTabBar`（130px 视口文档页签：关闭、凹弧过渡、拖拽重排，080）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
 | 业务面板 | `qml/Panels/` | `TopChromePanel`、`RibbonPanel`、`TasksPanel`、`LayersPanel`、`PlaceholderPanel`（无 Bridge 变体用） |
 | Ribbon 页签 | `qml/Panels/Ribbon/` | `HomeRibbon`、`StartLearnRibbon`：各自的工具定义、启用条件与命令映射 |
 | 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |

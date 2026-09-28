@@ -331,7 +331,10 @@ transitions:
     Ok(())
 }
 
+// 容量边界必须构造 129 状态或 513 条边；Pest 在 Miri 中逐条解释执行超过
+// 可行时间。常规 cargo test 验证阈值，Miri 保留其余 FSM 解析行为测试。
 #[test]
+#[cfg_attr(miri, ignore)]
 fn rejects_state_and_transition_limits() -> Result<(), Box<dyn Error>> {
     let mut big_states = String::from(
         "version: 1
@@ -412,6 +415,7 @@ transitions:
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn accepts_documents_exactly_at_resource_limits() -> Result<(), Box<dyn Error>> {
     // 恰好 128 状态（127 active 链 + 1 终态）与 127 条边：合法上限内。
     let mut exact = String::from(

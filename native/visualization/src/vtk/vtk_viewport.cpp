@@ -565,6 +565,10 @@ void VtkViewport::sync_native_surface() {
     if (!impl_->scene_dirty && !resized) {
         return;
     }
+    // ResetCameraClippingRange 只计算可见 prop；恢复网格时先更新 actor 可见性。
+    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
+    impl_->welcome_scene.set_visible(impl_->pending.primitive_visible &&
+                                     impl_->pending.mesh == nullptr);
     if (resized) {
         stop_camera_transition();
         impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());
@@ -580,9 +584,6 @@ void VtkViewport::sync_native_surface() {
     impl_->renderer->SetBackground(impl_->pending.background.redF(),
                                    impl_->pending.background.greenF(),
                                    impl_->pending.background.blueF());
-    impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
-    impl_->welcome_scene.set_visible(impl_->pending.primitive_visible &&
-                                     impl_->pending.mesh == nullptr);
     impl_->render_window->Render();
     qCDebug(viewport_log) << "frame submitted" << pixel_size;
     impl_->applied_pixel_size = pixel_size;

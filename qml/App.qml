@@ -111,7 +111,11 @@ ApplicationWindow {
                     projectOpen: shellWindow.projectOpen
                     projectName: projectModel.currentName
                     importedPartNames: projectModel.importedPartNames
+                    importedPartIds: projectModel.importedPartIds
                     importedPartName: projectModel.importedPartName
+                    activeDocumentId: projectModel.activeDocumentId
+                    activeDocumentTitle: projectModel.activeDocumentTitle
+                    onOpenImportRequested: recordId => projectModel.openImportRecord(recordId)
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
                     onNewProjectRequested: newProjectDialog.open()

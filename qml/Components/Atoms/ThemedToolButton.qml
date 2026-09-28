@@ -84,7 +84,7 @@ ToolButton {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: button.showCaret
                 name: "caret-down"
-                iconSize: Theme.iconSizeCaret
+                iconSize: Theme.iconSizeCompact
                 color: button.contentColor
             }
         }

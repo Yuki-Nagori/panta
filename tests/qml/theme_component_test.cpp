@@ -12,11 +12,13 @@
 #include <QQmlEngine>
 #include <QQuickImageProvider>
 #include <QQuickItem>
+#include <QQuickItemGrabResult>
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qnamespace.h>
 #include <QtCore/qobjectdefs.h>
@@ -24,7 +26,9 @@
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <icon_provider.hpp>
+#include <qtestmouse.h>
 #include <qtestsupport_core.h>
+#include <qtestsupport_gui.h>
 
 namespace {
 
@@ -267,6 +271,24 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(content->property("visible").toBool());
     }
 
+    void tasks_inspector_title_uses_active_import_only() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QObject* panel = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+        QVERIFY(panel != nullptr);
+        panel->setProperty("importedPartIds", QStringList{QStringLiteral("import-1")});
+        panel->setProperty("importedPartName", QStringLiteral("latest.stl"));
+        panel->setProperty("activeDocumentId", QStringLiteral("welcome"));
+        panel->setProperty("activeDocumentTitle", QStringLiteral("Welcome"));
+        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("latest.stl"));
+
+        panel->setProperty("activeDocumentId", QStringLiteral("import-1"));
+        panel->setProperty("activeDocumentTitle", QStringLiteral("active.stl"));
+        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("active.stl"));
+    }
+
     void button_font_size_reaches_its_label() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);
@@ -356,6 +378,163 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(transparent.pixelColor(6, 6).alpha(), 0);
         QVERIFY(provider->requestImage("../document-new/ffffffff", nullptr, {}).isNull());
         QVERIFY(provider->requestImage("pane-close/not-a-color", nullptr, {}).isNull());
+    }
+
+    void document_tab_connectors_follow_html_reference() {
+        // 采样 HTML 参考的凹弧和白线，防止连接件缺失或白色外溢。
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent component(
+            &engine, QUrl(QStringLiteral(
+                         "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+
+        QVariantList documents;
+        documents.append(QVariantMap{{QStringLiteral("id"), QStringLiteral("welcome")},
+                                     {QStringLiteral("kind"), QStringLiteral("welcome")},
+                                     {QStringLiteral("state"), QStringLiteral("ready")},
+                                     {QStringLiteral("title"), QStringLiteral("Welcome")},
+                                     {QStringLiteral("message"), QString{}}});
+        documents.append(QVariantMap{{QStringLiteral("id"), QStringLiteral("import-1")},
+                                     {QStringLiteral("kind"), QStringLiteral("import")},
+                                     {QStringLiteral("state"), QStringLiteral("ready")},
+                                     {QStringLiteral("title"), QStringLiteral("part.stl")},
+                                     {QStringLiteral("message"), QString{}}});
+
+        auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
+            QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+                        {QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), QStringLiteral("welcome")}}));
+        QVERIFY(bar != nullptr);
+        bar->setParent(&owner);
+        bar->setWidth(400);
+        bar->setHeight(39);
+
+        QQuickWindow window;
+        window.resize(400, 39);
+        bar->setParentItem(window.contentItem());
+        window.show();
+        QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+        QTest::mouseMove(&window, QPoint(350, 20));
+
+        const auto result = bar->grabToImage();
+        QVERIFY(result != nullptr);
+        QSignalSpy ready(result.data(), &QQuickItemGrabResult::ready);
+        QVERIFY(ready.wait(5000));
+        const QImage image = result->image();
+        QCOMPARE(image.size(), QSize(400, 39));
+
+        // 取样避开文字和抗锯齿边界。
+        const QColor band_gray(QStringLiteral("#e7e4e1"));
+        const QColor panel_white(QStringLiteral("#ffffff"));
+        const auto near_white = [](const QColor& color) {
+            return color.alpha() == 255 && color.red() >= 254 && color.green() >= 254 &&
+                   color.blue() >= 254;
+        };
+        QCOMPARE(image.pixelColor(130, 37), QColor(QStringLiteral("#ffffff")));
+        QCOMPARE(image.pixelColor(270, 37), QColor(QStringLiteral("#ffffff")));
+        QCOMPARE(image.pixelColor(60, 10), panel_white);
+        QCOMPARE(image.pixelColor(350, 20), band_gray);
+        QVERIFY(near_white(image.pixelColor(133, 33)));
+        QCOMPARE(image.pixelColor(136, 30), band_gray);
+        QCOMPARE(image.pixelColor(139, 29), band_gray);
+
+        bar->setProperty("activeDocumentId", QStringLiteral("import-1"));
+        QTest::mouseMove(&window, QPoint(350, 20));
+        const auto secondResult = bar->grabToImage();
+        QVERIFY(secondResult != nullptr);
+        QSignalSpy secondReady(secondResult.data(), &QQuickItemGrabResult::ready);
+        QVERIFY(secondReady.wait(5000));
+        const QImage secondImage = secondResult->image();
+        QCOMPARE(secondImage.pixelColor(127, 29), band_gray);
+        QVERIFY(near_white(secondImage.pixelColor(133, 33)));
+        QVERIFY(near_white(secondImage.pixelColor(265, 33)));
+        QCOMPARE(secondImage.pixelColor(271, 29), band_gray);
+
+        QQuickItem* importTab = visual_item(bar, QStringLiteral("documentTab-import-1"));
+        QVERIFY(importTab != nullptr);
+        QQuickItem* importClose = visual_item(importTab, QStringLiteral("documentTabClose"));
+        QVERIFY(importClose != nullptr);
+        QTest::mouseMove(&window, QPoint(251, 20));
+        QTRY_COMPARE(importClose->property("color").value<QColor>(),
+                     QColor(QStringLiteral("#e5f1fb")));
+        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(251, 20));
+        QTRY_COMPARE(importClose->property("color").value<QColor>(),
+                     QColor(QStringLiteral("#d5e3ef")));
+        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(251, 20));
+        QTest::mouseMove(&window, QPoint(350, 20));
+        QTRY_COMPARE(importClose->property("color").value<QColor>(), Qt::transparent);
+
+        QQuickItem* welcomeTab = visual_item(bar, QStringLiteral("documentTab-welcome"));
+        QVERIFY(welcomeTab != nullptr);
+        QQuickItem* welcomeClose = visual_item(welcomeTab, QStringLiteral("documentTabClose"));
+        QVERIFY(welcomeClose != nullptr);
+        QTest::mouseMove(&window, QPoint(119, 20));
+        QTRY_COMPARE(welcomeClose->property("color").value<QColor>(),
+                     QColor(QStringLiteral("#e5f1fb")));
+        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(119, 20));
+        QTRY_COMPARE(welcomeClose->property("color").value<QColor>(),
+                     QColor(QStringLiteral("#d5e3ef")));
+        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(119, 20));
+        QTest::mouseMove(&window, QPoint(350, 20));
+        QTRY_COMPARE(welcomeClose->property("color").value<QColor>(), Qt::transparent);
+
+        QSignalSpy activated(bar, SIGNAL(activateDocument(QString)));
+        QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, QPoint(200, 20));
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
+        QQuickItem* dragArea = visual_item(welcomeTab, QStringLiteral("documentTabDragArea"));
+        QVERIFY(dragArea != nullptr);
+        bar->setProperty("order",
+                         QStringList{QStringLiteral("import-1"), QStringLiteral("welcome")});
+        QTRY_COMPARE(welcomeTab->x(), 134.0);
+        QTest::qWait(200);
+        QCOMPARE(welcomeTab->x(), 134.0);
+
+        bar->setProperty("order",
+                         QStringList{QStringLiteral("welcome"), QStringLiteral("import-1")});
+        QTRY_COMPARE(welcomeTab->x(), 2.0);
+        QVERIFY(QMetaObject::invokeMethod(bar, "begin_press", Q_ARG(QVariant, "welcome"),
+                                          Q_ARG(QVariant, 20.0), Q_ARG(QVariant, 20.0)));
+        QVERIFY(QMetaObject::invokeMethod(bar, "detect_drag", Q_ARG(QVariant, "welcome"),
+                                          Q_ARG(QVariant, 30.0), Q_ARG(QVariant, 20.0)));
+        QCOMPARE(bar->property("draggedId").toString(), QStringLiteral("welcome"));
+        QVERIFY(welcomeTab->x() > 2.0);
+        QVERIFY(QMetaObject::invokeMethod(bar, "drag_move", Q_ARG(QVariant, 60.0)));
+        QVERIFY(welcomeTab->x() > 2.0);
+        QVERIFY(QMetaObject::invokeMethod(bar, "finish_drag", Q_ARG(QVariant, true)));
+        QTRY_COMPARE(welcomeTab->x(), 2.0);
+
+        // 悬停移动不能复用上一次按下坐标；真实左键拖动才进入拖拽态。
+        QTest::mouseMove(&window, QPoint(20, 20));
+        QTest::mouseMove(&window, QPoint(80, 20));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+        QCOMPARE(dragArea->property("cursorShape").toInt(), int(Qt::OpenHandCursor));
+        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(20, 20));
+        QTest::mouseMove(&window, QPoint(40, 20));
+        QTRY_COMPARE(bar->property("draggedId").toString(), QStringLiteral("welcome"));
+        QCOMPARE(dragArea->property("cursorShape").toInt(), int(Qt::ClosedHandCursor));
+        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(40, 20));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+        QCOMPARE(dragArea->property("cursorShape").toInt(), int(Qt::OpenHandCursor));
+        QTest::mouseMove(&window, QPoint(80, 20));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+
+        QSignalSpy moved(bar, SIGNAL(moveDocument(int, int)));
+        QVERIFY(QMetaObject::invokeMethod(bar, "begin_press", Q_ARG(QVariant, "welcome"),
+                                          Q_ARG(QVariant, 20.0), Q_ARG(QVariant, 20.0)));
+        QVERIFY(QMetaObject::invokeMethod(bar, "detect_drag", Q_ARG(QVariant, "welcome"),
+                                          Q_ARG(QVariant, 40.0), Q_ARG(QVariant, 20.0)));
+        QVERIFY(QMetaObject::invokeMethod(bar, "drag_move", Q_ARG(QVariant, 220.0)));
+        QVERIFY(QMetaObject::invokeMethod(bar, "finish_drag", Q_ARG(QVariant, true)));
+        QCOMPARE(moved.count(), 1);
+        QCOMPARE(moved.takeFirst(), (QList<QVariant>{0, 1}));
+        QVariantList reordered{documents[1], documents[0]};
+        bar->setProperty("documents", reordered);
+        QTRY_COMPARE(welcomeTab->x(), 134.0);
+        QTest::qWait(200);
+        QCOMPARE(welcomeTab->x(), 134.0);
     }
 };
 

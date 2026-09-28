@@ -1,4 +1,4 @@
-// CaeViewport 原生视口与视图页签；工程网格由 Rust 服务快照提供。
+// CaeViewport 原生视口与视口文档页签；工程网格由 Rust 服务快照提供。
 // 仅进入启用 Bridge 的构建变体，QML 无法覆盖原生视口表面。
 import QtQuick
 import QtQuick.Layouts
@@ -8,6 +8,7 @@ PanelSurface {
     id: panel
 
     property var meshSource: null
+    property bool reducedMotion: false
     signal closeRequested
 
     PaneCloseButton {
@@ -29,10 +30,15 @@ PanelSurface {
             }
         }
 
-        PanelTabBar {
+        DocumentTabBar {
+            objectName: "documentTabBar"
             Layout.fillWidth: true
-            edge: Qt.BottomEdge
-            tabs: [qsTr("Model"), qsTranslate("UiCommonModeling", "Mesh"), qsTranslate("UiCommonResults", "Results")]
+            documents: panel.meshSource ? panel.meshSource.openDocuments : []
+            activeDocumentId: panel.meshSource ? panel.meshSource.activeDocumentId : ""
+            reducedMotion: panel.reducedMotion
+            onActivateDocument: documentId => panel.meshSource.activateDocument(documentId)
+            onCloseDocument: documentId => panel.meshSource.closeDocument(documentId)
+            onMoveDocument: (fromIndex, toIndex) => panel.meshSource.moveDocument(fromIndex, toIndex)
         }
     }
 }
