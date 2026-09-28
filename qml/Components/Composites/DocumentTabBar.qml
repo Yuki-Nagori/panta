@@ -55,6 +55,23 @@ Item {
     function slot_of(id) {
         return order.indexOf(id);
     }
+    function same_named_imports(document) {
+        return documents.filter(entry => entry.kind === "import" && entry.title === document.title);
+    }
+    function display_title(document) {
+        const matches = same_named_imports(document);
+        if (document.kind !== "import" || matches.length < 2) {
+            return document.title ?? "";
+        }
+        return `${matches.findIndex(entry => entry.id === document.id) + 1} · ${document.title}`;
+    }
+    function accessible_title(document) {
+        const matches = same_named_imports(document);
+        if (document.kind !== "import" || matches.length < 2) {
+            return document.title ?? "";
+        }
+        return qsTr("%1, import %2").arg(document.title).arg(matches.findIndex(entry => entry.id === document.id) + 1);
+    }
 
     Component.onCompleted: sync_documents()
 
@@ -100,6 +117,21 @@ Item {
                 readonly property string tabState: doc.state ?? "ready"
                 readonly property bool isActive: documentId === bar.activeDocumentId
                 readonly property bool isDragged: documentId === bar.draggedId
+                Accessible.role: Accessible.PageTab
+                Accessible.name: bar.accessible_title(tab.doc)
+                Accessible.selected: tab.isActive
+                Accessible.onPressAction: {
+                    if (tab.tabState === "ready") {
+                        bar.activateDocument(tab.documentId);
+                    }
+                }
+                activeFocusOnTab: true
+                Keys.onPressed: event => {
+                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && tab.tabState === "ready") {
+                        bar.activateDocument(tab.documentId);
+                        event.accepted = true;
+                    }
+                }
                 Behavior on x {
                     enabled: !tab.isDragged && !bar.reducedMotion
                     NumberAnimation {
@@ -268,8 +300,9 @@ Item {
                             color: tab.tabState === "failed" ? Theme.colorError : Theme.colorIcon
                         }
                         ThemedLabel {
+                            objectName: "documentTabTitle"
                             width: Math.min(implicitWidth, Math.max(0, labelClip.width - (tab.doc.kind === "welcome" ? Theme.documentTabWelcomeIconSize : Theme.iconSizeSmall) - Theme.spacingMedium))
-                            text: tab.doc.title ?? ""
+                            text: bar.display_title(tab.doc)
                             textSize: Theme.fontBody
                             color: tab.tabState === "failed" ? Theme.colorError : tab.isActive ? Theme.colorText : Theme.colorTextMuted
                             elide: Text.ElideRight

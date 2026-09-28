@@ -80,7 +80,8 @@
 
 - [x] 每次进入工程工作区时只有活动 `Welcome` 页签并显示现有默认 `panta` 3D 场景；打开新项目不继承旧工程活动文件页签。Welcome 和 STL 页签都有关闭按钮，旧 `Model / Mesh / Results` 视口类别条不再出现。
 - [x] 新导入成功后自动出现并激活一个 STL 页签；工程树点击同一稳定 ImportRecord ID 不会重复创建标签，点击未打开记录时先创建 Loading 页签，异步加载成功后激活。
-- [ ] 已打开页签之间切换时，单一 ViewModel 活动文档 ID、选中页签和 CaeViewport 场景始终对应；标签名冲突时仍能区分对象；关闭非活动标签不改变当前视口，关闭活动标签按定义选择相邻页签；关闭全部标签后视口及标签栏为空白。
+- [ ] 已打开页签之间切换时，单一 ViewModel 活动文档 ID、选中页签和 CaeViewport 场景始终对应；关闭非活动标签不改变当前视口，关闭活动标签按定义选择相邻页签；关闭全部标签后视口及标签栏为空白。
+- [x] 同名 STL 页签显示序号以区分标签，并将完整来源名和序号作为 Qt PageTab 无障碍名称；就绪页签可用 Enter / Space 激活。
 - [x] 灰色标签带底边存在一条连续白色细线；活动标签上沿圆角完整，左右下角圆弧对称接入白线，交界无凸点、露底或错位；关闭图标视觉居中，hover / active 背景圆角为 5px，标签选中和各交互态无颜色分裂。
 - [ ] 页签可通过水平拖拽重排；拖动非活动标签时立即将其激活；拖动标签保持不透明、持续跟随指针且只沿 X 轴位移，跨越多个相邻标签期间拖拽不被中断，相邻标签平滑让位，松开后拖动标签动画归位；尊重减少动态效果偏好；垂直手势不触发重排，拖动关闭按钮不开始重排；重排后标签与其文档 ID、活动态及视口内容保持一致。
 - [ ] 文档页签宽度固定为 130px，长标题以省略号截断；文档标签带内边距为 `2px 2px 0 2px`，首个 tab 左侧仍缩进 2px；滚动裁切不截掉首末活动标签的圆弧，其他 `.tabs` 使用处维持原有间距。
@@ -112,6 +113,13 @@
 | 2026-09-28 | `QT_QPA_PLATFORM=offscreen QT_QUICK_CONTROLS_STYLE=Basic target/native/debug/qml/panta_qml_cpu_benchmark` | 文档页签构造、32 次切换与关闭末项分别计时 | macOS 26.3.1 arm64、Qt 6.11.2、debug；1 次预热、31 次采样，最终源码重建后 3/3 通过。8 页签构造 p50/p95=974/1321 µs，切换=326/610 µs，关闭=910/1241 µs；24 页签分别为 2829/4823、482/2484、3165/5745 µs。仅为 QML CPU 更新成本，不推断 GPU 耗时。 |
 | 2026-09-28 | `PantaBenchmark.app` 临时 wrapper 启动 `PANTA_BENCHMARK_DOCUMENT_TABS_ONLY=1 QT_QUICK_CONTROLS_STYLE=Basic` 的 `panta_qml_gpu_benchmark` | 真实窗口下比较页签静态、可见页签切换、首项关闭/重开 | macOS 26.3.1 arm64、Qt 6.11.2、Metal、debug；真实 1000×700 窗口，30 帧预热，每场景 3×60 帧。8 页签静态 p50/p95=16.64/24.24 ms、切换=16.67/23.65 ms、关闭/重开=16.61/23.04 ms；24 页签分别为 16.67/23.76、16.67/22.86、16.67/17.64 ms。三项均通过，数值含垂直同步与窗口合成，不能据此称为 GPU 内核耗时或性能改进。 |
 | 2026-09-28 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo test --locked -p panta-dsl-core --test fsm`、`cargo format --check`、`cargo lint`、`cargo sanitize` | 完成前的聚合与 CI 失败路径复核 | build、format、lint 八阶段均通过；Cargo 聚合 CTest 62/62（含页签动画断言），普通 FSM 20/20（含容量阈值）；macOS ASan/UBSan 62/62、TSan 47/47。TSan 排除两项经 FFI 拉取 Rust 异步结果的测试，其余五个 ViewModel 用例继续执行。远端三平台 CI 尚需新提交触发确认。 |
+| 2026-09-28 | GitHub Actions run [36430454561](https://github.com/Yuki-Nagori/panta/actions/runs/36430454561)，commit `ca8ad8a` | 确认此前失败后的当前远端 CI 状态 | 全部 19 个 job 成功：三平台 build/test 与 sanitizer、Miri、覆盖率、格式及 lint 均通过。该 run 是旧失败记录的后续成功结果；它不包含本次尚未 push 的本地动画测试修正。 |
+| 2026-09-28 | `cargo test --locked --workspace` | 验证页签动画断言修正及完整本机聚合测试 | 通过：Rust workspace 测试通过，native CTest 62/62；`ThemeComponentTest` 动画断言通过。固定 200ms 等待改为等待 x 坐标进入 0.1px 容差，避免 sanitizer 下按帧调度精确比较失败。 |
+| 2026-09-28 | `cargo sanitize` | 验证页签改动在本机 sanitizer 构建下的 native 回归 | macOS ASan/UBSan CTest 62/62、TSan CTest 47/47 均通过。TSan 按 042 边界排除 TaskHost/Ffi/Qml 与两个经 Rust mutex drain 结果的 ProjectViewModel 异步激活用例；其余五个 ProjectViewModel 测试通过。 |
+| 2026-09-28 | `cargo format --check`、`cargo lint` | 格式与静态质量验收 | format 通过；lint 在沙箱 TCP 锁限制导致首次失败后，于受限环境外重跑完整 8 阶段通过。 |
+| 2026-09-28 | `cargo test --locked --workspace` | 验证同名来源的标签区分、PageTab 无障碍信息及键盘激活 | 通过：CTest 62/62。新增 QML 回归检查两个同名导入页签显示不同序号、Qt accessibility interface 暴露 PageTab 和完整名称、Enter 激活就绪页签；Space 使用相同处理分支。 |
+| 2026-09-28 | `cargo format --check` | 检查同名标签回归及 QML 行为修改的格式 | 通过。 |
+| 2026-09-28 | `cargo lint` | 静态检查本次 QML 与 C++ 回归 | 首轮 clang-tidy 因两个测试 API 缺少直接头文件失败；补齐 Qt accessibility 与键盘测试头文件后，完整 8 阶段通过，包括 qmllint、clang-tidy、include-cleaner 和 cppcheck。 |
 
 ## 风险与回退
 
@@ -133,7 +141,11 @@
 - 2026-09-28：用户要求对当前分支相对 `main` 的完整差异做代码与注释评审。复核功能实现、测试、资源和任务记录的职责与一致性，删除死代码、临时诊断与逐句解释型注释；只修正与 080 行为相关且有证据的问题，再以 Cargo 聚合入口重新验收。
 - 2026-09-28：完整差异评审清理了 ViewModel 未实现声明与空转信号封装，统一激活失败码解析；页签模型同步按 ID 建索引以保持委托身份并避免逐项线性查找；移除历史性注释。审计时发现同名页签可见消歧、性能高水位、反复切换资源释放、键盘可访问性、系统减少动态效果接线及手动基准尚无完整证据，将相关验收项恢复为未完成，不以本地构建通过代替这些结论。
 - 2026-09-28：提交前复核分支完整差异和暂存边界；修正文档对 Loading 页签建立时机及 ViewModel 职责的不准确描述，补活动页签关闭按钮的悬停/按下回归，并将资产丢失测试改为验证具体用户消息。其余待验收项目保持 `in-progress`。
+- 2026-09-28：最新远端 CI run 36430454561（commit `ca8ad8a`）19 个 job 全部成功，Miri、三平台 sanitizer、build/test、格式、覆盖率和 lint 均通过；较早的 run 36265495455 与 36402570741 失败记录由此更新为已恢复。该 run 不含未 push 的本地修正。
+- 2026-09-28：将 `ThemeComponentTest` 的页签动画位置断言改为等待目标位置进入 0.1px 容差，删除固定 200ms sleep；完整 Cargo 聚合、ASan/UBSan、TSan、format 和 lint 本机通过。TSan 与 Miri 的平台边界和排除范围保留在当前 042 runner 契约中。
+- 2026-09-28：同名 STL 页签在显示标题前加当前同名页签序号，并通过 PageTab accessibility name 暴露完整来源名与序号；就绪页签响应 Enter / Space 与辅助技术 press action。新增 QML 回归确认可见消歧、无障碍角色/名称及 Enter 激活，Cargo 聚合通过。
+- 2026-09-28：补齐无障碍 QML 测试需要的 Qt 头文件后，`cargo lint` 完整 8 阶段通过，包含 clang-tidy、include-cleaner 和 cppcheck。
 
 ## 完成摘要
 
-核心实现已进入分支，CI 像素断言、圆弧、拖动及 STL actor 可见性已在本地修复并经过真窗口复核；远端 CI 尚待重新运行。系统 reduced-motion 偏好源尚未接入，CPU / GPU 基准本次未重跑，任务保持 `in-progress`。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧，并支持就绪标签的 Enter / Space 激活。任务继续保持 `in-progress`：重复切换资源释放、代表性 STL 内存高水位/重载延迟、完整键盘焦点导航、系统 reduced-motion 接线及后续性能证据仍未闭环；本次本地修改尚未 push，因此没有对应远端 CI 结果。

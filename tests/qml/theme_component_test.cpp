@@ -26,6 +26,9 @@
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <icon_provider.hpp>
+#include <qaccessible.h>
+#include <qaccessible_base.h>
+#include <qtestkeyboard.h>
 #include <qtestmouse.h>
 #include <qtestsupport_core.h>
 #include <qtestsupport_gui.h>
@@ -488,13 +491,11 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(dragArea != nullptr);
         bar->setProperty("order",
                          QStringList{QStringLiteral("import-1"), QStringLiteral("welcome")});
-        QTRY_COMPARE(welcomeTab->x(), 134.0);
-        QTest::qWait(200);
-        QCOMPARE(welcomeTab->x(), 134.0);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 134.0) < 0.1, 10000);
 
         bar->setProperty("order",
                          QStringList{QStringLiteral("welcome"), QStringLiteral("import-1")});
-        QTRY_COMPARE(welcomeTab->x(), 2.0);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 2.0) < 0.1, 10000);
         QVERIFY(QMetaObject::invokeMethod(bar, "begin_press", Q_ARG(QVariant, "welcome"),
                                           Q_ARG(QVariant, 20.0), Q_ARG(QVariant, 20.0)));
         QVERIFY(QMetaObject::invokeMethod(bar, "detect_drag", Q_ARG(QVariant, "welcome"),
@@ -504,7 +505,7 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(bar, "drag_move", Q_ARG(QVariant, 60.0)));
         QVERIFY(welcomeTab->x() > 2.0);
         QVERIFY(QMetaObject::invokeMethod(bar, "finish_drag", Q_ARG(QVariant, true)));
-        QTRY_COMPARE(welcomeTab->x(), 2.0);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 2.0) < 0.1, 10000);
 
         // 悬停移动不能复用上一次按下坐标；真实左键拖动才进入拖拽态。
         QTest::mouseMove(&window, QPoint(20, 20));
@@ -535,6 +536,68 @@ class ThemeComponentTest final : public QObject {
         QTRY_COMPARE(welcomeTab->x(), 134.0);
         QTest::qWait(200);
         QCOMPARE(welcomeTab->x(), 134.0);
+    }
+
+    void duplicate_document_tabs_are_visibly_and_accessibly_distinguished() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent component(
+            &engine, QUrl(QStringLiteral(
+                         "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+
+        const auto document = [](const QString& id, const QString& kind, const QString& title) {
+            return QVariantMap{{QStringLiteral("id"), id},
+                               {QStringLiteral("kind"), kind},
+                               {QStringLiteral("state"), QStringLiteral("ready")},
+                               {QStringLiteral("title"), title},
+                               {QStringLiteral("message"), QString{}}};
+        };
+        const QVariantList documents{document(QStringLiteral("welcome"), QStringLiteral("welcome"),
+                                              QStringLiteral("Welcome")),
+                                     document(QStringLiteral("import-1"), QStringLiteral("import"),
+                                              QStringLiteral("sample.stl")),
+                                     document(QStringLiteral("import-2"), QStringLiteral("import"),
+                                              QStringLiteral("sample.stl"))};
+        auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
+            QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+                        {QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), QStringLiteral("import-1")}}));
+        QVERIFY(bar != nullptr);
+        bar->setParent(&owner);
+        bar->setWidth(400);
+        bar->setHeight(39);
+
+        QQuickWindow window;
+        window.resize(400, 39);
+        bar->setParentItem(window.contentItem());
+        window.show();
+        QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+
+        QQuickItem* firstTab = visual_item(bar, QStringLiteral("documentTab-import-1"));
+        QQuickItem* secondTab = visual_item(bar, QStringLiteral("documentTab-import-2"));
+        QVERIFY(firstTab != nullptr);
+        QVERIFY(secondTab != nullptr);
+        QQuickItem* firstTitle = visual_item(firstTab, QStringLiteral("documentTabTitle"));
+        QQuickItem* secondTitle = visual_item(secondTab, QStringLiteral("documentTabTitle"));
+        QVERIFY(firstTitle != nullptr);
+        QVERIFY(secondTitle != nullptr);
+        QCOMPARE(firstTitle->property("text").toString(), QStringLiteral("1 · sample.stl"));
+        QCOMPARE(secondTitle->property("text").toString(), QStringLiteral("2 · sample.stl"));
+
+        QAccessibleInterface* accessibleTab = QAccessible::queryAccessibleInterface(firstTab);
+        QVERIFY(accessibleTab != nullptr);
+        QCOMPARE(accessibleTab->role(), QAccessible::PageTab);
+        QCOMPARE(accessibleTab->text(QAccessible::Name), QStringLiteral("sample.stl, import 1"));
+
+        QSignalSpy activated(bar, SIGNAL(activateDocument(QString)));
+        QCOMPARE(firstTab->property("activeFocusOnTab").toBool(), true);
+        firstTab->forceActiveFocus();
+        QTRY_VERIFY(firstTab->hasActiveFocus());
+        QTest::keyClick(&window, Qt::Key_Return);
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
     }
 };
 
