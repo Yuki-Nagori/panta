@@ -627,6 +627,18 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(activated.count(), 1);
         QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
 
+        QQuickItem* closeButton = visual_item(secondTab, QStringLiteral("documentTabClose"));
+        QVERIFY(closeButton != nullptr);
+        closeButton->forceActiveFocus();
+        QTRY_VERIFY(closeButton->hasActiveFocus());
+        QTest::mouseClick(
+            &window, Qt::LeftButton, Qt::NoModifier,
+            firstTab->mapToScene(QPointF(firstTab->width() / 2, firstTab->height() / 2)).toPoint());
+        QTRY_VERIFY(firstTab->hasActiveFocus());
+        QTRY_VERIFY(accessibleTab->state().focused);
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
+
         QQuickItem* scroller = visual_item(bar, QStringLiteral("documentTabScroller"));
         QVERIFY(scroller != nullptr);
         secondTab->forceActiveFocus();
@@ -653,8 +665,6 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(activated.count(), 1);
         QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-2"));
 
-        QQuickItem* closeButton = visual_item(secondTab, QStringLiteral("documentTabClose"));
-        QVERIFY(closeButton != nullptr);
         QCOMPARE(closeButton->property("activeFocusOnTab").toBool(), true);
         closeButton->forceActiveFocus();
         QTRY_VERIFY(closeButton->hasActiveFocus());

@@ -92,7 +92,9 @@
 - [ ] 在真实 VTK 窗口重复切换与关闭页签后，确认没有旧 actor/mapper、回调、snapshot 或设备资源残留。
 - [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；记录内存高水位与切换/重载延迟，达到约定预算时行为明确，不发生无界增长。
 - [x] 页签栏暴露 PageTabList / PageTab，标签和关闭按钮有可访问名称；Tab 获得键盘焦点后可用左右键导航并滚入可视区，Enter / Space 激活标签，关闭按钮可用 Space 或辅助技术 press action 执行。
-- [ ] 在真实 VTK 窗口确认键盘焦点视觉状态与系统读屏操作；适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
+- [x] 真实 VTK 窗口中，辅助技术激活 PageTab 会转移键盘焦点并显示焦点框；Close 按钮的辅助技术动作会关闭对应标签。
+- [ ] 在 VoiceOver 真读屏环境确认标签名称、选中态和关闭操作的朗读；从全局搜索框按 Tab 进入标签栏的焦点路径也待验证。
+- [x] 适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
 - [x] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
 - [ ] 不保留旧视口分类切换路径；task、索引、HTML、C++/Rust 边界和性能记录相互一致。
 
@@ -136,6 +138,7 @@
 | 2026-09-29 | `panta_qml_cpu_benchmark`，offscreen / Qt Quick Basic；macOS 26.3.1 arm64、Qt 6.11.2、debug | 069 CPU harness 测文档页签构造、32 次切换与关闭末项 | 通过；每场景预热后 31 次，p50/p95 µs。1 页签构造 150/224；8 页签构造 932/1204、切换 323/598、关闭 894/1267；24 页签构造 2790/4998、切换 442/2079、关闭 2932/5721。计时覆盖 QML 构造/模型更新与事件处理，不代表 GPU 帧成本。 |
 | 2026-09-29 | `PANTA_BENCHMARK_DOCUMENT_TABS_ONLY=1` 的 `panta_qml_gpu_benchmark` 真窗口；macOS 26.3.1 arm64、Qt 6.11.2、Metal、debug | 069 GPU harness 测静态、切换与关闭/重开时可见页签的帧呈现 | 通过；1000×700 窗口，30 帧预热，每场景 3×60 帧；p50/p95 ms/frame。空场景 16.65/18.93；静态 1/8/24 页签分别 16.70/25.60、16.69/25.27、16.70/24.90；切换 8/24 页签为 16.73/24.35、16.75/25.38；关闭/重开 8/24 页签为 16.71/24.59、16.67/18.96。测量包含 compositor/vsync，是 Qt Quick 端到端帧间隔，不是 GPU 内核耗时；本 harness 呈现独立 DocumentTabBar，不包括 VTK 网格场景。 |
 | 2026-09-29 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`；`PantaViewportTest.app` 真窗口运行 `PANTA_TEST_NATIVE_VIEWPORT=1 panta_qml_viewport_module_test native_refresh_and_window_lifecycle`；macOS 26.3.1 arm64、Qt 6.11.2、VTK WebGPU | 视口隐藏时关闭 STL 文档，确认 CPU 网格快照立即释放，再显示并继续渲染 | 通过：构建、format、Cargo 聚合测试（CTest 66/66）及 lint 八阶段通过；真实桌面窗口日志为 3 passed、0 failed。弱引用在视口隐藏、场景清空后过期，随后重新显示仍提交帧。该用例确认 `SurfaceMeshSnapshot` 生命周期，不单独统计 VTK actor/mapper、回调或设备资源循环，完整资源验收仍待完成。 |
+| 2026-09-29 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`；PantaPreview.app 真窗口与 macOS AX 操作 | 验证 PageTab 焦点视觉、辅助技术激活与关闭 | 通过：构建、format、Cargo 聚合测试（CTest 66/66）及 lint 八阶段通过。真实窗口 AX 树暴露 PageTabList / Welcome PageTab / Close Welcome；AX 激活 Welcome 后焦点移到 PageTab，截图可见焦点框；AX 激活关闭按钮后该标签从树中移除。按 Tab 从全局搜索框没有移动焦点；本次未启动 VoiceOver，语音朗读与该焦点进入路径仍待验。 |
 
 ## 风险与回退
 
@@ -173,7 +176,8 @@
 - 2026-09-29：按维护者要求先建立独立 Qt 平台服务适配层，再继续页签动画接线。系统平台查询及标准目录发现由 086 收拢；086 已完成。根 QML 现使用 `Settings` 并将 `Settings.reducedMotion` 注入 ViewportPane 的页签动画。
 - 2026-09-29：补充 reduced-motion 回归，验证开启时页签换序同步定位；Cargo 聚合 CTest 66/66、format 与 lint 八阶段通过。真窗口 CUA 截图和 AX 树确认 Welcome VTK 场景及 PageTab 语义；Tab 后焦点仍位于全局搜索，焦点视觉/VoiceOver 验收继续待办。
 - 2026-09-29：排查关闭活动 STL 页签的 VTK 所有权时发现，视口隐藏期间 `sync_native_surface()` 提前返回，旧 actor mapper 与 `applied_mesh` 会一直保留到视口重新显示。隐藏分支现在同步替换 actor 管线并释放旧 CPU 快照；真实桌面窗口回归验证弱引用在隐藏状态下即过期，视口恢复后仍可继续提交帧。另修正测试对快照的局部强引用并补直接头文件。VTK actor/mapper、回调和设备资源的重复切换/关闭验收仍未完成。
+- 2026-09-29：真窗口检查发现鼠标/辅助技术激活文档标签后，焦点仍留在全局搜索框。`DocumentTabBar` 现在在标签按下和 PageTab 辅助技术 press action 时显式转移焦点；QML 回归验证鼠标点击后 PageTab 获得 active focus。更新后的 PantaPreview 真窗口通过 AX 激活 Welcome 后焦点树指向 PageTab，截图显示焦点边框；AX 关闭动作从无障碍树移除 Welcome。按 Tab 从搜索框仍未进入标签栏；实际 VoiceOver 朗读及该键盘进入路径继续待验。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API，任务恢复 in-progress；本次继续修复并在真窗口验证隐藏视口关闭网格后 CPU 快照释放。剩余真实窗口读屏/焦点验收、VTK actor/mapper/回调/设备资源循环释放、代表性 STL 内存高水位/重载延迟、reduced-motion 动画效果验收，以及本地改动的后续远端 CI。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API，任务保持 in-progress；本次修复并在真窗口验证隐藏视口关闭网格后 CPU 快照释放，也验证 AX 激活标签的焦点框与关闭动作。剩余 VoiceOver 朗读和从搜索框进入标签栏的焦点路径、VTK actor/mapper/回调/设备资源循环释放、代表性 STL 内存高水位/重载延迟、reduced-motion 动画效果验收，以及本地改动的后续远端 CI。

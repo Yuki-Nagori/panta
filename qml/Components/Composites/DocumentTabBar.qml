@@ -145,6 +145,7 @@ Item {
                 Accessible.selected: tab.isActive
                 Accessible.onPressAction: {
                     if (tab.tabState === "ready") {
+                        tab.forceActiveFocus();
                         bar.activateDocument(tab.documentId);
                     }
                 }
@@ -261,6 +262,7 @@ Item {
                         if (mouse.button !== Qt.LeftButton) {
                             return;
                         }
+                        tab.forceActiveFocus(Qt.MouseFocusReason);
                         const p = scroller.contentItem.mapFromItem(tab, mouse.x, mouse.y);
                         bar.begin_press(tab.documentId, p.x, p.y);
                     }
