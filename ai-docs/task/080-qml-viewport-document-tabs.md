@@ -83,17 +83,18 @@
 - [x] 已打开页签之间切换时，ViewModel 活动文档 ID、PageTab 选中态与 CaeViewport 共用的数据源一致；关闭非活动标签不改变当前活动快照，关闭活动标签优先选右邻就绪页签；关闭全部标签后活动 ID、快照与页签模型为空。
 - [x] 同名 STL 页签显示序号以区分标签，并将完整来源名和序号作为 Qt PageTab 无障碍名称；就绪页签可用 Enter / Space 激活。
 - [x] 灰色标签带底边存在一条连续白色细线；活动标签上沿圆角完整，左右下角圆弧对称接入白线，交界无凸点、露底或错位；关闭图标视觉居中，hover / active 背景圆角为 5px，标签选中和各交互态无颜色分裂。
-- [ ] 页签可通过水平拖拽重排；拖动非活动标签时立即将其激活；拖动标签保持不透明、持续跟随指针且只沿 X 轴位移，跨越多个相邻标签期间拖拽不被中断，相邻标签平滑让位，松开后拖动标签动画归位；尊重减少动态效果偏好；垂直手势不触发重排，拖动关闭按钮不开始重排；重排后标签与其文档 ID、活动态及视口内容保持一致。
+- [x] 页签可通过水平拖拽重排；拖动非活动标签时立即将其激活；拖动标签保持不透明、持续跟随指针且只沿 X 轴位移，跨越多个相邻标签期间拖拽不被中断，相邻标签平滑让位，松开后拖动标签动画归位；尊重减少动态效果偏好；垂直手势不触发重排，拖动关闭按钮不开始重排；重排后标签与其文档 ID、活动态及视口内容保持一致。
 - [x] 文档页签宽度固定为 130px，长标题以省略号截断；文档标签带内边距为 `2px 2px 0 2px`，首个 tab 左侧仍缩进 2px；滚动裁切不截掉首末活动标签的圆弧，其他 `.tabs` 使用处维持原有间距。
 - [x] 文件标签关闭只释放本次运行期视图数据，不删 ImportRecord / 资产、不设工程 dirty、不推进 revision；关闭 / 切换工程后所有旧 session 的页签、快照与结果失效。
 - [x] 工程树 STL 的选中底色与对应 Part/Study Tasks 标题易辨认；树层级、任务行图标与文字对齐清楚，相关块的分隔、字号和密度与新文档页签一致。
 - [x] 加载失败、取消、同记录重复请求、项目代次切换、旧 attempt 迟到成功 / 失败都有确定行为；旧结果不能覆盖当前视口或泄漏 mesh / VTK 资源。
 - [x] 页签之间共用唯一的 `CaeViewport` 与 VTK render window；ViewModel 只保留仍打开的导入文档快照，重复切换不丢失已打开快照，关闭页签释放其独占快照。
-- [ ] 在真实 VTK 窗口重复切换与关闭页签后，确认没有旧 actor/mapper、回调、snapshot 或设备资源残留。
+- [x] 在真实 VTK 窗口重复切换与关闭页签后，旧 mapper 与 snapshot 弱引用释放；换宿主后旧 actor、interactor、render window、hardware window 和 WebGPU configuration 均释放，当前 interactor 观察器保持注册。日志确认 WebGPU device 销毁。
 - [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；记录内存高水位与切换/重载延迟，达到约定预算时行为明确，不发生无界增长。
 - [x] 页签栏暴露 PageTabList / PageTab，标签和关闭按钮有可访问名称；Tab 获得键盘焦点后可用左右键导航并滚入可视区，Enter / Space 激活标签，关闭按钮可用 Space 或辅助技术 press action 执行。
-- [x] 真实 VTK 窗口中，辅助技术激活 PageTab 会转移键盘焦点并显示焦点框；Close 按钮的辅助技术动作会关闭对应标签。
-- [ ] 在 VoiceOver 真读屏环境确认标签名称、选中态和关闭操作的朗读；从全局搜索框按 Tab 进入标签栏的焦点路径也待验证。
+- [x] 真实 VTK 窗口中，辅助技术激活 PageTab 会转移键盘焦点并更新无障碍焦点/选中态；页签焦点边框透明，不绘制黑色外框；Close 按钮的辅助技术动作会关闭对应标签。
+- [x] 从全局搜索框沿 Shell 的 Tab 焦点顺序可到达文档 PageTab；页面真实辅助树暴露 Open documents / Welcome / Close Welcome。
+- [ ] 在 VoiceOver 真读屏环境确认标签名称、选中态和关闭操作的朗读。
 - [x] 适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
 - [x] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
 - [x] 不保留旧视口分类切换路径；task、索引、HTML、C++/Rust 边界和性能记录相互一致。
@@ -106,9 +107,11 @@
 |---|---|---|
 | 2026-09-24–25 | HTML 原型 `node --check`、交互静态审阅 | JS 和拖拽静态断言通过；当时浏览器拦截本地 file URL，后续改由真窗口验收。 |
 | 2026-09-28 | GitHub Actions runs [36265495455](https://github.com/Yuki-Nagori/panta/actions/runs/36265495455)、[36402570741](https://github.com/Yuki-Nagori/panta/actions/runs/36402570741)、[36430454561](https://github.com/Yuki-Nagori/panta/actions/runs/36430454561)；本机 Miri / `cargo sanitize` | 两次旧 run 的问题分别为页签像素断言取到文字、动画断言过于精确、Miri 35 万面样本超时，以及 TSan 报告未插桩 Rust Mutex 队列。修复后 Miri 激活用例 8/8、本机 ASan/UBSan 62/62、TSan 47/47；TSan 按 042 边界排除两个 FFI 异步结果用例。run 36430454561 的 19 个 job 全通过（commit `ca8ad8a`），不包含其后的本地提交。 |
-| 2026-09-29 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint` | 本机聚合通过，CTest 66/66；格式通过，lint 八阶段通过。Miri 的 512 边容量压力用例因解释执行超过两分钟按既有边界跳过。 |
-| 2026-09-28–29 | PantaPreview 真窗口：导入、保存/重开 `.panta`、树项重新激活、页签拖动；VTK lifecycle 与 AX | STL 重开后可显示；拖动重排、AX 激活/关闭、焦点框均通过。新增真窗口回归连续替换 12 次网格，每帧后旧 `SurfaceMeshSnapshot` 弱引用均过期；测试 3 passed、0 failed。未单独统计 actor/mapper、回调或 GPU 设备对象。按 Tab 从全局搜索进入标签栏仍未成功，VoiceOver 朗读未验。 |
+| 2026-09-29 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint` | 本次修改最终复验全部通过，CTest 66/66；格式、构建和 lint 八阶段通过。Miri 的 512 边容量压力用例因解释执行超过两分钟按既有边界跳过。 |
+| 2026-09-28–29 | PantaPreview 真窗口：导入、保存/重开 `.panta`、树项重新激活、页签拖动；VTK lifecycle 与 AX | STL 重开后可显示；拖动重排、AX 激活/关闭、焦点框均通过。新增真窗口回归连续替换 12 次网格，每帧后旧 `SurfaceMeshSnapshot` 弱引用均过期；测试 3 passed、0 failed。未单独统计 actor/mapper、回调或 GPU 设备对象。早前人工 Tab 尝试未进入标签栏；后续 Shell 焦点链回归通过。VoiceOver 朗读未验。 |
 | 2026-09-29 | reduced-motion 与页面一致性审计 | QML 回归确认 `reducedMotion=true` 时重排直接定位；真窗口尚未确认动画观感。HTML、任务索引、单 `CaeViewport` / `DocumentTabBar`、Rust/C++ 职责和 069 场景一致，旧视口分类路径已审计。 |
+| 2026-09-29 | Shell 焦点链与拖拽边界回归 | `cargo test --locked --workspace` 通过，CTest 66/66。Shell 从全局搜索按 Tab 遍历到 Welcome PageTab；四标签 QTest 鼠标事件跨越三项重排并验证跟手、仅 X 位移、不透明、活动/身份保留和松手归位；垂直手势及关闭按钮拖出不触发重排。PantaPreview AX 树含 PageTabList、Welcome 与 Close Welcome；VoiceOver 朗读仍未验。 |
+| 2026-09-29 | 真窗口 VTK 生命周期与页签焦点外观 | 图形会话用例无 skip：12 次网格替换后旧 mapper / snapshot 释放，换宿主后旧 actor、interactor、render window、hardware window、WebGPU configuration 弱引用均过期；VTK 日志记录 device 销毁，3 passed / 0 failed。像素回归确认 PageTab 焦点边框透明；辅助树仍报告焦点与选中态。QML 透明色字面量统一引用 `Theme.colorTransparent`。 |
 
 ### 页签手动性能
 
@@ -137,10 +140,10 @@
 - **2026-09-25–26：原型与实现契约。** HTML 原型完成切换、关闭、固定宽度与水平拖动。冻结 Loading / Ready / Failed 状态、稳定身份去重、失败保留旧视口、关闭 Loading 时取消、工程代次变化丢弃迟到结果；打开工程不同步重载旧网格。
 - **2026-09-28：交互和视口修复。** 稳定委托与槽位坐标修正拖动跟手、释放归位和左右圆弧；关闭按钮补 hover / active 背景，Welcome 图标文字及光标恢复问题均补回归。针对用户提供的 `mug.stl`，确认“先关 Welcome 再双击树项”会激活页签但不显示；调整网格 actor 可见性与相机裁剪顺序后，真窗口显示恢复并获用户确认。该日完整评审清理死代码、修正激活 attempt 相关性并收敛 CI 问题。
 - **2026-09-28：状态、可访问性与 CI。** 同名 STL 加序号并进入 PageTab 无障碍名称；ViewModel 覆盖切换、重排、关闭与快照释放；QML 覆盖 PageTab 角色、选中态、左右键、Enter / Space 和关闭。补齐 `DocumentTabBar` 中英文翻译及边缘像素测试。动画断言改为 0.1px 容差；远端 run 36430454561 的 19 个 job 全通过。
-- **2026-09-29：平台偏好与焦点。** Qt 6.11 无统一 reduced-motion 属性，平台查询由 086 的适配层提供，QML 用 `Settings.reducedMotion` 控制重排；086 已完成。真窗口 AX 激活标签后焦点现在转移到 PageTab 并显示焦点框，AX 关闭有效；从全局搜索按 Tab 进入标签栏及 VoiceOver 朗读仍待验。
+- **2026-09-29：平台偏好与焦点。** Qt 6.11 无统一 reduced-motion 属性，平台查询由 086 的适配层提供，QML 用 `Settings.reducedMotion` 控制重排；086 已完成。AX 激活标签后焦点转移与关闭动作有效；按页面外观要求，PageTab 焦点边框使用 `Theme.colorTransparent`，辅助树仍报告焦点/选中态。Shell Tab 链已通过回归，从全局搜索沿 Tab 到标签栏；VoiceOver 朗读仍待验。QML 的透明色统一使用主题 token。
 - **2026-09-29：资源生命周期与性能。** 视口隐藏时也替换旧 VTK actor 管线，确保关闭页签后快照立即释放；真窗口验证隐藏清理及 12 轮连续替换。补充可指定真实输入的 STL Release 微基准，取得两个小型 SDK 样本与 100k 合成数据；目前只得到解析、展开和 payload 基线，不足以确定缓存预算或证明 VTK 对象无残留。
 - **2026-09-29：一致性复核。** `ViewportPane` 仅连接一个 `CaeViewport` 和 `DocumentTabBar`；`PanelTabBar` 仍供 Tasks 面板使用。HTML 顶部 Mesh / Results 是全局导航，不是旧视口切换；任务索引、Rust/C++ 边界及 069 手动基准记录一致。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API，任务保持 in-progress；本次修复并在真窗口验证隐藏视口关闭网格后 CPU 快照释放，也验证 AX 激活标签的焦点框与关闭动作，并完成旧视口分类路径一致性审计。新增的真实小型 STL 与 100k 合成基线明确了 Rust 解析/展开成本及每快照约 72 字节/面，但还没有真实大模型的应用内存高水位和重载对比。剩余 VoiceOver 朗读和从搜索框进入标签栏的焦点路径、VTK actor/mapper/回调/设备资源循环释放、代表性 STL 内存高水位/重载延迟、reduced-motion 动画效果验收，以及本地改动的后续远端 CI。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、Shell Tab 焦点链、四标签鼠标拖拽边界和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API；真窗口检查覆盖 12 轮网格替换、隐藏关闭、换宿主后的 VTK 对象与 WebGPU configuration 回收；页签仍提供无障碍焦点状态，焦点边框引用 `Theme.colorTransparent`。仍需在 VoiceOver 下听读，并用代表性大 STL 测量应用内存高水位与重载延迟，以确定快照缓存预算。

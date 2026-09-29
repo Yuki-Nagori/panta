@@ -17,7 +17,7 @@ Window {
     height: 430
     minimumWidth: 580
     minimumHeight: 360
-    color: "transparent"
+    color: Theme.colorTransparent
     modality: Qt.ApplicationModal
     flags: Qt.Dialog | Qt.FramelessWindowHint
     title: qsTranslate("UiCommon", "Import")

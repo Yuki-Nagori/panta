@@ -183,9 +183,9 @@ Item {
                     anchors.fill: parent
                     topLeftRadius: Theme.documentTabRadius
                     topRightRadius: Theme.documentTabRadius
-                    color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : "transparent"
+                    color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : Theme.colorTransparent
                     border.width: tab.activeFocus ? Theme.borderWidth : 0
-                    border.color: Theme.colorIcon
+                    border.color: Theme.colorTransparent
                 }
                 // HTML 伪元素的 8px 圆角阴影只在圆弧外露出面板色；
                 // PathArc 保持真圆；与主体重叠 1px 避免抗锯齿接缝。
@@ -198,7 +198,7 @@ Item {
                     z: 2
                     ShapePath {
                         fillColor: Theme.colorPanel
-                        strokeColor: "transparent"
+                        strokeColor: Theme.colorTransparent
                         strokeWidth: 0
                         startX: Theme.documentTabRadius
                         startY: 0
@@ -227,7 +227,7 @@ Item {
                     z: 2
                     ShapePath {
                         fillColor: Theme.colorPanel
-                        strokeColor: "transparent"
+                        strokeColor: Theme.colorTransparent
                         strokeWidth: 0
                         startX: Theme.borderWidth
                         startY: 0
@@ -353,7 +353,7 @@ Item {
                     width: Theme.documentTabCloseSize
                     height: Theme.documentTabCloseSize
                     radius: Theme.documentTabCloseRadius
-                    color: closeArea.pressed ? Theme.colorDocumentClosePressed : closeArea.containsMouse ? Theme.colorHover : "transparent"
+                    color: closeArea.pressed ? Theme.colorDocumentClosePressed : closeArea.containsMouse ? Theme.colorHover : Theme.colorTransparent
                     border.width: closeButton.activeFocus ? Theme.borderWidth : 0
                     border.color: Theme.colorIcon
 

@@ -168,7 +168,7 @@ PanelSurface {
 
                     width: projectTree.width
                     height: Theme.controlHeight
-                    color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : "transparent"
+                    color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : Theme.colorTransparent
 
                     HoverHandler {
                         id: partHover

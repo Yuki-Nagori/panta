@@ -502,6 +502,27 @@ class ThemeComponentTest final : public QObject {
         bar->setProperty("order",
                          QStringList{QStringLiteral("welcome"), QStringLiteral("import-1")});
         QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 2.0) < 0.1, 10000);
+
+        // 垂直手势不开始拖动，也不改变显示顺序。
+        const QStringList initialOrder = bar->property("order").toStringList();
+        QVERIFY(QMetaObject::invokeMethod(bar, "begin_press", Q_ARG(QVariant, "welcome"),
+                                          Q_ARG(QVariant, 20.0), Q_ARG(QVariant, 20.0)));
+        QVERIFY(QMetaObject::invokeMethod(bar, "detect_drag", Q_ARG(QVariant, "welcome"),
+                                          Q_ARG(QVariant, 21.0), Q_ARG(QVariant, 50.0)));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+        QCOMPARE(bar->property("order").toStringList(), initialOrder);
+
+        // 关闭按钮独占按压；拖出按钮区域不能启动页签拖拽或关闭标签。
+        QSignalSpy closed(bar, SIGNAL(closeDocument(QString)));
+        const QPoint closeCenter =
+            importClose->mapToScene(QPointF(importClose->width() / 2, importClose->height() / 2))
+                .toPoint();
+        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, closeCenter);
+        QTest::mouseMove(&window, closeCenter + QPoint(-40, 0));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, closeCenter + QPoint(-40, 0));
+        QCOMPARE(closed.count(), 0);
+
         QVERIFY(QMetaObject::invokeMethod(bar, "begin_press", Q_ARG(QVariant, "welcome"),
                                           Q_ARG(QVariant, 20.0), Q_ARG(QVariant, 20.0)));
         QVERIFY(QMetaObject::invokeMethod(bar, "detect_drag", Q_ARG(QVariant, "welcome"),
@@ -512,6 +533,8 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(welcomeTab->x() > 2.0);
         QVERIFY(QMetaObject::invokeMethod(bar, "finish_drag", Q_ARG(QVariant, true)));
         QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 2.0) < 0.1, 10000);
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("welcome"));
 
         // 悬停移动不能复用上一次按下坐标；真实左键拖动才进入拖拽态。
         QTest::mouseMove(&window, QPoint(20, 20));
@@ -525,6 +548,8 @@ class ThemeComponentTest final : public QObject {
         QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(40, 20));
         QCOMPARE(bar->property("draggedId").toString(), QString{});
         QCOMPARE(dragArea->property("cursorShape").toInt(), int(Qt::OpenHandCursor));
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("welcome"));
         QTest::mouseMove(&window, QPoint(80, 20));
         QCOMPARE(bar->property("draggedId").toString(), QString{});
 
@@ -533,6 +558,8 @@ class ThemeComponentTest final : public QObject {
                                           Q_ARG(QVariant, 20.0), Q_ARG(QVariant, 20.0)));
         QVERIFY(QMetaObject::invokeMethod(bar, "detect_drag", Q_ARG(QVariant, "welcome"),
                                           Q_ARG(QVariant, 40.0), Q_ARG(QVariant, 20.0)));
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("welcome"));
         QVERIFY(QMetaObject::invokeMethod(bar, "drag_move", Q_ARG(QVariant, 220.0)));
         QVERIFY(QMetaObject::invokeMethod(bar, "finish_drag", Q_ARG(QVariant, true)));
         QCOMPARE(moved.count(), 1);
@@ -623,6 +650,11 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(firstTab->property("activeFocusOnTab").toBool(), true);
         firstTab->forceActiveFocus();
         QTRY_VERIFY(firstTab->hasActiveFocus());
+        const auto focusedImageResult = bar->grabToImage();
+        QVERIFY(focusedImageResult);
+        QSignalSpy focusedImageReady(focusedImageResult.data(), &QQuickItemGrabResult::ready);
+        QVERIFY(focusedImageReady.wait(5000));
+        QCOMPARE(focusedImageResult->image().pixelColor(150, 3), QColor(Qt::white));
         QTest::keyClick(&window, Qt::Key_Return);
         QCOMPARE(activated.count(), 1);
         QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("import-1"));
@@ -671,6 +703,85 @@ class ThemeComponentTest final : public QObject {
         QTest::keyClick(&window, Qt::Key_Space);
         QCOMPARE(closed.count(), 1);
         QCOMPARE(closed.takeFirst().at(0).toString(), QStringLiteral("import-2"));
+    }
+
+    void document_tab_drag_crosses_multiple_neighbors_without_changing_identity() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent component(
+            &engine, QUrl(QStringLiteral(
+                         "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+
+        const auto document = [](const QString& id) {
+            return QVariantMap{{QStringLiteral("id"), id},
+                               {QStringLiteral("kind"), QStringLiteral("import")},
+                               {QStringLiteral("state"), QStringLiteral("ready")},
+                               {QStringLiteral("title"), id + QStringLiteral(".stl")},
+                               {QStringLiteral("message"), QString{}}};
+        };
+        const QVariantList documents{
+            document(QStringLiteral("doc-1")), document(QStringLiteral("doc-2")),
+            document(QStringLiteral("doc-3")), document(QStringLiteral("doc-4"))};
+        auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
+            QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
+                        {QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), QStringLiteral("doc-4")}}));
+        QVERIFY(bar != nullptr);
+        bar->setParent(&owner);
+        bar->setWidth(600);
+        bar->setHeight(39);
+
+        QQuickWindow window;
+        window.resize(600, 80);
+        bar->setParentItem(window.contentItem());
+        window.show();
+        QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+
+        QQuickItem* draggedTab = visual_item(bar, QStringLiteral("documentTab-doc-1"));
+        QVERIFY(draggedTab != nullptr);
+        QCOMPARE(draggedTab->y(), 3.0);
+        QSignalSpy activated(bar, SIGNAL(activateDocument(QString)));
+        QSignalSpy moved(bar, SIGNAL(moveDocument(int, int)));
+        const QStringList initialOrder = bar->property("order").toStringList();
+        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(20, 20));
+        QTest::mouseMove(&window, QPoint(21, 55));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+        QCOMPARE(bar->property("order").toStringList(), initialOrder);
+        QCOMPARE(activated.count(), 0);
+        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(21, 55));
+
+        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(20, 20));
+        QTest::mouseMove(&window, QPoint(200, 20));
+        QTRY_COMPARE(bar->property("draggedId").toString(), QStringLiteral("doc-1"));
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(draggedTab->x() - 182.0) < 0.1, 10000);
+        QCOMPARE(draggedTab->opacity(), 1.0);
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.takeFirst().at(0).toString(), QStringLiteral("doc-1"));
+        bar->setProperty("activeDocumentId", QStringLiteral("doc-1"));
+
+        QTest::mouseMove(&window, QPoint(520, 20));
+        QTRY_COMPARE(bar->property("order").toStringList(),
+                     (QStringList{QStringLiteral("doc-2"), QStringLiteral("doc-3"),
+                                  QStringLiteral("doc-4"), QStringLiteral("doc-1")}));
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(draggedTab->x() - 470.0) < 0.1, 10000);
+        QCOMPARE(draggedTab->y(), 3.0);
+        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(520, 20));
+        QCOMPARE(bar->property("draggedId").toString(), QString{});
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(draggedTab->x() - 398.0) < 0.1, 10000);
+        QCOMPARE(moved.count(), 1);
+        QCOMPARE(moved.takeFirst(), (QList<QVariant>{0, 3}));
+
+        QVariantList reordered{documents[1], documents[2], documents[3], documents[0]};
+        bar->setProperty("documents", reordered);
+        QQuickItem* movedTab = visual_item(bar, QStringLiteral("documentTab-doc-1"));
+        QVERIFY(movedTab != nullptr);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(movedTab->x() - 398.0) < 0.1, 10000);
+        QVERIFY(movedTab->property("isActive").toBool());
+        QQuickItem* previousActiveTab = visual_item(bar, QStringLiteral("documentTab-doc-4"));
+        QVERIFY(previousActiveTab != nullptr);
+        QCOMPARE(previousActiveTab->property("isActive").toBool(), false);
     }
 
     void document_tab_scroll_preserves_active_edge_connectors() {

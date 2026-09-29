@@ -16,7 +16,7 @@ Window {
     height: 360
     minimumWidth: 520
     minimumHeight: 320
-    color: "transparent"
+    color: Theme.colorTransparent
     modality: Qt.ApplicationModal
     flags: Qt.Dialog | Qt.FramelessWindowHint
     title: qsTranslate("NewProjectDialog", "Create New Project")

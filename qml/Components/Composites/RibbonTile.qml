@@ -23,7 +23,7 @@ ToolButton {
     implicitHeight: Math.max(Theme.ribbonToolHeight, contentItem.implicitHeight + topPadding + bottomPadding)
 
     background: Rectangle {
-        color: tile.enabled && (tile.hovered || tile.visualFocus) ? Theme.colorHover : "transparent"
+        color: tile.enabled && (tile.hovered || tile.visualFocus) ? Theme.colorHover : Theme.colorTransparent
         radius: Theme.radiusSmall
         border.width: tile.visualFocus ? Theme.borderWidth : 0
         border.color: Theme.colorIcon

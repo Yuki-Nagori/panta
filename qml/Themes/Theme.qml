@@ -7,6 +7,7 @@ QtObject {
     // 界面色彩
     readonly property color colorBackground: "#ffffff"
     readonly property color colorPanel: "#ffffff"
+    readonly property color colorTransparent: "transparent"
     readonly property color colorChrome: "#e9e9e9"
     readonly property color colorChromeLine: "#d0d0d0"
     readonly property color colorPanelLine: "#c9c9c9"

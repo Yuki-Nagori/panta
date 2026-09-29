@@ -11,7 +11,7 @@ ToolButton {
     property int cornerRadius: Theme.radiusSmall
     property color contentColor: Theme.colorIcon
     property color hoverColor: Theme.colorSelected
-    property color borderColor: "transparent"
+    property color borderColor: Theme.colorTransparent
     property string iconName: ""
     // 纯图标按钮由宿主提供已翻译的名称，供读屏与悬停提示使用。
     property string accessibleName: text
@@ -41,7 +41,7 @@ ToolButton {
         implicitWidth: Theme.controlHeight
         // highlighted 表示宿主指定的强调态（当前菜单白底），
         // 不再响应悬停高亮；visualFocus 使键盘 Tab 焦点获得与悬停一致的反馈。
-        color: button.highlighted ? Theme.colorPanel : button.enabled && (button.hovered || button.visualFocus) ? button.hoverColor : "transparent"
+        color: button.highlighted ? Theme.colorPanel : button.enabled && (button.hovered || button.visualFocus) ? button.hoverColor : Theme.colorTransparent
         border.width: button.borderColor.a > 0 ? Theme.borderWidth : 0
         border.color: button.borderColor
         radius: button.cornerRadius

@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QString>
+#include <QStringList>
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
 #include <QtQuickControls2/qquickstyle.h>
@@ -11,6 +12,8 @@
 #include <QtTest/qtestcase.h>
 #include <QtTest/qtestmouse.h>
 #include <icon_provider.hpp>
+#include <qcontainerfwd.h>
+#include <qlist.h>
 #include <qlogging.h>
 #include <qtenvironmentvariables.h>
 #include <qtestsupport_core.h>
@@ -301,6 +304,40 @@ class ShellModuleLoadTest final : public QObject {
                                     .arg(strip->property("contentX").toDouble())));
         animationButton->setProperty("text", originalText);
         QTest::qWait(50);
+
+        // 从搜索字段沿真实 Shell Tab 顺序遍历，标签页必须能被键盘抵达。
+        auto* documentBar = root->findChild<QQuickItem*>(QStringLiteral("documentTabBar"));
+        QQuickItem* welcomeTab = nullptr;
+        QVERIFY(documentBar != nullptr);
+        documentBar->ensurePolished();
+        QTRY_VERIFY(visual_item(documentBar, QStringLiteral("documentTab-welcome")) != nullptr);
+        welcomeTab = visual_item(documentBar, QStringLiteral("documentTab-welcome"));
+        shellWindow->resize(1440, 900);
+        QTest::qWait(50);
+        search->forceActiveFocus(Qt::TabFocusReason);
+        QTRY_COMPARE(shellWindow->activeFocusItem(), search);
+        QStringList focusTrail;
+        QList<QQuickItem*> visited;
+        bool reachedDocumentTab = false;
+        for (int step = 0; step < 128; ++step) {
+            auto* focused = shellWindow->activeFocusItem();
+            if (focused == welcomeTab) {
+                reachedDocumentTab = true;
+                break;
+            }
+            if (focused == nullptr || visited.contains(focused)) {
+                break;
+            }
+            visited.append(focused);
+            focusTrail.append(focused->objectName().isEmpty()
+                                  ? QString::fromLatin1(focused->metaObject()->className())
+                                  : focused->objectName());
+            QTest::keyClick(shellWindow, Qt::Key_Tab);
+            QCoreApplication::processEvents();
+        }
+        QVERIFY2(reachedDocumentTab,
+                 qPrintable(QStringLiteral("Tab focus path did not reach the document tab: %1")
+                                .arg(focusTrail.join(QStringLiteral(" -> ")))));
 
         auto* searchButton = root->findChild<QQuickItem*>(QStringLiteral("searchButton"));
         QVERIFY(searchButton != nullptr);
