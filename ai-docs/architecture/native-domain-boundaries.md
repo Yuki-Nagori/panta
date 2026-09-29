@@ -80,6 +80,17 @@ Rust 工作区由 `panta-import` 承担统一的**导入服务契约**，不要�
 
 跨格式共享的是导入编排和工程资产元数据，不是所有文件都先化成同一种 Mesh。STEP/IGES 的 B-rep 由 C++ adapter 的 native shape 所有者管理并释放，Rust 只保存稳定领域 ID 与修订号；跨 FFI 通过 ID 寻址，修订不匹配则拒绝操作。可视化三角化是派生缓存，不能替代几何资产。STL 是表面网格，若未来用于体网格生成，应经明确的转换 / 网格任务，不把它伪装成原生 OCCT shape。
 
+从 STL 派生显示、修复几何和生成体网格时，目标职责保持如下；表中 B / C 尚无端到端实现：
+
+| 阶段 | Rust 权威 | C++ / 重库适配 | 提交结果 |
+|---|---|---|---|
+| 读取 STL | `panta-import` 编排来源快照，`panta-mesh` 解析并拥有 `SurfaceMesh` | 无格式解析或业务选择 | 原始 source asset 与 Surface Mesh revision 分别标识 |
+| A. 直接显示 | 选择活动 Mesh revision，返回拥有内存的批量快照 | C++ 将三角面转换为 `vtkPolyData`，VTK 管 renderer / WebGPU 生命周期 | 无工程写入，仅显示派生数据 |
+| B. 修复为几何 | 决定是否启动转换任务、策略 / 容差、来源 revision；校验并提交新 `GeometryAsset` | C++ adapter 调用 OCCT 重建 faceted B-rep、执行范围明确的修复并返回诊断 | 新几何 ID / revision 与来源 Mesh revision 关联；原 Mesh 保留 |
+| C. 生成体网格 | 选择 `SurfaceMesh` revision、Netgen 参数和任务语义；`panta-mesh` 校验 `TetMesh` 并提交 | C++ adapter 调用 Netgen 的 STL 几何入口，转换输出 DTO，不持有 Rust 领域规则 | 新 Volume Mesh ID / revision 与来源 Mesh 和参数关联 |
+
+读取 / 解析、OCCT 修复和 Netgen 网格生成都是不可预测耗时操作，应在 Rust 后台任务中编排并支持取消 / 过期结果拒绝。固定 SDK Netgen 6.2.2604 的 [`nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h) 暴露 STL 三角片填充和表面到体网格生成入口；这只是 adapter 可行性依据，封闭性等输入要求与实测留给后续网格任务。CXX 只声明快照 / DTO 与受控适配调用，不存领域策略。Mesh sidecar 和 `.panta` 索引规划见 [088](../task/088-mesh-asset-sidecar-storage.md)；OCCT B-rep 持久化不在该任务中。
+
 格式分发以显式声明或扩展名为入口，再由实际解析器验证内容；扩展名本身不保证格式有效。各格式返回结构化错误，公共流程只决定是否提交，不吞掉 OCCT / STL 的专门诊断。新的导入格式在有端到端使用者时才加入路由、bridge 和测试；若新增本构、网格生成或格式修复算法，仍调用相应重库或另立明确的轻量功能任务。
 
 异步 FSM 的职责见 [FSM 与 Rust 状态机规划](../modules/fsm.md)。首个消费者 [080](../task/080-qml-viewport-document-tabs.md) 只读激活已提交的 STL 视口资产，由 Rust 校验工程代次、记录身份和迟到结果，不改写工程；未来写入型导入由 `panta-core` 协调工程提交和任务生命周期。FSM parser 复用已有 `panta-dsl-core`，生成产物不进入运行期解析；实施由 [073](../task/073-fsm-dsl-and-import-state-machine.md) 与真实消费者推进，不追加已完成 067 的同步 STL 状态机改造。

@@ -10,6 +10,12 @@ V1 先保证导入与检查闭环，不预设完整 CAD 建模、布尔编辑或
 
 规划中 `panta-geom` 拥有几何领域身份、修订和后端契约；C++ 继续调用 OCCT 并持有 native 对象。当前仅有 STEP 摘要适配，完整资产服务尚未接入 Rust；所有权与依赖规则见 [适配边界](native-domain-boundaries.md)。
 
+## 从 STL 表面构造 B-rep
+
+未来的 STL 修复路线以 Rust `panta-mesh::SurfaceMesh` 作为来源资产。Rust 任务根据几何摘要、用户选择和限制决定转换策略；C++ OCCT adapter 将三角片构造成 faceted B-rep、执行明确范围的修复，并返回结构化诊断。Rust 验证结果后提交一个新的 `GeometryAsset` ID / revision，记录它来源于哪个 Mesh revision；失败、取消或来源 revision 变化不能覆盖旧 Mesh 或已提交几何。
+
+由三角片重建的 faceted B-rep 不会恢复原始 STEP/IGES 中的解析曲面、尺寸约束或设计历史。曲面拟合、闭合判定、修复容差、拓扑身份映射和可逆性必须由单独任务定义，不可将 OCCT 接口调用描述为可无损“修复 STL”。提交后的 B-rep 需要独立的数据文件格式 / native shape 所有权策略；Mesh sidecar 任务 088 只负责 Surface / Volume Mesh 资产，不持久化 OCCT 对象。
+
 ## 导入流程
 
 1. 校验路径可访问性，建立后台任务并记录来源。

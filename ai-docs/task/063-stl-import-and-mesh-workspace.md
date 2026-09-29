@@ -36,6 +36,8 @@
 
 原始 STL 不应被修改；近似尺寸由解析结果计算并在确认窗只读展示。取消或导入失败不能写入工程 manifest、替换当前工程或清空已有视口。确认后的导入记录采用追加 / 版本化语义，避免改写其他已导入资产；具体 manifest schema 和资产复制策略在 native 实现阶段锁定并同步 034/048 的契约。
 
+当前实现将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。后续 `.panta` 元数据 + Mesh 索引、按页签加载规范 Mesh 的设计由 [任务 088](088-mesh-asset-sidecar-storage.md) 跟踪；不在 063 中提前改变现有 schema 或把 VTK 快照持久化。
+
 ## 范围与非目标
 
 包含：

@@ -11,7 +11,7 @@
 | Cargo/CMake、运行与部署 | [构建与开发](build-and-development.md) | 本仓库 |
 | QML、ViewModel 与交互 | [界面与桥接](ui-and-bridge.md) | 本仓库 |
 | STEP、拓扑与 OCCT | [几何模型](geometry.md) | 本仓库 |
-| Mesh IR、Netgen 与质量 | [网格](mesh.md) | 本仓库 |
+| Mesh IR、Netgen、资产 revision 与旁置存储 | [网格](mesh.md) | 本仓库；持久化与按需加载见 [088](../task/088-mesh-asset-sidecar-storage.md) 规划 |
 | VTK、视口与字段 | [可视化](visualization.md) | 本仓库 |
 | Rust、工程与持久化 | [应用平台与存储](application-and-storage.md) | 本仓库 |
 | FSM DSL 与 Rust 状态机 | [FSM 编译期声明与事务设计](../modules/fsm.md) | 本仓库；后续规划 |
