@@ -540,6 +540,14 @@ class ThemeComponentTest final : public QObject {
         QVariantList reordered{documents[1], documents[0]};
         bar->setProperty("documents", reordered);
         QTRY_VERIFY_WITH_TIMEOUT(qAbs(welcomeTab->x() - 134.0) < 0.1, 10000);
+
+        bar->setProperty("reducedMotion", true);
+        bar->setProperty("order",
+                         QStringList{QStringLiteral("welcome"), QStringLiteral("import-1")});
+        QCOMPARE(welcomeTab->x(), 2.0);
+        bar->setProperty("order",
+                         QStringList{QStringLiteral("import-1"), QStringLiteral("welcome")});
+        QCOMPARE(welcomeTab->x(), 134.0);
     }
 
     void duplicate_document_tabs_are_visibly_and_accessibly_distinguished() {

@@ -132,6 +132,7 @@
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`git diff HEAD --check` | 验证页签固定宽度、长标题省略和键盘导航后的可见范围 | 通过：CTest 64/64；QML 回归确认 tab 宽 130px、来源长标题已截断但完整文本仍进入无障碍名称，左右键将末尾 tab 的主体滚入可视区。首末活动页签圆弧在裁切边界处的像素检查仍待补。 |
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 检查首末活动页签滚动到边缘时的圆弧与白线像素 | 通过：CTest 64/64、format、lint 完整 8 阶段及差异检查通过；首个活动页签左下连接像素保持面板白色，末个活动页签滚到最右端时保留完整 8px 圆弧连接范围，圆弧外恢复标签带灰色，底部白线连续。 |
 | 2026-09-29 | macOS arm64，`cargo format`；`cargo build --locked` | 适配层完成后，根 QML 的 reduced-motion 绑定通过格式和构建 | 通过。`Settings` QML 类型可用，`Settings.reducedMotion` 编译接入 `ViewportPane`；真实窗口动画效果仍待验收。 |
+| 2026-09-29 | macOS arm64：`cargo build --locked`、`cargo format --check`、`cargo test --locked --workspace`、`cargo lint`；PantaPreview.app 真窗口及 AX 检查 | 验证 reduced-motion 下换序直接定位，并检查实际 VTK Welcome、页签角色/名称和键盘焦点 | build、format、聚合测试（CTest 66/66）及 lint 八阶段通过。QML 回归验证 `reducedMotion=true` 时页签重排同步到目标位置。真窗口截图显示 VTK `panta` Welcome 场景；AX 树包含 PageTabList、Welcome PageTab 和 Close Welcome 按钮。Tab 导航仍停在全局搜索框，真实页签焦点视觉与 VoiceOver 操作尚未验证；临时 app wrapper 已清理并关闭应用。 |
 
 ## 风险与回退
 
@@ -167,6 +168,7 @@
 - 2026-09-28：页签末端滚动范围增加 8px 圆弧余量，并新增首尾活动页签连接处的像素回归；Cargo 聚合 CTest 64/64、format 与 lint 完整 8 阶段通过，固定宽度、长标题、省略、2px 首项位置及边缘圆弧布局验收完成。
 - 2026-09-28：Qt 6.11 的 `QStyleHints` / `QAccessibilityHints` 未提供 reduced-motion 属性；采用平台适配：macOS `NSWorkspace.accessibilityDisplayShouldReduceMotion` 与选项变更通知，Windows `SPI_GETCLIENTAREAANIMATION` 与 `WM_SETTINGCHANGE`，Linux XDG Desktop Portal Settings v2 的 `org.freedesktop.appearance/reduced-motion` 与 `SettingChanged`。值未知或接口不可用时按无减少动态效果偏好处理，由 Bridge `Settings.reducedMotion` 注入视口页签。
 - 2026-09-29：按维护者要求先建立独立 Qt 平台服务适配层，再继续页签动画接线。系统平台查询及标准目录发现由 086 收拢；086 已完成。根 QML 现使用 `Settings` 并将 `Settings.reducedMotion` 注入 ViewportPane 的页签动画。
+- 2026-09-29：补充 reduced-motion 回归，验证开启时页签换序同步定位；Cargo 聚合 CTest 66/66、format 与 lint 八阶段通过。真窗口 CUA 截图和 AX 树确认 Welcome VTK 场景及 PageTab 语义；Tab 后焦点仍位于全局搜索，焦点视觉/VoiceOver 验收继续待办。
 
 ## 完成摘要
 
