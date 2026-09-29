@@ -4,6 +4,7 @@
 /// 默认只验证无头模块加载；PANTA_TEST_NATIVE_VIEWPORT=1 时在真实桌面
 /// 验证帧合并、隐藏恢复、跨窗口重建与析构，不能使用 offscreen 平台。
 
+#include "panta/visualization/mesh_source.hpp"
 #include <QGuiApplication>
 #include <QLoggingCategory>
 #include <QObject>
@@ -105,6 +106,27 @@ class ViewportModuleLoadTest final : public QObject {
         }
         QTest::qWait(100);
         QCOMPARE(rendered_frames, 1);
+
+        auto snapshot = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        snapshot->vertices = {{{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}}};
+        const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> snapshot_lifetime =
+            snapshot;
+        scene.mesh = snapshot;
+        snapshot.reset();
+        ++scene.revision;
+        rendered_frames = 0;
+        viewport.apply_state(scene);
+        QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
+        QVERIFY(!snapshot_lifetime.expired());
+
+        viewport.setVisible(false);
+        scene.mesh.reset();
+        ++scene.revision;
+        viewport.apply_state(scene);
+        QTRY_VERIFY_WITH_TIMEOUT(snapshot_lifetime.expired(), 5000);
+        rendered_frames = 0;
+        viewport.setVisible(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
 
         rendered_frames = 0;
         surface_syncs = 0;

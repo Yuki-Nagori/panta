@@ -549,6 +549,14 @@ void VtkViewport::sync_native_surface() {
     set_native_surface_visible(impl_->native_surface, visible);
     if (!visible || impl_->render_window == nullptr) {
         stop_camera_transition();
+        if (impl_->render_window != nullptr && impl_->primitive_actor != nullptr &&
+            impl_->pending.mesh != impl_->applied_mesh) {
+            // 文档可能在视口隐藏期间关闭；替换 actor 管线并释放旧快照，不等到
+            // surface 再次显示才清理其 CPU 与 VTK 数据。
+            update_mesh_actor();
+            impl_->applied_mesh = impl_->pending.mesh;
+            impl_->applied_pixel_size = {};
+        }
         return;
     }
     ::panta::visualization::sync_native_surface(window(), this, impl_->hardware_window.get(),
