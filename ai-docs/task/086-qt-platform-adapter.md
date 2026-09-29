@@ -1,6 +1,6 @@
 # 086 — Qt 平台服务适配层
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[002](002-dependency-baseline.md)、[005](005-qt-qml-shell.md)、[023](023-cross-platform-paths.md)、[034](034-rust-panta-artifact-parser.md)
 - 优先级：P1
@@ -76,7 +76,7 @@
 - [x] Bridge 不残留 AppKit / Win32 / DBus 平台实现与专属链接；Windows、macOS、Linux 构建分支归 adapter target。
 - [x] 审计中保留的 Qt/OS 集成均有层级理由，尤其 VTK native surface 仍由 Visualization 持有。
 - [x] macOS 适用构建及格式入口成功，具体环境和平台验证边界记录在本任务；080 / 023 / 分层文档与索引一致。
-- [ ] Linux D-Bus 与 Windows 系统偏好分支在 CI 中编译通过，相关 lint/build job 不再被平台源文件编译错误阻断。
+- [x] Linux D-Bus 与 Windows 系统偏好分支在 CI 中编译通过，相关 lint/build job 不再被平台源文件编译错误阻断。
 - [x] Settings 语言切换用例在常规 CTest 中通过，并以 `Qml.*` 命名供任务 042 的 TSan / Windows ASan 边界过滤。
 
 ## 验证计划与结果
@@ -92,6 +92,7 @@
 | 2026-09-29 | `cargo format`、`cargo build --locked`、`cargo lint` | 格式、构建及八阶段 lint 通过 | 全部通过；lint 覆盖 Clippy、依赖、CMake、qmllint、clang-tidy、include-cleaner、cppcheck。默认沙箱禁止 Cargo 锁用本地 TCP 监听，完整 lint 在授权环境执行。Windows/Linux 代码分支未在本机编译 |
 | 2026-09-29 | 修复后 macOS arm64：`cargo format --check`、`cargo build --locked`、`cargo test --locked --workspace`、`cargo lint`、`git diff --check` | 当前平台构建、聚合回归、lint 与补丁格式通过 | 全部通过，native CTest 66/66。macOS 主机只编译 macOS 条件分支；Linux/Windows 的修复尚未由远端 CI 复跑确认，按用户约定保留为本地提交 |
 | 2026-09-29 | macOS arm64：`cargo format --check`、`cargo test --locked --workspace`、`cargo lint`、`cargo sanitize`、`git diff --check` | QML 行为测试在普通回归中通过，lint 与平台适用 sanitizer 策略通过 | 全部通过；普通 CTest 66/66，包含 `Qml.SettingsLanguageSwitch`；cargo lint 八阶段通过；ASan/UBSan 66/66；TSan 50/50，按 Task 042 规则未运行 `Qml.*`。macOS 不验证 Windows ASan 行为，修改后的 Linux/Windows 条件编译仍待后续远端 CI 确认 |
+| 2026-09-29 | 修复提交后的后续 GitHub Actions CI（维护者确认） | Linux/Windows 平台分支、lint 与 sanitizer job 全部通过 | 维护者确认 CI 结果可收尾；Linux D-Bus 与 Windows 系统偏好编译、Qt include-cleaner 和 QML sanitizer 分类问题均已解决。此前 CI run 36502014437 的失败由后续修复消除 |
 
 ## 风险与回退
 
@@ -110,7 +111,8 @@
 - 2026-09-29：新增 Rust、Qt adapter 和 Bridge/QML 回归，修正直接头文件引用、`StandardLocation` 底层类型、CMake 格式及语言服务客户端命名。三次消融均证明对应测试能捕获行为退化；恢复实现后的 Cargo 聚合、build 和 lint 通过。
 - 2026-09-29：GitHub Actions 首次三平台构建发现 Linux D-Bus 和 Windows SDK 分支编译错误；重新打开任务，修复后需等待下一次 CI 运行验证远端平台结果。
 - 2026-09-29：run 36502014437 确认平台普通构建通过；include-cleaner 报漏直接头文件，Settings QML 测试因 GTest discovery 未归入 Task 042 的 `Qml.*` sanitizer 过滤。本次改用 QtTest/add_test 命名为 `Qml.SettingsLanguageSwitch`，并补齐 Linux 分支直接依赖头文件。
+- 2026-09-29：维护者确认修复后的 CI 结果通过；平台条件编译、include-cleaner 和 QML sanitizer 分类均收尾，任务状态更新为 done。
 
 ## 完成摘要
 
-首次实施完成：新增独立 `panta::qt_adapter` 并迁移 reduced-motion、标准目录查询和 QTranslator 生命周期；Rust `LanguageService` 拥有 locale 目录/状态，Bridge `Settings` 作为 QML 单例暴露语言后端和系统偏好。macOS arm64 的 Cargo build/test/format/lint 通过，CTest 66/66，三次消融按预期失败后恢复并复测。2026-09-28 的 CI 发现 Linux/Windows 平台分支编译问题，2026-09-29 的 CI 又发现直接 include 和 QML sanitizer 分类问题，本任务重新打开并继续修复；远端复跑证据待补。设置 UI 与语言持久化分别由 087/048 跟进。
+已新增独立 `panta::qt_adapter` 并迁移 reduced-motion、标准目录查询和 QTranslator 生命周期；Rust `LanguageService` 拥有 locale 目录/状态，Bridge `Settings` 作为 QML 单例暴露语言后端和系统偏好。macOS arm64 的 Cargo build/test/format/lint 通过，CTest 66/66，三次消融按预期失败后恢复并复测；Linux/Windows 平台构建、include-cleaner 与 QML sanitizer 分类经修复后由维护者确认 CI 通过。设置 UI 与语言持久化分别由 087/048 跟进。
