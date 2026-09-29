@@ -106,7 +106,7 @@ ai-docs/
 | 073 | [FSM DSL 与首个异步 STL 视口资源激活](task/073-fsm-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | in-progress |
 | 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
 | 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073, 086 | in-progress |
-| 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | planned |
+| 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | in-progress |
 | 085 | [Qt reduced-motion 原生属性迁移](task/085-qt-reduced-motion-preference-migration.md) | 应用平台扩展 | 080, 086, 002 | planned |
 | 086 | [Qt 平台服务适配层](task/086-qt-platform-adapter.md) | 应用平台扩展 | 002, 005, 023, 034 | done |
 | 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 048, 086 | planned |

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="42" height="42" viewBox="0 0 42 42" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-ribbon-tutorials；内部绘制，原始几何与颜色保留。 -->
+  <path d="M8 8h11c3 0 4 1 4 4v22c0-3-1-4-4-4H8z" fill="#f2f2f2" stroke="#4a4a4a" stroke-width="1.3"/>
+  <path d="M34 8H23c-3 0-4 1-4 4v22c0-3 1-4 4-4h11z" fill="#dce9f7" stroke="#4a4a4a" stroke-width="1.3"/>
+  <path d="M12 14h6M26 14h5M26 19h5" stroke="#2e7ce0" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

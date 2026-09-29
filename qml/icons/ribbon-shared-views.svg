@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-ribbon-shared-views；内部绘制，原始几何与颜色保留。 -->
+  <path d="m13 3 8 4.5v9L13 21l-8-4.5v-9z" fill="#dce9f7" stroke="#3e6996" stroke-width="1.2"/>
+  <path d="m5 7.5 8 4.5 8-4.5M13 12v9" stroke="#3e6996" stroke-width="1.1"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-task-settings；内部绘制，原始几何与颜色保留。 -->
+  <path d="M2 4h12M2 8h12M2 12h12" stroke="#4a4a4a"/>
+  <circle cx="5" cy="4" r="1.5" fill="#2e7ce0"/>
+  <circle cx="11" cy="8" r="1.5" fill="#2e7ce0"/>
+  <circle cx="7" cy="12" r="1.5" fill="#2e7ce0"/>
+</svg>

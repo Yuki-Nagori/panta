@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="15" height="15" viewBox="0 0 15 15" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-print；内部绘制，原始几何与颜色保留。 -->
+  <path d="M4 5V2h7v3M2 5h11v5h-2M4 8h7v5H4z" stroke="#4a4a4a" stroke-width="1.2"/>
+</svg>

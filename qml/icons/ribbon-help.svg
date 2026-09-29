@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="42" height="42" viewBox="0 0 42 42" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-ribbon-help；内部绘制，原始几何与颜色保留。 -->
+  <circle cx="21" cy="21" r="13" fill="#dce9f7" stroke="#4a6f9f" stroke-width="1.3"/>
+  <path d="M17 17a4 4 0 1 1 5 3.8c-1 .4-1.5 1.1-1.5 2.2v1" stroke="#2e7ce0" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="20.5" cy="28.5" r="1" fill="#2e7ce0"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-ribbon-mesh；内部绘制，原始几何与颜色保留。 -->
+  <path d="m4 6 9-3 9 3v14l-9 3-9-3z" stroke="#3f698b" stroke-width="1.1"/>
+  <path d="m4 6 9 4 9-4M13 10v13M8.5 4.5v14M17.5 4.5v14" stroke="#6f9fbe" stroke-width="1"/>
+</svg>

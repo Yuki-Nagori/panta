@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="17" height="17" viewBox="0 0 17 17" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-help；内部绘制，原始几何与颜色保留。 -->
+  <circle cx="8.5" cy="8.5" r="7" stroke="currentColor" stroke-width="1.2"/>
+  <path d="M6.6 6.6a2 2 0 1 1 2.7 1.9c-.5.2-.8.6-.8 1.1v.3" stroke="currentColor" stroke-width="1.2"/>
+  <circle cx="8.5" cy="12.2" r=".9" fill="currentColor"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-ribbon-thermoplastics-injection-molding；内部绘制，原始几何与颜色保留。 -->
+  <path d="M13 3 22 8v10l-9 5-9-5V8z" fill="#cbe6da" stroke="#2e4d3a" stroke-width="1.2"/>
+  <path d="m8 10 5 3 5-3M13 13v6" stroke="#2e4d3a" stroke-width="1.2"/>
+</svg>

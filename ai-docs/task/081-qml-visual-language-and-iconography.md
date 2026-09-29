@@ -1,11 +1,11 @@
 # 081 — QML 视觉语言与图标体系统一
 
-- 状态：planned
+- 状态：in-progress
 - 阶段：应用平台扩展
 - 依赖：[029](029-qml-component-library.md)、[050](050-qml-html-page-replica.md)、[069](069-project-docks-review-and-ablation.md)、[078](078-qml-performance-benchmark-policy.md)、[080](080-qml-viewport-document-tabs.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-25
+- 创建 / 更新：2026-09-24 / 2026-09-30
 
 ## 目标与背景
 
@@ -81,12 +81,14 @@
 
 ## 验证计划与结果
 
-尚未实施。依赖完成后，在仓库根目录按锁定工具链运行 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`；补充真实窗口截图、SVG 资源打包、键盘/焦点和多 DPI 验收。按实际受影响的 QML 场景手动运行 069 的 CPU / GPU 基准并记录测量，GPU 端只在真实图形窗口执行，不接入 CI 时间门禁。
+实施中。在仓库根目录按锁定工具链运行 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`；补充真实窗口截图、SVG 资源打包、键盘/焦点和多 DPI 验收。按实际受影响的 QML 场景手动运行 069 的 CPU / GPU 基准并记录测量，GPU 端只在真实图形窗口执行，不接入 CI 时间门禁。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-24 | 参考图来源核验与仓库资产盘点 | 区分用户提供参考图、CSS 字样、HTML 内联 SVG 与 QML 图标文件 | 已初步核实 HTML Welcome 是 CSS 立体文字，Ribbon 图标是 `shell.js` 内联手写 SVG；完整 QML SVG 来源审计待实施 |
 | — | 真实 QML 视觉迁移、真窗口、多 DPI 与 QML CPU / GPU 手动基准 | 按以上验收执行 | 未实施 |
+| 2026-09-29 | 盘点 029/050/069/078/080/053 的已交付组件、基准与交接边界 | 在已有组件库、主题 token、页签和 benchmark 上完成剩余统一工作 | 核心实现可开始；080 的 VoiceOver 验收与 053 的 3D Welcome 完整验收仍按各自 task 记录，不阻止本任务完成图标、HTML 与 QML 视觉体系 |
+| 2026-09-30 | `qml/icons/` SVG 资源首批与 `shell.js` caret symbol | 独立资源可与正式 symbol 对照，应用已有资源仍保持可用 | 新增 61 个正式 symbol SVG，并同步 caret 的内缩 path；保留现有资源，避免在消费者迁移前改变运行引用。`layers.svg` 与 `project-file.svg` 两个同名资源在调用迁移批次替换；旧资源清理、Qt 加载测试与性能测量随后完成 |
 
 ## 风险与回退
 

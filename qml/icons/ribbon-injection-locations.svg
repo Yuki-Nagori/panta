@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-ribbon-injection-locations；内部绘制，原始几何与颜色保留。 -->
+  <path d="M13 22s6-6.2 6-11a6 6 0 1 0-12 0c0 4.8 6 11 6 11z" fill="#e8c4c4" stroke="#a33d3d" stroke-width="1.2"/>
+  <circle cx="13" cy="11" r="2" fill="#c8322b"/>
+</svg>

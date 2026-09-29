@@ -23,7 +23,7 @@ shellTemplate.innerHTML = `
     <symbol id="i-export" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3"/><path d="M2 12.5h11" stroke="currentColor" stroke-width="1.3"/></symbol>
     <symbol id="i-delete" viewBox="0 0 15 15" fill="none"><path d="M2.5 4h10M5.5 4V2.5h4V4M4 4l1 9h5l1-9" stroke="currentColor" stroke-width="1.2"/></symbol>
     <symbol id="i-layers" viewBox="0 0 16 16" fill="none"><path d="m1.5 4 6.5-3 6.5 3-6.5 3zM1.5 7l6.5 3 6.5-3M1.5 10l6.5 3 6.5-3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
-    <symbol id="i-caret" viewBox="0 0 7 5" fill="none"><path d="M0 0h7L3.5 5z" fill="currentColor"/></symbol>
+    <symbol id="i-caret" viewBox="0 0 7 5" fill="none"><path d="M0.7 0.6h5.6L3.5 4.4z" fill="currentColor"/></symbol>
     <symbol id="i-globe" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.4" stroke="currentColor" stroke-width="1.3"/><ellipse cx="8.5" cy="8.5" rx="2.9" ry="6.4" stroke="currentColor" stroke-width="1.3"/><path d="M2.4 8.5h12.2" stroke="currentColor" stroke-width="1.3"/></symbol>
     <symbol id="i-split" viewBox="0 0 10 12" fill="none"><path d="M1 1.5h8" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 5.5L5 8.8 7.5 5.5z" fill="currentColor"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.5 6 5h3l1 9.5M14 14.5 15 5h3l2 9.5M10 10h4"/><rect x="3.5" y="13" width="7" height="7.5" rx="2.5"/><rect x="13.5" y="13" width="7" height="7.5" rx="2.5"/></symbol>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-log；内部绘制，原始几何与颜色保留。 -->
+  <path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/>
+  <path d="M10 1.5v3h3M5 8h6M5 10.5h5" stroke="#7b858a"/>
+</svg>
