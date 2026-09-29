@@ -24,7 +24,7 @@ PanelSurface {
             ThemedLabel {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: qsTr("Cover / surface-pair / CPU\nUse the defaults to run the complete filling workflow.")
+                text: qsTr("Cover / surface-pair / CPU\nMesh and filling settings are read from the case file for each run.")
                 textColor: Theme.colorTextMuted
             }
             Repeater {
@@ -46,7 +46,7 @@ PanelSurface {
             ThemedLabel {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: qsTr("Fixed inputs\nCover: 202 × 6 × 152 mm\nMaterial: Polyflam RIPP 3625 CS1\nMesh edge: 12 mm\nGate: (102, 3, 82) mm\nMelt / mold: 230 / 40 °C\nFlow: 94.7 cm³/s\nV/P: 99% volume\nPressure limit: 140 MPa\nClamp limit: 350 t\nNon-isothermal · 12 layers")
+                text: qsTr("Case file\nbenchmarks/cover_noniso_quick.case.yaml\nEdit its parameters before running. If you change mesh settings, reset and generate the mesh again.")
             }
             ThemedLabel {
                 visible: panel.previewModel.triangles > 0
@@ -59,7 +59,7 @@ PanelSurface {
                 borderColor: Theme.colorPanelLine
                 highlighted: true
                 enabled: !panel.previewModel.busy && panel.previewModel.step < 3
-                text: panel.previewModel.step === 0 ? qsTr("Load default example") : panel.previewModel.step === 1 ? qsTr("Generate default mesh") : panel.previewModel.step === 2 ? qsTr("Start filling with defaults") : qsTr("Filling complete")
+                text: panel.previewModel.step === 0 ? qsTr("Load example") : panel.previewModel.step === 1 ? qsTr("Generate mesh") : panel.previewModel.step === 2 ? qsTr("Start filling") : qsTr("Filling complete")
                 onClicked: panel.previewModel.advance()
             }
             ProgressBar {
