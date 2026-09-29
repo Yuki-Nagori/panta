@@ -96,7 +96,7 @@
 - [ ] 在 VoiceOver 真读屏环境确认标签名称、选中态和关闭操作的朗读；从全局搜索框按 Tab 进入标签栏的焦点路径也待验证。
 - [x] 适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
 - [x] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
-- [ ] 不保留旧视口分类切换路径；task、索引、HTML、C++/Rust 边界和性能记录相互一致。
+- [x] 不保留旧视口分类切换路径；task、索引、HTML、C++/Rust 边界和性能记录相互一致。
 
 ## 验证计划与结果
 
@@ -177,7 +177,8 @@
 - 2026-09-29：补充 reduced-motion 回归，验证开启时页签换序同步定位；Cargo 聚合 CTest 66/66、format 与 lint 八阶段通过。真窗口 CUA 截图和 AX 树确认 Welcome VTK 场景及 PageTab 语义；Tab 后焦点仍位于全局搜索，焦点视觉/VoiceOver 验收继续待办。
 - 2026-09-29：排查关闭活动 STL 页签的 VTK 所有权时发现，视口隐藏期间 `sync_native_surface()` 提前返回，旧 actor mapper 与 `applied_mesh` 会一直保留到视口重新显示。隐藏分支现在同步替换 actor 管线并释放旧 CPU 快照；真实桌面窗口回归验证弱引用在隐藏状态下即过期，视口恢复后仍可继续提交帧。另修正测试对快照的局部强引用并补直接头文件。VTK actor/mapper、回调和设备资源的重复切换/关闭验收仍未完成。
 - 2026-09-29：真窗口检查发现鼠标/辅助技术激活文档标签后，焦点仍留在全局搜索框。`DocumentTabBar` 现在在标签按下和 PageTab 辅助技术 press action 时显式转移焦点；QML 回归验证鼠标点击后 PageTab 获得 active focus。更新后的 PantaPreview 真窗口通过 AX 激活 Welcome 后焦点树指向 PageTab，截图显示焦点边框；AX 关闭动作从无障碍树移除 Welcome。按 Tab 从搜索框仍未进入标签栏；实际 VoiceOver 朗读及该键盘进入路径继续待验。
+- 2026-09-29：复核视口路径一致性：`ViewportPane.qml` 仅组合一个 `CaeViewport` 和 `DocumentTabBar`，通用 `PanelTabBar` 仍由 Tasks 面板使用；HTML 视口只有 Welcome / 单个 STL 场景，顶部 Mesh / Results 属于全局导航与 Ribbon；任务索引依赖与状态、Rust/C++ 所有权边界及 069 页签 CPU/GPU 场景和测量记录一致。旧视口分类切换路径已完成审计。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API，任务保持 in-progress；本次修复并在真窗口验证隐藏视口关闭网格后 CPU 快照释放，也验证 AX 激活标签的焦点框与关闭动作。剩余 VoiceOver 朗读和从搜索框进入标签栏的焦点路径、VTK actor/mapper/回调/设备资源循环释放、代表性 STL 内存高水位/重载延迟、reduced-motion 动画效果验收，以及本地改动的后续远端 CI。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、键盘交互和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API，任务保持 in-progress；本次修复并在真窗口验证隐藏视口关闭网格后 CPU 快照释放，也验证 AX 激活标签的焦点框与关闭动作，并完成旧视口分类路径一致性审计。剩余 VoiceOver 朗读和从搜索框进入标签栏的焦点路径、VTK actor/mapper/回调/设备资源循环释放、代表性 STL 内存高水位/重载延迟、reduced-motion 动画效果验收，以及本地改动的后续远端 CI。
