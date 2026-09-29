@@ -136,6 +136,7 @@ ai-docs/
 | 076 | [Cargo 测试与质量 runner 维护](task/076-panta-tests-runner-maintenance.md) | 验证基础 | 011, 043 | done |
 | 082 | [CI 修复：VTK benchmark moc 前置与标题条焦点滚动](task/082-ci-vtk-benchmark-moc-and-focus-scroll.md) | 验证基础 | 048, 076, 029 | done |
 | 083 | [Windows 开发裸启应用的 Qt 运行库部署](task/083-windows-app-runtime-deployment.md) | 应用平台扩展 | 005, 042 | done |
+| 089 | [CI 修复：STL benchmark RSS 头文件识别](task/089-ci-stl-benchmark-rusage-include.md) | 验证基础 | 048, 080 | in-progress |
 
 ## 仓库与文档维护
 

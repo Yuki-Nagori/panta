@@ -41,7 +41,6 @@
 #include <sys/resource.h>
 #elif defined(Q_OS_LINUX)
 #include <fstream>
-#include <sys/resource.h>
 #include <unistd.h>
 #elif defined(Q_OS_WIN)
 #include <psapi.h>
@@ -168,16 +167,29 @@ std::optional<std::uint64_t> resident_bytes() {
 }
 
 std::optional<std::uint64_t> peak_rss_bytes() {
-#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
-    rusage usage{};
+#if defined(Q_OS_MACOS)
+    struct rusage usage{};
     if (getrusage(RUSAGE_SELF, &usage) != 0) {
         return std::nullopt;
     }
-#if defined(Q_OS_MACOS)
     return static_cast<std::uint64_t>(usage.ru_maxrss);
-#else
-    return static_cast<std::uint64_t>(usage.ru_maxrss) * 1024U;
-#endif
+#elif defined(Q_OS_LINUX)
+    // VmHWM 是 Linux 提供的进程 RSS 高水位，单位为 kB。
+    std::ifstream status("/proc/self/status");
+    std::string key;
+    while (status >> key) {
+        if (key == "VmHWM:") {
+            std::uint64_t peak_kib = 0;
+            std::string unit;
+            if (!(status >> peak_kib >> unit) || unit != "kB") {
+                return std::nullopt;
+            }
+            return peak_kib * 1024U;
+        }
+        std::string remainder;
+        std::getline(status, remainder);
+    }
+    return std::nullopt;
 #elif defined(Q_OS_WIN)
     PROCESS_MEMORY_COUNTERS_EX counters{};
     counters.cb = sizeof(counters);
