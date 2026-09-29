@@ -26,6 +26,8 @@
 #include <qlogging.h>
 #include <qtenvironmentvariables.h>
 #include <qtestsupport_core.h>
+#include <utility>
+#include <vector>
 #include <vtk_viewport.hpp>
 
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
@@ -118,6 +120,23 @@ class ViewportModuleLoadTest final : public QObject {
         viewport.apply_state(scene);
         QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
         QVERIFY(!snapshot_lifetime.expired());
+
+        std::vector<std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot>> old_snapshots;
+        old_snapshots.push_back(snapshot_lifetime);
+        for (int cycle = 0; cycle < 12; ++cycle) {
+            auto next = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+            const double x = static_cast<double>(cycle + 1);
+            next->vertices = {{{x, 0.0, 0.0}, {x + 1.0, 0.0, 0.0}, {x, 1.0, 0.0}}};
+            old_snapshots.emplace_back(next);
+            scene.mesh = std::move(next);
+            ++scene.revision;
+            rendered_frames = 0;
+            viewport.apply_state(scene);
+            QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
+            for (std::size_t index = 0; index + 1 < old_snapshots.size(); ++index) {
+                QVERIFY(old_snapshots[index].expired());
+            }
+        }
 
         viewport.setVisible(false);
         scene.mesh.reset();
