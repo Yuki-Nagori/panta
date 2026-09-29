@@ -5,10 +5,13 @@
 #include <QtCore/qobjectdefs.h>
 #include <qtmetamacros.h>
 #if defined(Q_OS_WIN)
-// windef/winuser 提供 MSG、SPI_GETCLIENTAREAANIMATION 等声明；Windows SDK
-// 还要求保留 windows.h 以满足基础类型前提，例外见 comments.md。
-#include <windef.h>
+// Windows SDK 需先经此伞头建立目标架构和基础类型上下文，例外见 comments.md。
 #include <windows.h> // NOLINT(misc-include-cleaner)
+#endif
+
+#if defined(Q_OS_WIN)
+// windef/winuser 再提供 MSG、SPI_GETCLIENTAREAANIMATION 等直接声明。
+#include <windef.h>
 #include <winuser.h>
 #elif defined(Q_OS_LINUX)
 #include <QDBusConnection>
@@ -50,7 +53,7 @@ SystemMotionPreference::SystemMotionPreference(QObject* parent) : QObject(parent
 #if defined(Q_OS_LINUX)
     const QString sessionAddress = qEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
     if (!sessionAddress.isEmpty()) {
-        const auto bus = QDBusConnection::sessionBus();
+        auto bus = QDBusConnection::sessionBus();
         bus.connect(QString::fromLatin1(kPortalService), QString::fromLatin1(kPortalPath),
                     QString::fromLatin1(kPortalInterface), QStringLiteral("SettingChanged"), this,
                     SLOT(portalSettingChanged(QString, QString, QDBusVariant)));
