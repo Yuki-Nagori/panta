@@ -93,7 +93,7 @@
 - [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；记录内存高水位与切换/重载延迟，达到约定预算时行为明确，不发生无界增长。
 - [x] 页签栏暴露 PageTabList / PageTab，标签和关闭按钮有可访问名称；Tab 获得键盘焦点后可用左右键导航并滚入可视区，Enter / Space 激活标签，关闭按钮可用 Space 或辅助技术 press action 执行。
 - [ ] 在真实 VTK 窗口确认键盘焦点视觉状态与系统读屏操作；适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
-- [ ] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
+- [x] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
 - [ ] 不保留旧视口分类切换路径；task、索引、HTML、C++/Rust 边界和性能记录相互一致。
 
 ## 验证计划与结果
@@ -133,6 +133,8 @@
 | 2026-09-28 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint`、`git diff HEAD --check` | 检查首末活动页签滚动到边缘时的圆弧与白线像素 | 通过：CTest 64/64、format、lint 完整 8 阶段及差异检查通过；首个活动页签左下连接像素保持面板白色，末个活动页签滚到最右端时保留完整 8px 圆弧连接范围，圆弧外恢复标签带灰色，底部白线连续。 |
 | 2026-09-29 | macOS arm64，`cargo format`；`cargo build --locked` | 适配层完成后，根 QML 的 reduced-motion 绑定通过格式和构建 | 通过。`Settings` QML 类型可用，`Settings.reducedMotion` 编译接入 `ViewportPane`；真实窗口动画效果仍待验收。 |
 | 2026-09-29 | macOS arm64：`cargo build --locked`、`cargo format --check`、`cargo test --locked --workspace`、`cargo lint`；PantaPreview.app 真窗口及 AX 检查 | 验证 reduced-motion 下换序直接定位，并检查实际 VTK Welcome、页签角色/名称和键盘焦点 | build、format、聚合测试（CTest 66/66）及 lint 八阶段通过。QML 回归验证 `reducedMotion=true` 时页签重排同步到目标位置。真窗口截图显示 VTK `panta` Welcome 场景；AX 树包含 PageTabList、Welcome PageTab 和 Close Welcome 按钮。Tab 导航仍停在全局搜索框，真实页签焦点视觉与 VoiceOver 操作尚未验证；临时 app wrapper 已清理并关闭应用。 |
+| 2026-09-29 | `panta_qml_cpu_benchmark`，offscreen / Qt Quick Basic；macOS 26.3.1 arm64、Qt 6.11.2、debug | 069 CPU harness 测文档页签构造、32 次切换与关闭末项 | 通过；每场景预热后 31 次，p50/p95 µs。1 页签构造 150/224；8 页签构造 932/1204、切换 323/598、关闭 894/1267；24 页签构造 2790/4998、切换 442/2079、关闭 2932/5721。计时覆盖 QML 构造/模型更新与事件处理，不代表 GPU 帧成本。 |
+| 2026-09-29 | `PANTA_BENCHMARK_DOCUMENT_TABS_ONLY=1` 的 `panta_qml_gpu_benchmark` 真窗口；macOS 26.3.1 arm64、Qt 6.11.2、Metal、debug | 069 GPU harness 测静态、切换与关闭/重开时可见页签的帧呈现 | 通过；1000×700 窗口，30 帧预热，每场景 3×60 帧；p50/p95 ms/frame。空场景 16.65/18.93；静态 1/8/24 页签分别 16.70/25.60、16.69/25.27、16.70/24.90；切换 8/24 页签为 16.73/24.35、16.75/25.38；关闭/重开 8/24 页签为 16.71/24.59、16.67/18.96。测量包含 compositor/vsync，是 Qt Quick 端到端帧间隔，不是 GPU 内核耗时；本 harness 呈现独立 DocumentTabBar，不包括 VTK 网格场景。 |
 
 ## 风险与回退
 
