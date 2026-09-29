@@ -240,7 +240,37 @@ pub mod bridge {
         fn cpp_prefix() -> String;
     }
 
+    pub enum PreviewEventKind {
+        Progress,
+        ModelReady,
+        MeshReady,
+        Completed,
+        Failed,
+        Cancelled,
+    }
+
+    /// 求解器粗粒度事件；坐标 mm，充填时间 s，压力 MPa。
+    pub struct PreviewEvent {
+        pub kind: PreviewEventKind,
+        pub message: String,
+        pub progress: f64,
+        pub elapsed: f64,
+        pub fill_time: f64,
+        pub peak_pressure: f64,
+        pub output_dir: String,
+        pub coordinates: Vec<f64>,
+        pub fill_times: Vec<f64>,
+    }
+
     extern "Rust" {
+        type PreviewService;
+        fn preview_service_new() -> Box<PreviewService>;
+        fn preview_load(service: &mut PreviewService) -> Result<()>;
+        fn preview_remesh(service: &mut PreviewService) -> Result<()>;
+        fn preview_fill(service: &mut PreviewService) -> Result<()>;
+        fn preview_cancel(service: &PreviewService);
+        fn preview_drain(service: &mut PreviewService) -> Vec<PreviewEvent>;
+
         /// Rust 侧拥有的 opaque 句柄：C++ 经 `rust::Box` 持有唯一所有权，
         /// 释放只能把 Box move 回 Rust；不暴露指针或复制语义。
         type Session;
@@ -1352,6 +1382,53 @@ fn project_service_finish_fill_settings_confirmation(
         .service
         .finish_fill_settings_confirmation()
         .map_err(|error| error.to_string())
+}
+
+/// 固定演示服务的 CXX 所有者；释放时取消并回收外部进程。
+pub struct PreviewService(panta_solver::PreviewService);
+
+fn preview_service_new() -> Box<PreviewService> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    Box::new(PreviewService(panta_solver::PreviewService::new(
+        root.canonicalize().unwrap_or(root),
+    )))
+}
+fn preview_load(service: &mut PreviewService) -> Result<(), String> {
+    service.0.load()
+}
+fn preview_remesh(service: &mut PreviewService) -> Result<(), String> {
+    service.0.remesh()
+}
+fn preview_fill(service: &mut PreviewService) -> Result<(), String> {
+    service.0.fill()
+}
+fn preview_cancel(service: &PreviewService) {
+    service.0.cancel();
+}
+fn preview_drain(service: &mut PreviewService) -> Vec<bridge::PreviewEvent> {
+    service
+        .0
+        .drain()
+        .into_iter()
+        .map(|event| bridge::PreviewEvent {
+            kind: match event.kind {
+                panta_solver::EventKind::Progress => bridge::PreviewEventKind::Progress,
+                panta_solver::EventKind::ModelReady => bridge::PreviewEventKind::ModelReady,
+                panta_solver::EventKind::MeshReady => bridge::PreviewEventKind::MeshReady,
+                panta_solver::EventKind::Completed => bridge::PreviewEventKind::Completed,
+                panta_solver::EventKind::Failed => bridge::PreviewEventKind::Failed,
+                panta_solver::EventKind::Cancelled => bridge::PreviewEventKind::Cancelled,
+            },
+            message: event.message,
+            progress: event.progress,
+            elapsed: event.elapsed,
+            fill_time: event.fill_time,
+            peak_pressure: event.peak_pressure,
+            output_dir: event.output_dir,
+            coordinates: event.mesh.coordinates,
+            fill_times: event.mesh.fill_times,
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -127,6 +127,41 @@ class WelcomeWordmarkTest final : public QObject {
         }
     }
 
+    void filling_front_preserves_area_and_distinguishes_unfilled_surface() {
+        panta::visualization::SurfaceMeshSnapshot snapshot;
+        snapshot.vertices = {{{0, 0, 0}}, {{1, 0, 0}}, {{0, 1, 0}}};
+        snapshot.fill_times = {0, 1, 1};
+        snapshot.fill_duration = 1;
+        for (const double time : {0.0, 0.5, 1.0}) {
+            const auto mesh = panta::visualization::make_filling_poly_data(snapshot, time);
+            auto* colors = mesh->GetPointData()->GetScalars();
+            QVERIFY(colors != nullptr);
+            double total_area = 0;
+            double filled_area = 0;
+            vtkIdType count = 0;
+            const vtkIdType* ids = nullptr;
+            auto* cells = mesh->GetPolys();
+            cells->InitTraversal();
+            while (cells->GetNextCell(count, ids)) {
+                QCOMPARE(count, 3);
+                double a[3], b[3], c[3], color[3];
+                mesh->GetPoint(ids[0], a);
+                mesh->GetPoint(ids[1], b);
+                mesh->GetPoint(ids[2], c);
+                const double area =
+                    std::abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) * 0.5;
+                total_area += area;
+                colors->GetTuple(ids[0], color);
+                if (color[0] != 205 || color[1] != 212 || color[2] != 220) {
+                    filled_area += area;
+                }
+            }
+            // 线性到达场在直角三角形上产生相似三角形，面积比为 t²。
+            QVERIFY(std::abs(total_area - 0.5) < 1e-12);
+            QVERIFY(std::abs(filled_area - 0.5 * time * time) < 1e-12);
+        }
+    }
+
     void ignores_detached_and_invalid_cube_picks() {
         panta::visualization::ViewportOrientation orientation;
         QVERIFY(!orientation.cube_direction(940, 704, 1000, 800).has_value());

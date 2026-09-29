@@ -292,6 +292,7 @@ dependencies = [
  "panta-core",
  "panta-foundation",
  "panta-mesh",
+ "panta-solver",
 ]
 
 [[package]]
@@ -321,6 +322,16 @@ dependencies = [
 [[package]]
 name = "panta-mesh"
 version = "0.1.0"
+
+[[package]]
+name = "panta-solver"
+version = "0.1.0"
+dependencies = [
+ "panta-foundation",
+ "panta-mesh",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "panta-tests"

@@ -56,6 +56,17 @@ void CaeViewport::setMeshSource(QObject* source) {
     emit meshSourceChanged();
 }
 
+double CaeViewport::playbackTime() const { return impl_->scene.playback_time; }
+void CaeViewport::setPlaybackTime(double seconds) {
+    if (impl_->scene.playback_time == seconds) {
+        return;
+    }
+    impl_->scene.playback_time = seconds;
+    ++impl_->scene.revision;
+    impl_->backend->apply_state(impl_->scene);
+    emit playbackTimeChanged();
+}
+
 void CaeViewport::refresh_mesh() {
     impl_->scene.mesh = impl_->mesh_source ? impl_->mesh_source->mesh_snapshot() : nullptr;
     // 占位开关只影响无网格场景；导入网格始终显示其 actor。

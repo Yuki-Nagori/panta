@@ -16,6 +16,11 @@ QtObject {
     readonly property color colorTextMuted: "#5a5a5a"
     readonly property color colorIcon: "#4a4a4a"
     readonly property color colorHover: "#e5f1fb"
+    // VTK 充填图例：蓝→青→黄→红，数值单位 s。
+    readonly property color colorFillEarly: "#2353d2"
+    readonly property color colorFillMidEarly: "#14b7cc"
+    readonly property color colorFillMidLate: "#f9d642"
+    readonly property color colorFillLate: "#d7312e"
     readonly property color colorSelected: "#e8f3fd"
     readonly property color colorFocus: "#2e7ce0"
     readonly property color colorBrand: "#c8322b"

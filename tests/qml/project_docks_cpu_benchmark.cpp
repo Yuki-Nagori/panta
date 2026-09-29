@@ -33,6 +33,12 @@
 #include <utility>
 #include <vector>
 
+#ifdef PANTA_BENCHMARK_BRIDGE
+#include <QtQml/qqmlextensionplugin.h>
+Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
+Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
+#endif
+
 namespace {
 
 constexpr int kSampleCount = 31;
@@ -479,6 +485,33 @@ class QmlPerformanceBenchmark final : public QObject {
     }
 
   private slots:
+
+#ifdef PANTA_BENCHMARK_BRIDGE
+    void measures_filling_preview() {
+        QQmlComponent component(&m_engine);
+        component.setData(
+            QByteArrayLiteral(
+                "import QtQuick\nimport Panta.Shell\nimport Panta.Bridge\n"
+                "Item { FillingPreviewModel { id: model } "
+                "FillingPreviewPanel { width: 320; height: parent.height; previewModel: model } "
+                "FillingPlaybackBar { x: 320; width: parent.width - 320; anchors.bottom: "
+                "parent.bottom; "
+                "previewModel: model } }"),
+            QUrl(QStringLiteral("qrc:/benchmark/Filling.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        run_scenario({QStringLiteral("filling preview"), QStringLiteral("construct fixed defaults"),
+                      4,
+                      [this, &component] {
+                          QObject owner;
+                          QElapsedTimer timer;
+                          timer.start();
+                          create(component, {}, owner);
+                          QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+                          return Sample{timer.nsecsElapsed(), 0, 0, false};
+                      },
+                      [](const Sample&) {}});
+    }
+#endif
     void initTestCase() {
         panta::install_icon_provider(m_engine);
         m_analysisSequences = analysis_sequence_catalog();

@@ -39,6 +39,8 @@ set(PANTA_SHELL_QML_FILES
     Panels/AnalysisLogPanel.qml
     Panels/AnalysisResultsTree.qml
     Panels/ViewportPane.qml
+    Panels/FillingPreviewPanel.qml
+    Panels/FillingPlaybackBar.qml
     Panels/PlaceholderPanel.qml
     Dialogs/NewProjectDialog.qml
     Dialogs/ImportDialog.qml
@@ -54,8 +56,14 @@ endif()
 if(NOT PANTA_ENABLE_BRIDGE_MODULE)
   # 提供无 Bridge 的最小 Shell，避免关闭可选模块后残留 Panta.Bridge import；
   # ViewportPane 依赖 Panta.Visualization（CaeViewport），一并剔除。
-  list(REMOVE_ITEM PANTA_SHELL_QML_FILES App.qml Panels/ViewportPane.qml
-       Dialogs/NewProjectDialog.qml)
+  list(
+    REMOVE_ITEM
+    PANTA_SHELL_QML_FILES
+    App.qml
+    Panels/ViewportPane.qml
+    Panels/FillingPreviewPanel.qml
+    Panels/FillingPlaybackBar.qml
+    Dialogs/NewProjectDialog.qml)
   list(APPEND PANTA_SHELL_QML_FILES AppNoBridge.qml)
 endif()
 
@@ -130,6 +138,10 @@ if(BUILD_TESTING)
                                        panta_qml_gpu_benchmark)
       target_link_libraries(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE panta::bridge)
       target_compile_definitions(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE PANTA_TEST_WITH_BRIDGE=1)
+    endforeach()
+    foreach(_benchmark IN ITEMS panta_qml_cpu_benchmark panta_qml_gpu_benchmark)
+      target_compile_definitions(${_benchmark} PRIVATE PANTA_BENCHMARK_BRIDGE)
+      target_link_libraries(${_benchmark} PRIVATE panta_bridgeplugin panta_visualizationplugin)
     endforeach()
   endif()
   # 手动基准的 moc 登记给 lint 前置聚合（native 顶层 panta_benchmark_moc）。

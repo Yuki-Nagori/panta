@@ -37,6 +37,12 @@
 #include <utility>
 #include <vector>
 
+#ifdef PANTA_BENCHMARK_BRIDGE
+#include <QtQml/qqmlextensionplugin.h>
+Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
+Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
+#endif
+
 namespace {
 
 constexpr int kFrameCountPerSample = 60;
@@ -331,6 +337,34 @@ class ProjectDocksGpuBenchmark final : public QObject {
     }
 
   private slots:
+
+#ifdef PANTA_BENCHMARK_BRIDGE
+    void measures_filling_preview() {
+        QQmlComponent component(&m_engine);
+        component.setData(
+            QByteArrayLiteral(
+                "import QtQuick\nimport Panta.Shell\nimport Panta.Bridge\n"
+                "Item { FillingPreviewModel { id: model } "
+                "FillingPreviewPanel { width: 320; height: parent.height; previewModel: model } "
+                "FillingPlaybackBar { x: 320; width: parent.width - 320; anchors.bottom: "
+                "parent.bottom; "
+                "previewModel: model } }"),
+            QUrl(QStringLiteral("qrc:/benchmark/Filling.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QObject owner;
+        QVERIFY(create(component, {}, owner, QPoint(0, 0), QSize(1000, 700)) != nullptr);
+        QVERIFY(measure_frame_intervals(kWarmupFrameCount).size() == kWarmupFrameCount);
+        std::vector<double> samples;
+        for (int sample = 0; sample < kSampleCount; ++sample) {
+            const auto values = measure_frame_intervals(kFrameCountPerSample);
+            QVERIFY(values.size() == kFrameCountPerSample);
+            samples.insert(samples.end(), values.begin(), values.end());
+        }
+        const auto summary = percentiles(samples);
+        qInfo() << "Filling preview Qt Quick frame interval p50/p95 ms:" << summary[0]
+                << summary[1];
+    }
+#endif
     void initTestCase() {
         panta::install_icon_provider(m_engine);
         m_analysisSequences = analysis_sequence_catalog();

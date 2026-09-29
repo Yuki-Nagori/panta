@@ -71,22 +71,26 @@ using Vector3 = std::array<double, 3>;
 
 // 字样保持透视深度；按实际宽高比留出 25% 边距，窄窗口也不裁字。
 void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect,
-                              double fit_margin) {
+                              double fit_margin, bool z_up) {
     double bounds[6];
     actor->GetBounds(bounds);
     constexpr double view_angle = 30.0;
     constexpr double half_angle_radians = 0.2617993877991494;
     const double half_width = (bounds[1] - bounds[0]) / 2;
-    const double half_height = (bounds[3] - bounds[2]) / 2;
-    const double half_depth = (bounds[5] - bounds[4]) / 2;
+    const double half_height = z_up ? (bounds[5] - bounds[4]) / 2 : (bounds[3] - bounds[2]) / 2;
+    const double half_depth = z_up ? (bounds[3] - bounds[2]) / 2 : (bounds[5] - bounds[4]) / 2;
     const double distance =
         fit_margin * std::max(half_height, half_width / aspect) / std::tan(half_angle_radians) +
         half_depth;
     vtkCamera* camera = renderer->GetActiveCamera();
     const double* center = actor->GetCenter();
-    camera->SetPosition(center[0], center[1], center[2] + distance);
+    if (z_up) {
+        camera->SetPosition(center[0], center[1] - distance, center[2]);
+    } else {
+        camera->SetPosition(center[0], center[1], center[2] + distance);
+    }
     camera->SetFocalPoint(center);
-    camera->SetViewUp(0, 1, 0);
+    camera->SetViewUp(0, z_up ? 0 : 1, z_up ? 1 : 0);
     camera->SetViewAngle(view_angle);
     renderer->ResetCameraClippingRange();
 }
@@ -137,6 +141,7 @@ struct VtkViewport::Impl {
     QSize applied_pixel_size;
     bool refresh_scheduled = false;
     bool scene_dirty = true;
+    double applied_playback_time = -1.0;
     bool creation_warning_emitted = false;
     std::shared_ptr<const SurfaceMeshSnapshot> applied_mesh;
     bool pointer_dragging = false;
@@ -223,7 +228,8 @@ void VtkViewport::apply_state(const RenderScene& state) {
     }
     impl_->scene_dirty |= state.background != impl_->pending.background ||
                           state.primitive_visible != impl_->pending.primitive_visible ||
-                          state.mesh != impl_->pending.mesh;
+                          state.mesh != impl_->pending.mesh ||
+                          state.playback_time != impl_->pending.playback_time;
     impl_->pending = state;
     schedule_refresh();
 }
@@ -396,13 +402,14 @@ void VtkViewport::update_mesh_actor() {
 
     vtkSmartPointer<vtkPolyData> geometry;
     const bool imported_mesh = impl_->pending.mesh != nullptr;
-    geometry =
-        imported_mesh ? make_surface_poly_data(*impl_->pending.mesh) : create_welcome_wordmark();
+    geometry = imported_mesh
+                   ? make_filling_poly_data(*impl_->pending.mesh, impl_->pending.playback_time)
+                   : create_welcome_wordmark();
 
     vtkNew<vtkPolyDataMapper> mapper;
     if (imported_mesh) {
         mapper->SetInputData(geometry);
-        mapper->SetColorModeToDefault();
+        mapper->SetColorModeToDirectScalars();
         mapper->SetScalarModeToDefault();
     } else {
         vtkNew<vtkPolyDataNormals> normals;
@@ -428,10 +435,13 @@ void VtkViewport::update_mesh_actor() {
         impl_->primitive_actor->SetOrientation(16.0, -18.0, -4.0);
     }
     auto* material = impl_->primitive_actor->GetProperty();
+    const bool filling = imported_mesh && !impl_->pending.mesh->fill_times.empty();
+    material->SetEdgeVisibility(imported_mesh && impl_->pending.mesh->show_edges);
+    material->SetEdgeColor(0.25, 0.34, 0.45);
     material->SetInterpolationToPhong();
-    material->SetAmbient(0.22);
-    material->SetDiffuse(0.78);
-    material->SetSpecular(0.28);
+    material->SetAmbient(filling ? 1.0 : 0.22);
+    material->SetDiffuse(filling ? 0.0 : 0.78);
+    material->SetSpecular(filling ? 0.0 : 0.28);
     material->SetSpecularPower(28.0);
     if (imported_mesh) {
         material->SetColor(0.72, 0.82, 0.94);
@@ -619,6 +629,15 @@ void VtkViewport::sync_native_surface() {
         impl_->applied_mesh = impl_->pending.mesh;
         resized = true;
     }
+    if (impl_->pending.mesh && !impl_->pending.mesh->fill_times.empty() &&
+        impl_->pending.playback_time != impl_->applied_playback_time) {
+        auto* mapper = vtkPolyDataMapper::SafeDownCast(impl_->primitive_actor->GetMapper());
+        if (mapper != nullptr) {
+            mapper->SetInputData(
+                make_filling_poly_data(*impl_->pending.mesh, impl_->pending.playback_time));
+        }
+    }
+    impl_->applied_playback_time = impl_->pending.playback_time;
     if (!impl_->scene_dirty && !resized) {
         return;
     }
@@ -635,7 +654,8 @@ void VtkViewport::sync_native_surface() {
         configure_default_camera(impl_->renderer, impl_->primitive_actor,
                                  static_cast<double>(pixel_size.width()) / pixel_size.height(),
                                  impl_->pending.mesh == nullptr ? kWelcomeCameraFitMargin
-                                                                : kModelCameraFitMargin);
+                                                                : kModelCameraFitMargin,
+                                 impl_->pending.mesh && impl_->pending.mesh->z_up);
     }
     impl_->orientation.update(impl_->renderer->GetActiveCamera());
     impl_->renderer->SetBackground(impl_->pending.background.redF(),

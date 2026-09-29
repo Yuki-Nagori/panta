@@ -20,6 +20,8 @@ using SceneRevision = std::uint64_t;
 struct RenderScene {
     /// 状态版本：后端已应用的修订低于此值时必须重新应用。
     SceneRevision revision = 0;
+    /// 本地显示的物理时间 s，不触发求解器调用。
+    double playback_time = 0.0;
     /// 视口背景基色（演示阶段的可恢复状态之一；VTK 以轻微渐变呈现）。
     QColor background{248, 249, 250};
     /// 默认欢迎字样可见性；为空 mesh 时由 VTK 适配器显示欢迎几何。

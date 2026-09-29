@@ -22,6 +22,7 @@ ApplicationWindow {
     readonly property bool layersDockShown: layersPanel.dockOpen
     readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
+    property bool fillingPreview: false
     property string activeRibbonTab: "start-learn"
 
     function selectRibbonTab(tab) {
@@ -32,6 +33,11 @@ ApplicationWindow {
 
     ShellViewModel {
         id: viewModel
+    }
+
+    FillingPreviewModel {
+        id: fillingModel
+        objectName: "fillingPreviewModel"
     }
 
     ProjectViewModel {
@@ -144,6 +150,23 @@ ApplicationWindow {
             onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
         }
 
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.spacingLarge
+            ThemedToolButton {
+                objectName: "openFillingPreview"
+                text: shellWindow.fillingPreview ? qsTr("Back to workspace") : qsTr("Filling MVP · default example")
+                borderColor: Theme.colorPanelLine
+                onClicked: shellWindow.fillingPreview = !shellWindow.fillingPreview
+            }
+            ThemedLabel {
+                text: shellWindow.fillingPreview ? qsTr("Load → Mesh → Fill → Replay · all settings are preset") : ""
+                textColor: Theme.colorTextMuted
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+            }
+        }
+
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。
         Item {
             id: workspace
@@ -163,9 +186,17 @@ ApplicationWindow {
                 width: Math.max(workspace.width * Theme.leftPanelRatio, Theme.leftPanelMinimumWidth)
                 spacing: 0
 
+                FillingPreviewPanel {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: shellWindow.fillingPreview
+                    previewModel: fillingModel
+                }
+
                 TasksPanel {
                     id: tasksPanel
                     objectName: "tasksPanel"
+                    visible: !shellWindow.fillingPreview
 
                     Layout.fillWidth: true
                     Layout.fillHeight: !shellWindow.layersDockShown
@@ -213,13 +244,14 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Theme.borderWidth
-                    visible: shellWindow.layersDockShown
+                    visible: !shellWindow.fillingPreview && shellWindow.layersDockShown
                     color: Theme.colorPanelLine
                 }
 
                 LayersPanel {
                     id: layersPanel
                     objectName: "layersPanel"
+                    visible: !shellWindow.fillingPreview && dockOpen
                     Layout.fillWidth: true
                     Layout.fillHeight: shellWindow.layersDockShown
                     Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * Theme.layersPanelRatio : 0
@@ -241,7 +273,9 @@ ApplicationWindow {
             ViewportPane {
                 id: viewportPane
 
-                meshSource: projectModel
+                documentSource: projectModel
+                meshSource: shellWindow.fillingPreview ? fillingModel : projectModel
+                previewModel: shellWindow.fillingPreview ? fillingModel : null
                 reducedMotion: Settings.reducedMotion
                 logContextId: projectModel.currentPath + ":" + (projectModel.planSettings.importId ?? "")
                 anchors.left: workspaceSplit.right
