@@ -128,7 +128,8 @@ Window {
                             Layout.preferredWidth: 92
                             Layout.preferredHeight: Theme.controlHeight
                             text: qsTranslate("UiCommonNavigation", "Browse")
-                            iconName: "document-open"
+                            iconName: "open"
+                            preserveIconColors: true
                             contentPadding: Theme.spacingSmall
                             hoverColor: Theme.colorHover
                             borderColor: Theme.colorPanelLine
@@ -222,11 +223,11 @@ Window {
                         Layout.preferredWidth: 92
                         Layout.preferredHeight: Theme.controlHeight
                         text: qsTranslate("DialogAction", "OK")
-                        highlighted: true
+                        primaryAction: true
                         enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
-                        borderColor: Theme.colorPanelLine
+                        borderColor: Theme.colorDialogPrimaryBorder
                         onClicked: dialog.submit()
                     }
                     ThemedToolButton {

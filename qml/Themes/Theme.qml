@@ -17,6 +17,7 @@ QtObject {
     readonly property color colorIcon: "#4a4a4a"
     readonly property color colorHover: "#e5f1fb"
     readonly property color colorSelected: "#e8f3fd"
+    readonly property color colorFocus: "#2e7ce0"
     readonly property color colorBrand: "#c8322b"
     readonly property color colorError: "#c62828"
     readonly property color colorMenubar: "#2b2b2b"
@@ -32,6 +33,8 @@ QtObject {
     readonly property color colorDocumentHover: "#f0eeec"
     readonly property color colorDocumentClosePressed: "#d5e3ef"
     readonly property color colorDocumentWelcomeIcon: "#a83e47"
+    readonly property color colorDialogPrimary: "#e5f1fb"
+    readonly property color colorDialogPrimaryBorder: "#5d9fc7"
 
     // 字号（逻辑像素）
     readonly property int fontTitle: 13
@@ -47,7 +50,23 @@ QtObject {
     readonly property int spacingLarge: 12
     readonly property int spacingStrip: 10
 
-    // 结构尺寸（逻辑像素）与栏宽比例
+    // 图标尺寸（逻辑像素）
+    readonly property int iconSizeSmall: 16
+    readonly property int iconSizeDefault: 18
+    readonly property int iconSizeRibbon: 26
+    readonly property int iconSizeCompact: 12
+    readonly property int iconSizePaneClose: 10
+    readonly property int documentTabWelcomeIconSize: 17
+
+    // 圆角与线宽（逻辑像素）
+    readonly property int radiusSmall: 3
+    readonly property int documentTabRadius: 8
+    readonly property int documentTabCloseRadius: 5
+    readonly property int borderWidth: 1
+    readonly property int focusBorderWidth: 2
+    readonly property int documentTabBottomLineHeight: 3
+
+    // 布局尺寸（逻辑像素）与栏宽比例
     readonly property int titlebarHeight: 30
     readonly property int menubarHeight: 24
     readonly property int ribbonHeight: 96
@@ -65,38 +84,30 @@ QtObject {
     readonly property int searchFieldWidth: 200
     readonly property int toolbarButtonWidth: 24
     readonly property int toolbarButtonHeight: 22
-    readonly property int iconSizeSmall: 16
-    readonly property int iconSizeDefault: 18
-    readonly property int iconSizeRibbon: 26
-    readonly property int iconSizeCompact: 12
     readonly property int paneCloseSize: 20
-    readonly property int tabSlideDuration: 120
     readonly property int tabSegmentWidth: 96
     readonly property int documentTabWidth: 130
     readonly property int documentTabBarHeight: 39
-    readonly property int documentTabRadius: 8
-    readonly property int documentTabBottomLineHeight: 3
     readonly property int documentTabContentInset: 11
     readonly property int documentTabCloseSize: 19
     readonly property int documentTabCloseRightInset: 3
-    readonly property int documentTabCloseRadius: 5
-    readonly property int documentTabWelcomeIconSize: 17
-    readonly property int documentTabDragThreshold: 4
-    readonly property int documentTabAnimationDuration: 150
     readonly property int panelToolbarHeight: 32
     readonly property int titlebarMinimumContentWidth: 1100
-    readonly property int toolTipDelay: 600
     readonly property int logoWidth: 46
     readonly property real leftPanelRatio: 0.26
     readonly property int leftPanelMinimumWidth: 320
     readonly property real layersPanelRatio: 0.42
 
-    // 圆角与线宽
-    readonly property int radiusSmall: 3
-    readonly property int borderWidth: 1
+    // 交互阈值（逻辑像素）与时长（毫秒）
+    readonly property int tabSlideDuration: 120
+    readonly property int documentTabDragThreshold: 4
+    readonly property int documentTabAnimationDuration: 150
+    readonly property int toolTipDelay: 600
+
     // 禁用控件的整体透明度
     readonly property real disabledOpacity: 0.4
 
+    // 窗口最小尺寸（逻辑像素）
     readonly property int windowMinimumWidth: 640
     readonly property int windowMinimumHeight: 480
 }

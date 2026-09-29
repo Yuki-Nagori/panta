@@ -5,6 +5,8 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QGuiApplication>
+#include <QMetaEnum>
+#include <QMetaProperty>
 #include <QObject>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -37,9 +39,11 @@ constexpr int kItemCounts[] = {0, 1, 100, 1000};
 // 文档页签代表性规模：单页签（Welcome 态）、少量打开、多页签滚动。
 constexpr int kDocumentTabCounts[] = {1, 8, 24};
 constexpr int kDocumentSwitchRounds = 32;
+constexpr int kIconCounts[] = {1, 8, 24};
 
 enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both };
 enum class DocumentTabWorkload : std::uint8_t { Construct, Switch, Close };
+enum class IconSourceMode : std::uint8_t { Empty, MonochromeProvider, SourceColors };
 
 struct Sample {
     qint64 elapsed_nanoseconds = 0;
@@ -59,6 +63,11 @@ struct Scenario {
 struct Summary {
     double median_microseconds = 0.0;
     double p95_microseconds = 0.0;
+};
+
+struct IconLoadSample {
+    qint64 elapsed_nanoseconds = 0;
+    int loaded_icons = 0;
 };
 
 QStringList make_names(int count) {
@@ -94,6 +103,8 @@ class QmlPerformanceBenchmark final : public QObject {
     QQmlComponent m_documentTabBarComponent{
         &m_engine,
         QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
+    QQmlComponent m_themedIconComponent{
+        &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedIcon.qml"))};
 
     QObject* create(QQmlComponent& component, const QVariantMap& properties, QObject& owner) {
         QObject* object = component.createWithInitialProperties(properties);
@@ -219,6 +230,176 @@ class QmlPerformanceBenchmark final : public QObject {
         return {elapsed, realized_closes, realized_closes, false};
     }
 
+    QStringList icon_names(IconSourceMode mode, int count) const {
+        static const QStringList monochrome_icons{
+            QStringLiteral("undo"),    QStringLiteral("redo"),    QStringLiteral("print"),
+            QStringLiteral("preview"), QStringLiteral("account"), QStringLiteral("cart"),
+            QStringLiteral("help"),    QStringLiteral("close")};
+        static const QStringList source_color_icons{
+            QStringLiteral("new"),
+            QStringLiteral("open"),
+            QStringLiteral("save"),
+            QStringLiteral("project-file"),
+            QStringLiteral("project-folder"),
+            QStringLiteral("stl-file"),
+            QStringLiteral("study"),
+            QStringLiteral("status-ok"),
+            QStringLiteral("task-analysis"),
+            QStringLiteral("task-fill"),
+            QStringLiteral("task-injection"),
+            QStringLiteral("task-material"),
+            QStringLiteral("task-mesh"),
+            QStringLiteral("task-optimization"),
+            QStringLiteral("task-settings"),
+            QStringLiteral("log"),
+            QStringLiteral("ribbon-start-here"),
+            QStringLiteral("ribbon-new-features"),
+            QStringLiteral("ribbon-tutorials"),
+            QStringLiteral("ribbon-videos"),
+            QStringLiteral("ribbon-help"),
+            QStringLiteral("ribbon-project"),
+            QStringLiteral("ribbon-open-project"),
+            QStringLiteral("ribbon-import"),
+            QStringLiteral("ribbon-add"),
+            QStringLiteral("ribbon-dual-domain"),
+            QStringLiteral("ribbon-geometry"),
+            QStringLiteral("ribbon-mesh"),
+            QStringLiteral("ribbon-thermoplastics-injection-molding"),
+            QStringLiteral("ribbon-analysis-sequence"),
+            QStringLiteral("ribbon-select-material"),
+            QStringLiteral("ribbon-injection-locations"),
+            QStringLiteral("ribbon-process-settings"),
+            QStringLiteral("ribbon-optimization"),
+            QStringLiteral("ribbon-boundary-conditions"),
+            QStringLiteral("ribbon-analyze"),
+            QStringLiteral("ribbon-job-manager"),
+            QStringLiteral("ribbon-results"),
+            QStringLiteral("ribbon-reports"),
+            QStringLiteral("ribbon-shared-views"),
+            QStringLiteral("ribbon-logs")};
+
+        QStringList names;
+        names.reserve(count);
+        if (mode == IconSourceMode::Empty) {
+            return names;
+        }
+        const QStringList& palette =
+            mode == IconSourceMode::MonochromeProvider ? monochrome_icons : source_color_icons;
+        // Use separate symbol slices for 1/8/24 color-icon rows to keep their first samples useful.
+        const int start = count == 1 ? 0 : count == 8 ? 1 : 9;
+        for (int index = 0; index < count; ++index) {
+            names.append(palette[(start + index) % palette.size()]);
+        }
+        return names;
+    }
+
+    QByteArray image_status_name(QObject& image) const {
+        const QMetaObject* meta_object = image.metaObject();
+        const int status_index = meta_object->indexOfProperty("status");
+        if (status_index < 0) {
+            return {};
+        }
+        const QMetaProperty status_property = meta_object->property(status_index);
+        return status_property.enumerator().valueToKey(status_property.read(&image).toInt());
+    }
+
+    IconLoadSample measure_icon_loading(IconSourceMode mode, int count) {
+        QObject owner;
+        const QStringList names = icon_names(mode, count);
+        std::vector<QObject*> icons;
+        icons.reserve(count);
+        QElapsedTimer timer;
+        timer.start();
+
+        for (int index = 0; index < count; ++index) {
+            QVariantMap properties{
+                {QStringLiteral("name"), names.isEmpty() ? QString{} : names[index]},
+                {QStringLiteral("iconSize"), 26},
+                {QStringLiteral("preserveSourceColors"), mode == IconSourceMode::SourceColors}};
+            QObject* object = m_themedIconComponent.createWithInitialProperties(properties);
+            if (object == nullptr) {
+                QTest::qFail(qPrintable(m_themedIconComponent.errorString()), __FILE__, __LINE__);
+                return {};
+            }
+            object->setParent(&owner);
+            auto* item = qobject_cast<QQuickItem*>(object);
+            if (item == nullptr) {
+                QTest::qFail("ThemedIcon did not create a QQuickItem", __FILE__, __LINE__);
+                return {};
+            }
+            const int x = (index % 12) * 28;
+            const int y = (index / 12) * 28;
+            item->setPosition(QPointF(static_cast<qreal>(x), static_cast<qreal>(y)));
+            item->setWidth(26);
+            item->setHeight(26);
+            item->setParentItem(m_window.contentItem());
+            icons.push_back(object);
+        }
+
+        int loaded_icons = 0;
+        if (mode == IconSourceMode::Empty) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        } else {
+            QElapsedTimer wait_timer;
+            wait_timer.start();
+            while (wait_timer.elapsed() < 5000) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+                loaded_icons = 0;
+                bool pending = false;
+                for (QObject* icon : icons) {
+                    const QByteArray status = image_status_name(*icon);
+                    if (status == "Error") {
+                        QTest::qFail(qPrintable(QStringLiteral("Failed to load icon '%1'")
+                                                    .arg(icon->property("name").toString())),
+                                     __FILE__, __LINE__);
+                        return {};
+                    }
+                    if (status == "Ready") {
+                        ++loaded_icons;
+                    } else {
+                        pending = true;
+                    }
+                }
+                if (!pending) {
+                    break;
+                }
+            }
+            if (loaded_icons != count) {
+                QTest::qFail("Timed out waiting for QML icon images to become ready", __FILE__,
+                             __LINE__);
+                return {};
+            }
+        }
+        return {timer.nsecsElapsed(), loaded_icons};
+    }
+
+    void run_icon_loading_scenarios() {
+        const std::array<std::pair<IconSourceMode, const char*>, 3> modes = {
+            {{IconSourceMode::Empty, "empty source baseline"},
+             {IconSourceMode::MonochromeProvider, "monochrome provider"},
+             {IconSourceMode::SourceColors, "source-color qrc"}}};
+        for (const auto& [mode, label] : modes) {
+            for (const int count : kIconCounts) {
+                const IconLoadSample first_load = measure_icon_loading(mode, count);
+                QCOMPARE(first_load.loaded_icons, mode == IconSourceMode::Empty ? 0 : count);
+                std::vector<double> cached_samples;
+                cached_samples.reserve(kSampleCount);
+                for (int sample_index = 0; sample_index < kSampleCount; ++sample_index) {
+                    const IconLoadSample sample = measure_icon_loading(mode, count);
+                    QCOMPARE(sample.loaded_icons, mode == IconSourceMode::Empty ? 0 : count);
+                    cached_samples.push_back(static_cast<double>(sample.elapsed_nanoseconds) /
+                                             1000.0);
+                }
+                const Summary summary = summarize(std::move(cached_samples));
+                qInfo().nospace() << "QML CPU icon load (" << label << ", " << count
+                                  << " items; initial sample / cached p50 / p95 microseconds): "
+                                  << static_cast<double>(first_load.elapsed_nanoseconds) / 1000.0
+                                  << "/" << summary.median_microseconds << "/"
+                                  << summary.p95_microseconds;
+            }
+        }
+    }
+
     void verify_sample(Panels panels, int expected_rows, const Sample& sample) {
         const bool includes_tasks = panels == Panels::Tasks || panels == Panels::Both;
         const bool includes_layers = panels == Panels::Layers || panels == Panels::Both;
@@ -276,6 +457,7 @@ class QmlPerformanceBenchmark final : public QObject {
         QVERIFY(m_emptyComponent.isReady());
         QVERIFY2(m_tasksComponent.isReady(), qPrintable(m_tasksComponent.errorString()));
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
+        QVERIFY2(m_themedIconComponent.isReady(), qPrintable(m_themedIconComponent.errorString()));
     }
 
     std::vector<Scenario> document_tab_scenarios() {
@@ -314,6 +496,8 @@ class QmlPerformanceBenchmark final : public QObject {
             run_scenario(scenario);
         }
     }
+
+    void measures_icon_loading() { run_icon_loading_scenarios(); }
 };
 
 QTEST_MAIN(QmlPerformanceBenchmark)

@@ -5,8 +5,11 @@
 #include <QPainter>
 #include <QQmlEngine>
 #include <QQuickImageProvider>
+#include <QRectF>
 #include <QRegularExpression>
+#include <QSet>
 #include <QSize>
+#include <QSizeF>
 #include <QString>
 #include <QSvgRenderer>
 #include <qnamespace.h>
@@ -24,7 +27,7 @@ class IconProvider final : public QQuickImageProvider {
         static const QRegularExpression valid_id(
             QStringLiteral("^([a-z][a-z0-9-]*)/([0-9a-fA-F]{8})$"));
         const auto match = valid_id.match(id);
-        if (!match.hasMatch()) {
+        if (!match.hasMatch() || !monochrome_symbols().contains(match.captured(1))) {
             return {};
         }
         QSvgRenderer renderer(
@@ -38,13 +41,39 @@ class IconProvider final : public QQuickImageProvider {
         const QSize pixels = requested_size.isValid() && !requested_size.isEmpty()
                                  ? requested_size
                                  : renderer.defaultSize();
+        const QSizeF intrinsic = renderer.defaultSize();
+        if (intrinsic.isEmpty()) {
+            return {};
+        }
         QImage image(pixels, QImage::Format_ARGB32_Premultiplied);
         image.fill(Qt::transparent);
         QPainter painter(&image);
-        renderer.render(&painter);
+        const qreal scale =
+            qMin(pixels.width() / intrinsic.width(), pixels.height() / intrinsic.height());
+        const QSizeF rendered(intrinsic.width() * scale, intrinsic.height() * scale);
+        const QRectF bounds((pixels.width() - rendered.width()) / 2.0,
+                            (pixels.height() - rendered.height()) / 2.0, rendered.width(),
+                            rendered.height());
+        renderer.render(&painter, bounds);
         painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
         painter.fillRect(image.rect(), QColor(QStringLiteral("#") + match.captured(2)));
         return image;
+    }
+
+  private:
+    static const QSet<QString>& monochrome_symbols() {
+        // 限定为视觉上单色的 glyph，彩色语义资源必须由 QML 保留原色加载。
+        static const QSet<QString> names{
+            QStringLiteral("undo"),    QStringLiteral("redo"),     QStringLiteral("print"),
+            QStringLiteral("preview"), QStringLiteral("account"),  QStringLiteral("cart"),
+            QStringLiteral("help"),    QStringLiteral("minimize"), QStringLiteral("maximize"),
+            QStringLiteral("close"),   QStringLiteral("check"),    QStringLiteral("wizard"),
+            QStringLiteral("copy"),    QStringLiteral("image"),    QStringLiteral("export"),
+            QStringLiteral("delete"),  QStringLiteral("layers"),   QStringLiteral("caret"),
+            QStringLiteral("globe"),   QStringLiteral("split"),    QStringLiteral("search"),
+            QStringLiteral("right"),
+        };
+        return names;
     }
 };
 

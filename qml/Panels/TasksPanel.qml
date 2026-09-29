@@ -21,36 +21,36 @@ PanelSurface {
     readonly property var importedTaskItems: [
         {
             text: qsTranslate("ImportTask", "Create Mesh..."),
-            icon: "mesh"
+            icon: "task-mesh"
         },
         {
             text: qsTranslate("ImportTask", "Fill"),
-            icon: "geometry"
+            icon: "task-fill"
         },
         {
             text: qsTranslate("ImportTask", "Material Data"),
-            icon: "material"
+            icon: "task-material"
         },
         {
             text: qsTranslate("ImportTask", "Set Injection Locations..."),
-            icon: "injection-location"
+            icon: "task-injection"
         },
         {
             text: qsTranslate("ProcessTask", "Process Settings (Default)"),
-            icon: "process-settings"
+            icon: "task-settings"
         },
         {
             text: qsTranslate("ImportTask", "Optimization (None)"),
-            icon: "optimization"
+            icon: "task-optimization"
         },
         {
             text: qsTranslate("UiCommonAnalysis", "Analyze"),
-            icon: "analysis-run",
+            icon: "task-analysis",
             enabled: false
         },
         {
             text: qsTranslate("ImportTask", "Logs*"),
-            icon: "output-copy"
+            icon: "log"
         }
     ]
 
@@ -109,7 +109,9 @@ PanelSurface {
                             Layout.fillWidth: true
                             text: qsTranslate("IconActionOpenProject", "Open Project")
                             dimText: "…"
-                            iconName: "document-open"
+                            iconName: "open"
+                            preserveIconColors: true
+                            iconSize: Theme.iconSizeSmall
                             contentAlignLeft: true
                             contentColor: Theme.colorText
                             contentPadding: Theme.spacingLarge
@@ -120,7 +122,9 @@ PanelSurface {
                             Layout.fillWidth: true
                             text: qsTranslate("UiCommonNavigation", "New Project")
                             dimText: "…"
-                            iconName: "document-new"
+                            iconName: "new"
+                            preserveIconColors: true
+                            iconSize: Theme.iconSizeSmall
                             contentAlignLeft: true
                             contentColor: Theme.colorText
                             contentPadding: Theme.spacingLarge
@@ -136,6 +140,8 @@ PanelSurface {
                         visible: panel.projectOpen
                         text: qsTranslate("ProjectTaskItem", "Project '%1'").arg(panel.projectName)
                         iconName: "project-file"
+                        preserveIconColors: true
+                        iconSize: Theme.iconSizeSmall
                         contentAlignLeft: true
                         contentColor: Theme.colorText
                         contentPadding: Theme.spacingLarge
@@ -145,6 +151,7 @@ PanelSurface {
                             ThemedIcon {
                                 name: projectEntry.iconName
                                 iconSize: projectEntry.iconSize
+                                preserveSourceColors: true
                                 color: projectEntry.contentColor
                             }
                             ThemedLabel {
@@ -187,8 +194,9 @@ PanelSurface {
                         spacing: Theme.spacingSmall
 
                         ThemedIcon {
-                            name: "mesh"
+                            name: "stl-file"
                             iconSize: Theme.iconSizeSmall
+                            preserveSourceColors: true
                         }
                         ThemedLabel {
                             Layout.fillWidth: true
@@ -234,8 +242,9 @@ PanelSurface {
                             spacing: Theme.spacingSmall
 
                             ThemedIcon {
-                                name: "project-file"
+                                name: "study"
                                 iconSize: Theme.iconSizeSmall
+                                preserveSourceColors: true
                             }
                             ThemedLabel {
                                 Layout.fillWidth: true
@@ -250,7 +259,9 @@ PanelSurface {
                         Layout.fillWidth: true
                         Layout.leftMargin: Theme.spacingMedium
                         text: qsTranslate("ImportTask", "Part (%1)").arg(panel.activePartTitle)
-                        iconName: "project-file"
+                        iconName: "stl-file"
+                        preserveIconColors: true
+                        iconSize: Theme.iconSizeSmall
                         contentAlignLeft: true
                         contentColor: Theme.colorText
                         contentPadding: Theme.spacingSmall
@@ -266,6 +277,8 @@ PanelSurface {
                             Layout.leftMargin: Theme.spacingLarge
                             text: modelData.text
                             iconName: modelData.icon
+                            preserveIconColors: true
+                            iconSize: Theme.iconSizeSmall
                             enabled: modelData.enabled !== false
                             contentAlignLeft: true
                             contentColor: Theme.colorText

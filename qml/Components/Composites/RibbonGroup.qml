@@ -52,7 +52,7 @@ Rectangle {
             ThemedIcon {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: group.showCaret
-                name: "caret-down"
+                name: "caret"
                 iconSize: Theme.iconSizeCompact
                 color: Theme.colorTextMuted
             }

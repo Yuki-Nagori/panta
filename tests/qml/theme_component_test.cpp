@@ -14,6 +14,7 @@
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
 #include <QQuickWindow>
+#include <QRect>
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
@@ -324,64 +325,124 @@ class ThemeComponentTest final : public QObject {
             engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedIcon.qml"),
             owner);
         QVERIFY(icon != nullptr);
-        icon->setProperty("name", QStringLiteral("caret-down"));
-        const QUrl source = icon->property("source").value<QUrl>();
-        QCOMPARE(source, QUrl(QStringLiteral("image://panta-icons/caret-down/ff4a4a4a")));
-        // qtsvg 供给的 qsvg 图像格式插件必须能解码模块内 SVG 资源。
-        QImageReader reader(QStringLiteral(":/qt/qml/Panta/Shell/icons/caret-down.svg"));
-        QCOMPARE(reader.canRead(), true);
-        QCOMPARE(reader.size(), QSize(24, 24));
+        icon->setProperty("name", QStringLiteral("caret"));
+        QCOMPARE(icon->property("source").value<QUrl>(),
+                 QUrl(QStringLiteral("image://panta-icons/caret/ff4a4a4a")));
+        // qtsvg 提供的 qsvg 插件可以读取模块打包的原始 SVG viewBox 尺寸。
+        QImageReader reader(QStringLiteral(":/qt/qml/Panta/Shell/icons/caret.svg"));
+        QVERIFY(reader.canRead());
+        QCOMPARE(reader.size(), QSize(7, 5));
         icon->setProperty("color", QColor(QStringLiteral("#ffffff")));
         QCOMPARE(icon->property("source").value<QUrl>(),
-                 QUrl(QStringLiteral("image://panta-icons/caret-down/ffffffff")));
+                 QUrl(QStringLiteral("image://panta-icons/caret/ffffffff")));
+        icon->setProperty("preserveSourceColors", true);
+        icon->setProperty("name", QStringLiteral("ribbon-project"));
+        QCOMPARE(icon->property("source").value<QUrl>(),
+                 QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/icons/ribbon-project.svg")));
         icon->setProperty("name", QString());
         QVERIFY(icon->property("source").value<QUrl>().isEmpty());
     }
+
     void svg_resources_render_with_caller_color() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);
         auto* provider = static_cast<QQuickImageProvider*>(engine.imageProvider("panta-icons"));
         QVERIFY(provider != nullptr);
-        const QStringList icons = QDir(QStringLiteral(":/qt/qml/Panta/Shell/icons"))
-                                      .entryList({QStringLiteral("*.svg")}, QDir::Files);
-        QVERIFY(!icons.isEmpty());
-        for (const QString& file : icons) {
+        const QString resource_root = QStringLiteral(":/qt/qml/Panta/Shell/icons/");
+        const QStringList files =
+            QDir(resource_root).entryList({QStringLiteral("*.svg")}, QDir::Files);
+        QVERIFY(files.size() >= 63);
+        for (const QString& file : files) {
+            QImageReader reader(resource_root + file);
+            QVERIFY2(reader.canRead(), qPrintable(file));
+            QVERIFY2(reader.size().isValid(), qPrintable(file));
+            QVERIFY2(!reader.read().isNull(), qPrintable(file));
+        }
+
+        const QStringList monochrome_icons{
+            QStringLiteral("undo"),    QStringLiteral("redo"),     QStringLiteral("print"),
+            QStringLiteral("preview"), QStringLiteral("account"),  QStringLiteral("cart"),
+            QStringLiteral("help"),    QStringLiteral("minimize"), QStringLiteral("maximize"),
+            QStringLiteral("close"),   QStringLiteral("check"),    QStringLiteral("wizard"),
+            QStringLiteral("copy"),    QStringLiteral("image"),    QStringLiteral("export"),
+            QStringLiteral("delete"),  QStringLiteral("layers"),   QStringLiteral("caret"),
+            QStringLiteral("globe"),   QStringLiteral("split"),    QStringLiteral("search"),
+            QStringLiteral("right"),
+        };
+        for (const QString& name : monochrome_icons) {
+            QImageReader reader(resource_root + name + QStringLiteral(".svg"));
+            const QSize expected_size = reader.size();
+            QVERIFY(expected_size.isValid());
             for (const int pixels : {16, 18, 24, 48}) {
                 QSize original;
-                const QString name = file.chopped(4);
-                const QImage frame =
-                    provider->requestImage(name + "/ff2878b8", &original, QSize(pixels, pixels));
-                QVERIFY2(!frame.isNull(), qPrintable(file));
-                QCOMPARE(original, QSize(24, 24));
+                const QImage frame = provider->requestImage(name + QStringLiteral("/ff2878b8"),
+                                                            &original, QSize(pixels, pixels));
+                QVERIFY2(!frame.isNull(), qPrintable(name));
+                QCOMPARE(original, expected_size);
                 QCOMPARE(frame.size(), QSize(pixels, pixels));
                 int colored = 0;
                 for (int y = 0; y < pixels; ++y) {
                     for (int x = 0; x < pixels; ++x) {
                         const QColor pixel = frame.pixelColor(x, y);
-                        if (pixel.alpha() > 240) {
-                            // 允许预乘 alpha 的整数舍入；不允许硬编码黑色漏出。
-                            QVERIFY(qAbs(pixel.red() - 40) <= 1);
-                            QVERIFY(qAbs(pixel.green() - 120) <= 1);
-                            QVERIFY(qAbs(pixel.blue() - 184) <= 1);
+                        if (pixel.alpha() > 0) {
                             ++colored;
                         }
-                        if (x == 0 || y == 0 || x == pixels - 1 || y == pixels - 1) {
-                            QCOMPARE(pixel.alpha(), 0);
+                        if (pixel.alpha() > 192) {
+                            // Alpha mask 只保留几何覆盖，像素颜色必须完全来自调用方。
+                            QVERIFY2(qAbs(pixel.red() - 40) <= 1, qPrintable(name));
+                            QVERIFY2(qAbs(pixel.green() - 120) <= 1, qPrintable(name));
+                            QVERIFY2(qAbs(pixel.blue() - 184) <= 1, qPrintable(name));
                         }
                     }
                 }
-                QVERIFY2(colored > 0, qPrintable(file));
+                QVERIFY2(colored > 0, qPrintable(name));
             }
         }
+
+        const QImage caret =
+            provider->requestImage(QStringLiteral("caret/ff4a4a4a"), nullptr, QSize(24, 24));
+        QVERIFY(!caret.isNull());
+        QRect caret_bounds;
+        for (int y = 0; y < caret.height(); ++y) {
+            for (int x = 0; x < caret.width(); ++x) {
+                if (caret.pixelColor(x, y).alpha() > 0) {
+                    caret_bounds |= QRect(x, y, 1, 1);
+                }
+            }
+        }
+        QVERIFY(caret_bounds.isValid());
+        QVERIFY(caret_bounds.width() < caret.width());
+        QVERIFY(caret_bounds.height() < 16);
+
+        QImageReader color_reader(resource_root + QStringLiteral("ribbon-project.svg"));
+        color_reader.setScaledSize(QSize(42, 42));
+        const QImage color_icon = color_reader.read();
+        QVERIFY(!color_icon.isNull());
+        bool has_blue = false;
+        bool has_neutral = false;
+        for (int y = 0; y < color_icon.height(); ++y) {
+            for (int x = 0; x < color_icon.width(); ++x) {
+                const QColor pixel = color_icon.pixelColor(x, y);
+                has_blue = has_blue || (pixel.alpha() > 180 && pixel.blue() > pixel.red() * 1.4);
+                has_neutral =
+                    has_neutral || (pixel.alpha() > 180 && qAbs(pixel.red() - pixel.green()) < 5 &&
+                                    qAbs(pixel.green() - pixel.blue()) < 5);
+            }
+        }
+        QVERIFY(has_blue);
+        QVERIFY(has_neutral);
+
         QSize original;
         const QImage white =
-            provider->requestImage("pane-close/ffffffff", &original, QSize(24, 24));
+            provider->requestImage(QStringLiteral("close/ffffffff"), &original, QSize(24, 24));
         QVERIFY(white.pixelColor(6, 6).lightness() > 240);
         const QImage transparent =
-            provider->requestImage("pane-close/00ffffff", nullptr, QSize(24, 24));
+            provider->requestImage(QStringLiteral("close/00ffffff"), nullptr, QSize(24, 24));
         QCOMPARE(transparent.pixelColor(6, 6).alpha(), 0);
-        QVERIFY(provider->requestImage("../document-new/ffffffff", nullptr, {}).isNull());
-        QVERIFY(provider->requestImage("pane-close/not-a-color", nullptr, {}).isNull());
+        QVERIFY(provider->requestImage(QStringLiteral("../new/ffffffff"), nullptr, {}).isNull());
+        QVERIFY(provider->requestImage(QStringLiteral("ribbon-project/ffffffff"), nullptr, {})
+                    .isNull());
+        QVERIFY(provider->requestImage(QStringLiteral("close/not-a-color"), nullptr, {}).isNull());
     }
 
     void document_tab_connectors_follow_html_reference() {

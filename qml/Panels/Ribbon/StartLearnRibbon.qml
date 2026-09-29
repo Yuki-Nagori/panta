@@ -15,12 +15,12 @@ RibbonContent {
                 {
                     key: "new-project",
                     label: qsTranslate("RibbonActionNewProject", "New\nProject"),
-                    icon: "document-new"
+                    icon: "ribbon-project"
                 },
                 {
                     key: "open-project",
                     label: qsTranslate("RibbonActionOpenProject", "Open\nProject"),
-                    icon: "document-open"
+                    icon: "ribbon-open-project"
                 }
             ]
         },
@@ -31,7 +31,7 @@ RibbonContent {
                 {
                     key: "new-features",
                     label: qsTranslate("RibbonActionNewFeatures", "New\nFeatures"),
-                    icon: "ribbon-whatsnew"
+                    icon: "ribbon-new-features"
                 }
             ]
         },
@@ -42,22 +42,22 @@ RibbonContent {
                 {
                     key: "start-here",
                     label: qsTranslate("RibbonActionStartHere", "Start Here"),
-                    icon: "ribbon-start"
+                    icon: "ribbon-start-here"
                 },
                 {
                     key: "tutorials",
                     label: qsTranslate("RibbonActionTutorials", "Tutorials"),
-                    icon: "ribbon-learn"
+                    icon: "ribbon-tutorials"
                 },
                 {
                     key: "videos",
                     label: qsTranslate("RibbonActionVideos", "Videos"),
-                    icon: "media-video"
+                    icon: "ribbon-videos"
                 },
                 {
                     key: "help",
                     label: qsTranslate("UiCommonHelp", "Help"),
-                    icon: "help-browser"
+                    icon: "ribbon-help"
                 }
             ]
         }

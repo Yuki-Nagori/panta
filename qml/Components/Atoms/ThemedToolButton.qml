@@ -10,9 +10,11 @@ ToolButton {
     property int contentPadding: Theme.spacingXSmall
     property int cornerRadius: Theme.radiusSmall
     property color contentColor: Theme.colorIcon
-    property color hoverColor: Theme.colorSelected
+    property color hoverColor: Theme.colorHover
     property color borderColor: Theme.colorTransparent
+    property bool primaryAction: false
     property string iconName: ""
+    property bool preserveIconColors: false
     // 纯图标按钮由宿主提供已翻译的名称，供读屏与悬停提示使用。
     property string accessibleName: text
     property int iconSize: Theme.iconSizeDefault
@@ -39,11 +41,26 @@ ToolButton {
 
     background: Rectangle {
         implicitWidth: Theme.controlHeight
-        // highlighted 表示宿主指定的强调态（当前菜单白底），
-        // 不再响应悬停高亮；visualFocus 使键盘 Tab 焦点获得与悬停一致的反馈。
-        color: button.highlighted ? Theme.colorPanel : button.enabled && (button.hovered || button.visualFocus) ? button.hoverColor : Theme.colorTransparent
-        border.width: button.borderColor.a > 0 ? Theme.borderWidth : 0
-        border.color: button.borderColor
+        // 强调状态不依赖悬停显示；键盘焦点使用独立轮廓。
+        color: {
+            if (button.highlighted) {
+                return Theme.colorPanel;
+            }
+            if (button.primaryAction) {
+                return Theme.colorDialogPrimary;
+            }
+            if (button.enabled && (button.hovered || button.visualFocus)) {
+                return button.hoverColor;
+            }
+            return Theme.colorTransparent;
+        }
+        border.width: {
+            if (button.visualFocus) {
+                return Theme.focusBorderWidth;
+            }
+            return button.borderColor.a > 0 ? Theme.borderWidth : 0;
+        }
+        border.color: button.visualFocus ? Theme.colorFocus : button.borderColor
         radius: button.cornerRadius
     }
 
@@ -65,6 +82,7 @@ ToolButton {
                 name: button.iconName
                 iconSize: button.iconSize
                 color: button.contentColor
+                preserveSourceColors: button.preserveIconColors
             }
             ThemedLabel {
                 anchors.verticalCenter: parent.verticalCenter
@@ -83,7 +101,7 @@ ToolButton {
             ThemedIcon {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: button.showCaret
-                name: "caret-down"
+                name: "caret"
                 iconSize: Theme.iconSizeCompact
                 color: button.contentColor
             }

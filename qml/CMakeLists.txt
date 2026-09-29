@@ -75,7 +75,7 @@ target_sources(panta_shell PRIVATE ../native/app/icon_provider.cpp ../native/app
 target_include_directories(panta_shell PUBLIC ../native/app)
 target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick Qt6::QuickDialogs2)
 
-# ThemedIcon 使用 image://panta-icons；provider 读取下列 qrc 资源并着色。
+# 彩色图标由 ThemedIcon 从 qrc 原色加载；单色 utility 图标由 panta-icons provider 着色。
 # CONFIGURE_DEPENDS 收集资源；视觉、功能及来源清单见 ai-docs/standards/icons.md。
 file(
   GLOB PANTA_SHELL_ICON_FILES CONFIGURE_DEPENDS

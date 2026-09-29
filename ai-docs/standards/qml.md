@@ -45,7 +45,7 @@ Qt 建议分离界面与业务逻辑，并使用资源系统组织应用资源�
 
 | 要测的成本 | 基准入口与边界 |
 |---|---|
-| 组件构造、模型/delegate 创建与回收、绑定/布局/JavaScript 更新 | `tests/qml/project_docks_cpu_benchmark.cpp`。允许使用 offscreen 场景测 CPU 构造和更新成本，不据此声称 GPU 渲染性能。 |
+| 组件构造、模型/delegate 创建与回收、绑定/布局/JavaScript 更新，以及 QML Image 资源请求和 SVG 解码 | `tests/qml/project_docks_cpu_benchmark.cpp`。允许使用 offscreen 场景测 CPU 构造、资源加载和更新成本，不据此声称 GPU 渲染性能。 |
 | 可见内容的帧呈现、动画或场景更新 | `tests/qml/project_docks_gpu_benchmark.cpp`。必须在真实图形窗口测量，并把结果表述为 Qt Quick 端到端帧间隔；不得称作 GPU 内核耗时。 |
 | 同时影响 CPU 更新和可见渲染 | 两种入口都覆盖。 |
 

@@ -49,4 +49,4 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 [组件库与主题 DSL](../modules/qml-components-and-theme.md)）。本轮两状态整理见
 [任务 059](../task/059-open-project-html-reference.md)，HTML 已经维护者手工验收，
 作为 [QML 同步任务 060](../task/060-qml-project-workspace-reference.md) 的底稿。
-布局与状态由 QML 实现，正式图标沿用仓库 Mono 规范，不直接复制彩色占位路径。
+布局与状态由 QML 实现。`shell.js` 中的 SVG symbol 是正式图标造型来源，QML 按相同 ID 从 `qml/icons/` 加载独立资源；彩色图标保留源色，单色 utility glyph 由 `panta-icons` provider 按 Theme 着色。资源和来源登记见[`../standards/icons.md`](../standards/icons.md)。

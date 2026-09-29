@@ -76,8 +76,8 @@ TabBar {
                     anchors.margins: Theme.spacingTiny
                     radius: height / 2
                     color: !tab.checked && tab.hovered ? Theme.colorHover : Theme.colorTransparent
-                    border.width: tab.visualFocus ? Theme.borderWidth : 0
-                    border.color: Theme.colorIcon
+                    border.width: tab.visualFocus ? Theme.focusBorderWidth : 0
+                    border.color: Theme.colorFocus
                 }
             }
             contentItem: ThemedLabel {

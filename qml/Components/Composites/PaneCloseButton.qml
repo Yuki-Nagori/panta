@@ -13,11 +13,11 @@ ThemedToolButton {
     z: 2
 
     accessibleName: qsTranslate("IconActionClosePanel", "Close panel")
-    iconName: "pane-close"
+    iconName: "close"
     width: Theme.paneCloseSize
     controlHeight: Theme.paneCloseSize
     contentColor: hovered || visualFocus ? Theme.colorPanel : Theme.colorTextMuted
-    iconSize: Theme.iconSizeSmall
+    iconSize: Theme.iconSizePaneClose
     contentPadding: 0
     hoverColor: Theme.colorCloseHover
 

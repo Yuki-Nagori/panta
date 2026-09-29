@@ -25,8 +25,8 @@ ToolButton {
     background: Rectangle {
         color: tile.enabled && (tile.hovered || tile.visualFocus) ? Theme.colorHover : Theme.colorTransparent
         radius: Theme.radiusSmall
-        border.width: tile.visualFocus ? Theme.borderWidth : 0
-        border.color: Theme.colorIcon
+        border.width: tile.visualFocus ? Theme.focusBorderWidth : 0
+        border.color: Theme.colorFocus
     }
 
     contentItem: Item {
@@ -44,6 +44,7 @@ ToolButton {
                 anchors.horizontalCenter: parent.horizontalCenter
                 name: tile.iconName
                 iconSize: tile.iconSize
+                preserveSourceColors: true
             }
             ThemedLabel {
                 objectName: "ribbonTileLabel"
@@ -66,7 +67,7 @@ ToolButton {
                 ThemedIcon {
                     anchors.centerIn: parent
                     visible: tile.showCaret
-                    name: "caret-down"
+                    name: "caret"
                     iconSize: Theme.iconSizeCompact
                 }
             }

@@ -14,7 +14,7 @@ RibbonContent {
                 {
                     key: "import",
                     label: qsTranslate("UiCommon", "Import"),
-                    icon: "project-import"
+                    icon: "ribbon-import"
                 }
             ]
         },
@@ -25,23 +25,23 @@ RibbonContent {
                 {
                     key: "add",
                     label: qsTranslate("RibbonActionAdd", "Add"),
-                    icon: "document-new"
+                    icon: "ribbon-add"
                 },
                 {
                     key: "dual-domain",
                     label: qsTranslate("RibbonActionDualDomain", "Dual\nDomain"),
-                    icon: "domain-dual",
+                    icon: "ribbon-dual-domain",
                     caret: true
                 },
                 {
                     key: "geometry",
                     label: qsTranslate("UiCommonModeling", "Geometry"),
-                    icon: "geometry"
+                    icon: "ribbon-geometry"
                 },
                 {
                     key: "mesh",
                     label: qsTranslate("UiCommonModeling", "Mesh"),
-                    icon: "mesh"
+                    icon: "ribbon-mesh"
                 }
             ]
         },
@@ -52,27 +52,27 @@ RibbonContent {
                 {
                     key: "molding",
                     label: qsTranslate("RibbonActionMolding", "Thermoplastics\nInjection Molding"),
-                    icon: "molding"
+                    icon: "ribbon-thermoplastics-injection-molding"
                 },
                 {
                     key: "sequence",
                     label: qsTranslate("RibbonActionSequence", "Analysis\nSequence"),
-                    icon: "analysis-sequence"
+                    icon: "ribbon-analysis-sequence"
                 },
                 {
                     key: "material",
                     label: qsTranslate("RibbonActionMaterial", "Select\nMaterial"),
-                    icon: "material"
+                    icon: "ribbon-select-material"
                 },
                 {
                     key: "injection",
                     label: qsTranslate("RibbonActionInjection", "Injection\nLocations"),
-                    icon: "injection-location"
+                    icon: "ribbon-injection-locations"
                 },
                 {
                     key: "settings",
                     label: qsTranslate("RibbonActionSettings", "Process\nSettings"),
-                    icon: "process-settings"
+                    icon: "ribbon-process-settings"
                 }
             ]
         },
@@ -83,28 +83,28 @@ RibbonContent {
                 {
                     key: "optimization",
                     label: qsTranslate("UiCommonModeling", "Optimization"),
-                    icon: "optimization"
+                    icon: "ribbon-optimization"
                 },
                 {
                     key: "boundary",
                     label: qsTranslate("RibbonActionBoundary", "Boundary\nConditions"),
-                    icon: "boundary-conditions"
+                    icon: "ribbon-boundary-conditions"
                 },
                 {
                     key: "analyze",
                     label: qsTranslate("UiCommonAnalysis", "Analyze"),
-                    icon: "analysis-run",
+                    icon: "ribbon-analyze",
                     enabled: false
                 },
                 {
                     key: "logs",
                     label: qsTranslate("RibbonActionLogs", "Logs"),
-                    icon: "document-report"
+                    icon: "ribbon-logs"
                 },
                 {
                     key: "jobs",
                     label: qsTranslate("RibbonActionJobs", "Job\nManager"),
-                    icon: "job-manager"
+                    icon: "ribbon-job-manager"
                 }
             ]
         },
@@ -115,12 +115,12 @@ RibbonContent {
                 {
                     key: "results",
                     label: qsTranslate("UiCommonResults", "Results"),
-                    icon: "analysis-results"
+                    icon: "ribbon-results"
                 },
                 {
                     key: "reports",
                     label: qsTranslate("UiCommonReports", "Reports"),
-                    icon: "document-report"
+                    icon: "ribbon-reports"
                 }
             ]
         },
@@ -131,7 +131,7 @@ RibbonContent {
                 {
                     key: "shared-views",
                     label: qsTranslate("RibbonActionSharedViews", "Shared\nViews"),
-                    icon: "shared-views"
+                    icon: "ribbon-shared-views"
                 }
             ]
         }

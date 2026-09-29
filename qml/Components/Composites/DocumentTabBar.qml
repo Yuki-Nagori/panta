@@ -196,7 +196,7 @@ Item {
                     topLeftRadius: Theme.documentTabRadius
                     topRightRadius: Theme.documentTabRadius
                     color: tab.isActive ? Theme.colorPanel : tabArea.containsMouse ? Theme.colorDocumentHover : Theme.colorTransparent
-                    border.width: tab.activeFocus ? Theme.borderWidth : 0
+                    border.width: tab.activeFocus ? Theme.focusBorderWidth : 0
                     border.color: Theme.colorTransparent
                 }
                 // HTML 伪元素的 8px 圆角阴影只在圆弧外露出面板色；
@@ -341,9 +341,9 @@ Item {
                         }
                         ThemedIcon {
                             visible: (tab.doc.kind ?? "") !== "welcome" && tab.tabState !== "loading"
-                            name: "mesh"
+                            name: "stl-file"
                             iconSize: Theme.iconSizeSmall
-                            color: tab.tabState === "failed" ? Theme.colorError : Theme.colorIcon
+                            preserveSourceColors: true
                         }
                         ThemedLabel {
                             objectName: "documentTabTitle"
@@ -366,8 +366,8 @@ Item {
                     height: Theme.documentTabCloseSize
                     radius: Theme.documentTabCloseRadius
                     color: closeArea.pressed ? Theme.colorDocumentClosePressed : closeArea.containsMouse ? Theme.colorHover : Theme.colorTransparent
-                    border.width: closeButton.activeFocus ? Theme.borderWidth : 0
-                    border.color: Theme.colorIcon
+                    border.width: closeButton.activeFocus ? Theme.focusBorderWidth : 0
+                    border.color: Theme.colorFocus
 
                     Accessible.role: Accessible.Button
                     Accessible.name: qsTr("Close %1").arg(bar.accessible_title(tab.doc))
@@ -382,7 +382,7 @@ Item {
 
                     ThemedIcon {
                         anchors.centerIn: parent
-                        name: "pane-close"
+                        name: "close"
                         iconSize: Theme.iconSizeCompact
                         color: closeArea.containsMouse || closeArea.pressed ? Theme.colorText : tab.isActive ? Theme.colorIcon : Theme.colorTextMuted
                     }

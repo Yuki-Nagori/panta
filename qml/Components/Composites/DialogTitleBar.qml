@@ -35,8 +35,8 @@ Rectangle {
             Layout.preferredHeight: Theme.paneCloseSize
             controlHeight: Theme.paneCloseSize
             contentPadding: 0
-            iconName: "pane-close"
-            iconSize: Theme.iconSizeSmall
+            iconName: "close"
+            iconSize: Theme.iconSizeCompact
             accessibleName: qsTranslate("IconActionCloseDialog", "Close dialog")
             contentColor: hovered || visualFocus ? Theme.colorPanel : Theme.colorTextMuted
             hoverColor: Theme.colorCloseHover

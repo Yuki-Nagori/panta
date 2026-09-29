@@ -45,7 +45,9 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 显示文案使用英文源 + `qsTr()` / `qsTranslate()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`。`qsTr()` 使用组件同名上下文；需要独立语义时通过 `qsTranslate()` 分配 context。Ribbon 的显式换行属于源文本，译文按目标语言排版分行；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
 
-图标遵循 [SVG 图标设计规范](../standards/icons.md)：模块内 `qml/icons/` 保存统一 24 网格的 Mono 几何，经 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。Shell 引擎安装 `panta-icons` provider，以 qtsvg 渲染资源并按 `ThemedIcon.color` 着色，颜色来自 Theme/宿主；不依赖 SVG 自动继承 QML 颜色。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
+图标遵循 [SVG 图标设计规范](../standards/icons.md)：`qml/icons/<symbol-id>.svg` 与 `shell.js` 的正式 symbol 一一对应，保留源 viewBox、比例和颜色，并通过 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。`ThemedIcon` 的 `preserveSourceColors` 显式选择加载方式：彩色资源直接从 qrc 加载；单色 utility glyph 由 `panta-icons` provider 使用 qtsvg 渲染，再按 `ThemedIcon.color` 着色。
+
+新增 Theme token 时按 `Theme.qml` 内的颜色、字号、间距、图标尺寸、圆角与线宽、布局尺寸、交互阈值与时长、禁用状态和窗口约束分组归位，不在文件末尾另起重复分类。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
 
 App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入 TasksPanel 和 TopChromePanel。新建或打开成功后，TasksPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单；失败保留上一有效快照。Start & Learn Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；Home 的 Import 也只发语义信号，由 App 打开 `ImportDialog`，选项预检和持久化经 `ProjectViewModel` 进入 Rust 工程服务。成功导入后 TasksPanel 展开首期任务树，ViewportPane 只接收工程内复制资产路径；其他 Ribbon 工具仍是设计入口，不表示求解或网格生成业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
 

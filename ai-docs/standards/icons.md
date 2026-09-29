@@ -1,6 +1,6 @@
 # panta 图标设计规范
 
-更新日期：2026-09-25。适用于 `qml/icons/`、Shell 图标使用点与 `ai-docs/qml-html/shell.js` 视觉原型。项目确定以 HTML 原型中经维护者确认的 SVG symbol 集合作为正式图标视觉基准；QML 使用的图标应迁移到对应 symbol 的独立 SVG 资源，不再另画一套单色几何图。迁移和组件适配由[081 QML 视觉语言与图标体系统一](../task/081-qml-visual-language-and-iconography.md)跟踪。
+更新日期：2026-09-30。适用于 `qml/icons/`、Shell 图标使用点与 `ai-docs/qml-html/shell.js` 视觉原型。项目确定以 HTML 原型中经维护者确认的 SVG symbol 集合作为正式图标视觉基准；QML 使用的图标迁移到对应 symbol 的独立 SVG 资源，不再另画一套图形。迁移和组件适配由[081 QML 视觉语言与图标体系统一](../task/081-qml-visual-language-and-iconography.md)跟踪。
 
 ## 视觉语言
 
@@ -27,6 +27,24 @@
 
 新增图标先确认清单中没有相同概念；若需增加，先在 `shell.js` 加入原型 glyph、登记此规范中的 ID 和含义，再将同一几何迁入独立 QML SVG。HTML sprite 与 QML 资源不可长期各自演变成不同图样。
 
+## QML 资源与调用清单
+
+正式 QML symbol 集合包含 63 个资源，与上表的 63 个 symbol ID 一一对应；文件名固定为 `<symbol-id>.svg`，资源内部记录对应的 `shell.js` symbol 来源。除下表说明的 caret 缩小外，其余资源保留源 viewBox、路径、比例和填色。它们均由本项目绘制，没有外部图标包、第三方许可证或外部资源依赖。迁移前的旧 SVG 在消费者切换后通过独立 cleanup commit 删除。
+
+| QML 资源组 | symbol ID / 文件名（逐项同名） | 当前调用位置 |
+|---|---|---|
+| 壳层与操作 | `account`、`cart`、`globe`、`help`、`search`、`right`、`caret`、`close`、`minimize`、`maximize`、`undo`、`redo`、`new`、`open`、`save`、`print`、`preview`、`split` | 顶部工具区、对话框、面板关闭、页签与下拉指示 |
+| 页签与工具状态 | `layers` | Layers 工具条与页签 |
+| Ribbon | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help`、`ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` | Start & Learn 与 Home Ribbon |
+| 工程与任务 | `project-file`、`project-folder`、`stl-file`、`study`、`status-ok`、`task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
+| Layers 操作 | `check`、`copy`、`delete`、`export`、`image`、`wizard` | Layers 输出操作按钮 |
+
+`ThemedIcon.preserveSourceColors` 是颜色加载模式的唯一开关，不另设彩色图标组件。默认模式将允许的单色 utility glyph 交给 `image://panta-icons/<name>/<argb>`；provider 内的白名单与颜色图标清单保持一致，未知和多色 ID 均拒绝着色。设置为 `true` 时直接从 `qrc:/qt/qml/Panta/Shell/icons/<name>.svg` 加载并保留 SVG 源色。所有 63 个资源通过 QtTest 检查可读和可解码，provider 对单色集合检查了缩放和着色行为。
+
+`caret.svg` 的源 viewBox 为 `0 0 7 5`。为响应维护者要求缩小指示三角，仅将路径由
+`M0 0h7L3.5 5z` 内缩为 `M0.7 0.6h5.6L3.5 4.4z`；HTML symbol 与 QML 资源同步，viewBox
+和显示槽位不变。其余源符号没有几何修改。
+
 ## QML 资源与颜色
 
 - 以 `qml/icons/` 中独立 SVG 文件供 QML 使用，不让运行中的 QML 加载 `ai-docs/`。静态 SVG 继续经 `qt_add_resources` 随模块打包；遵守仓库对 QML/SVG 的文件规范。
@@ -36,9 +54,10 @@
 - SVG 作为装饰内容时设为屏幕阅读器忽略；操作按钮通过宿主英文源 `qsTr()` 文案提供 `Accessible.name` 与 tooltip，并保留键盘焦点、禁用原因和文字标签。
 - 图标状态的颜色与组件状态保持协调；正常、选中、悬停、按下、禁用及焦点不能因 glyph 固定色而无法辨识。需要变色时按设计拆分资源或使用宿主叠层，不得破坏彩色图标本身含义。
 
-## 旧资源到正式 symbol 的映射
+## 旧资源到正式 symbol 的迁移记录
 
-以下是迁移基线，若经视觉检查发现概念不对应，应修正 symbol 或 QML 语义映射并同步本表，不得仅按文件名机械替换。
+以下记录迁移前的旧文件与采用的正式 symbol；调用点统一使用当前 symbol ID，旧文件在单独的 cleanup commit 删除。
+若经视觉检查发现概念不对应，应修正 symbol 或 QML 语义映射并同步清单，不得仅按文件名机械替换。
 
 | 现有 QML 资源 | 正式 HTML symbol |
 |---|---|

@@ -11,42 +11,44 @@ PanelSurface {
     property var importedPartNames: []
     readonly property var layerTools: [
         {
-            icon: "document-new",
+            icon: "new",
+            preserveIconColors: true,
             label: qsTranslate("LayerAction", "New layer"),
             action: "new"
         },
         {
-            icon: "document-open",
+            icon: "open",
+            preserveIconColors: true,
             label: qsTranslate("LayerAction", "Open layer"),
             action: "open"
         },
         {
-            icon: "output-check",
+            icon: "check",
             label: qsTranslate("LayerAction", "Validate layer"),
             action: "validate"
         },
         {
-            icon: "output-wizard",
+            icon: "wizard",
             label: qsTranslate("LayerAction", "Edit layer"),
             action: "edit"
         },
         {
-            icon: "output-delete",
+            icon: "delete",
             label: qsTranslate("LayerAction", "Remove layer"),
             action: "remove"
         },
         {
-            icon: "output-copy",
+            icon: "copy",
             label: qsTranslate("LayerAction", "Layer options"),
             action: "options"
         },
         {
-            icon: "output-export",
+            icon: "export",
             label: qsTranslate("LayerAction", "Move layer"),
             action: "move"
         },
         {
-            icon: "pane-close",
+            icon: "close",
             label: qsTranslate("LayerAction", "Close layer tools"),
             action: "close-tools"
         }
@@ -90,6 +92,7 @@ PanelSurface {
                         contentPadding: 0
                         iconSize: Theme.iconSizeSmall
                         iconName: modelData.icon
+                        preserveIconColors: modelData.preserveIconColors === true
                         accessibleName: modelData.label
                         onClicked: panel.toolRequested(modelData.action)
                     }

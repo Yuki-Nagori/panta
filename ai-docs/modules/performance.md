@@ -23,6 +23,13 @@
 
 ## 当前 QML / 原生视口诊断
 
+QML CPU 构造与资源加载基准由任务 [069](../task/069-project-docks-review-and-ablation.md) 的手动入口承载；图标场景比较空 source、单色 image provider 和保留 SVG 原色的 qrc 路径，测 1 / 8 / 24 个图标从创建到 `Image.Ready` 的耗时，并报告首轮样本与缓存后 31 次采样的 p50 / p95。首轮样本包含该进程和当前路径的初始化成本，计时不包括 GPU 帧呈现。基准不注册为 CTest 或 CI 门禁，任务 081 记录此次环境和结果。
+
+```sh
+cmake --build target/native/debug --config Debug --target panta_qml_cpu_benchmark --parallel 4
+QT_QPA_PLATFORM=offscreen target/native/debug/qml/panta_qml_cpu_benchmark measures_icon_loading
+```
+
 任务 [056](../task/056-qml-native-review.md) 已提供按需诊断：`QT_LOGGING_RULES='panta.viewport.debug=true'` 输出原生区域同步与实际提交帧；默认关闭。`PANTA_TEST_NATIVE_VIEWPORT=1` 启用既有 `panta_qml_viewport_module_test` 中的真实窗口用例，覆盖连续更新合帧、相同外观不重绘、祖先移动、隐藏/零尺寸恢复及跨窗口重建。必须在实际桌面和正确平台插件下运行，不设 `offscreen`；默认无头测试明确跳过该用例，另行验证带窗口归属的条目析构。
 
 macOS 示例（仓库根目录，先 `cargo build --locked`）：

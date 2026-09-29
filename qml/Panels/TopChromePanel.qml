@@ -64,33 +64,36 @@ Rectangle {
                         objectName: "titleQuickActions"
                         Layout.minimumWidth: implicitWidth
                         ThemedToolButton {
-                            iconName: "document-new"
+                            iconName: "new"
+                            preserveIconColors: true
                             accessibleName: qsTranslate("IconActionNewDocument", "New document")
                             showCaret: true
                         }
                         ThemedToolButton {
-                            iconName: "document-open"
+                            iconName: "open"
+                            preserveIconColors: true
                             accessibleName: qsTranslate("IconActionOpenDocument", "Open document")
                         }
                         ThemedToolButton {
-                            iconName: "document-save"
+                            iconName: "save"
+                            preserveIconColors: true
                             accessibleName: qsTranslate("IconActionSaveDocument", "Save document")
                             showCaret: true
                         }
                         ThemedToolButton {
-                            iconName: "edit-undo"
+                            iconName: "undo"
                             accessibleName: qsTranslate("IconActionUndo", "Undo")
                         }
                         ThemedToolButton {
-                            iconName: "edit-redo"
+                            iconName: "redo"
                             accessibleName: qsTranslate("IconActionRedo", "Redo")
                         }
                         ThemedToolButton {
-                            iconName: "document-print"
+                            iconName: "print"
                             accessibleName: qsTranslate("IconActionPrint", "Print")
                         }
                         ThemedToolButton {
-                            iconName: "animation-preview"
+                            iconName: "preview"
                             accessibleName: qsTranslate("IconActionPreviewAnimation", "Preview animation")
                             showCaret: true
                         }
@@ -103,7 +106,7 @@ Rectangle {
                         }
                         ThemedIcon {
                             anchors.verticalCenter: parent.verticalCenter
-                            name: "activate-split"
+                            name: "split"
                             iconSize: Theme.iconSizeSmall
                             color: Theme.colorIcon
                         }
@@ -131,7 +134,7 @@ Rectangle {
                                 height: Theme.searchHeight
                                 ThemedIcon {
                                     anchors.centerIn: parent
-                                    name: "caret-right"
+                                    name: "right"
                                     iconSize: Theme.iconSizeCompact
                                 }
                             }
@@ -157,21 +160,21 @@ Rectangle {
                             }
                             ThemedToolButton {
                                 objectName: "searchButton"
-                                iconName: "binoculars"
+                                iconName: "search"
                                 accessibleName: qsTranslate("IconActionSearch", "Search")
                             }
                         }
                         ThemedToolButton {
                             text: qsTr("Sign in")
-                            iconName: "user-account"
+                            iconName: "account"
                             showCaret: true
                         }
                         ThemedToolButton {
-                            iconName: "shopping-cart"
+                            iconName: "cart"
                             accessibleName: qsTranslate("IconActionShoppingCart", "Shopping cart")
                         }
                         ThemedToolButton {
-                            iconName: "help-browser"
+                            iconName: "help"
                             accessibleName: qsTranslate("UiCommonHelp", "Help")
                             showCaret: true
                         }
@@ -274,7 +277,7 @@ Rectangle {
                         }
                         ThemedToolButton {
                             objectName: "languageButton"
-                            iconName: "menubar-globe"
+                            iconName: "globe"
                             showCaret: true
                             accessibleName: qsTranslate("IconActionLanguage", "Language")
                             controlHeight: Theme.menubarHeight
