@@ -3,6 +3,7 @@ use panta_mesh::{
     SurfaceMesh, SurfaceTriangle, TetMesh, Tetrahedron, parse_stl, validate_tet_mesh,
 };
 use std::hint::black_box;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 const TRIANGLE_COUNT: usize = 100_000;
@@ -65,6 +66,43 @@ fn parse_and_snapshot_copy_cost() -> Result<(), Box<dyn std::error::Error>> {
         bytes.len(),
         mesh.triangles.len() * std::mem::size_of::<[[f64; 3]; 3]>(),
         TRIANGLE_COUNT * 9 * std::mem::size_of::<f64>(),
+        median(parse_samples).as_secs_f64() * 1000.0,
+        median(copy_samples).as_secs_f64() * 1000.0
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "manual STL workload benchmark; set PANTA_BENCH_STL and run in release mode"]
+fn supplied_stl_parse_and_snapshot_copy_cost() -> Result<(), Box<dyn std::error::Error>> {
+    let path = std::env::var_os("PANTA_BENCH_STL")
+        .ok_or("set PANTA_BENCH_STL to a representative STL file before running this benchmark")?;
+    let bytes = std::fs::read(&path)?;
+    let mesh = parse_stl(&bytes)?;
+    let triangle_count = mesh.triangles.len();
+    let filename = Path::new(&path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("stl");
+
+    let mut parse_samples = Vec::with_capacity(SAMPLES);
+    let mut copy_samples = Vec::with_capacity(SAMPLES);
+    for _ in 0..SAMPLES {
+        let start = Instant::now();
+        let parsed = parse_stl(black_box(&bytes))?;
+        parse_samples.push(start.elapsed());
+        let start = Instant::now();
+        let coordinates = flatten(black_box(&parsed));
+        copy_samples.push(start.elapsed());
+        assert_eq!(coordinates.len(), triangle_count * 9);
+        black_box(coordinates);
+    }
+
+    println!(
+        "file={filename} triangles={triangle_count} input_bytes={} mesh_payload_bytes={} ffi_coordinates_bytes={} parse_median_ms={:.3} flatten_median_ms={:.3}",
+        bytes.len(),
+        mesh.triangles.capacity() * std::mem::size_of::<[[f64; 3]; 3]>(),
+        triangle_count * 9 * std::mem::size_of::<f64>(),
         median(parse_samples).as_secs_f64() * 1000.0,
         median(copy_samples).as_secs_f64() * 1000.0
     );
