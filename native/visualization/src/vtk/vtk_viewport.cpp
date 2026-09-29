@@ -42,6 +42,7 @@
 #include <vtkPolyDataMapper.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkProperty.h>
+#include <vtkWebGPUConfiguration.h>
 #if defined(Q_OS_MACOS)
 #include <vtkCocoaRenderWindowInteractor.h>
 #elif defined(Q_OS_WIN)
@@ -51,6 +52,7 @@
 #endif
 #include <vtkRenderWindowInteractor.h>
 #include <vtkSmartPointer.h>
+#include <vtkWeakPointer.h>
 #include <vtkWebGPURenderWindow.h>
 #include <vtkWebGPURenderer.h>
 
@@ -116,6 +118,13 @@ struct VtkViewport::Impl {
     vtkSmartPointer<vtkWebGPURenderer> renderer;
     vtkSmartPointer<vtkRenderWindowInteractor> interactor;
     vtkSmartPointer<vtkActor> primitive_actor;
+    vtkWeakPointer<vtkObject> previous_mapper;
+    vtkWeakPointer<vtkObject> webgpu_configuration;
+    vtkWeakPointer<vtkObject> retired_actor;
+    vtkWeakPointer<vtkObject> retired_interactor;
+    vtkWeakPointer<vtkObject> retired_render_window;
+    vtkWeakPointer<vtkObject> retired_hardware_window;
+    vtkWeakPointer<vtkObject> retired_webgpu_configuration;
     WelcomeScene welcome_scene;
     ViewportOrientation orientation;
     QMetaObject::Connection window_visibility_connection;
@@ -176,6 +185,37 @@ VtkViewport::~VtkViewport() {
 }
 
 QQuickItem* VtkViewport::item() { return this; }
+
+const void* VtkViewport::test_actor_identity() const { return impl_->primitive_actor.GetPointer(); }
+
+bool VtkViewport::test_has_mapper() const {
+    return impl_->primitive_actor != nullptr && impl_->primitive_actor->GetMapper() != nullptr;
+}
+
+bool VtkViewport::test_previous_mapper_released() const {
+    return impl_->previous_mapper.GetPointer() == nullptr;
+}
+
+bool VtkViewport::test_interaction_observers_registered() const {
+    if (impl_->interactor == nullptr) {
+        return false;
+    }
+    return impl_->interactor->HasObserver(vtkCommand::LeftButtonPressEvent) &&
+           impl_->interactor->HasObserver(vtkCommand::RightButtonPressEvent) &&
+           impl_->interactor->HasObserver(vtkCommand::MouseMoveEvent) &&
+           impl_->interactor->HasObserver(vtkCommand::LeftButtonReleaseEvent) &&
+           impl_->interactor->HasObserver(vtkCommand::RightButtonReleaseEvent) &&
+           impl_->interactor->HasObserver(vtkCommand::MouseWheelForwardEvent) &&
+           impl_->interactor->HasObserver(vtkCommand::MouseWheelBackwardEvent);
+}
+
+bool VtkViewport::test_previous_window_resources_released() const {
+    return impl_->retired_actor.GetPointer() == nullptr &&
+           impl_->retired_interactor.GetPointer() == nullptr &&
+           impl_->retired_render_window.GetPointer() == nullptr &&
+           impl_->retired_hardware_window.GetPointer() == nullptr &&
+           impl_->retired_webgpu_configuration.GetPointer() == nullptr;
+}
 
 void VtkViewport::apply_state(const RenderScene& state) {
     if (state.revision < impl_->pending.revision) {
@@ -321,6 +361,7 @@ void VtkViewport::ensure_render_window() {
     impl_->interactor->AddObserver(vtkCommand::MouseWheelBackwardEvent, interaction_command);
     impl_->render_window->Initialize();
     impl_->interactor->Initialize();
+    impl_->webgpu_configuration = impl_->render_window->GetWGPUConfiguration();
 
     if (impl_->render_window->GetGenericContext() == nullptr) {
         warn_once("VtkViewport: VTK WebGPU device 初始化失败");
@@ -372,6 +413,7 @@ void VtkViewport::update_mesh_actor() {
         mapper->SetColorModeToDirectScalars();
         mapper->SetScalarModeToUsePointData();
     }
+    impl_->previous_mapper = impl_->primitive_actor->GetMapper();
     impl_->primitive_actor->SetMapper(mapper);
     if (imported_mesh) {
         impl_->primitive_actor->SetOrientation(0.0, 0.0, 0.0);
@@ -604,6 +646,12 @@ void VtkViewport::destroy_render_window() {
     impl_->scene_dirty = true;
     impl_->pointer_dragging = false;
     impl_->cube_pressed = false;
+    impl_->retired_actor = impl_->primitive_actor;
+    impl_->retired_interactor = impl_->interactor;
+    impl_->retired_render_window = impl_->render_window;
+    impl_->retired_hardware_window = impl_->hardware_window.get();
+    impl_->retired_webgpu_configuration = impl_->webgpu_configuration.GetPointer();
+    impl_->webgpu_configuration = nullptr;
     if (impl_->interactor != nullptr) {
         impl_->interactor->Disable();
         impl_->interactor->SetRenderWindow(nullptr);

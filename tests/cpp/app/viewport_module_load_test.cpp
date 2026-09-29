@@ -32,6 +32,25 @@
 
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
 
+namespace panta::visualization {
+class ViewportTestAccess final {
+  public:
+    static const void* actor_identity(const VtkViewport& viewport) {
+        return viewport.test_actor_identity();
+    }
+    static bool has_mapper(const VtkViewport& viewport) { return viewport.test_has_mapper(); }
+    static bool previous_mapper_released(const VtkViewport& viewport) {
+        return viewport.test_previous_mapper_released();
+    }
+    static bool interaction_observers_registered(const VtkViewport& viewport) {
+        return viewport.test_interaction_observers_registered();
+    }
+    static bool previous_window_resources_released(const VtkViewport& viewport) {
+        return viewport.test_previous_window_resources_released();
+    }
+};
+} // namespace panta::visualization
+
 namespace {
 int rendered_frames = 0;
 int surface_syncs = 0;
@@ -120,6 +139,12 @@ class ViewportModuleLoadTest final : public QObject {
         viewport.apply_state(scene);
         QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
         QVERIFY(!snapshot_lifetime.expired());
+        const void* actor_identity =
+            panta::visualization::ViewportTestAccess::actor_identity(viewport);
+        QVERIFY(actor_identity != nullptr);
+        QVERIFY(panta::visualization::ViewportTestAccess::has_mapper(viewport));
+        QVERIFY(
+            panta::visualization::ViewportTestAccess::interaction_observers_registered(viewport));
 
         std::vector<std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot>> old_snapshots;
         old_snapshots.push_back(snapshot_lifetime);
@@ -133,6 +158,12 @@ class ViewportModuleLoadTest final : public QObject {
             rendered_frames = 0;
             viewport.apply_state(scene);
             QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
+            QCOMPARE(panta::visualization::ViewportTestAccess::actor_identity(viewport),
+                     actor_identity);
+            QVERIFY(panta::visualization::ViewportTestAccess::previous_mapper_released(viewport));
+            QVERIFY(panta::visualization::ViewportTestAccess::has_mapper(viewport));
+            QVERIFY(panta::visualization::ViewportTestAccess::interaction_observers_registered(
+                viewport));
             for (std::size_t index = 0; index + 1 < old_snapshots.size(); ++index) {
                 QVERIFY(old_snapshots[index].expired());
             }
@@ -143,6 +174,7 @@ class ViewportModuleLoadTest final : public QObject {
         ++scene.revision;
         viewport.apply_state(scene);
         QTRY_VERIFY_WITH_TIMEOUT(snapshot_lifetime.expired(), 5000);
+        QVERIFY(panta::visualization::ViewportTestAccess::previous_mapper_released(viewport));
         rendered_frames = 0;
         viewport.setVisible(true);
         QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
@@ -179,6 +211,8 @@ class ViewportModuleLoadTest final : public QObject {
         second.show();
         parent.setParentItem(second.contentItem());
         QTRY_COMPARE_WITH_TIMEOUT(initialized.count(), 2, 10000);
+        QVERIFY(
+            panta::visualization::ViewportTestAccess::previous_window_resources_released(viewport));
         // 原窗口关闭后新宿主仍可更新；排队刷新在条目析构后不会再执行。
         first.close();
         viewport.setWidth(420);

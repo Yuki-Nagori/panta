@@ -14,6 +14,7 @@ class vtkRenderWindowInteractor;
 namespace panta::visualization {
 
 class ViewportInteractionCommand;
+class ViewportTestAccess;
 
 class VtkViewport final : public QQuickItem, public ViewportBackend {
     Q_OBJECT
@@ -35,6 +36,7 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
 
   private:
     friend class ViewportInteractionCommand;
+    friend class ViewportTestAccess;
 
     void bind_window(QQuickWindow* window);
     void ensure_render_window();
@@ -47,6 +49,12 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     /// 排队刷新时同步原生区域，仅状态/像素尺寸改变或恢复显示时提交帧。
     void sync_native_surface();
     void destroy_render_window();
+    /// 测试只读生命周期状态，不转移 VTK 对象所有权。
+    const void* test_actor_identity() const;
+    bool test_has_mapper() const;
+    bool test_previous_mapper_released() const;
+    bool test_interaction_observers_registered() const;
+    bool test_previous_window_resources_released() const;
 
     struct Impl;
     std::unique_ptr<Impl> impl_;
