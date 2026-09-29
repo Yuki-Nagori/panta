@@ -413,7 +413,13 @@ void VtkViewport::update_mesh_actor() {
         mapper->SetColorModeToDirectScalars();
         mapper->SetScalarModeToUsePointData();
     }
-    impl_->previous_mapper = impl_->primitive_actor->GetMapper();
+    auto* previous_mapper = impl_->primitive_actor->GetMapper();
+    impl_->previous_mapper = previous_mapper;
+    if (previous_mapper != nullptr && impl_->render_window != nullptr) {
+        // 页签切换会替换整条 mapper 管线；先显式释放旧窗口的图形资源，
+        // 不依赖 mapper 析构来回收 WebGPU buffers。
+        previous_mapper->ReleaseGraphicsResources(impl_->render_window.GetPointer());
+    }
     impl_->primitive_actor->SetMapper(mapper);
     if (imported_mesh) {
         impl_->primitive_actor->SetOrientation(0.0, 0.0, 0.0);

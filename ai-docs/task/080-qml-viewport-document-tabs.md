@@ -60,7 +60,7 @@
 3. 先完成 073 的 FSM 元数据生成与只读 STL 工程资产激活消费者；Rust 返回经相关性校验的完成 / 失败 / 取消结果及可释放快照。
 4. 通过 ViewModel 暴露导入记录模型和单一活动文档 ID；QML 用一个视口和文档标签组件呈现状态；集成导入成功后的新页签激活，并同步整理工程树选中反馈与 Part / Study Tasks 检查器排版。
 5. 实现可测的资源保留/释放策略，处理项目代次失效、迟到结果、加载失败、重复点击、活动标签关闭与全标签关闭后的空白视口；删除旧 `Model / Mesh / Results` 视口切换路径和其仅由该路径使用的资源。
-6. 完成 Rust / ViewModel / QML 行为测试、CPU / GPU 手动性能场景和真窗口 VTK 生命周期验收，同步 063、068、073、QML 规范或架构中确需更新的契约与索引。
+6. 完成 Rust / ViewModel / QML 行为测试、CPU / GPU 手动性能场景和真窗口 VTK 生命周期验收；覆盖大网格重复切换后的 mapper / WebGPU 资源回收与高水位，再确定打开快照的保留或预算逐出策略；同步 063、068、073、QML 规范或架构中确需更新的契约与索引。
 7. 用 `gh` 核对失败作业与前次 Miri 日志，缩小激活测试样本且保持取消/去重/过期语义；修正动画断言等待；按 042 已登记的边界收窄 TSan 排除；为文档页签增加构造、切换、关闭的 CPU/GPU 消融场景并实测。
 
 ## 预计改动
@@ -90,7 +90,7 @@
 - [x] 加载失败、取消、同记录重复请求、项目代次切换、旧 attempt 迟到成功 / 失败都有确定行为；旧结果不能覆盖当前视口或泄漏 mesh / VTK 资源。
 - [x] 页签之间共用唯一的 `CaeViewport` 与 VTK render window；ViewModel 只保留仍打开的导入文档快照，重复切换不丢失已打开快照，关闭页签释放其独占快照。
 - [x] 在真实 VTK 窗口重复切换与关闭页签后，旧 mapper 与 snapshot 弱引用释放；换宿主后旧 actor、interactor、render window、hardware window 和 WebGPU configuration 均释放，当前 interactor 观察器保持注册。日志确认 WebGPU device 销毁。
-- [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；记录内存高水位与切换/重载延迟，达到约定预算时行为明确，不发生无界增长。
+- [ ] 代表性小 / 中 / 大 STL 已验证快照保留或逐出策略；重复替换大网格后旧 mapper / WebGPU 资源回收或稳定在有界高水位；记录 CPU / GPU 内存、切换 / 重载延迟，并冻结预算及超限行为。
 - [x] 页签栏暴露 PageTabList / PageTab，标签和关闭按钮有可访问名称；Tab 获得键盘焦点后可用左右键导航并滚入可视区，Enter / Space 激活标签，关闭按钮可用 Space 或辅助技术 press action 执行。
 - [x] 真实 VTK 窗口中，辅助技术激活 PageTab 会转移键盘焦点并更新无障碍焦点/选中态；页签焦点边框透明，不绘制黑色外框；Close 按钮的辅助技术动作会关闭对应标签。
 - [x] 从全局搜索框沿 Shell 的 Tab 焦点顺序可到达文档 PageTab；页面真实辅助树暴露 Open documents / Welcome / Close Welcome。
@@ -108,6 +108,7 @@
 | 2026-09-24–25 | HTML 原型 `node --check`、交互静态审阅 | JS 和拖拽静态断言通过；当时浏览器拦截本地 file URL，后续改由真窗口验收。 |
 | 2026-09-28 | GitHub Actions runs [36265495455](https://github.com/Yuki-Nagori/panta/actions/runs/36265495455)、[36402570741](https://github.com/Yuki-Nagori/panta/actions/runs/36402570741)、[36430454561](https://github.com/Yuki-Nagori/panta/actions/runs/36430454561)；本机 Miri / `cargo sanitize` | 两次旧 run 的问题分别为页签像素断言取到文字、动画断言过于精确、Miri 35 万面样本超时，以及 TSan 报告未插桩 Rust Mutex 队列。修复后 Miri 激活用例 8/8、本机 ASan/UBSan 62/62、TSan 47/47；TSan 按 042 边界排除两个 FFI 异步结果用例。run 36430454561 的 19 个 job 全通过（commit `ca8ad8a`），不包含其后的本地提交。 |
 | 2026-09-29 | `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint` | 本次修改最终复验全部通过，CTest 66/66；格式、构建和 lint 八阶段通过。Miri 的 512 边容量压力用例因解释执行超过两分钟按既有边界跳过。 |
+| 2026-09-29 | Release CPU / GPU STL 手动基准；显式释放旧 mapper 图形资源后再跑 GPU；`cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint --check` | 两个 CMake 手动目标构建通过；Cargo 聚合测试通过，CTest 66/66；格式及 lint 检查模式八阶段通过。默认 `cargo lint` 修复模式在 sandbox 中无法绑定本地 TCP 锁监听器，故使用仓库支持的 `--check` 完成全 lint。三资产完成 CPU 每文件 100 次热缓存重载和真实 Cocoa VTK WebGPU 窗口每文件 31 次切换。显式调用 `ReleaseGraphicsResources` 后 GPU 峰值仍为 1,651.12 MiB；关闭文档时 RSS 从未显式释放时的 1,299.62 降至 1,063.62 MiB。完整数据与边界见下表，预算决策未验收。 |
 | 2026-09-28–29 | PantaPreview 真窗口：导入、保存/重开 `.panta`、树项重新激活、页签拖动；VTK lifecycle 与 AX | STL 重开后可显示；拖动重排、AX 激活/关闭、焦点框均通过。新增真窗口回归连续替换 12 次网格，每帧后旧 `SurfaceMeshSnapshot` 弱引用均过期；测试 3 passed、0 failed。未单独统计 actor/mapper、回调或 GPU 设备对象。早前人工 Tab 尝试未进入标签栏；后续 Shell 焦点链回归通过。VoiceOver 朗读未验。 |
 | 2026-09-29 | reduced-motion 与页面一致性审计 | QML 回归确认 `reducedMotion=true` 时重排直接定位；真窗口尚未确认动画观感。HTML、任务索引、单 `CaeViewport` / `DocumentTabBar`、Rust/C++ 职责和 069 场景一致，旧视口分类路径已审计。 |
 | 2026-09-29 | Shell 焦点链与拖拽边界回归 | `cargo test --locked --workspace` 通过，CTest 66/66。Shell 从全局搜索按 Tab 遍历到 Welcome PageTab；四标签 QTest 鼠标事件跨越三项重排并验证跟手、仅 X 位移、不透明、活动/身份保留和松手归位；垂直手势及关闭按钮拖出不触发重排。PantaPreview AX 树含 PageTabList、Welcome 与 Close Welcome；VoiceOver 朗读仍未验。 |
@@ -122,13 +123,46 @@
 
 ### STL 解析与快照基线
 
+真实工程测量使用用户提供的 `test_1.panta` 及其三个已保存资产：`Frame.stl`（47,946 面，约 2.3 MiB）、`Large_Earth_Elemental.stl`（608,218 面，约 29 MiB）和 `mug.stl`（8,834 面，约 431 KiB）。CPU 基准负责 ViewModel 工程激活/重载延迟和快照缓存内存；独立 GPU 基准在真实窗口测量单个 VTK 视口的帧提交及进程 RSS。两个手动目标和 CPU / GPU 源码分别集中于 `native/performance/CMakeLists.txt` 与 `tests/cpp/performance/`，不加入默认构建或 CTest。目标为 `panta_bridge_project_stl_activation_cpu_benchmark` 与 `panta_project_stl_viewport_gpu_benchmark`，通过 `cmake --build target/native/release --target panta_bridge_project_stl_activation_cpu_benchmark panta_project_stl_viewport_gpu_benchmark --parallel 4` 构建；CPU 目标接受工程路径和重载次数，GPU 目标接受工程路径及可选采样数，并要求可见原生图形窗口。CPU 重载重复运行时操作系统文件缓存为热状态；GPU 切换复用已加载快照。进程 RSS 不代表专用 GPU 显存。
+
 | 输入 | 解析 / 展开中位数 | 数据量与边界 |
 |---|---|---|
 | Netgen `part1.stl`（小型 ASCII） | 0.129 / 0.001 ms | 380 面，99,118 输入字节；Rust Mesh capacity 36,864 字节，坐标快照 27,360 字节。 |
 | Netgen `hinge.stl`（小型 ASCII） | 0.423 / 0.002 ms | 1,212 面，318,065 输入字节；Rust Mesh capacity 147,456 字节，坐标快照 87,264 字节。 |
 | 合成 binary STL | 0.592 / 0.198 ms | 100k 面，输入 5,000,084 字节；Rust Mesh 与展开坐标各 7,200,000 字节。仅为规模参照。 |
 
-使用 `PANTA_BENCH_STL=<文件路径> cargo test -p panta-mesh --release --test mesh_performance supplied_stl_parse_and_snapshot_copy_cost -- --ignored --nocapture` 可测指定 STL。解析计时不含磁盘读取和应用激活链路。C++ 当前快照为每面三个未共享的 `double` 顶点，payload 约 72 字节/面；以上样本没有真实大模型的应用内存高水位、缓存策略对比或冷重载延迟，故缓存预算仍未冻结。
+使用 `PANTA_BENCH_STL=<文件路径> cargo test -p panta-mesh --release --test mesh_performance supplied_stl_parse_and_snapshot_copy_cost -- --ignored --nocapture` 可测指定 STL。解析计时不含磁盘读取和应用激活链路。C++ 当前快照为每面三个未共享的 `double` 顶点，payload 约 72 字节/面；前表的小型 SDK 样本和 100k 合成模型本身不足以确定缓存预算。
+
+#### 用户工程 CPU / GPU 实测
+
+环境：macOS 26.3.1、arm64、Release、Qt 6.11.2。CPU 目标以 100 次逐文件重载测量 ViewModel 与 Rust 激活链路，GPU 目标通过临时 `.app` 在真实 Cocoa 窗口中驱动同一个 VTK WebGPU viewport；每个模型测 31 次实际文档切换至 `frame submitted`。测试工程与资产均来自用户工作区，没有复制进仓库。
+
+| CPU 阶段 | 进程 RSS / 峰值 | 快照 payload capacity | 说明 |
+|---|---:|---:|---|
+| Service baseline | 30.47 / 30.47 MiB | 0 MiB | 工程尚未激活资产。 |
+| 三个快照全部驻留 | 154.39 / 154.39 MiB | 45.66 MiB | 小 3.29、中 0.61、大 41.76 MiB。 |
+| 各资产 100 次重载后 | 156.17 / 156.20 MiB | 45.66 MiB | RSS 在第 50 至 100 次间持平；文件页缓存热。 |
+| 关闭全部文档后 | 156.17 / 156.20 MiB | 0 MiB | 逻辑快照容量释放，进程 RSS 未回落，符合 allocator 保留工作集的表现。 |
+
+| 资产 | 初次激活 | 100 次重载 p50 / p95 | 口径 |
+|---|---:|---:|---|
+| `Frame.stl` | 12.091 ms | 12.728 / 13.805 ms | 同步 ViewModel 激活；文件页缓存热。 |
+| `Large_Earth_Elemental.stl` | 31.624 ms | 19.833 / 20.239 ms | 同步 ViewModel 激活；文件页缓存热。 |
+| `mug.stl` | 11.294 ms | 11.615 / 11.684 ms | 同步 ViewModel 激活；文件页缓存热。 |
+
+全部快照驻留时的同步已缓存页签选择耗时为 31 批、每批 300 次操作，p50 / p95 均为 0.02 µs/次；这是 ViewModel 选择路径计时，不含 QML 事件派发或 VTK 帧。
+
+| GPU 阶段 / 资产 | RSS / 峰值 | 快照 payload capacity | 帧提交或激活时间 |
+|---|---:|---:|---:|
+| 原生 viewport baseline | 218.02 / 218.28 MiB | 0 MiB | — |
+| 三个快照驻留、大 STL 活动 | 569.22 / 614.30 MiB | 45.66 MiB | — |
+| 完成三组各 31 次切换 | 1,348.17 / 1,651.12 MiB | 45.66 MiB | — |
+| 关闭全部文档 | 1,063.62 / 1,651.12 MiB | 0 MiB | — |
+| `Frame.stl` | — | — | 初次激活 130.347 ms；帧提交 p50 / p95 16.678 / 17.121 ms。 |
+| `Large_Earth_Elemental.stl` | — | — | 初次激活 130.097 ms；帧提交 p50 / p95 83.336 / 83.402 ms。 |
+| `mug.stl` | — | — | 初次激活 16.440 ms；帧提交 p50 / p95 16.660 / 16.738 ms。 |
+
+帧计时从 ViewModel 激活到 VTK 的 `frame submitted` 日志，不证明 GPU 执行完成或已呈现在显示器上；RSS 包含 CPU 工作集及图形栈进程内存，不包含可单独核对的专用显存。视口切换 mapper 时现在显式调用旧 mapper 的 `ReleaseGraphicsResources`：相对未显式释放的对照，31 次循环后的峰值基本不变（1,653.05 → 1,651.12 MiB），关闭全部文档后的 RSS 下降约 236 MiB（1,299.62 → 1,063.62 MiB），但仍显著高于原生 viewport baseline。未显式释放时的 5 次诊断采样已观察到 RSS 从约 570 MiB 增至约 933 MiB。当前数据不足以区分 VTK / WebGPU 暂存与内存分配器保留，也不能据此冻结快照预算。因此“保留所有打开页签”与“预算驱逐后重载”尚未完成对比，验收项保持未勾选；需继续剖析多轮切换后的内存回收，再定策略与预算。
 
 ## 风险与回退
 
@@ -142,8 +176,9 @@
 - **2026-09-28：状态、可访问性与 CI。** 同名 STL 加序号并进入 PageTab 无障碍名称；ViewModel 覆盖切换、重排、关闭与快照释放；QML 覆盖 PageTab 角色、选中态、左右键、Enter / Space 和关闭。补齐 `DocumentTabBar` 中英文翻译及边缘像素测试。动画断言改为 0.1px 容差；远端 run 36430454561 的 19 个 job 全通过。
 - **2026-09-29：平台偏好与焦点。** Qt 6.11 无统一 reduced-motion 属性，平台查询由 086 的适配层提供，QML 用 `Settings.reducedMotion` 控制重排；086 已完成。AX 激活标签后焦点转移与关闭动作有效；按页面外观要求，PageTab 焦点边框使用 `Theme.colorTransparent`，辅助树仍报告焦点/选中态。Shell Tab 链已通过回归，从全局搜索沿 Tab 到标签栏；VoiceOver 朗读仍待验。QML 的透明色统一使用主题 token。
 - **2026-09-29：资源生命周期与性能。** 视口隐藏时也替换旧 VTK actor 管线，确保关闭页签后快照立即释放；真窗口验证隐藏清理及 12 轮连续替换。补充可指定真实输入的 STL Release 微基准，取得两个小型 SDK 样本与 100k 合成数据；目前只得到解析、展开和 payload 基线，不足以确定缓存预算或证明 VTK 对象无残留。
+- **2026-09-29：用户工程真实 STL 实测。** 使用 `test_1.panta` 的三个资产完成 Release CPU 重载与真实窗口 GPU 切换测量。CPU 侧全部快照容量 45.66 MiB；三文件分别 100 次热缓存重载后 RSS 在第 50 至 100 次间稳定，关闭后快照容量归零。GPU 侧测得帧提交 p50/p95，真实窗口显示 608,218 面模型；增加旧 mapper 显式释放后，31 次切换峰值仍为 1,651.12 MiB，关闭后 RSS 从 1,299.62 降到 1,063.62 MiB。高水位仍未解释，快照预算决策继续挂起。CPU 与 GPU 基准源文件同置 `tests/cpp/performance/`，目标统一登记在 `native/performance/CMakeLists.txt`。
 - **2026-09-29：一致性复核。** `ViewportPane` 仅连接一个 `CaeViewport` 和 `DocumentTabBar`；`PanelTabBar` 仍供 Tasks 面板使用。HTML 顶部 Mesh / Results 是全局导航，不是旧视口切换；任务索引、Rust/C++ 边界及 069 手动基准记录一致。
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、Shell Tab 焦点链、四标签鼠标拖拽边界和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API；真窗口检查覆盖 12 轮网格替换、隐藏关闭、换宿主后的 VTK 对象与 WebGPU configuration 回收；页签仍提供无障碍焦点状态，焦点边框引用 `Theme.colorTransparent`。仍需在 VoiceOver 下听读，并用代表性大 STL 测量应用内存高水位与重载延迟，以确定快照缓存预算。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、Shell Tab 焦点链、四标签鼠标拖拽边界和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API；真窗口检查覆盖 12 轮网格替换、隐藏关闭、换宿主后的 VTK 对象与 WebGPU configuration 回收；页签仍提供无障碍焦点状态，焦点边框引用 `Theme.colorTransparent`。代表性 STL 的 CPU 重载和 GPU 帧提交测量已完成；GPU 侧反复切换后的 RSS 高水位尚未解释，快照保留 / 驱逐策略和预算未冻结。VoiceOver 标签朗读也仍待验收。
