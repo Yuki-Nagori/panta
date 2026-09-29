@@ -58,7 +58,7 @@ Python 要求以求解器的 `pyproject.toml` 为准；本机已验证 Python 3.
 
 启动器固定使用 CPU 快速预设：`MOLDFILL_DEVICE=cpu`、`MOLDFILL_PRESSURE_DEVICE=cpu`、`MOLDFILL_PRESSURE_SOLVER=direct`、`MOLDFILL_FAST_SOLVER=1`、`MOLDFILL_PICARD_MAX=4`、`MOLDFILL_CFL=0.9`、`MOLDFILL_DT_GROWTH=0.5`。无需用户设置环境变量；其他继承的 `MOLDFILL_*` 覆盖会被清除。
 
-为保证只读摘要与真实输入一致，程序校验默认配置、模型和材料文件的 SHA-256。不要直接修改这三份文件来调参；文件被修改后会明确报错，不会继续按旧摘要运行。
+算例配置 `benchmarks/cover_noniso_quick.case.yaml` 不锁定 SHA-256；网格和充填操作每次都会读取当前文件，可直接修改数值参数做试算。修改网格参数后，点击 **Start over** 并重新生成网格，再运行充填；充填阶段会复用刚生成的网格。实际生效值记录在本次 run 的 `manifest.json`、`case.snapshot.yaml` 和 `remesh_report.yaml`。默认 STL 与材料文件仍校验 SHA-256；参数试算时保持算例中的几何和材料引用指向默认文件。
 
 ## 4. 怎样读结果
 

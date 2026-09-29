@@ -16,12 +16,8 @@ use std::thread::JoinHandle;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 const CASE: &str = "benchmarks/cover_noniso_quick.case.yaml";
-// 固定示例与 GUI 只读参数必须一致；改用其他输入需要重新验证本演示。
-const FIXED_INPUTS: [(&str, &str); 3] = [
-    (
-        "benchmarks/cover_noniso_quick.case.yaml",
-        "d62605cd253c0a14d63c5d85e54ee4171afbe0200d70eacea3d88edfe2e1cbe9",
-    ),
+// 参数算例允许编辑；默认几何与材料仍校验哈希，避免资产被静默替换。
+const FIXED_ASSETS: [(&str, &str); 2] = [
     (
         "examples/cover/cover.STL",
         "4102bfe5acccad37ca3a0eed80ddd43997a7dcf42a518cfd58398fb53a5c227f",
@@ -256,7 +252,7 @@ fn perform(
     sender: &mpsc::Sender<Event>,
 ) -> Result<Event, String> {
     let solver = root.join("target/Moldfill_HITL_v1");
-    for (relative, expected) in FIXED_INPUTS {
+    for (relative, expected) in FIXED_ASSETS {
         let bytes = fs::read(solver.join(relative))
             .map_err(|e| format!("Default input {relative}: {e}"))?;
         if format!("{:x}", Sha256::digest(bytes)) != expected {

@@ -57,11 +57,11 @@
 
 不要直接把 [W0 重型测试](target/Moldfill_HITL_v1/tests/test_w0_e2e_full.py) 的配置当作演示默认：该测试服务于运行存储验证，使用不同材料/等温设置，还显式覆盖配对冲突门禁。这里复用正式 quick 算例，不复用测试中的放行策略。
 
-## 4. 固定默认值，用户只需向前推进
+## 4. 默认参数与试算方式
 
-以下“默认”指 **GUI 的固定演示预设**，以 `cover_noniso_quick.case.yaml` 为输入权威来源；不让用户逐项填写，也不依赖 Python 内核的隐式默认值。
+下表记录 GUI 的默认演示参数，输入权威来源是 `cover_noniso_quick.case.yaml`。GUI 不提供逐项编辑控件；网格与充填步骤每次启动时都会读取该文件当前内容，因此可以直接修改 YAML 做参数试算。应保持 `geometry.file` 和 `material` 指向默认资产，避免首步预览与后续求解输入不一致。
 
-| 项目 | 固定值 |
+| 项目 | 默认值 |
 |---|---|
 | 模型 / 单位 | cover.STL / mm |
 | 求解路线 | surface-pair |
@@ -76,7 +76,7 @@
 | 热计算 | 非等温，厚度方向 12 层 |
 | 输出 | `store: final`、`vtk: true`，保持 quick 配置不变 |
 
-材料、工艺和浇口只做只读摘要。浇口位置可显示一个标记，不提供拖动或编辑。模型也从“载入默认示例”进入，首版无需文件选择器支持任意零件。
+改变网格参数后，需要从头重跑网格步骤；充填步骤会用本次生成的网格并读取当前工艺参数。实际生效配置可从本次 run 的 `manifest.json`、`case.snapshot.yaml` 和 `remesh_report.yaml` 核对。模型仍从固定默认示例载入，首版不提供文件选择器。
 
 计算后端同样固定。已用以下 CPU 快速预设在本机跑通：
 
@@ -127,7 +127,7 @@ MOLDFILL_DT_GROWTH=0.5
 新增 [panta-solver](crates/panta-solver/src/lib.rs)，负责固定输入校验、步骤前置条件、后台作业、CLI 调用、事件读取及结果提交；[foundation 进程设施](crates/panta-foundation/src/process.rs) 负责子进程取消和回收。[CXX](crates/panta-ffi/src/lib.rs) 只转发服务及批量 DTO。
 
 - 使用 `target/moldfill-venv` 的独立 Python 环境，不污染 Panta 自身的 Python 工具环境。
-- 原始 STL、quick 配置与材料文件使用已验证 SHA-256 校验，保证固定 GUI 摘要不会与修改后的输入静默错配。
+- 原始 STL 与默认材料文件使用已验证 SHA-256 校验；quick 配置允许编辑，run manifest 会记录实际读取的配置快照与哈希。
 - 重划调用 `--remesh-only`；充填通过 `--mesh` 复用本次生成的网格，不重复重划。
 - 每个操作使用 `target/moldfill-preview/gui-<pid>-<时间戳>` 新目录，保存固定设置和控制台输出。
 - 工作线程增量读取完整 JSONL 行，支持 UTF-8 被分块截断、staging 目录完成后重命名；GUI 每 100 ms 拉取事件，不同步等待求解。
