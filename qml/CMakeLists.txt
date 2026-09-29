@@ -89,6 +89,16 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qml_theme_component_test)
   target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
                                                                Qt6::Test Qt6::Quick)
+  # 测试对照正式 HTML symbol 清单与打包的 QML SVG 资源集合。
+  qt_add_resources(
+    panta_qml_theme_component_test
+    panta_icon_reference
+    PREFIX
+    "/panta-test"
+    BASE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../ai-docs/qml-html"
+    FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/../ai-docs/qml-html/shell.js")
   panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
   # 开发侧 QML 性能工作台：按场景扩展，手动运行，不注册为 CTest 或 CI 时间门禁。
   add_executable(panta_qml_cpu_benchmark EXCLUDE_FROM_ALL

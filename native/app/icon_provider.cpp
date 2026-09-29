@@ -27,7 +27,7 @@ class IconProvider final : public QQuickImageProvider {
         static const QRegularExpression valid_id(
             QStringLiteral("^([a-z][a-z0-9-]*)/([0-9a-fA-F]{8})$"));
         const auto match = valid_id.match(id);
-        if (!match.hasMatch() || !monochrome_symbols().contains(match.captured(1))) {
+        if (!match.hasMatch() || !monochrome_icon_names().contains(match.captured(1))) {
             return {};
         }
         QSvgRenderer renderer(
@@ -59,25 +59,24 @@ class IconProvider final : public QQuickImageProvider {
         painter.fillRect(image.rect(), QColor(QStringLiteral("#") + match.captured(2)));
         return image;
     }
-
-  private:
-    static const QSet<QString>& monochrome_symbols() {
-        // 限定为视觉上单色的 glyph，彩色语义资源必须由 QML 保留原色加载。
-        static const QSet<QString> names{
-            QStringLiteral("undo"),    QStringLiteral("redo"),     QStringLiteral("print"),
-            QStringLiteral("preview"), QStringLiteral("account"),  QStringLiteral("cart"),
-            QStringLiteral("help"),    QStringLiteral("minimize"), QStringLiteral("maximize"),
-            QStringLiteral("close"),   QStringLiteral("check"),    QStringLiteral("wizard"),
-            QStringLiteral("copy"),    QStringLiteral("image"),    QStringLiteral("export"),
-            QStringLiteral("delete"),  QStringLiteral("layers"),   QStringLiteral("caret"),
-            QStringLiteral("globe"),   QStringLiteral("split"),    QStringLiteral("search"),
-            QStringLiteral("right"),
-        };
-        return names;
-    }
 };
 
 } // namespace
+
+const QSet<QString>& monochrome_icon_names() {
+    // 限定为视觉上单色的 glyph，彩色语义资源必须保留 SVG 原色加载。
+    static const QSet<QString> names{
+        QStringLiteral("undo"),    QStringLiteral("redo"),     QStringLiteral("print"),
+        QStringLiteral("preview"), QStringLiteral("account"),  QStringLiteral("cart"),
+        QStringLiteral("help"),    QStringLiteral("minimize"), QStringLiteral("maximize"),
+        QStringLiteral("close"),   QStringLiteral("check"),    QStringLiteral("wizard"),
+        QStringLiteral("copy"),    QStringLiteral("image"),    QStringLiteral("export"),
+        QStringLiteral("delete"),  QStringLiteral("layers"),   QStringLiteral("caret"),
+        QStringLiteral("globe"),   QStringLiteral("split"),    QStringLiteral("search"),
+        QStringLiteral("right"),
+    };
+    return names;
+}
 
 void install_icon_provider(QQmlEngine& engine) {
     engine.addImageProvider(QStringLiteral("panta-icons"), new IconProvider);

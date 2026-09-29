@@ -2,6 +2,9 @@
 #include "quick_item_helpers.hpp"
 #include <QColor>
 #include <QDir>
+#include <QDirIterator>
+#include <QFile>
+#include <QFileInfo>
 #include <QFont>
 #include <QGuiApplication>
 #include <QImage>
@@ -15,11 +18,13 @@
 #include <QQuickItemGrabResult>
 #include <QQuickWindow>
 #include <QRect>
+#include <QRegularExpression>
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
 #include <QVariantMap>
+#include <QVector>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qnamespace.h>
 #include <QtCore/qobjectdefs.h>
@@ -36,6 +41,52 @@
 #include <qtestsupport_gui.h>
 
 namespace {
+
+QVector<QString> qml_object_blocks(const QString& text, const char* type_name) {
+    QVector<QString> blocks;
+    const QRegularExpression type_start(
+        QStringLiteral("\\b") + QRegularExpression::escape(QString::fromLatin1(type_name)) +
+            QStringLiteral("\\s*\\{([^{}]*)\\}"),
+        QRegularExpression::DotMatchesEverythingOption);
+    auto match = type_start.globalMatch(text);
+    while (match.hasNext()) {
+        blocks.push_back(match.next().captured(1));
+    }
+    return blocks;
+}
+
+QString qml_binding(const QString& block, const char* property_name) {
+    const QRegularExpression binding(
+        QStringLiteral("(?:^|\\n)[\\t ]*") +
+        QRegularExpression::escape(QString::fromLatin1(property_name)) +
+        QStringLiteral("\\s*:\\s*([^\\n]+)"));
+    const auto match = binding.match(block);
+    if (!match.hasMatch()) {
+        return {};
+    }
+    QString value = match.captured(1).trimmed();
+    if (value.endsWith(QLatin1Char(','))) {
+        value.chop(1);
+    }
+    return value.trimmed();
+}
+
+QString qml_icon_literal(const QString& expression) {
+    static const QRegularExpression literal(QStringLiteral("^[\\\"']([^\\\"']*)[\\\"']$"));
+    const auto match = literal.match(expression);
+    return match.hasMatch() ? match.captured(1) : QString{};
+}
+
+QVector<QString> qml_simple_object_blocks(const QString& text) {
+    QVector<QString> blocks;
+    static const QRegularExpression object_start(QStringLiteral("\\{([^{}]*)\\}"),
+                                                 QRegularExpression::DotMatchesEverythingOption);
+    auto match = object_start.globalMatch(text);
+    while (match.hasNext()) {
+        blocks.push_back(match.next().captured(1));
+    }
+    return blocks;
+}
 
 QObject* create_component(QQmlEngine& engine, const QString& path, QObject& owner) {
     QQmlComponent component(&engine, QUrl(path));
@@ -343,6 +394,195 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(icon->property("source").value<QUrl>().isEmpty());
     }
 
+    void qml_icon_catalog_and_modes_are_consistent() {
+        const QString icon_root = QStringLiteral(":/qt/qml/Panta/Shell/icons/");
+        const QStringList files = QDir(icon_root).entryList({QStringLiteral("*.svg")}, QDir::Files);
+        QVERIFY(!files.isEmpty());
+
+        QSet<QString> resource_ids;
+        const QRegularExpression source_symbol(
+            QStringLiteral("shell\\.js 的 #i-([a-z][a-z0-9-]*)"));
+        for (const QString& file_name : files) {
+            QFile file(icon_root + file_name);
+            QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(file_name));
+            const QString svg = QString::fromUtf8(file.readAll());
+            const auto match = source_symbol.match(svg);
+            QVERIFY2(match.hasMatch(), qPrintable(file_name));
+            const QString resource_id = QFileInfo(file_name).completeBaseName();
+            QCOMPARE(match.captured(1), resource_id);
+            QVERIFY2(!resource_ids.contains(resource_id), qPrintable(resource_id));
+            resource_ids.insert(resource_id);
+        }
+
+        QFile reference_file(QStringLiteral(":/panta-test/shell.js"));
+        QVERIFY2(reference_file.open(QIODevice::ReadOnly), qPrintable(reference_file.fileName()));
+        const QString reference = QString::fromUtf8(reference_file.readAll());
+        const QRegularExpression official_symbol(
+            QStringLiteral("<symbol\\s+id=[\\\"']i-([a-z][a-z0-9-]*)[\\\"']"));
+        QSet<QString> official_ids;
+        auto symbols = official_symbol.globalMatch(reference);
+        while (symbols.hasNext()) {
+            const QString symbol_id = symbols.next().captured(1);
+            QVERIFY2(!official_ids.contains(symbol_id), qPrintable(symbol_id));
+            official_ids.insert(symbol_id);
+        }
+        QCOMPARE(official_ids, resource_ids);
+
+        const QSet<QString>& monochrome_ids = panta::monochrome_icon_names();
+        for (const QString& icon_id : monochrome_ids) {
+            QVERIFY2(resource_ids.contains(icon_id), qPrintable(icon_id));
+        }
+
+        int referenced_icon_count = 0;
+        int ribbon_data_icons = 0;
+        int task_data_icons = 0;
+        bool ribbon_model_uses_source_colors = false;
+        bool ribbon_content_forwards_model_icon = false;
+        bool tool_button_forwards_icon_mode = false;
+        bool task_model_uses_source_colors = false;
+        bool layer_model_uses_item_mode = false;
+        bool qml_resources_found = false;
+        QDirIterator qml_files(QStringLiteral(":/qt/qml/Panta/Shell"), {QStringLiteral("*.qml")},
+                               QDir::Files, QDirIterator::Subdirectories);
+
+        while (qml_files.hasNext()) {
+            qml_resources_found = true;
+            const QString path = qml_files.next();
+            QFile file(path);
+            QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(path));
+            const QString qml = QString::fromUtf8(file.readAll());
+
+            if (path.endsWith(QStringLiteral("/RibbonContent.qml"))) {
+                for (const QString& block : qml_object_blocks(qml, "RibbonTile")) {
+                    ribbon_content_forwards_model_icon =
+                        qml_binding(block, "iconName") == QStringLiteral("modelData.icon");
+                }
+            }
+
+            for (const QString& item : qml_simple_object_blocks(qml)) {
+                const QString icon_expression = qml_binding(item, "icon");
+                if (icon_expression.isEmpty()) {
+                    continue;
+                }
+                const QString icon_id = qml_icon_literal(icon_expression);
+                QVERIFY2(!icon_id.isEmpty(),
+                         qPrintable(path + QStringLiteral(": model icon must be a literal: ") +
+                                    icon_expression));
+                ++referenced_icon_count;
+                QVERIFY2(resource_ids.contains(icon_id),
+                         qPrintable(path + QStringLiteral(": missing SVG for ") + icon_id));
+
+                const QString mode = qml_binding(item, "preserveIconColors");
+                const bool is_ribbon_data = path.contains(QStringLiteral("/Panels/Ribbon/"));
+                const bool is_task_data = path.endsWith(QStringLiteral("/TasksPanel.qml"));
+                ribbon_data_icons += is_ribbon_data ? 1 : 0;
+                task_data_icons += is_task_data ? 1 : 0;
+                bool preserves_source = false;
+                if (!mode.isEmpty()) {
+                    QVERIFY2(mode == QStringLiteral("true") || mode == QStringLiteral("false"),
+                             qPrintable(path + QStringLiteral(": data icon mode must be a bool: ") +
+                                        icon_id));
+                    preserves_source = mode == QStringLiteral("true");
+                } else if (is_ribbon_data || is_task_data) {
+                    // Ribbon 与导入任务模型由其视觉组件统一按资源原色呈现。
+                    preserves_source = true;
+                }
+                QVERIFY2(preserves_source == !monochrome_ids.contains(icon_id),
+                         qPrintable(path + QStringLiteral(": wrong data icon mode: ") + icon_id));
+            }
+
+            for (const QString& block : qml_object_blocks(qml, "ThemedIcon")) {
+                const QString expression = qml_binding(block, "name");
+                if (expression.isEmpty() || expression == QStringLiteral("\"\"") ||
+                    expression == QStringLiteral("''")) {
+                    continue;
+                }
+                const QString icon_id = qml_icon_literal(expression);
+                const QString mode = qml_binding(block, "preserveSourceColors");
+                if (icon_id.isEmpty()) {
+                    if (expression == QStringLiteral("tile.iconName")) {
+                        QCOMPARE(mode, QStringLiteral("true"));
+                        ribbon_model_uses_source_colors = mode == QStringLiteral("true");
+                    } else if (expression == QStringLiteral("button.iconName")) {
+                        QCOMPARE(mode, QStringLiteral("button.preserveIconColors"));
+                        tool_button_forwards_icon_mode = true;
+                    } else if (expression == QStringLiteral("projectEntry.iconName")) {
+                        QCOMPARE(mode, QStringLiteral("true"));
+                    } else {
+                        QFAIL(qPrintable(
+                            path + QStringLiteral(": unrecognized dynamic ThemedIcon name: ") +
+                            expression));
+                    }
+                    continue;
+                }
+                ++referenced_icon_count;
+                QVERIFY2(resource_ids.contains(icon_id),
+                         qPrintable(path + QStringLiteral(": missing SVG for ") + icon_id));
+                bool preserves_source = false;
+                if (mode == QStringLiteral("true")) {
+                    preserves_source = true;
+                } else if (mode != QStringLiteral("false") && !mode.isEmpty()) {
+                    QFAIL(qPrintable(path +
+                                     QStringLiteral(": static ThemedIcon mode must be a bool: ") +
+                                     icon_id));
+                }
+                QVERIFY2(preserves_source == !monochrome_ids.contains(icon_id),
+                         qPrintable(path + QStringLiteral(": wrong ThemedIcon mode: ") + icon_id));
+            }
+
+            for (const QString& block : qml_object_blocks(qml, "ThemedToolButton")) {
+                const QString expression = qml_binding(block, "iconName");
+                if (expression.isEmpty() || expression == QStringLiteral("\"\"") ||
+                    expression == QStringLiteral("''")) {
+                    continue;
+                }
+                const QString icon_id = qml_icon_literal(expression);
+                const QString mode = qml_binding(block, "preserveIconColors");
+                if (icon_id.isEmpty()) {
+                    if (expression == QStringLiteral("modelData.icon") &&
+                        path.endsWith(QStringLiteral("/TasksPanel.qml"))) {
+                        QCOMPARE(mode, QStringLiteral("true"));
+                        task_model_uses_source_colors = mode == QStringLiteral("true");
+                    } else if (expression == QStringLiteral("modelData.icon") &&
+                               path.endsWith(QStringLiteral("/LayersPanel.qml"))) {
+                        QCOMPARE(mode, QStringLiteral("modelData.preserveIconColors === true"));
+                        layer_model_uses_item_mode = true;
+                    } else {
+                        QFAIL(qPrintable(
+                            path +
+                            QStringLiteral(": unrecognized dynamic ThemedToolButton icon: ") +
+                            expression));
+                    }
+                    continue;
+                }
+                ++referenced_icon_count;
+                QVERIFY2(resource_ids.contains(icon_id),
+                         qPrintable(path + QStringLiteral(": missing SVG for ") + icon_id));
+                bool preserves_source = false;
+                if (mode == QStringLiteral("true")) {
+                    preserves_source = true;
+                } else if (mode != QStringLiteral("false") && !mode.isEmpty()) {
+                    QFAIL(qPrintable(
+                        path + QStringLiteral(": static ThemedToolButton mode must be a bool: ") +
+                        icon_id));
+                }
+                QVERIFY2(
+                    preserves_source == !monochrome_ids.contains(icon_id),
+                    qPrintable(path + QStringLiteral(": wrong ThemedToolButton mode: ") + icon_id));
+            }
+        }
+
+        QVERIFY(qml_resources_found);
+        QVERIFY(ribbon_content_forwards_model_icon);
+        QVERIFY(ribbon_data_icons > 0);
+        QVERIFY(task_data_icons > 0);
+        QVERIFY(ribbon_model_uses_source_colors);
+        QVERIFY(task_model_uses_source_colors);
+        QVERIFY(layer_model_uses_item_mode);
+        QVERIFY(tool_button_forwards_icon_mode);
+        QVERIFY(referenced_icon_count > 0);
+    }
+
     void svg_resources_render_with_caller_color() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);
@@ -351,7 +591,7 @@ class ThemeComponentTest final : public QObject {
         const QString resource_root = QStringLiteral(":/qt/qml/Panta/Shell/icons/");
         const QStringList files =
             QDir(resource_root).entryList({QStringLiteral("*.svg")}, QDir::Files);
-        QCOMPARE(files.size(), 63);
+        QVERIFY(!files.isEmpty());
         for (const QString& file : files) {
             QImageReader reader(resource_root + file);
             QVERIFY2(reader.canRead(), qPrintable(file));
@@ -359,16 +599,8 @@ class ThemeComponentTest final : public QObject {
             QVERIFY2(!reader.read().isNull(), qPrintable(file));
         }
 
-        const QStringList monochrome_icons{
-            QStringLiteral("undo"),    QStringLiteral("redo"),     QStringLiteral("print"),
-            QStringLiteral("preview"), QStringLiteral("account"),  QStringLiteral("cart"),
-            QStringLiteral("help"),    QStringLiteral("minimize"), QStringLiteral("maximize"),
-            QStringLiteral("close"),   QStringLiteral("check"),    QStringLiteral("wizard"),
-            QStringLiteral("copy"),    QStringLiteral("image"),    QStringLiteral("export"),
-            QStringLiteral("delete"),  QStringLiteral("layers"),   QStringLiteral("caret"),
-            QStringLiteral("globe"),   QStringLiteral("split"),    QStringLiteral("search"),
-            QStringLiteral("right"),
-        };
+        QStringList monochrome_icons = panta::monochrome_icon_names().values();
+        monochrome_icons.sort();
         for (const QString& name : monochrome_icons) {
             QImageReader reader(resource_root + name + QStringLiteral(".svg"));
             const QSize expected_size = reader.size();

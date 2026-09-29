@@ -39,7 +39,7 @@
 | 工程与任务 | `project-file`、`project-folder`、`stl-file`、`study`、`status-ok`、`task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
 | Layers 操作 | `check`、`copy`、`delete`、`export`、`image`、`wizard` | Layers 输出操作按钮 |
 
-`ThemedIcon.preserveSourceColors` 是颜色加载模式的唯一开关，不另设彩色图标组件。默认模式将允许的单色 utility glyph 交给 `image://panta-icons/<name>/<argb>`；provider 内的白名单与颜色图标清单保持一致，未知和多色 ID 均拒绝着色。设置为 `true` 时直接从 `qrc:/qt/qml/Panta/Shell/icons/<name>.svg` 加载并保留 SVG 源色。所有 63 个资源通过 QtTest 检查可读和可解码，provider 对单色集合检查了缩放和着色行为。
+`ThemedIcon.preserveSourceColors` 是颜色加载模式的唯一开关，不另设彩色图标组件。默认模式将允许的单色 utility glyph 交给 `image://panta-icons/<name>/<argb>`；provider 内的白名单与颜色图标清单保持一致，未知和多色 ID 均拒绝着色。设置为 `true` 时直接从 `qrc:/qt/qml/Panta/Shell/icons/<name>.svg` 加载并保留 SVG 源色。QtTest 校验 SVG 文件名与 `shell.js` symbol 集合一一对应，QML 字面图标引用均有资源，静态加载模式与 provider 白名单一致；Ribbon、任务列表和 Layers 的动态模型模式也单独校验。单色集合检查缩放、着色与错误路径。
 
 `caret.svg` 的源 viewBox 为 `0 0 7 5`。为响应维护者要求缩小指示三角，仅将路径由
 `M0 0h7L3.5 5z` 内缩为 `M0.7 0.6h5.6L3.5 4.4z`；HTML symbol 与 QML 资源同步，viewBox

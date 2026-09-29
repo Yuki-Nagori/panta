@@ -73,6 +73,7 @@
 - [ ] 所有产品页面使用同一套 Theme 语义 token；色彩、字号、间距、图标尺寸和组件状态无重复权威定义。
 - [ ] 关键界面与所给风格方向一致：浅色工作区、轻量 chrome、分组工具条、清晰图标层级、统一圆角/边框/悬停反馈；Welcome 3D 标志由 053 使用约定外观实现。
 - [ ] 所有实际使用图标在清单中有唯一语义、功能映射、来源/许可证及修改记录；第三方素材满足许可证和署名要求，未确认来源的资源已移除或原创重绘。
+- [ ] 自动一致性检查覆盖 SVG 资源 ID、QML 图标引用及彩色/单色加载模式，确保单色 provider 白名单与 QML 调用约定一致；新增或误配图标时检查失败并指出位置。
 - [ ] 多色图标的正常、禁用、焦点和高对比场景可辨；颜色不作为唯一的信息通道；键盘焦点和可访问名称完整。
 - [ ] HTML 参考与真实 QML 在相关组件层级、颜色、图标和交互状态一致；QML 打包后所有模块资源可载入，`qmllint` 与组件行为测试通过。
 - [ ] 窄宽度、长英文/中文、至少 1.0/1.5/2.0 DPR、焦点/禁用态与真实图形窗口无截断、重叠或看不清的状态。
@@ -91,6 +92,7 @@
 | 2026-09-30 | `qml/icons/` SVG 资源首批与 `shell.js` caret symbol | 独立资源可与正式 symbol 对照，应用已有资源仍保持可用 | 新增 61 个正式 symbol SVG，并同步 caret 的内缩 path；保留现有资源，避免在消费者迁移前改变运行引用。`layers.svg` 与 `project-file.svg` 两个同名资源在调用迁移批次替换；旧资源清理、Qt 加载测试与性能测量随后完成 |
 | 2026-09-30 | `Qml.ThemeComponentParameters` 与 `panta_qml_cpu_benchmark measures_icon_loading` | 验证 Qt 可以解码全部打包 SVG，并比较空 source、单色 provider 和原色 qrc 的首轮及缓存路径 | QtTest 通过；CPU 基准通过。环境：macOS 26.3.1 arm64、Qt 6.11.2、`target/native/debug`。首轮样本包含进程/路径初始化；缓存后采样 31 次，p50/p95 见下表。场景在 offscreen 下测 Image 创建至 Ready，不测 GPU 呈现 |
 | 2026-09-30 | 旧图标资源 cleanup commit 与 QML 调用审计 | 旧路径无消费者，打包目录仅保留 63 个正式 symbol | 删除 43 个旧 SVG；源码引用扫描未发现旧图标 ID，`Qml.ThemeComponentParameters` 断言 qrc 中恰有 63 个 SVG |
+| 2026-09-30 | `Qml.ThemeComponentParameters`；`cargo build --locked`、`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace` | 对齐 `shell.js` symbol、Qt 打包 SVG、QML 图标引用、单色 provider 白名单及静态/动态颜色模式；适用聚合检查通过 | 一致性 QtTest 通过；SVG 集合与正式 symbol 集合逐项相等，图标文件名与 SVG 内来源标记相符；QML 引用均有资源，provider 着色模式、Ribbon / 任务 / 图层数据和动态转发链路匹配。`cargo build --locked`、`cargo format --check`、`cargo lint --check` 的 8 个阶段及 `cargo test --locked --workspace` 通过，CTest 66/66。默认会自动修复的 `cargo lint` 因沙箱拒绝绑定本地锁 listener 未能启动；只读 lint 全检查通过 |
 
 ### 图标加载 CPU 消融
 
