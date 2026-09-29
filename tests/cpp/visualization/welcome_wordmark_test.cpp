@@ -106,11 +106,25 @@ class WelcomeWordmarkTest final : public QObject {
 
     void converts_surface_snapshot_to_poly_data() {
         panta::visualization::SurfaceMeshSnapshot snapshot;
-        snapshot.vertices = {{{0.0, 0.0, 0.0}}, {{1.0, 0.0, 0.0}}, {{0.0, 1.0, 0.0}}};
+        snapshot.vertices = {{{0.0, 0.0, 0.0}}, {{1.0, 0.0, 0.0}}, {{0.0, 1.0, 0.0}},
+                             {{0.0, 0.0, 1.0}}, {{0.0, 1.0, 1.0}}, {{1.0, 0.0, 1.0}},
+                             {{3.0, 3.0, 3.0}}, {{3.0, 3.0, 3.0}}, {{3.0, 3.0, 3.0}},
+                             {{2.0, 2.0, 2.0}}};
         const auto mesh = panta::visualization::make_surface_poly_data(snapshot);
-        QCOMPARE(mesh->GetNumberOfPoints(), vtkIdType(3));
-        QCOMPARE(mesh->GetNumberOfPolys(), vtkIdType(1));
+        QCOMPARE(mesh->GetNumberOfPoints(), vtkIdType(9));
+        QCOMPARE(mesh->GetNumberOfPolys(), vtkIdType(3));
         QCOMPARE(mesh->GetPoints()->GetDataType(), VTK_DOUBLE);
+        auto* normals = mesh->GetPointData()->GetNormals();
+        QVERIFY(normals != nullptr);
+        QCOMPARE(normals->GetNumberOfTuples(), vtkIdType(9));
+        constexpr std::array expected_z{1.0, -1.0, 0.0};
+        for (vtkIdType point = 0; point < 9; ++point) {
+            double normal[3];
+            normals->GetTuple(point, normal);
+            QCOMPARE(normal[0], 0.0);
+            QCOMPARE(normal[1], 0.0);
+            QCOMPARE(normal[2], expected_z[static_cast<std::size_t>(point / 3)]);
+        }
     }
 
     void ignores_detached_and_invalid_cube_picks() {

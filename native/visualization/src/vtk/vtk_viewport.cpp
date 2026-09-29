@@ -399,17 +399,18 @@ void VtkViewport::update_mesh_actor() {
     geometry =
         imported_mesh ? make_surface_poly_data(*impl_->pending.mesh) : create_welcome_wordmark();
 
-    vtkNew<vtkPolyDataNormals> normals;
-    normals->SetInputData(geometry);
-    normals->SetFeatureAngle(45.0);
-    normals->ConsistencyOn();
-    normals->SplittingOn();
     vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(normals->GetOutputPort());
     if (imported_mesh) {
+        mapper->SetInputData(geometry);
         mapper->SetColorModeToDefault();
         mapper->SetScalarModeToDefault();
     } else {
+        vtkNew<vtkPolyDataNormals> normals;
+        normals->SetInputData(geometry);
+        normals->SetFeatureAngle(45.0);
+        normals->ConsistencyOn();
+        normals->SplittingOn();
+        mapper->SetInputConnection(normals->GetOutputPort());
         mapper->SetColorModeToDirectScalars();
         mapper->SetScalarModeToUsePointData();
     }

@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QQuickWindow>
 #include <QString>
+#include <QStringList>
 #include <QSysInfo>
 #include <QTimer>
 #include <QVariant>
@@ -91,6 +92,38 @@ class FrameCapture final {
         qInstallMessageHandler(previous_message_handler);
         QLoggingCategory::setFilterRules(QString{});
     }
+};
+
+class DiagnosticPause final {
+  public:
+    DiagnosticPause()
+        : phases_(QString::fromLocal8Bit(qgetenv("PANTA_BENCH_PAUSE_PHASE"))
+                      .split(',', Qt::SkipEmptyParts)) {
+        if (phases_.isEmpty()) {
+            return;
+        }
+        duration_ms_ = qEnvironmentVariableIntValue("PANTA_BENCH_PAUSE_MS", &valid_);
+        valid_ = valid_ && duration_ms_ > 0;
+    }
+
+    [[nodiscard]] bool valid() const { return valid_; }
+
+    void at(const char* phase) const {
+        if (!phases_.contains(QString::fromLatin1(phase))) {
+            return;
+        }
+        std::cout << "diagnostic_pause phase=" << phase
+                  << " pid=" << QCoreApplication::applicationPid()
+                  << " duration_ms=" << duration_ms_ << '\n';
+        QEventLoop loop;
+        QTimer::singleShot(duration_ms_, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+
+  private:
+    QStringList phases_;
+    int duration_ms_ = 0;
+    bool valid_ = true;
 };
 
 struct MemorySample {
@@ -256,6 +289,10 @@ int main(int argc, char* argv[]) try {
     if (!sample_count_ok || kSamples <= 0) {
         return fail("samples must be a positive integer");
     }
+    const DiagnosticPause diagnostic_pause;
+    if (!diagnostic_pause.valid()) {
+        return fail("PANTA_BENCH_PAUSE_PHASE requires a positive PANTA_BENCH_PAUSE_MS");
+    }
     const FrameCapture frame_capture;
 
     std::cout << "benchmark=project_stl_viewport_gpu build="
@@ -267,6 +304,9 @@ int main(int argc, char* argv[]) try {
               << " qt=" << qVersion()
               << " architecture=" << QSysInfo::currentCpuArchitecture().toStdString()
               << " samples_per_document=" << kSamples
+              << " malloc_stack_logging=" << qgetenv("MallocStackLogging").constData()
+              << " malloc_stack_logging_no_compact="
+              << qEnvironmentVariableIsSet("MallocStackLoggingNoCompact")
               << " metric=VtkViewport_frame_submitted excludes=GPU_completion_and_dedicated_VRAM\n";
 
     ProjectViewModel view_model;
@@ -304,6 +344,7 @@ int main(int argc, char* argv[]) try {
         return fail("VTK WebGPU scene did not submit a frame");
     }
     print_memory("native_viewport_baseline", {resident_bytes(), peak_rss_bytes()}, 0);
+    diagnostic_pause.at("native_viewport_baseline");
 
     if (!view_model.openProject(arguments[1])) {
         return fail("openProject failed: " + view_model.error().toStdString());
@@ -359,6 +400,7 @@ int main(int argc, char* argv[]) try {
     }
     print_memory("all_snapshots_retained_largest_active", {resident_bytes(), peak_rss_bytes()},
                  retained_payload(loaded));
+    diagnostic_pause.at("all_snapshots_retained_largest_active");
 
     for (const auto& document : loaded) {
         const auto alternate = std::find_if(
@@ -409,6 +451,7 @@ int main(int argc, char* argv[]) try {
     }
     print_memory("after_frame_cycles", {resident_bytes(), peak_rss_bytes()},
                  retained_payload(loaded));
+    diagnostic_pause.at("after_frame_cycles");
 
     bool pause_value_ok = true;
     const int pause_ms =
@@ -448,6 +491,7 @@ int main(int argc, char* argv[]) try {
         return fail("empty viewport frame did not submit after closing all documents");
     }
     print_memory("all_documents_closed", {resident_bytes(), peak_rss_bytes()}, 0);
+    diagnostic_pause.at("all_documents_closed");
     return 0;
 } catch (const std::exception& exception) {
     std::fprintf(stderr, "error: uncaught benchmark exception: %s\n", exception.what());
