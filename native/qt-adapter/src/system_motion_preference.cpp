@@ -1,6 +1,7 @@
 #include "panta/qt_adapter/system_motion_preference.hpp"
 
 #include <QCoreApplication>
+#include <QString>
 #include <QtCore/qbytearray.h>
 #include <QtCore/qobjectdefs.h>
 #include <qtmetamacros.h>
@@ -18,8 +19,10 @@
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusVariant>
 #include <QMetaType>
 #include <QVariant>
+#include <QtCore/qtenvironmentvariables.h>
 #endif
 
 #if defined(Q_OS_MACOS)

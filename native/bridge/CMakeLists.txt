@@ -87,7 +87,9 @@ if(BUILD_TESTING)
 
   add_executable(panta_bridge_settings_test ../../tests/cpp/bridge/settings_test.cpp)
   panta_native_defaults(panta_bridge_settings_test)
-  target_link_libraries(panta_bridge_settings_test PRIVATE panta::bridge panta::i18n GTest::gtest
-                                                           Qt6::Test)
-  gtest_discover_tests(panta_bridge_settings_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
+  target_link_libraries(panta_bridge_settings_test PRIVATE panta::bridge panta::i18n Qt6::Test)
+  # 该行为测试加载 QML 引擎，按 QML 测试注册：任务 042 已登记的 TSan 与
+  # Windows ASan QML 第三方运行时边界会过滤 Qml.*；QtTest/add_test 也避免
+  # 构建期 GTest discovery 在 Windows sanitizer 下提前启动 QML DLL。
+  panta_add_qml_test(Qml.SettingsLanguageSwitch panta_bridge_settings_test)
 endif()
