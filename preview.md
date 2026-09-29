@@ -124,7 +124,7 @@ MOLDFILL_DT_GROWTH=0.5
 
 ### 进程与结果链路
 
-新增 [panta-solver](crates/panta-solver/src/lib.rs)，负责固定输入校验、步骤前置条件、后台作业、CLI 调用、事件读取及结果提交；[foundation 进程设施](crates/panta-foundation/src/process.rs) 负责子进程取消和回收。[CXX](crates/panta-ffi/src/lib.rs) 只转发服务及批量 DTO。
+新增 [panta-solver](crates/panta-solver/src/lib.rs)，负责默认资产校验、步骤前置条件、后台作业、CLI 调用、事件读取及结果提交；[foundation 进程设施](crates/panta-foundation/src/process.rs) 负责子进程取消和回收。[CXX](crates/panta-ffi/src/lib.rs) 只转发服务及批量 DTO。
 
 - 使用 `target/moldfill-venv` 的独立 Python 环境，不污染 Panta 自身的 Python 工具环境。
 - 原始 STL 与默认材料文件使用已验证 SHA-256 校验；quick 配置允许编辑，run manifest 会记录实际读取的配置快照与哈希。
@@ -197,6 +197,7 @@ MOLDFILL_DT_GROWTH=0.5
 
 ## 2026-10-01 main GUI 合并验证
 
-- 状态：进行中；沿用本分支根目录记录约定。
+- 状态：已完成；沿用本分支根目录记录约定。
 - 范围：完成 preview 对 main 的变基，保留 main 工艺设置、日志、结果面板和原有文档页签，同时接入充填演示与回放条。
-- 验证：待执行 Cargo 聚合检查；沿用用户要求，不启动真实 GUI 验收。
+- 冲突：合并 Rust FFI 工艺设置与充填演示接口、QML 组件与基准构建配置，以及视口中的日志和回放条；普通工作区保留文档页签，充填模式显示回放条。
+- 验证：`cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint` 均通过；聚合测试中的 67 项 native/QML 检查全部通过。CPU/GPU 基准程序编译通过，未运行性能场景。沿用用户要求，不启动真实 GUI 验收。
