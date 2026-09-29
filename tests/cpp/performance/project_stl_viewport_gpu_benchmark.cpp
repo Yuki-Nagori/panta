@@ -60,7 +60,7 @@ using panta::visualization::VtkViewport;
 struct LoadedDocument {
     QString id;
     QString name;
-    std::uint64_t snapshot_capacity_bytes = 0;
+    std::uint64_t mesh_payload_estimate_bytes = 0;
 };
 
 QtMessageHandler previous_message_handler = nullptr;
@@ -195,7 +195,7 @@ std::optional<std::uint64_t> peak_rss_bytes() {
 double mib(std::uint64_t bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); }
 
 void print_memory(const char* phase, const MemorySample& sample,
-                  std::uint64_t retained_snapshot_bytes) {
+                  std::uint64_t project_mesh_payload_estimate_bytes) {
     std::cout << "memory phase=" << phase << " resident_mib=";
     if (sample.resident_bytes) {
         std::cout << std::fixed << std::setprecision(2) << mib(*sample.resident_bytes);
@@ -208,8 +208,8 @@ void print_memory(const char* phase, const MemorySample& sample,
     } else {
         std::cout << "unavailable";
     }
-    std::cout << " retained_snapshot_capacity_mib=" << std::fixed << std::setprecision(2)
-              << mib(retained_snapshot_bytes) << '\n';
+    std::cout << " project_mesh_payload_estimate_mib=" << std::fixed << std::setprecision(2)
+              << mib(project_mesh_payload_estimate_bytes) << '\n';
 }
 
 double percentile_ms(std::vector<double> samples, double percentile) {
@@ -223,10 +223,11 @@ double percentile_ms(std::vector<double> samples, double percentile) {
     return samples[index];
 }
 
-std::uint64_t retained_payload(const std::vector<LoadedDocument>& documents) {
+// DTO capacity estimates the raw mesh payload; this sum does not imply per-tab DTO retention.
+std::uint64_t project_mesh_payload_estimate(const std::vector<LoadedDocument>& documents) {
     std::uint64_t bytes = 0;
     for (const auto& document : documents) {
-        bytes += document.snapshot_capacity_bytes;
+        bytes += document.mesh_payload_estimate_bytes;
     }
     return bytes;
 }
@@ -374,18 +375,20 @@ int main(int argc, char* argv[]) try {
         if (!snapshot || snapshot->vertices.empty()) {
             return fail("activation returned an empty mesh for " + names[index].toStdString());
         }
-        const auto payload_bytes = static_cast<std::uint64_t>(snapshot->vertices.capacity()) *
-                                   static_cast<std::uint64_t>(sizeof(snapshot->vertices[0]));
-        loaded.push_back({id, names[index], payload_bytes});
+        const auto mesh_payload_estimate_bytes =
+            static_cast<std::uint64_t>(snapshot->vertices.capacity()) *
+            static_cast<std::uint64_t>(sizeof(snapshot->vertices[0]));
+        loaded.push_back({id, names[index], mesh_payload_estimate_bytes});
         std::cout << "initial_render file=" << names[index].toStdString()
                   << " triangles=" << snapshot->vertices.size() / 3
-                  << " activation_to_frame_ms=" << std::fixed << std::setprecision(3) << elapsed_ms
-                  << '\n';
+                  << " active_dto_capacity_mib=" << std::fixed << std::setprecision(2)
+                  << mib(mesh_payload_estimate_bytes)
+                  << " activation_to_frame_ms=" << std::setprecision(3) << elapsed_ms << '\n';
     }
 
     const auto largest = std::max_element(
         loaded.begin(), loaded.end(), [](const LoadedDocument& lhs, const LoadedDocument& rhs) {
-            return lhs.snapshot_capacity_bytes < rhs.snapshot_capacity_bytes;
+            return lhs.mesh_payload_estimate_bytes < rhs.mesh_payload_estimate_bytes;
         });
     if (largest != loaded.end() && view_model.activeDocumentId() != largest->id) {
         const int before_frame = submitted_frames.load(std::memory_order_relaxed);
@@ -399,7 +402,7 @@ int main(int argc, char* argv[]) try {
         }
     }
     print_memory("all_snapshots_retained_largest_active", {resident_bytes(), peak_rss_bytes()},
-                 retained_payload(loaded));
+                 project_mesh_payload_estimate(loaded));
     diagnostic_pause.at("all_snapshots_retained_largest_active");
 
     for (const auto& document : loaded) {
@@ -447,10 +450,10 @@ int main(int argc, char* argv[]) try {
                   << " boundary=scene_change_to_VTK_submit_not_GPU_completion\n";
         std::cout << "memory_after_frame_cycles file=" << document.name.toStdString() << ' ';
         print_memory("document_complete", {resident_bytes(), peak_rss_bytes()},
-                     retained_payload(loaded));
+                     project_mesh_payload_estimate(loaded));
     }
     print_memory("after_frame_cycles", {resident_bytes(), peak_rss_bytes()},
-                 retained_payload(loaded));
+                 project_mesh_payload_estimate(loaded));
     diagnostic_pause.at("after_frame_cycles");
 
     bool pause_value_ok = true;

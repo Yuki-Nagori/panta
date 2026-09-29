@@ -73,13 +73,10 @@ impl ProjectService {
             let _ = fs::remove_file(&asset_path);
             return Err(error);
         }
-        self.current_mesh = Some(prepared.mesh);
+        self.latest_mesh_id = Some(record.id.clone());
+        self.mesh_cache
+            .insert_active(record.id.clone(), prepared.mesh);
         Ok(record)
-    }
-
-    /// Latest committed mesh; copied only when crossing the CXX boundary.
-    pub fn current_mesh(&self) -> Option<&SurfaceMesh> {
-        self.current_mesh.as_ref()
     }
 
     /// Parse STL metadata without requiring an open project or mutating disk.

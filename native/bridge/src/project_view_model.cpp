@@ -71,10 +71,9 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
 
 std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
 ProjectViewModel::mesh_snapshot() const {
-    // 视口内容 = 活动文档快照；Welcome / 空白 / 加载中返回空（由
-    // placeholder_visible 区分欢迎字样与空白）。
-    const auto found = m_documentMeshes.constFind(m_activeDocumentId);
-    return found == m_documentMeshes.cend() ? nullptr : found.value();
+    // 绘制刷新路径只读取这个本地共享快照，不能在这里跨 CXX 调 Rust。
+    // Welcome / 空白 / 加载中返回空，由 placeholder_visible 区分欢迎字样与空白。
+    return m_activeMesh;
 }
 
 bool ProjectViewModel::placeholder_visible() const {
@@ -88,9 +87,10 @@ bool ProjectViewModel::placeholder_visible() const {
 }
 
 std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
-ProjectViewModel::pull_service_mesh() const {
+ProjectViewModel::pull_service_mesh(const QString& importId) const {
     try {
-        const auto snapshot = panta::ffi::project_service_mesh_snapshot(*m_service);
+        const auto snapshot = panta::ffi::project_service_mesh_snapshot_for_import(
+            *m_service, importId.toStdString());
         if (snapshot.coordinates.empty() || snapshot.coordinates.size() % 9 != 0) {
             return nullptr;
         }
@@ -274,18 +274,19 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
             return false;
         }
         const QString recordId = QString::fromUtf8(imported.id);
-        // 导入事务已产出网格：直接复用为文档快照，不再二次解析。
-        if (auto mesh = pull_service_mesh()) {
-            m_documentMeshes.insert(recordId, mesh);
-        }
         int index = document_index(recordId);
+        bool documentsChangedEmitted = false;
         if (index < 0) {
             index = static_cast<int>(m_documents.size());
             m_documents.append({recordId, QStringLiteral("import"), QStringLiteral("ready"),
                                 QString::fromUtf8(imported.source_name), QString{}});
+            documentsChangedEmitted = true;
+        }
+        documentsChangedEmitted = activate_ready_document(index) || documentsChangedEmitted;
+        documentsChangedEmitted = sync_mesh_residency() || documentsChangedEmitted;
+        if (documentsChangedEmitted) {
             emit documentsChanged();
         }
-        activate_ready_document(index);
         emit projectImported(m_importedAssetPath);
         return true;
     } catch (const rust::Error& failure) {
@@ -511,24 +512,85 @@ int ProjectViewModel::document_index(const QString& documentId) const {
     return -1;
 }
 
-void ProjectViewModel::activate_ready_document(int index) {
+bool ProjectViewModel::activate_ready_document(
+    int index, std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> loadedMesh) {
     if (index < 0 || index >= m_documents.size()) {
-        return;
+        return false;
     }
     const auto& document = m_documents[index];
     if (document.state != QStringLiteral("ready")) {
-        return;
+        return false;
     }
-    if (m_activeDocumentId != document.id) {
-        m_activeDocumentId = document.id;
+    const QString documentId = document.id;
+    const bool isImport = document.kind == QStringLiteral("import");
+    if (isImport &&
+        !panta::ffi::project_service_activate_mesh_document(*m_service, documentId.toStdString())) {
+        m_documents[index].state = QStringLiteral("unloaded");
+        m_documents[index].message.clear();
+        return true;
+    }
+
+    if (!isImport) {
+        panta::ffi::project_service_deactivate_mesh_document(*m_service);
+    }
+
+    const bool activeChanged = m_activeDocumentId != documentId;
+    if (activeChanged) {
+        auto nextMesh = isImport
+                            ? (loadedMesh ? std::move(loadedMesh) : pull_service_mesh(documentId))
+                            : nullptr;
+        if (isImport && !nextMesh) {
+            // 保留旧视口；恢复与 UI 活动文档一致的 Rust pin。
+            const int previous = document_index(m_activeDocumentId);
+            if (previous >= 0 && m_documents[previous].kind == QStringLiteral("import")) {
+                panta::ffi::project_service_activate_mesh_document(
+                    *m_service, m_activeDocumentId.toStdString());
+            } else {
+                panta::ffi::project_service_deactivate_mesh_document(*m_service);
+            }
+            return false;
+        }
+        m_activeDocumentId = documentId;
+        m_activeMesh = std::move(nextMesh);
+    }
+
+    const bool residencyChanged = sync_mesh_residency();
+    if (activeChanged) {
         emit activeDocumentChanged();
         emit meshChanged();
     }
+    return residencyChanged || activeChanged;
+}
+
+bool ProjectViewModel::sync_mesh_residency() {
+    const auto residentIds = panta::ffi::project_service_resident_mesh_ids(*m_service);
+    QSet<QString> residents;
+    residents.reserve(static_cast<qsizetype>(residentIds.size()));
+    for (std::size_t index = 0; index < residentIds.size(); ++index) {
+        residents.insert(QString::fromUtf8(residentIds[index]));
+    }
+
+    bool changed = false;
+    for (auto& document : m_documents) {
+        if (document.kind != QStringLiteral("import") ||
+            document.state == QStringLiteral("loading") ||
+            document.state == QStringLiteral("failed")) {
+            continue;
+        }
+        const QString state =
+            residents.contains(document.id) ? QStringLiteral("ready") : QStringLiteral("unloaded");
+        if (document.state != state) {
+            document.state = state;
+            document.message.clear();
+            changed = true;
+        }
+    }
+    return changed;
 }
 
 void ProjectViewModel::reset_documents() {
     m_documents.clear();
-    m_documentMeshes.clear();
+    m_activeMesh.reset();
     m_activationAttempts.clear();
     m_activationPoll.stop();
     m_documents.append({QString::fromLatin1(kWelcomeDocumentId), QStringLiteral("welcome"),
@@ -540,7 +602,21 @@ void ProjectViewModel::reset_documents() {
 }
 
 void ProjectViewModel::activateDocument(const QString& documentId) {
-    activate_ready_document(document_index(documentId));
+    const int index = document_index(documentId);
+    if (index < 0) {
+        return;
+    }
+    if (m_documents[index].state == QStringLiteral("unloaded")) {
+        openImportRecord(documentId);
+        return;
+    }
+    if (activate_ready_document(index)) {
+        if (m_documents[index].state == QStringLiteral("unloaded")) {
+            openImportRecord(documentId);
+            return;
+        }
+        emit documentsChanged();
+    }
 }
 
 void ProjectViewModel::closeDocument(const QString& documentId) {
@@ -556,8 +632,14 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
         }
     }
     m_activationAttempts.remove(documentId);
-    m_documentMeshes.remove(documentId);
+    if (m_documents[index].kind == QStringLiteral("import")) {
+        panta::ffi::project_service_release_mesh_document(*m_service, documentId.toStdString());
+    }
+    if (m_activeDocumentId == documentId) {
+        m_activeMesh.reset();
+    }
     m_documents.remove(index);
+    sync_mesh_residency();
 
     // 被关的是活动文档：按右邻优先找第一个就绪页签，否则回到 Welcome；
     // 全部关闭后活动 ID 为空，视口留白。
@@ -575,10 +657,34 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
             }
         }
         if (fallback >= 0) {
-            m_activeDocumentId = m_documents[fallback].id;
+            activate_ready_document(fallback);
+            if (m_documents[fallback].state == QStringLiteral("unloaded")) {
+                m_documents[fallback].state = QStringLiteral("loading");
+                m_documents[fallback].message.clear();
+                begin_import_activation(m_documents[fallback].id);
+            }
+        } else {
+            panta::ffi::project_service_deactivate_mesh_document(*m_service);
+            emit activeDocumentChanged();
+            emit meshChanged();
+            // 若其他页签都因预算被逐出，关闭活动页签后异步恢复最近的邻页。
+            int reload = -1;
+            for (int probe = index; probe < m_documents.size() && reload < 0; ++probe) {
+                if (m_documents[probe].state == QStringLiteral("unloaded")) {
+                    reload = probe;
+                }
+            }
+            for (int probe = index - 1; probe >= 0 && reload < 0; --probe) {
+                if (m_documents[probe].state == QStringLiteral("unloaded")) {
+                    reload = probe;
+                }
+            }
+            if (reload >= 0) {
+                m_documents[reload].state = QStringLiteral("loading");
+                m_documents[reload].message.clear();
+                begin_import_activation(m_documents[reload].id);
+            }
         }
-        emit activeDocumentChanged();
-        emit meshChanged();
     }
     sync_activation_poll();
     emit documentsChanged();
@@ -589,8 +695,17 @@ void ProjectViewModel::openImportRecord(const QString& recordId) {
     if (index >= 0) {
         // 已打开：就绪直接激活；加载中不重复请求；失败页签重新发起加载。
         if (m_documents[index].state == QStringLiteral("ready")) {
-            activate_ready_document(index);
-        } else if (m_documents[index].state == QStringLiteral("failed")) {
+            const bool changed = activate_ready_document(index);
+            if (m_documents[index].state == QStringLiteral("unloaded")) {
+                m_documents[index].state = QStringLiteral("loading");
+                m_documents[index].message.clear();
+                emit documentsChanged();
+                begin_import_activation(recordId);
+            } else if (changed) {
+                emit documentsChanged();
+            }
+        } else if (m_documents[index].state == QStringLiteral("failed") ||
+                   m_documents[index].state == QStringLiteral("unloaded")) {
             m_documents[index].state = QStringLiteral("loading");
             m_documents[index].message.clear();
             emit documentsChanged();
@@ -639,16 +754,25 @@ void ProjectViewModel::drain_activations() {
     try {
         const auto outcomes = panta::ffi::project_service_drain_asset_activations(*m_service);
         bool documentsChangedEmitted = false;
+        const bool residencyMayHaveChanged = !outcomes.empty();
         for (const auto& outcome : outcomes) {
             const QString recordId = QString::fromUtf8(outcome.import_id);
             // 同一记录可在关闭后重新打开；旧 attempt 的迟到结果不能
             // 覆盖新页签，即使它们的 ImportRecord.id 相同。
             const auto attempt = m_activationAttempts.constFind(recordId);
             if (attempt == m_activationAttempts.cend() || attempt.value() != outcome.attempt) {
+                const int index = document_index(recordId);
+                if (index < 0) {
+                    // 只有页签确已关闭才按 ID 释放；同 ID 的重开页签可能已有新 attempt 缓存。
+                    panta::ffi::project_service_release_mesh_document(*m_service,
+                                                                      recordId.toStdString());
+                }
                 continue;
             }
             const int index = document_index(recordId);
             if (index < 0) {
+                panta::ffi::project_service_release_mesh_document(*m_service,
+                                                                  recordId.toStdString());
                 continue; // 页签已关闭：结果（含快照）就地丢弃。
             }
             if (outcome.kind == panta::ffi::ActivationOutcomeKind::Cancelled) {
@@ -670,19 +794,21 @@ void ProjectViewModel::drain_activations() {
                                               outcome.coordinates[offset + 1],
                                               outcome.coordinates[offset + 2]});
                 }
-                m_documentMeshes[recordId] = std::move(mesh);
                 document.state = QStringLiteral("ready");
                 document.message.clear();
                 m_activationAttempts.remove(recordId);
                 documentsChangedEmitted = true;
                 // 激活仍由活动文档语义决定：成功后自动切到该文档。
-                activate_ready_document(index);
+                activate_ready_document(index, std::move(mesh));
             } else if (outcome.kind == panta::ffi::ActivationOutcomeKind::Failed) {
                 document.state = QStringLiteral("failed");
                 document.message = activation_message_for(QString::fromUtf8(outcome.code));
                 m_activationAttempts.remove(recordId);
                 documentsChangedEmitted = true;
             }
+        }
+        if (residencyMayHaveChanged) {
+            documentsChangedEmitted = sync_mesh_residency() || documentsChangedEmitted;
         }
         if (documentsChangedEmitted) {
             emit documentsChanged();

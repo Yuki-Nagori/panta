@@ -286,7 +286,19 @@ pub mod bridge {
             service: &mut ProjectService,
             source: String,
         ) -> Result<StlImportPreview>;
-        fn project_service_mesh_snapshot(service: &ProjectService) -> Result<SurfaceMeshSnapshot>;
+        /// 已驻留 Mesh 的一次性显示快照；只由文档激活路径调用，不用于逐帧读取。
+        fn project_service_mesh_snapshot_for_import(
+            service: &ProjectService,
+            import_id: &str,
+        ) -> Result<SurfaceMeshSnapshot>;
+        /// 活动页签 pin/unpin 与关闭释放属于粗粒度文档状态变化。
+        fn project_service_activate_mesh_document(
+            service: &mut ProjectService,
+            import_id: &str,
+        ) -> bool;
+        fn project_service_deactivate_mesh_document(service: &mut ProjectService);
+        fn project_service_release_mesh_document(service: &mut ProjectService, import_id: &str);
+        fn project_service_resident_mesh_ids(service: &ProjectService) -> Vec<String>;
 
         /// 只读资产激活（073 首个 FSM 消费者）：按稳定 ImportRecord ID
         /// 异步读取并解析已提交 STL；结果只在会话仍有效时发布。
@@ -794,21 +806,38 @@ fn mesh_coordinates(mesh: &panta_mesh::SurfaceMesh) -> Result<Vec<f64>, String> 
     Ok(coordinates)
 }
 
-fn project_service_mesh_snapshot(
+fn project_service_mesh_snapshot_for_import(
     service: &ProjectService,
+    import_id: &str,
 ) -> Result<bridge::SurfaceMeshSnapshot, String> {
     let snapshot = service
         .service
         .current()
         .map_err(|error| error.to_string())?;
-    let coordinates = match service.service.current_mesh() {
-        Some(mesh) => mesh_coordinates(mesh)?,
-        None => Vec::new(),
-    };
+    let mesh = service
+        .service
+        .mesh_for_import(import_id)
+        .ok_or_else(|| "project.mesh_not_resident".to_owned())?;
     Ok(bridge::SurfaceMeshSnapshot {
-        coordinates,
+        coordinates: mesh_coordinates(mesh)?,
         revision: snapshot.revision,
     })
+}
+
+fn project_service_activate_mesh_document(service: &mut ProjectService, import_id: &str) -> bool {
+    service.service.activate_mesh_document(import_id)
+}
+
+fn project_service_deactivate_mesh_document(service: &mut ProjectService) {
+    service.service.deactivate_mesh_document();
+}
+
+fn project_service_release_mesh_document(service: &mut ProjectService, import_id: &str) {
+    service.service.release_mesh_document(import_id);
+}
+
+fn project_service_resident_mesh_ids(service: &ProjectService) -> Vec<String> {
+    service.service.resident_mesh_ids()
 }
 
 fn project_service_begin_asset_activation(
@@ -836,42 +865,85 @@ fn project_service_drain_asset_activations(
         .service
         .drain_asset_activations()
         .into_iter()
-        .map(|outcome| {
-            // 坐标跨越所有权边界时才转换；分配失败把本次结果降级为带稳定
-            // 错误码的 Failed，不发布无负载的假成功。
-            let (kind, code, detail, coordinates) = match outcome.mesh {
-                Some(mesh) => match mesh_coordinates(&mesh) {
-                    Ok(coordinates) => (
-                        bridge::ActivationOutcomeKind::Succeeded,
-                        outcome.code,
-                        outcome.detail,
-                        coordinates,
-                    ),
-                    Err(detail) => (
+        .map(|outcome| activation_outcome_to_bridge(&mut service.service, outcome))
+        .collect()
+}
+
+fn activation_outcome_to_bridge(
+    service: &mut panta_core::project::ProjectService,
+    outcome: panta_core::project::Outcome,
+) -> bridge::ActivationOutcome {
+    let (kind, code, detail, coordinates) = match outcome.kind {
+        panta_core::project::OutcomeKind::Succeeded
+            if !service.is_current_activation_attempt(&outcome.import_id, outcome.attempt) =>
+        {
+            // 同 ID 页签重开会产生新 attempt；旧成功结果既不进缓存，也不跨 FFI 携带大网格。
+            (
+                bridge::ActivationOutcomeKind::Expired,
+                String::new(),
+                String::new(),
+                Vec::new(),
+            )
+        }
+        panta_core::project::OutcomeKind::Succeeded => match outcome.mesh {
+            Some(mesh) => match mesh_coordinates(&mesh) {
+                Ok(coordinates) => {
+                    // DTO 由此 outcome 自己的 Mesh 构造；缓存提交再次校验 attempt。
+                    if service.cache_activation_result(&outcome.import_id, outcome.attempt, mesh) {
+                        (
+                            bridge::ActivationOutcomeKind::Succeeded,
+                            outcome.code,
+                            outcome.detail,
+                            coordinates,
+                        )
+                    } else {
+                        (
+                            bridge::ActivationOutcomeKind::Expired,
+                            String::new(),
+                            String::new(),
+                            Vec::new(),
+                        )
+                    }
+                }
+                Err(detail) => {
+                    service.finish_asset_activation(&outcome.import_id, outcome.attempt);
+                    (
                         bridge::ActivationOutcomeKind::Failed,
                         "project.mesh_allocation_failed".to_owned(),
                         detail,
                         Vec::new(),
-                    ),
-                },
-                None => (
-                    activation_kind(outcome.kind),
-                    outcome.code,
-                    outcome.detail,
+                    )
+                }
+            },
+            None => {
+                service.finish_asset_activation(&outcome.import_id, outcome.attempt);
+                (
+                    bridge::ActivationOutcomeKind::Failed,
+                    "project.mesh_missing".to_owned(),
+                    String::new(),
                     Vec::new(),
-                ),
-            };
-            bridge::ActivationOutcome {
-                attempt: outcome.attempt,
-                generation: outcome.generation,
-                import_id: outcome.import_id,
-                kind,
-                code,
-                detail,
-                coordinates,
+                )
             }
-        })
-        .collect()
+        },
+        kind => {
+            service.finish_asset_activation(&outcome.import_id, outcome.attempt);
+            (
+                activation_kind(kind),
+                outcome.code,
+                outcome.detail,
+                Vec::new(),
+            )
+        }
+    };
+    bridge::ActivationOutcome {
+        attempt: outcome.attempt,
+        generation: outcome.generation,
+        import_id: outcome.import_id,
+        kind,
+        code,
+        detail,
+        coordinates,
+    }
 }
 
 fn activation_kind(kind: panta_core::project::OutcomeKind) -> bridge::ActivationOutcomeKind {
@@ -947,13 +1019,14 @@ fn bridge_kind(category: panta_core::path::RootCategory) -> bridge::PathRootKind
 #[cfg(test)]
 mod tests {
     use super::{
-        FfiRequest, FfiResponse, MAX_LABEL_BYTES, bridge, panic_probe, path_ref_parse,
-        path_service_new, path_service_resolve, path_service_resolve_existing,
-        path_service_resolve_write_target, path_service_set_root, process, project_service_create,
-        project_service_current, project_service_execute, project_service_new,
-        project_service_open, project_service_save, session_close, session_create, session_label,
-        session_live_count, task_service_cancel, task_service_drain, task_service_new,
-        task_service_recent_logs, task_service_running, task_service_submit,
+        FfiRequest, FfiResponse, MAX_LABEL_BYTES, activation_outcome_to_bridge, bridge,
+        panic_probe, path_ref_parse, path_service_new, path_service_resolve,
+        path_service_resolve_existing, path_service_resolve_write_target, path_service_set_root,
+        process, project_service_create, project_service_current, project_service_execute,
+        project_service_mesh_snapshot_for_import, project_service_new, project_service_open,
+        project_service_resident_mesh_ids, project_service_save, session_close, session_create,
+        session_label, session_live_count, task_service_cancel, task_service_drain,
+        task_service_new, task_service_recent_logs, task_service_running, task_service_submit,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -1460,12 +1533,6 @@ endsolid
             Err(error) => error,
         };
         assert_eq!(no_project, "project.no_project");
-        let no_project_mesh = match crate::project_service_mesh_snapshot(&service) {
-            Ok(snapshot) => panic!("empty project returned revision {}", snapshot.revision),
-            Err(error) => error,
-        };
-        assert_eq!(no_project_mesh, "project.no_project");
-
         let preview =
             crate::project_service_inspect_stl(&mut service, source.display().to_string())?;
         assert_eq!(preview.source_name, "part.stl");
@@ -1488,9 +1555,7 @@ endsolid
 
         let created =
             project_service_create(&mut service, root.display().to_string(), "Demo".to_owned())?;
-        let before_import = crate::project_service_mesh_snapshot(&service)?;
-        assert_eq!(before_import.revision, created.revision);
-        assert!(before_import.coordinates.is_empty());
+        assert!(project_service_resident_mesh_ids(&service).is_empty());
         assert!(crate::project_service_imports(&service)?.is_empty());
 
         let imported = crate::project_service_import_stl(
@@ -1515,7 +1580,7 @@ endsolid
         let imports = crate::project_service_imports(&service)?;
         assert_eq!(imports.len(), 1);
         assert_eq!(imports[0].parser_version, imported.parser_version);
-        let snapshot = crate::project_service_mesh_snapshot(&service)?;
+        let snapshot = project_service_mesh_snapshot_for_import(&service, &imported.id)?;
         assert_eq!(snapshot.revision, 1);
         assert_eq!(
             snapshot.coordinates,
@@ -1524,11 +1589,13 @@ endsolid
 
         let mut reopened = project_service_new();
         project_service_open(&mut reopened, created.path)?;
-        // 打开工程只读清单；已保存网格必须经只读激活按需恢复（073/080），
-        // 这里验证修订投影不变且坐标为空（未激活）。
-        let restored = crate::project_service_mesh_snapshot(&reopened)?;
-        assert_eq!(restored.revision, snapshot.revision);
-        assert!(restored.coordinates.is_empty());
+        // 打开工程仅读取清单；已保存网格须通过只读激活按需恢复（073/080）。
+        assert!(project_service_resident_mesh_ids(&reopened).is_empty());
+        let unloaded = match project_service_mesh_snapshot_for_import(&reopened, &imported.id) {
+            Ok(_) => panic!("unloaded mesh returned a display snapshot"),
+            Err(error) => error,
+        };
+        assert_eq!(unloaded, "project.mesh_not_resident");
 
         let step_source = root.join("part.step");
         fs::write(&step_source, b"not a supported STL source")?;
@@ -1588,6 +1655,30 @@ endsolid
 
         let _ = fs::remove_dir_all(&root);
         Ok(())
+    }
+
+    #[test]
+    fn activation_without_a_current_attempt_does_not_cross_the_bridge() {
+        let mut service = project_service_new();
+        let outcome = |attempt, x| panta_core::project::Outcome {
+            attempt,
+            generation: 0,
+            import_id: "import-1".to_owned(),
+            kind: panta_core::project::OutcomeKind::Succeeded,
+            code: String::new(),
+            detail: String::new(),
+            mesh: Some(panta_mesh::SurfaceMesh {
+                triangles: vec![[[x, 0.0, 0.0], [x + 1.0, 0.0, 0.0], [x, 1.0, 0.0]]],
+            }),
+        };
+
+        let first = activation_outcome_to_bridge(&mut service.service, outcome(1, 1.0));
+        let second = activation_outcome_to_bridge(&mut service.service, outcome(2, 10.0));
+
+        assert!(first.kind == bridge::ActivationOutcomeKind::Expired);
+        assert!(first.coordinates.is_empty());
+        assert!(second.kind == bridge::ActivationOutcomeKind::Expired);
+        assert!(second.coordinates.is_empty());
     }
 
     #[test]

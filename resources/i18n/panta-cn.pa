@@ -644,6 +644,10 @@ loading:
   src: Loading
   tr: 正在加载
 
+mesh-data-released:
+  src: Mesh data released; activate to reload
+  tr: 网格数据已释放；激活页签可重新加载
+
 failed-to-load:
   src: Failed to load
   tr: 加载失败

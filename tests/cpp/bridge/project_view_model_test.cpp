@@ -268,7 +268,8 @@ TEST(ProjectViewModelTest, ReorderingAndClosingDocumentsPreservesActiveMeshSelec
     EXPECT_EQ(view_model.mesh_snapshot().get(), second_mesh.get());
     view_model.closeDocument(QStringLiteral("import-2"));
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
-    EXPECT_EQ(view_model.mesh_snapshot().get(), first_mesh.get());
+    EXPECT_NE(view_model.mesh_snapshot().get(), first_mesh.get());
+    EXPECT_EQ(view_model.mesh_snapshot()->vertices, first_mesh->vertices);
 
     view_model.closeDocument(QStringLiteral("import-1"));
     EXPECT_TRUE(view_model.activeDocumentId().isEmpty());
@@ -370,23 +371,28 @@ TEST(ProjectViewModelTest, ClosedDocumentsReleaseTheirMeshSnapshotsAfterRepeated
     const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> second_snapshot =
         view_model.mesh_snapshot();
     ASSERT_FALSE(second_snapshot.expired());
+    EXPECT_TRUE(first_snapshot.expired());
 
     for (int round = 0; round < 32; ++round) {
         view_model.activateDocument(QStringLiteral("import-1"));
         ASSERT_NE(view_model.mesh_snapshot(), nullptr);
+        EXPECT_TRUE(second_snapshot.expired());
         view_model.activateDocument(QStringLiteral("import-2"));
         ASSERT_NE(view_model.mesh_snapshot(), nullptr);
+        EXPECT_TRUE(first_snapshot.expired());
     }
-    EXPECT_FALSE(first_snapshot.expired());
-    EXPECT_FALSE(second_snapshot.expired());
+    EXPECT_TRUE(first_snapshot.expired());
+    EXPECT_TRUE(second_snapshot.expired());
 
     view_model.closeDocument(QStringLiteral("import-1"));
     EXPECT_TRUE(first_snapshot.expired());
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-2"));
     EXPECT_NE(view_model.mesh_snapshot(), nullptr);
 
+    const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> active_snapshot =
+        view_model.mesh_snapshot();
     view_model.closeDocument(QStringLiteral("import-2"));
-    EXPECT_TRUE(second_snapshot.expired());
+    EXPECT_TRUE(active_snapshot.expired());
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("welcome"));
     EXPECT_EQ(view_model.mesh_snapshot(), nullptr);
 }

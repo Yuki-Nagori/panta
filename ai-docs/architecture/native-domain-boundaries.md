@@ -2,7 +2,7 @@
 
 [架构总览](README.md) · [分层规则](../standards/layering.md) · [任务 066](../task/066-native-domain-boundaries.md)
 
-更新日期：2026-09-25。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
+更新日期：2026-09-29。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
 
 ## 分层与调用
 
@@ -22,6 +22,8 @@ Rust 管理工程身份、单位、修订、引用、任务与成功提交，C++
 Qt 是体量较大的原生 GUI 框架，在这条边界中单独作为**界面与平台运行时**看待，不与 OCCT / Netgen 的几何算法适配角色混为一谈。QML / Qt Quick 继续负责界面组合、布局、输入、动画和即时显示，使用 Qt scene graph、Controls、模型视图等已有的渲染与交互能力；C++ ViewModel / Controller 负责 Qt 对象生命周期、信号属性、模型 / 委托接口、线程亲和性、平台对话框及 QML 与服务 DTO 之间的类型适配。`native/qt-adapter` 集中标准目录、系统偏好等需要选择 Qt 平台 API 或操作系统 API 的服务，并以稳定值和 Qt 属性交给上层；该 target 不依赖 Rust、Bridge 或 VTK。Qt Quick 与 VTK hardware window 紧耦合的 surface 创建和同步仍由 Visualization 管理，避免把 VTK 窗口所有权抽到通用平台层。继续使用当前 Qt 基线和其已供给的界面、绘制及平台能力，包括 Qt 已有的高性能场景图和适用的绘图 / 可视化组件；不为语言统一而在 Rust 重写 Qt 的图形、事件循环或工具能力。
 
 Qt 边界不改变领域权威归属：工程身份与持久化、导入解析、单位 / 修订 / 引用规则、成功提交、业务任务和支持 locale/当前 locale 状态由 Rust 服务管理；QML 表达展示与用户意图，C++ ViewModel / Controller 只做 Qt 适配并转发粗粒度命令。翻译目录和 locale 校验由 Rust 提供；Bridge `Settings` 将已校验 locale 映射到构建资源命名并请求 QML 重翻译，通用 Qt adapter 管理 `QTranslator` 安装/卸载。Rust 不引入 Qt 类型、事件循环或 QM 资源 URL。Rust 服务应按用例返回拥有内存的批量快照 / DTO；C++ 可把 DTO 映射为 Qt 属性或 `QAbstractItemModel` 角色供 QML 使用，但不能让 ViewModel 通过逐行 FFI 查询拼装业务对象，也不能把 Rust 领域状态藏入 QObject 或 QML 作为第二份权威数据。跨过 CXX 边界后，传给 Qt 的数据必须由 C++ 值对象或具有明确共享所有权的不可变快照承载；不能把借用的 Rust 缓冲区直接放进排队信号。跨线程信号参数须满足 Qt queued connection 的类型和生命周期要求，并按 Qt 要求注册元类型；具体 payload 大小时，在对应任务中确定复制、移动或共享快照策略。
+
+运行期 Mesh 驻留策略也属于 Rust 工程服务：`ProjectService` 持有解析后的 `SurfaceMesh`，决定缓存预算、LRU 淘汰、活动文档 pin、缓存命中和关闭释放；它向 Bridge 批量报告驻留 ID。ViewModel 仍拥有打开页签与当前活动文档选择，只把驻留 ID 投影为 `ready/unloaded`，并在视口活动时持有单份 C++ 显示 DTO。`MeshSource::mesh_snapshot()` 是本地共享指针读取，VTK / Qt Quick 的刷新与逐帧路径不得通过此 getter 调用 CXX/Rust；跨边界复制仅在导入、选中、关闭或异步激活等粗粒度状态变化时发生。C++ VTK 后端负责把活动 DTO 转成 `vtkPolyData` 和管理显示资源；不得在 ViewModel 再维护第二份按文档索引的 Mesh 缓存或自行实施预算 / LRU。
 
 鼠标悬停、当前行高亮和即时交互反馈属于 Qt / QML / VTK 显示状态。若用户选择的实体将影响网格操作、边界条件或工程提交，稳定实体 ID、所属修订和引用有效性由 Rust 建模与校验；Qt 保留命中反馈并把完整、粗粒度的选择意图交给服务。选择意图应携带稳定实体 ID 集合、所属修订和选择模式（如替换、追加、移除或清空）；不能只把易变化的行号、显示索引或像素位置当成领域身份。纯显示高亮则无需因此升级为 Rust 领域状态。
 
@@ -44,6 +46,7 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 | 网格生成、库提供的网格优化 | C++ adapter 调用 Netgen；Rust 选择参数、输入修订与任务策略 | 适配层维护独立于领域层的网格有效性规则 |
 | 异常归一化、类型转换、数组展开、索引起点与单元节点顺序转换 | C++ adapter，属于接口语义转换 | 对外泄漏 OCCT/Netgen 类型或未声明所有权的指针 |
 | 工程网格有效性、应用质量阈值、区域 / 边界引用、资产失效 | Rust 领域层；边界仍保留必要长度 / 溢出 / 范围检查 | Rust 重写重库的几何修复或网格生成算法 |
+| 运行期 `SurfaceMesh` 缓存预算、LRU、驻留查询和关闭释放 | Rust `ProjectService`；C++ ViewModel 提供活动文档 pin 意图并投影批量驻留 ID | 在 ViewModel 按 ID 保留 Mesh 集合、计算预算或决定淘汰次序 |
 | VTK 数据对象、mapper/filter/actor、相机及显示命中、GPU 资源 | C++ 显示后端；调用 VTK 的绘制和数据处理能力 | 由 Rust 驱动逐帧导航或管理 VTK/GPU 生命周期 |
 | 导入格式解析、领域网格 / 字段、显示选项与选择状态 | Rust；轻量解析 / 校验可自有实现 | 用泛型解析接口抹平不同格式的语义 |
 

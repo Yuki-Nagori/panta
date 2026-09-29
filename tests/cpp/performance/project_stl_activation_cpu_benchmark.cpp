@@ -53,7 +53,7 @@ struct MemorySample {
 struct LoadedDocument {
     QString id;
     QString name;
-    std::uint64_t snapshot_capacity_bytes = 0;
+    std::uint64_t mesh_payload_estimate_bytes = 0;
 };
 
 std::optional<std::uint64_t> resident_bytes() {
@@ -122,7 +122,7 @@ MemorySample sample_memory() { return {resident_bytes(), peak_rss_bytes()}; }
 double mib(std::uint64_t bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); }
 
 void print_memory(const char* phase, const MemorySample& sample,
-                  std::uint64_t retained_snapshot_bytes) {
+                  std::uint64_t estimated_resident_mesh_bytes) {
     std::cout << "memory phase=" << phase << " resident_mib=";
     if (sample.resident_bytes) {
         std::cout << std::fixed << std::setprecision(2) << mib(*sample.resident_bytes);
@@ -135,8 +135,8 @@ void print_memory(const char* phase, const MemorySample& sample,
     } else {
         std::cout << "unavailable";
     }
-    std::cout << " retained_snapshot_capacity_mib=" << std::fixed << std::setprecision(2)
-              << mib(retained_snapshot_bytes) << '\n';
+    std::cout << " estimated_resident_mesh_payload_mib=" << std::fixed << std::setprecision(2)
+              << mib(estimated_resident_mesh_bytes) << '\n';
 }
 
 double percentile_ms(std::vector<double> samples, double percentile) {
@@ -150,16 +150,22 @@ double percentile_ms(std::vector<double> samples, double percentile) {
     return samples[index];
 }
 
+QString document_state(const ProjectViewModel& view_model, const QString& id) {
+    const auto documents = view_model.openDocuments();
+    for (const auto& value : documents) {
+        const auto document = value.toMap();
+        if (document.value(QStringLiteral("id")).toString() == id) {
+            return document.value(QStringLiteral("state")).toString();
+        }
+    }
+    return {};
+}
+
 bool document_ready(const ProjectViewModel& view_model, const QString& id) {
     if (view_model.activeDocumentId() != id || view_model.mesh_snapshot() == nullptr) {
         return false;
     }
-    const auto documents = view_model.openDocuments();
-    return std::any_of(documents.cbegin(), documents.cend(), [&id](const QVariant& value) {
-        const auto document = value.toMap();
-        return document.value(QStringLiteral("id")).toString() == id &&
-               document.value(QStringLiteral("state")).toString() == QStringLiteral("ready");
-    });
+    return document_state(view_model, id) == QStringLiteral("ready");
 }
 
 template <typename Predicate>
@@ -187,12 +193,24 @@ bool wait_for_activation(ProjectViewModel& view_model, Predicate&& ready, int ti
     return ready();
 }
 
-std::uint64_t retained_payload(const std::vector<LoadedDocument>& documents) {
+// 用每个资产先前跨 FFI 得到的显示 DTO 容量估算 Rust Mesh payload；DTO 本身不按页签保留。
+std::uint64_t resident_mesh_payload_estimate(const ProjectViewModel& view_model,
+                                             const std::vector<LoadedDocument>& documents) {
     std::uint64_t bytes = 0;
     for (const auto& document : documents) {
-        bytes += document.snapshot_capacity_bytes;
+        if (document_state(view_model, document.id) == QStringLiteral("ready")) {
+            bytes += document.mesh_payload_estimate_bytes;
+        }
     }
     return bytes;
+}
+
+std::size_t cached_document_count(const ProjectViewModel& view_model,
+                                  const std::vector<LoadedDocument>& documents) {
+    return static_cast<std::size_t>(std::count_if(
+        documents.cbegin(), documents.cend(), [&view_model](const LoadedDocument& document) {
+            return document_state(view_model, document.id) == QStringLiteral("ready");
+        }));
 }
 
 int fail(const std::string& message) {
@@ -224,6 +242,7 @@ int main(int argc, char* argv[]) try {
               << " qt=" << qVersion()
               << " architecture=" << QSysInfo::currentCpuArchitecture().toStdString()
               << " reload_iterations=" << reload_iterations
+              << " mesh_cache_policy=ProjectService_default"
               << " memory_scope=ProjectViewModel+Rust_activation excludes=VTK_GPU\n";
 
     ProjectViewModel view_model;
@@ -255,49 +274,63 @@ int main(int argc, char* argv[]) try {
         if (!snapshot || snapshot->vertices.empty()) {
             return fail("activation returned an empty mesh for " + names[index].toStdString());
         }
-        const auto payload_bytes = static_cast<std::uint64_t>(snapshot->vertices.capacity()) *
-                                   static_cast<std::uint64_t>(sizeof(snapshot->vertices[0]));
-        loaded.push_back({id, names[index], payload_bytes});
+        const auto mesh_payload_estimate_bytes =
+            static_cast<std::uint64_t>(snapshot->vertices.capacity()) *
+            static_cast<std::uint64_t>(sizeof(snapshot->vertices[0]));
+        loaded.push_back({id, names[index], mesh_payload_estimate_bytes});
         std::cout << "initial_activation file=" << names[index].toStdString()
                   << " triangles=" << snapshot->vertices.size() / 3
-                  << " snapshot_capacity_mib=" << std::fixed << std::setprecision(2)
-                  << mib(payload_bytes) << " elapsed_ms=" << std::setprecision(3) << elapsed_ms
-                  << '\n';
-        print_memory(("retained_after_" + std::to_string(index + 1)).c_str(), sample_memory(),
-                     retained_payload(loaded));
+                  << " active_dto_capacity_mib=" << std::fixed << std::setprecision(2)
+                  << mib(mesh_payload_estimate_bytes) << " elapsed_ms=" << std::setprecision(3)
+                  << elapsed_ms << '\n';
+        print_memory(("cache_after_activation_" + std::to_string(index + 1)).c_str(),
+                     sample_memory(), resident_mesh_payload_estimate(view_model, loaded));
     }
 
     const auto all_loaded_memory = sample_memory();
-    print_memory("all_documents_retained", all_loaded_memory, retained_payload(loaded));
+    const auto resident_mesh_bytes = resident_mesh_payload_estimate(view_model, loaded);
+    std::cout << "mesh_cache_state resident_documents=" << cached_document_count(view_model, loaded)
+              << " unloaded_documents=" << loaded.size() - cached_document_count(view_model, loaded)
+              << " estimated_resident_mesh_payload_mib=" << std::fixed << std::setprecision(2)
+              << mib(resident_mesh_bytes) << '\n';
+    print_memory("mesh_cache_after_opening_all_tabs", all_loaded_memory, resident_mesh_bytes);
 
     if (loaded.size() > 1) {
-        constexpr int kSwitchSamples = 31;
-        constexpr int kSwitchesPerSample = 300;
-        std::vector<double> switch_samples_us;
-        switch_samples_us.reserve(kSwitchSamples);
-        const auto repeat_count =
-            std::max<std::size_t>(1, static_cast<std::size_t>(kSwitchesPerSample) / loaded.size());
-        const double switches_per_sample = static_cast<double>(repeat_count * loaded.size());
-        for (int sample = 0; sample < kSwitchSamples; ++sample) {
-            const auto start = Clock::now();
-            for (std::size_t repeat = 0; repeat < repeat_count; ++repeat) {
-                for (const auto& document : loaded) {
-                    view_model.activateDocument(document.id);
-                    if (view_model.activeDocumentId() != document.id ||
-                        view_model.mesh_snapshot() == nullptr) {
-                        return fail("cached document switch did not retain its snapshot");
-                    }
+        constexpr int kSwitchCycles = 31;
+        std::vector<double> selection_call_samples_ms;
+        std::vector<double> selection_ready_samples_ms;
+        const auto expected_samples = static_cast<std::size_t>(kSwitchCycles) * loaded.size();
+        selection_call_samples_ms.reserve(expected_samples);
+        selection_ready_samples_ms.reserve(expected_samples);
+        std::size_t cache_misses = 0;
+        for (int cycle = 0; cycle < kSwitchCycles; ++cycle) {
+            for (const auto& document : loaded) {
+                cache_misses +=
+                    document_state(view_model, document.id) == QStringLiteral("unloaded");
+                const auto start = Clock::now();
+                view_model.activateDocument(document.id);
+                const auto selection_returned = Clock::now();
+                const auto ready = [&view_model, &document] {
+                    return document_ready(view_model, document.id);
+                };
+                if (!wait_for_activation(view_model, ready, 60000)) {
+                    return fail("document selection or cache reload timed out for " +
+                                document.name.toStdString());
                 }
+                const auto completed = Clock::now();
+                selection_call_samples_ms.push_back(
+                    std::chrono::duration<double, std::milli>(selection_returned - start).count());
+                selection_ready_samples_ms.push_back(
+                    std::chrono::duration<double, std::milli>(completed - start).count());
             }
-            switch_samples_us.push_back(
-                std::chrono::duration<double, std::micro>(Clock::now() - start).count() /
-                switches_per_sample);
         }
-        std::cout << "cached_switch samples=" << switch_samples_us.size()
-                  << " switches_per_sample=" << kSwitchesPerSample << " p50_us=" << std::fixed
-                  << std::setprecision(2) << percentile_ms(switch_samples_us, 0.50)
-                  << " p95_us=" << percentile_ms(switch_samples_us, 0.95)
-                  << " scope=synchronous_ViewModel_selection\n";
+        std::cout << "document_selection samples=" << selection_call_samples_ms.size()
+                  << " cache_misses=" << cache_misses << " call_p50_ms=" << std::fixed
+                  << std::setprecision(3) << percentile_ms(selection_call_samples_ms, 0.50)
+                  << " call_p95_ms=" << percentile_ms(selection_call_samples_ms, 0.95)
+                  << " ready_p50_ms=" << percentile_ms(selection_ready_samples_ms, 0.50)
+                  << " ready_p95_ms=" << percentile_ms(selection_ready_samples_ms, 0.95)
+                  << " scope=ViewModel_selection_call_and_selection_to_ready\n";
     }
 
     for (const auto& document : loaded) {
@@ -305,6 +338,13 @@ int main(int argc, char* argv[]) try {
         reload_samples_ms.reserve(static_cast<std::size_t>(reload_iterations));
         for (int iteration = 0; iteration < reload_iterations; ++iteration) {
             view_model.activateDocument(document.id);
+            const auto ready = [&view_model, &document]() {
+                return document_ready(view_model, document.id);
+            };
+            if (!wait_for_activation(view_model, ready, 60000)) {
+                return fail("document selection timed out before close for " +
+                            document.name.toStdString());
+            }
             std::weak_ptr<const SurfaceMeshSnapshot> prior_snapshot;
             {
                 const auto snapshot = view_model.mesh_snapshot();
@@ -320,9 +360,6 @@ int main(int argc, char* argv[]) try {
 
             const auto start = Clock::now();
             view_model.openImportRecord(document.id);
-            const auto ready = [&view_model, &document]() {
-                return document_ready(view_model, document.id);
-            };
             if (!wait_for_activation(view_model, ready, 60000)) {
                 return fail("reload timed out or failed for " + document.name.toStdString());
             }
@@ -333,7 +370,8 @@ int main(int argc, char* argv[]) try {
                 completed == reload_iterations) {
                 const std::string phase = "reload_" + document.id.toStdString() + "_iteration_" +
                                           std::to_string(completed);
-                print_memory(phase.c_str(), sample_memory(), retained_payload(loaded));
+                print_memory(phase.c_str(), sample_memory(),
+                             resident_mesh_payload_estimate(view_model, loaded));
             }
         }
         std::cout << "file_reload file=" << document.name.toStdString()
@@ -344,7 +382,8 @@ int main(int argc, char* argv[]) try {
     }
 
     const auto before_close_memory = sample_memory();
-    print_memory("after_reloads_all_open", before_close_memory, retained_payload(loaded));
+    print_memory("after_reloads_all_open", before_close_memory,
+                 resident_mesh_payload_estimate(view_model, loaded));
     for (const auto& document : loaded) {
         view_model.closeDocument(document.id);
     }

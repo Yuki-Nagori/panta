@@ -75,6 +75,18 @@ Item {
         }
         return qsTr("%1, import %2").arg(document.title).arg(matches.findIndex(entry => entry.id === document.id) + 1);
     }
+    function accessible_description(document) {
+        if (document.state === "loading") {
+            return qsTr("Loading");
+        }
+        if (document.state === "failed") {
+            return document.message ?? qsTr("Failed to load");
+        }
+        if (document.state === "unloaded") {
+            return qsTr("Mesh data released; activate to reload");
+        }
+        return "";
+    }
     function focus_document(index) {
         const tab = tabRepeater.itemAt(index);
         const document = displayDocuments[index];
@@ -89,7 +101,7 @@ Item {
             scroller.contentX = right - scroller.width;
         }
         tab.forceActiveFocus();
-        if (document.state === "ready") {
+        if (document.state === "ready" || document.state === "unloaded") {
             bar.activateDocument(document.id);
         }
     }
@@ -141,10 +153,10 @@ Item {
                 readonly property bool isDragged: documentId === bar.draggedId
                 Accessible.role: Accessible.PageTab
                 Accessible.name: bar.accessible_title(tab.doc)
-                Accessible.description: tab.tabState === "loading" ? qsTr("Loading") : tab.tabState === "failed" ? tab.doc.message ?? qsTr("Failed to load") : ""
+                Accessible.description: bar.accessible_description(tab.doc)
                 Accessible.selected: tab.isActive
                 Accessible.onPressAction: {
-                    if (tab.tabState === "ready") {
+                    if (tab.tabState === "ready" || tab.tabState === "unloaded") {
                         tab.forceActiveFocus();
                         bar.activateDocument(tab.documentId);
                     }
@@ -158,7 +170,7 @@ Item {
                             bar.focus_document((tab.index + direction + count) % count);
                         }
                         event.accepted = true;
-                    } else if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && tab.tabState === "ready") {
+                    } else if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (tab.tabState === "ready" || tab.tabState === "unloaded")) {
                         bar.activateDocument(tab.documentId);
                         event.accepted = true;
                     }
@@ -416,7 +428,7 @@ Item {
         // 开始拖拽时保留指针在页签中的位置；否则越过阈值的首帧会跳位。
         internal.suppressClick = true;
         const document = bar.documents.find(entry => entry.id === documentId);
-        if (document && document.state === "ready") {
+        if (document && (document.state === "ready" || document.state === "unloaded")) {
             bar.activateDocument(documentId);
         }
         let visualX = slot_x(slot_of(documentId));

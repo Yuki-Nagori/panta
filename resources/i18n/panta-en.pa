@@ -644,6 +644,10 @@ loading:
   src: Loading
   tr: Loading
 
+mesh-data-released:
+  src: Mesh data released; activate to reload
+  tr: Mesh data released; activate to reload
+
 failed-to-load:
   src: Failed to load
   tr: Failed to load

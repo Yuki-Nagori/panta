@@ -20,6 +20,8 @@ class MeshSource : public QObject {
   public:
     using QObject::QObject;
     ~MeshSource() override = default;
+    /// 返回已准备好的本地显示 DTO。视口刷新会读取此值；实现不得在此调用
+    /// Rust / FFI，网格跨界复制只发生在导入、激活等粗粒度状态变化中。
     [[nodiscard]] virtual std::shared_ptr<const SurfaceMeshSnapshot> mesh_snapshot() const = 0;
     /// 无网格时是否显示占位字样（Welcome 场景）。返回 false 表示空白视口，
     /// 后端不得用占位内容填充；文档视图据此区分 Welcome 与全关闭。

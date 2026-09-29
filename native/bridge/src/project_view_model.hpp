@@ -6,6 +6,7 @@
 
 #include "panta_ffi.h"
 #include <QMap>
+#include <QSet>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -41,7 +42,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(quint64 importPreviewTriangleCount READ importPreviewTriangleCount NOTIFY
                    importPreviewChanged)
     /// 打开的视口文档（含 Welcome）；元素为 {id, kind, state, title, message}，
-    /// 顺序即页签顺序。QML 只投影，不另存可分歧的副本。
+    /// state 可为 ready/loading/failed/unloaded；unloaded 由 Rust 缓存驻留结果投影。
+    /// 顺序即页签顺序；QML 只投影，不另存可分歧的副本。
     Q_PROPERTY(QVariantList openDocuments READ openDocuments NOTIFY documentsChanged)
     /// 当前活动文档 ID；视口内容的唯一选择状态。空串表示全部关闭（空白视口）。
     Q_PROPERTY(QString activeDocumentId READ activeDocumentId NOTIFY activeDocumentChanged)
@@ -152,7 +154,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     struct DocumentEntry {
         QString id;
         QString kind;  // "welcome" | "import"
-        QString state; // "ready" | "loading" | "failed"
+        QString state; // "ready" | "loading" | "failed" | "unloaded"
         QString title;
         QString message; // Failed 态的用户可读原因
     };
@@ -164,9 +166,13 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     static QString userMessageFor(const QString& errorCode);
     static bool toBoundaryText(const QString& text, std::string* out, QString* error);
 
-    std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> pull_service_mesh() const;
+    std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
+    pull_service_mesh(const QString& importId) const;
     int document_index(const QString& documentId) const;
-    void activate_ready_document(int index);
+    bool activate_ready_document(
+        int index,
+        std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> loadedMesh = nullptr);
+    bool sync_mesh_residency();
     void reset_documents();
     void begin_import_activation(const QString& recordId);
     void drain_activations();
@@ -193,8 +199,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_importPreviewTriangleCount = 0;
     QVector<DocumentEntry> m_documents;
     QString m_activeDocumentId;
-    QMap<QString, std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>>
-        m_documentMeshes;
+    /// 当前活动文档的 C++ 显示 DTO；Rust ProjectService 拥有所有驻留 Mesh 与缓存策略。
+    std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_activeMesh;
     QMap<QString, quint64> m_activationAttempts;
     QTimer m_activationPoll;
     rust::Box<panta::ffi::ProjectService> m_service;
