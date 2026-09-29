@@ -30,10 +30,10 @@ Python 要求以求解器的 `pyproject.toml` 为准；本机已验证 Python 3.
 
 | 操作 | 界面应出现什么 |
 |---|---|
-| 点击 **Filling MVP · default example** | 左侧四步流程、固定参数；右侧显示区域和底部回放条 |
+| 点击 **Filling MVP · default example** | 左侧四步流程和算例配置路径；右侧显示区域和底部回放条 |
 | 点击 **Load default example** | Cover 模型，原始网格 164 个三角面 |
-| 点击 **Generate default mesh** | 实际调用 MMG 重划；完成后显示网格边线，本机默认结果为 2,638 个三角面 |
-| 点击 **Start filling with defaults** | 后台启动求解器；显示阶段、真实充填进度及运行耗时；运行时按钮禁用以防重复提交 |
+| 点击 **Generate mesh** | 实际调用 MMG 重划；默认参数下本机结果为 2,638 个三角面 |
+| 点击 **Start filling** | 后台启动求解器；显示阶段、真实充填进度及运行耗时；运行时按钮禁用以防重复提交 |
 | 等待 **Filling complete** | 显示已充满、物理充填时间、峰值压力及充填时间云图；底部回放按钮可用 |
 | 点击 **Play filling** | 从起点回放充填过程；再次点击 **Pause** 可暂停 |
 | 拖动底部时间轴 | 查看任意物理时刻的已充填区域；到结尾后再点击播放即可重播 |
