@@ -12,6 +12,11 @@ namespace panta::visualization {
 struct SurfaceMeshSnapshot {
     std::vector<std::array<double, 3>> vertices;
     std::uint64_t project_revision = 0;
+    /// 为空或与展开顶点一一对应；单位 s，NaN 表示未充填。
+    std::vector<double> fill_times;
+    double fill_duration = 0.0;
+    bool show_edges = false;
+    bool z_up = false;
 };
 
 class MeshSource : public QObject {

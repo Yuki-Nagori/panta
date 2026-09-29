@@ -16,6 +16,8 @@ namespace panta::visualization {
 class CaeViewport : public QQuickItem {
     Q_OBJECT
     QML_NAMED_ELEMENT(CaeViewport)
+    Q_PROPERTY(
+        double playbackTime READ playbackTime WRITE setPlaybackTime NOTIFY playbackTimeChanged)
     Q_PROPERTY(QObject* meshSource READ meshSource WRITE setMeshSource NOTIFY meshSourceChanged)
 
   public:
@@ -24,11 +26,14 @@ class CaeViewport : public QQuickItem {
 
     [[nodiscard]] QObject* meshSource() const;
     void setMeshSource(QObject* source);
+    [[nodiscard]] double playbackTime() const;
+    void setPlaybackTime(double seconds);
 
   signals:
     /// 后端完成场景构建后通知 GUI；渲染错误经 qWarning 上报，不静默。
     void sceneReady();
     void meshSourceChanged();
+    void playbackTimeChanged();
 
   protected:
     void componentComplete() override;
