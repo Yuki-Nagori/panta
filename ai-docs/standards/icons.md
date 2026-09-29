@@ -29,7 +29,7 @@
 
 ## QML 资源与调用清单
 
-正式 QML symbol 集合包含 63 个资源，与上表的 63 个 symbol ID 一一对应；文件名固定为 `<symbol-id>.svg`，资源内部记录对应的 `shell.js` symbol 来源。除下表说明的 caret 缩小外，其余资源保留源 viewBox、路径、比例和填色。它们均由本项目绘制，没有外部图标包、第三方许可证或外部资源依赖。迁移前的旧 SVG 在消费者切换后通过独立 cleanup commit 删除。
+`qml/icons/` 当前只包含 63 个正式 QML symbol 资源，与上表的 63 个 symbol ID 一一对应；文件名固定为 `<symbol-id>.svg`，资源内部记录对应的 `shell.js` symbol 来源。除下表说明的 caret 缩小外，其余资源保留源 viewBox、路径、比例和填色。它们均由本项目绘制，没有外部图标包、第三方许可证或外部资源依赖。消费者切换后已通过独立 cleanup commit 删除迁移前的旧 SVG。
 
 | QML 资源组 | symbol ID / 文件名（逐项同名） | 当前调用位置 |
 |---|---|---|
@@ -56,7 +56,7 @@
 
 ## 旧资源到正式 symbol 的迁移记录
 
-以下记录迁移前的旧文件与采用的正式 symbol；调用点统一使用当前 symbol ID，旧文件在单独的 cleanup commit 删除。
+以下记录迁移前已删除的旧文件与采用的正式 symbol；调用点统一使用当前 symbol ID。
 若经视觉检查发现概念不对应，应修正 symbol 或 QML 语义映射并同步清单，不得仅按文件名机械替换。
 
 | 现有 QML 资源 | 正式 HTML symbol |

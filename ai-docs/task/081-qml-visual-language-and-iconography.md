@@ -90,6 +90,7 @@
 | 2026-09-29 | 盘点 029/050/069/078/080/053 的已交付组件、基准与交接边界 | 在已有组件库、主题 token、页签和 benchmark 上完成剩余统一工作 | 核心实现可开始；080 的 VoiceOver 验收与 053 的 3D Welcome 完整验收仍按各自 task 记录，不阻止本任务完成图标、HTML 与 QML 视觉体系 |
 | 2026-09-30 | `qml/icons/` SVG 资源首批与 `shell.js` caret symbol | 独立资源可与正式 symbol 对照，应用已有资源仍保持可用 | 新增 61 个正式 symbol SVG，并同步 caret 的内缩 path；保留现有资源，避免在消费者迁移前改变运行引用。`layers.svg` 与 `project-file.svg` 两个同名资源在调用迁移批次替换；旧资源清理、Qt 加载测试与性能测量随后完成 |
 | 2026-09-30 | `Qml.ThemeComponentParameters` 与 `panta_qml_cpu_benchmark measures_icon_loading` | 验证 Qt 可以解码全部打包 SVG，并比较空 source、单色 provider 和原色 qrc 的首轮及缓存路径 | QtTest 通过；CPU 基准通过。环境：macOS 26.3.1 arm64、Qt 6.11.2、`target/native/debug`。首轮样本包含进程/路径初始化；缓存后采样 31 次，p50/p95 见下表。场景在 offscreen 下测 Image 创建至 Ready，不测 GPU 呈现 |
+| 2026-09-30 | 旧图标资源 cleanup commit 与 QML 调用审计 | 旧路径无消费者，打包目录仅保留 63 个正式 symbol | 删除 43 个旧 SVG；源码引用扫描未发现旧图标 ID，`Qml.ThemeComponentParameters` 断言 qrc 中恰有 63 个 SVG |
 
 ### 图标加载 CPU 消融
 
@@ -116,7 +117,7 @@
 - 2026-09-24：根据维护者提供的 Welcome 3D `panta` 标志和多色线性 Ribbon 图标参考，新建应用级视觉统一任务。图像是风格参考，不要求照搬第三方产品标识或专有图标。
 - 2026-09-24：检查当前 HTML 原型：Welcome 文字由 CSS 样式绘制，Ribbon glyph 为 `shell.js` 手写内联 SVG；二者不是 ImageGen 位图。现存 QML SVG 仍需对照图标规范和 029 记录核验来源。
 - 2026-09-24：053 负责 VTK 立体几何落地并依赖本任务的外观方向；080 负责文档页签行为，本任务为其提供统一视觉契约。
-- 2026-09-30：正式 SVG 资源先提交；按维护者要求，QML 调用迁移完成后再将旧 SVG 删除作为独立 commit。图标性能采用 069 CPU harness，GPU 帧计时不用于没有连续更新的静态资源加载问题。
+- 2026-09-30：正式 SVG 资源先提交；按维护者要求，在 QML 调用迁移完成后将旧 SVG 删除作为独立 cleanup commit。图标性能采用 069 CPU harness，GPU 帧计时不用于没有连续更新的静态资源加载问题。
 
 ## 完成摘要
 

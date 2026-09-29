@@ -351,7 +351,7 @@ class ThemeComponentTest final : public QObject {
         const QString resource_root = QStringLiteral(":/qt/qml/Panta/Shell/icons/");
         const QStringList files =
             QDir(resource_root).entryList({QStringLiteral("*.svg")}, QDir::Files);
-        QVERIFY(files.size() >= 63);
+        QCOMPARE(files.size(), 63);
         for (const QString& file : files) {
             QImageReader reader(resource_root + file);
             QVERIFY2(reader.canRead(), qPrintable(file));
