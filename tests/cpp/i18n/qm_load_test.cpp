@@ -41,7 +41,7 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QCOMPARE(translator.translate("UiCommonNavigation", "Tools"), QStringLiteral("工具"));
     QCOMPARE(translator.translate("UiCommonResults", "Results"), QStringLiteral("结果"));
     QCOMPARE(translator.translate("ImportDialogForm", "Mesh type"), QStringLiteral("网格类型"));
-    QCOMPARE(translator.translate("ImportMeshDualDomain", "Dual Domain"), QStringLiteral("双层面"));
+    QCOMPARE(translator.translate("MeshType", "Dual Domain"), QStringLiteral("双层面"));
     QCOMPARE(translator.translate("UiCommonUnitMillimeters", "Millimeters"),
              QStringLiteral("毫米"));
     QCOMPARE(translator.translate("ImportTask", "Create Mesh..."), QStringLiteral("创建网格..."));

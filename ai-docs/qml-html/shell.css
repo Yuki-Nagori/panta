@@ -488,8 +488,8 @@ body.mesh-tool-workspace .output-panel { display: none; }
 .inspector-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inspector-list { padding-top: 2px; }
 .inspector-row { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 8px; }
-.mesh-tool-entry { width: 100%; color: inherit; text-align: left; cursor: pointer; }
-.mesh-tool-entry:hover { background: var(--color-hover); }
+button.inspector-row { width: 100%; color: inherit; text-align: left; cursor: pointer; }
+button.inspector-row:hover { background: linear-gradient(to right, transparent calc(8px + var(--icon-size-small) + 6px), var(--color-hover) calc(8px + var(--icon-size-small) + 6px)); }
 .inspector-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inspector-row > .status-placeholder { flex: none; width: var(--icon-size-small); }
 .inspector-indent { margin-left: 52px; }
@@ -681,3 +681,10 @@ body.mesh-tool-workspace .output-panel { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .tab-strip::before { transition: none; }
 }
+
+.analysis-sequence-body { flex-direction: row; }
+.analysis-sequence-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.analysis-sequence-content select { width: 100%; min-height: 240px; padding: 6px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); color: var(--color-text); font: inherit; }
+.analysis-sequence-content option { padding: 5px 8px; }
+.analysis-sequence-actions { flex-direction: column; justify-content: flex-start; margin-top: 0; }
+.analysis-sequence-actions button:last-child { margin-top: auto; }

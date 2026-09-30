@@ -108,6 +108,10 @@ QtObject {
     readonly property real disabledOpacity: 0.4
 
     // 窗口最小尺寸（逻辑像素）
+    readonly property int analysisSequenceDialogWidth: 560
+    readonly property int analysisSequenceDialogHeight: 380
+    readonly property int analysisSequenceDialogMinimumWidth: 420
+    readonly property int analysisSequenceDialogMinimumHeight: 340
     readonly property int windowMinimumWidth: 640
     readonly property int windowMinimumHeight: 480
 }

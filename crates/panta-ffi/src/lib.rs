@@ -103,6 +103,20 @@ pub mod bridge {
         pub size_z: f64,
     }
 
+    struct ChoiceDefinition {
+        id: String,
+        source_text: String,
+    }
+
+    struct PlanSettings {
+        project_path: String,
+        revision: u64,
+        import_id: String,
+        mesh_type: String,
+        sequence_id: String,
+        sequence_source_text: String,
+    }
+
     /// STL metadata shown by the import dialog before the file is copied.
     #[derive(Clone, PartialEq)]
     pub struct StlImportPreview {
@@ -282,6 +296,21 @@ pub mod bridge {
             show_import_log: bool,
         ) -> Result<ProjectImport>;
         fn project_service_imports(service: &ProjectService) -> Result<Vec<ProjectImport>>;
+        fn analysis_sequence_catalog() -> Vec<ChoiceDefinition>;
+        fn mesh_type_catalog() -> Vec<ChoiceDefinition>;
+        fn default_mesh_type() -> String;
+        fn project_service_plan_settings(
+            service: &ProjectService,
+            preferred_import_id: &str,
+        ) -> PlanSettings;
+        fn project_service_set_analysis_sequence(
+            service: &mut ProjectService,
+            project_path: &str,
+            revision: u64,
+            import_id: &str,
+            sequence_id: &str,
+        ) -> Result<ProjectSnapshot>;
+
         fn project_service_inspect_stl(
             service: &mut ProjectService,
             source: String,
@@ -697,6 +726,73 @@ fn project_service_imports(service: &ProjectService) -> Result<Vec<bridge::Proje
         .service
         .imports()
         .map(|imports| imports.into_iter().map(project_import).collect())
+        .map_err(|error| error.to_string())
+}
+
+fn mesh_type_catalog() -> Vec<bridge::ChoiceDefinition> {
+    panta_core::project::MESH_TYPES
+        .iter()
+        .map(|entry| bridge::ChoiceDefinition {
+            id: entry.id.to_owned(),
+            source_text: entry.source_text.to_owned(),
+        })
+        .collect()
+}
+
+fn default_mesh_type() -> String {
+    panta_core::project::DEFAULT_MESH_TYPE.to_owned()
+}
+
+fn analysis_sequence_catalog() -> Vec<bridge::ChoiceDefinition> {
+    panta_core::project::ANALYSIS_SEQUENCES
+        .iter()
+        .map(|entry| bridge::ChoiceDefinition {
+            id: entry.id.to_owned(),
+            source_text: entry.source_text.to_owned(),
+        })
+        .collect()
+}
+
+fn project_service_plan_settings(
+    service: &ProjectService,
+    preferred_import_id: &str,
+) -> bridge::PlanSettings {
+    match service.service.plan_settings(preferred_import_id) {
+        Some(settings) => bridge::PlanSettings {
+            project_path: settings.project_path.display().to_string(),
+            revision: settings.revision,
+            import_id: settings.import_id,
+            mesh_type: settings.mesh_type,
+            sequence_id: settings.sequence_id,
+            sequence_source_text: settings.sequence_source_text,
+        },
+        None => bridge::PlanSettings {
+            project_path: String::new(),
+            revision: 0,
+            import_id: String::new(),
+            mesh_type: String::new(),
+            sequence_id: String::new(),
+            sequence_source_text: String::new(),
+        },
+    }
+}
+
+fn project_service_set_analysis_sequence(
+    service: &mut ProjectService,
+    project_path: &str,
+    revision: u64,
+    import_id: &str,
+    sequence_id: &str,
+) -> Result<bridge::ProjectSnapshot, String> {
+    service
+        .service
+        .set_analysis_sequence(
+            std::path::Path::new(project_path),
+            revision,
+            import_id,
+            sequence_id,
+        )
+        .map(project_snapshot)
         .map_err(|error| error.to_string())
 }
 

@@ -548,3 +548,88 @@ fn error_display_uses_stable_codes_and_details() {
         assert_eq!(error.to_string(), expected);
     }
 }
+
+#[test]
+fn plan_settings_are_per_record_and_transactional() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"solid case\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid case\n")?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Demo")?;
+    let first = service.import_stl(&source, "midplane", "millimeters", false)?;
+    let second = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let latest = service
+        .plan_settings("welcome")
+        .ok_or("missing latest plan")?;
+    assert_eq!(latest.import_id, second.id);
+    assert_eq!(latest.mesh_type, "solid-3d");
+    let settings = service
+        .plan_settings(&first.id)
+        .ok_or("missing first plan")?;
+    assert_eq!(settings.mesh_type, "midplane");
+    assert_eq!(settings.sequence_id, "fill");
+    let before = fs::read(&project.path)?;
+    for (path, revision, id, sequence) in [
+        (
+            project.path.clone(),
+            settings.revision,
+            first.id.as_str(),
+            "unknown",
+        ),
+        (
+            project.path.clone(),
+            settings.revision,
+            "missing",
+            "fill-pack",
+        ),
+        (
+            project.path.clone(),
+            settings.revision + 1,
+            first.id.as_str(),
+            "fill-pack",
+        ),
+        (
+            fixture.root.join("other.panta"),
+            settings.revision,
+            first.id.as_str(),
+            "fill-pack",
+        ),
+    ] {
+        assert!(
+            service
+                .set_analysis_sequence(&path, revision, id, sequence)
+                .is_err()
+        );
+        assert_eq!(fs::read(&project.path)?, before);
+    }
+    service.set_analysis_sequence(&project.path, settings.revision, &first.id, "fill-pack")?;
+    let mut reopened = ProjectService::new();
+    reopened.open(&project.path)?;
+    assert_eq!(
+        reopened
+            .plan_settings(&first.id)
+            .ok_or("missing first")?
+            .sequence_id,
+        "fill-pack"
+    );
+    assert_eq!(
+        reopened
+            .plan_settings(&second.id)
+            .ok_or("missing second")?
+            .sequence_id,
+        "fill"
+    );
+    let selected = service.plan_settings(&first.id).ok_or("missing settings")?;
+    let unchanged =
+        service.set_analysis_sequence(&project.path, selected.revision, &first.id, "fill-pack")?;
+    assert_eq!(unchanged.revision, selected.revision);
+    // 临时文件路径占用为目录，模拟元数据写入失败。
+    fs::create_dir(project.path.with_extension("panta.tmp"))?;
+    assert!(
+        service
+            .set_analysis_sequence(&project.path, selected.revision, &first.id, "cool")
+            .is_err()
+    );
+    assert_eq!(service.plan_settings(&first.id), Some(selected));
+    Ok(())
+}

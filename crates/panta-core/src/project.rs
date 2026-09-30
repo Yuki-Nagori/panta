@@ -5,14 +5,17 @@
 
 use panta_import::StlImportSession;
 pub use panta_import::{
-    IMPORT_RECORD_VERSION, ImportRecord, STL_IMPORT_PARSER_VERSION, StlImportPreview,
+    DEFAULT_MESH_TYPE, IMPORT_RECORD_VERSION, ImportRecord, MESH_TYPES, STL_IMPORT_PARSER_VERSION,
+    StlImportPreview,
 };
 use panta_mesh::SurfaceMesh;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
+mod analysis_sequence;
+pub use analysis_sequence::{ANALYSIS_SEQUENCES, AnalysisSequenceDefinition, PlanSettings};
 mod import;
 mod storage;
 use std::fs;
@@ -50,6 +53,7 @@ struct ProjectState {
     revision: u64,
     dirty: bool,
     imports: Vec<ImportRecord>,
+    analysis_sequences: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -59,6 +63,9 @@ struct ProjectManifest {
     revision: u64,
     #[serde(default)]
     imports: Vec<ImportRecord>,
+    // 稀疏覆盖表；未设置的方案采用领域默认 Fill。
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    analysis_sequences: BTreeMap<String, String>,
 }
 
 /// 工程 service 的可恢复错误；`Display` 的前缀是跨语言稳定错误码。
@@ -325,6 +332,7 @@ impl ProjectService {
             revision: 0,
             dirty: false,
             imports: Vec::new(),
+            analysis_sequences: BTreeMap::new(),
         };
         if let Err(error) = write_manifest(&state) {
             if let Some(project_root) = state.path.parent() {
@@ -367,12 +375,14 @@ impl ProjectService {
             return Err(ProjectError::UnsupportedSchema(manifest.schema));
         }
         validate_name(&manifest.name)?;
+        analysis_sequence::validate_sequences(&manifest)?;
         self.current = Some(ProjectState {
             path: path.to_path_buf(),
             name: manifest.name,
             revision: manifest.revision,
             dirty: false,
             imports: manifest.imports,
+            analysis_sequences: manifest.analysis_sequences,
         });
         self.latest_mesh_id = None;
         self.mesh_cache.clear();

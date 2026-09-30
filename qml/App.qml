@@ -51,6 +51,18 @@ ApplicationWindow {
         projectModel: projectModel
     }
 
+    AnalysisSequenceDialog {
+        id: analysisSequenceDialog
+        ownerWindow: shellWindow
+        sequences: projectModel.analysisSequences
+        planSettings: projectModel.planSettings
+        errorText: projectModel.error
+        onSelectionRequested: (path, revision, importId, sequenceId) => {
+            if (projectModel.setAnalysisSequence(path, revision, importId, sequenceId))
+                analysisSequenceDialog.close();
+        }
+    }
+
     FileDialog {
         id: openProjectFileDialog
         title: qsTranslate("IconActionOpenProject", "Open Project")
@@ -115,6 +127,13 @@ ApplicationWindow {
                     importedPartName: projectModel.importedPartName
                     activeDocumentId: projectModel.activeDocumentId
                     activeDocumentTitle: projectModel.activeDocumentTitle
+                    analysisSequenceText: qsTranslate("AnalysisSequence", projectModel.planSettings.sequenceSourceText ?? "")
+                    meshType: projectModel.planSettings.meshType ?? ""
+                    meshTypes: projectModel.meshTypes
+                    onAnalysisSequenceRequested: {
+                        projectModel.clearError();
+                        analysisSequenceDialog.open();
+                    }
                     onOpenImportRequested: recordId => projectModel.openImportRecord(recordId)
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()

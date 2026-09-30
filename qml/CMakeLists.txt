@@ -31,11 +31,13 @@ set(PANTA_SHELL_QML_FILES
     Panels/Ribbon/StartLearnRibbon.qml
     Panels/TasksPanel.qml
     Panels/MeshToolPanel.qml
+    Panels/AnalysisSequencePanel.qml
     Panels/LayersPanel.qml
     Panels/ViewportPane.qml
     Panels/PlaceholderPanel.qml
     Dialogs/NewProjectDialog.qml
-    Dialogs/ImportDialog.qml)
+    Dialogs/ImportDialog.qml
+    Dialogs/AnalysisSequenceDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)
@@ -113,6 +115,14 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qml_gpu_benchmark)
   target_link_libraries(panta_qml_gpu_benchmark PRIVATE panta_shell Qt6::Gui Qt6::Qml Qt6::Test
                                                         Qt6::Quick)
+  if(PANTA_ENABLE_BRIDGE_MODULE)
+    # 目录场景直接经正式 ViewModel 读取 Rust；不依赖测试进程的 QML 插件注册。
+    foreach(PANTA_SEQUENCE_TEST_TARGET panta_qml_theme_component_test panta_qml_cpu_benchmark
+                                       panta_qml_gpu_benchmark)
+      target_link_libraries(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE panta::bridge)
+      target_compile_definitions(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE PANTA_TEST_WITH_BRIDGE=1)
+    endforeach()
+  endif()
   # 手动基准的 moc 登记给 lint 前置聚合（native 顶层 panta_benchmark_moc）。
   add_dependencies(panta_benchmark_moc panta_qml_cpu_benchmark_autogen
                    panta_qml_gpu_benchmark_autogen)

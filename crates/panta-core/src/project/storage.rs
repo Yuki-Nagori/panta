@@ -7,6 +7,7 @@ pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
         name: state.name.clone(),
         revision: state.revision,
         imports: state.imports.clone(),
+        analysis_sequences: state.analysis_sequences.clone(),
     };
     let bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|error| ProjectError::Io(format!("serialize manifest: {error}")))?;

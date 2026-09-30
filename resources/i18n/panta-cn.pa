@@ -238,21 +238,6 @@ file-filter:
   src: STL files (*.stl)
   tr: STL 文件（*.stl）
 
-[ImportMeshMidplane]
-label:
-  src: Midplane
-  tr: 中面
-
-[ImportMeshDualDomain]
-label:
-  src: Dual Domain
-  tr: 双层面
-
-[ImportMeshSolid3D]
-label:
-  src: Solid 3D
-  tr: 实体 3D
-
 [DialogAction]
 ok:
   src: OK
@@ -263,6 +248,10 @@ cancel:
   tr: 取消
 
 [ImportTask]
+mesh-type:
+  src: Mesh (%1)
+  tr: 网格（%1）
+
 part:
   src: Part (%1)
   tr: 部件（%1）
@@ -270,10 +259,6 @@ part:
 create-mesh:
   src: Create Mesh...
   tr: 创建网格...
-
-fill:
-  src: Fill
-  tr: 填充
 
 material-data:
   src: Material Data
@@ -726,3 +711,66 @@ mesh-data-released:
 failed-to-load:
   src: Failed to load
   tr: 加载失败
+
+[AnalysisSequenceDialog]
+title:
+  src: Select Analysis Sequence
+  tr: 选择分析序列
+
+more:
+  src: More...
+  tr: 更多...
+
+[AnalysisSequence]
+fill:
+  src: Fill
+  tr: 填充
+
+fill-pack:
+  src: Fill + Pack
+  tr: 填充 + 保压
+
+fast-fill:
+  src: Fast Fill
+  tr: 快速填充
+
+fill-pack-warp:
+  src: Fill + Pack + Warp
+  tr: 填充 + 保压 + 翘曲
+
+cool:
+  src: Cool
+  tr: 冷却
+
+cool-fill-pack-warp:
+  src: Cool + Fill + Pack + Warp
+  tr: 冷却 + 填充 + 保压 + 翘曲
+
+molding-window:
+  src: Molding Window
+  tr: 成型窗口
+
+gate-location:
+  src: Gate Location
+  tr: 浇口位置
+
+cool-fem:
+  src: Cool (FEM)
+  tr: 冷却（FEM）
+
+cool-fem-fill-pack-warp:
+  src: Cool (FEM) + Fill + Pack + Warp
+  tr: 冷却（FEM）+ 填充 + 保压 + 翘曲
+
+[MeshType]
+midplane:
+  src: Midplane
+  tr: 中面
+
+dual-domain:
+  src: Dual Domain
+  tr: 双层面
+
+solid-3d:
+  src: Solid 3D
+  tr: 实体 3D

@@ -1,4 +1,5 @@
 // 开发侧 QML 构造消融基准：比较工程树、Layers 面板及组合的 CPU 构造成本。
+#include "analysis_sequence_helpers.hpp"
 #include "quick_item_helpers.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
@@ -41,7 +42,15 @@ constexpr int kDocumentTabCounts[] = {1, 8, 24};
 constexpr int kDocumentSwitchRounds = 32;
 constexpr int kIconCounts[] = {1, 8, 24};
 
-enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, MeshTool };
+enum class Panels : std::uint8_t {
+    Empty,
+    Tasks,
+    Layers,
+    Both,
+    MeshTool,
+    AnalysisSequence,
+    AnalysisSequenceDialog
+};
 enum class DocumentTabWorkload : std::uint8_t { Construct, Switch, Close };
 enum class IconSourceMode : std::uint8_t { Empty, MonochromeProvider, SourceColors };
 
@@ -94,12 +103,19 @@ class QmlPerformanceBenchmark final : public QObject {
 
   private:
     QQmlEngine m_engine;
+    QVariantList m_analysisSequences;
     QQuickWindow m_window;
     QQmlComponent m_emptyComponent{&m_engine};
     QQmlComponent m_tasksComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
+    QQmlComponent m_analysisSequenceDialogComponent{
+        &m_engine,
+        QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Dialogs/AnalysisSequenceDialog.qml"))};
+    QQmlComponent m_analysisSequenceComponent{
+        &m_engine,
+        QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/AnalysisSequencePanel.qml"))};
     QQmlComponent m_meshToolComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/MeshToolPanel.qml"))};
     QQmlComponent m_documentTabBarComponent{
@@ -135,6 +151,14 @@ class QmlPerformanceBenchmark final : public QObject {
         if (panels == Panels::Empty) {
             create(m_emptyComponent, {}, owner);
         } else {
+            if (panels == Panels::AnalysisSequenceDialog) {
+                create(m_analysisSequenceDialogComponent,
+                       QVariantMap{{QStringLiteral("sequences"), m_analysisSequences}}, owner);
+            }
+            if (panels == Panels::AnalysisSequence) {
+                create(m_analysisSequenceComponent,
+                       QVariantMap{{QStringLiteral("sequences"), m_analysisSequences}}, owner);
+            }
             if (panels == Panels::MeshTool) {
                 create(m_meshToolComponent, {}, owner);
             }
@@ -250,7 +274,7 @@ class QmlPerformanceBenchmark final : public QObject {
             QStringLiteral("plan-tasks"),
             QStringLiteral("status-ok"),
             QStringLiteral("task-analysis"),
-            QStringLiteral("task-fill"),
+            QStringLiteral("task-analysis-sequence"),
             QStringLiteral("task-injection"),
             QStringLiteral("task-material"),
             QStringLiteral("task-mesh"),
@@ -457,6 +481,7 @@ class QmlPerformanceBenchmark final : public QObject {
   private slots:
     void initTestCase() {
         panta::install_icon_provider(m_engine);
+        m_analysisSequences = analysis_sequence_catalog();
         m_emptyComponent.setData(QByteArrayLiteral("import QtQuick\nItem {}"),
                                  QUrl(QStringLiteral("qrc:/benchmark/Empty.qml")));
         QVERIFY(m_emptyComponent.isReady());
@@ -504,6 +529,22 @@ class QmlPerformanceBenchmark final : public QObject {
     }
 
     void measures_icon_loading() { run_icon_loading_scenarios(); }
+
+    void measures_analysis_sequence_construct() {
+#if !defined(PANTA_TEST_WITH_BRIDGE)
+        QSKIP("Analysis sequence catalog requires the enabled Bridge module");
+#endif
+        QVERIFY(!m_analysisSequences.isEmpty());
+        for (const auto [panels, name] :
+             {std::pair{Panels::Empty, "empty"},
+              std::pair{Panels::AnalysisSequence, "analysis sequence"},
+              std::pair{Panels::AnalysisSequenceDialog, "analysis sequence dialog"}}) {
+            run_scenario(
+                {QStringLiteral("analysis sequence"), QString::fromLatin1(name), 1,
+                 [this, panels] { return measure_once(panels, {}); },
+                 [this, panels](const Sample& sample) { verify_sample(panels, 0, sample); }});
+        }
+    }
 
     void measures_mesh_tool_construct() {
         for (const auto [panels, name] :

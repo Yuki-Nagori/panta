@@ -22,7 +22,7 @@
 | 工程树与状态 | `project-folder`、`project-file`、`stl-file`、`plan-tasks`、`status-ok`、`layers` |
 | Ribbon：工程与开始 | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help` |
 | Ribbon：CAE 工具 | `ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` |
-| Plan tasks | `task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings` |
+| Plan tasks | `task-analysis`、`task-analysis-sequence`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings` |
 | 输出操作 | `check`、`copy`、`delete`、`export`、`image`、`log`、`wizard` |
 
 新增图标先确认清单中没有相同概念；若需增加，先在 `shell.js` 加入原型 glyph、登记此规范中的 ID 和含义，再将同一几何迁入独立 QML SVG。HTML sprite 与 QML 资源不可长期各自演变成不同图样。
@@ -36,7 +36,7 @@
 | 壳层与操作 | `account`、`cart`、`globe`、`help`、`search`、`right`、`caret`、`close`、`minimize`、`maximize`、`undo`、`redo`、`new`、`open`、`save`、`print`、`preview`、`split` | 顶部工具区、对话框、面板关闭、页签与下拉指示 |
 | 页签与工具状态 | `layers` | Layers 工具条与页签 |
 | Ribbon | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help`、`ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` | Start & Learn 与 Home Ribbon |
-| 工程与任务 | `project-file`、`project-folder`、`stl-file`、`plan-tasks`、`status-ok`、`task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
+| 工程与任务 | `project-file`、`project-folder`、`stl-file`、`plan-tasks`、`status-ok`、`task-analysis`、`task-analysis-sequence`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
 | Layers 操作 | `check`、`copy`、`delete`、`export`、`image`、`wizard` | Layers 输出操作按钮 |
 
 `ThemedIcon.preserveSourceColors` 是颜色加载模式的唯一开关，不另设彩色图标组件。默认模式将允许的单色 utility glyph 交给 `image://panta-icons/<name>/<argb>`；provider 内的白名单与颜色图标清单保持一致，未知和多色 ID 均拒绝着色。设置为 `true` 时直接从 `qrc:/qt/qml/Panta/Shell/icons/<name>.svg` 加载并保留 SVG 源色。QtTest 校验 SVG 文件名与 `shell.js` symbol 集合一一对应，QML 字面图标引用均有资源，静态加载模式与 provider 白名单一致；Ribbon、任务列表和 Layers 的动态模型模式也单独校验。单色集合检查缩放、着色与错误路径。

@@ -59,6 +59,29 @@ pub struct StlImportPreview {
     pub dimensions: [f64; 3],
 }
 
+/// 可用网格类型的稳定 ID 和英文源文案；Qt 仅负责翻译和展示。
+#[derive(Debug, Clone, Copy)]
+pub struct MeshTypeDefinition {
+    pub id: &'static str,
+    pub source_text: &'static str,
+}
+
+pub const DEFAULT_MESH_TYPE: &str = "dual-domain";
+pub const MESH_TYPES: &[MeshTypeDefinition] = &[
+    MeshTypeDefinition {
+        id: "midplane",
+        source_text: "Midplane",
+    },
+    MeshTypeDefinition {
+        id: "dual-domain",
+        source_text: "Dual Domain",
+    },
+    MeshTypeDefinition {
+        id: "solid-3d",
+        source_text: "Solid 3D",
+    },
+];
+
 #[derive(Debug, Clone, Copy)]
 pub struct ImportOptions {
     mesh_type: &'static str,
@@ -102,12 +125,11 @@ impl LengthUnit {
 
 impl ImportOptions {
     pub fn new(mesh_type: &str, units: &str, show_import_log: bool) -> Result<Self, ImportError> {
-        let mesh_type = match mesh_type {
-            "midplane" => "midplane",
-            "dual-domain" => "dual-domain",
-            "solid-3d" => "solid-3d",
-            other => return Err(ImportError::UnsupportedMeshType(other.to_owned())),
-        };
+        let mesh_type = MESH_TYPES
+            .iter()
+            .find(|entry| entry.id == mesh_type)
+            .map(|entry| entry.id)
+            .ok_or_else(|| ImportError::UnsupportedMeshType(mesh_type.to_owned()))?;
         Ok(Self {
             mesh_type,
             units: LengthUnit::parse(units)?,

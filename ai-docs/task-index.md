@@ -112,6 +112,8 @@ ai-docs/
 | 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 048, 086 | planned |
 | 088 | [Mesh 资产旁置存储与按需加载](task/088-mesh-asset-sidecar-storage.md) | CAE 领域模块迁移 | 063, 067, 073, 080 | planned |
 | 090 | [Mesh Tool QML 界面](task/090-mesh-tool-qml-ui.md) | 应用平台扩展 | 050, 068, 081 | done |
+| 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | in-progress |
+| 092 | [方案分析序列与网格类型接线](task/092-plan-analysis-sequence-and-mesh-settings.md) | 应用平台扩展 | 057, 067, 080, 091 | in-progress |
 
 ## 验证与质量扩展队列
 

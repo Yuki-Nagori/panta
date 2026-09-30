@@ -23,13 +23,13 @@ Window {
     title: qsTranslate("UiCommon", "Import")
     transientParent: ownerWindow
 
-    readonly property var meshTypeValues: ["midplane", "dual-domain", "solid-3d"]
+    readonly property var meshTypes: projectModel.meshTypes
     readonly property var unitValues: ["millimeters", "centimeters", "inches"]
 
     function resetFields() {
         projectModel.clearError();
         sourcePath = "";
-        meshTypeCombo.currentIndex = 1;
+        meshTypeCombo.currentIndex = meshTypes.findIndex(entry => entry.id === projectModel.defaultMeshType);
         unitsCombo.currentIndex = 0;
         showImportLogCheckBox.checked = true;
         helpText.visible = false;
@@ -52,7 +52,7 @@ Window {
     function submit() {
         if (!sourcePath || !projectModel.importPreviewReady)
             return;
-        if (projectModel.importStl(sourcePath, meshTypeValues[meshTypeCombo.currentIndex], unitValues[unitsCombo.currentIndex], showImportLogCheckBox.checked)) {
+        if (projectModel.importStl(sourcePath, meshTypes[meshTypeCombo.currentIndex].id, unitValues[unitsCombo.currentIndex], showImportLogCheckBox.checked)) {
             dialog.close();
         }
     }
@@ -144,7 +144,7 @@ Window {
                     ComboBox {
                         id: meshTypeCombo
                         Layout.fillWidth: true
-                        model: [qsTranslate("ImportMeshMidplane", "Midplane"), qsTranslate("ImportMeshDualDomain", "Dual Domain"), qsTranslate("ImportMeshSolid3D", "Solid 3D")]
+                        model: dialog.meshTypes.map(entry => qsTranslate("MeshType", entry.sourceText))
                         Accessible.name: qsTranslate("ImportDialogForm", "Mesh type")
                     }
 

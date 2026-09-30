@@ -59,7 +59,7 @@ shellTemplate.innerHTML = `
     <symbol id="i-stl-file" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#e8f0f7" stroke="#4a6f9f"/><path d="M10 1.5v3h3M5 11l2-3 2 2 1.5-2 1.5 3z" stroke="#2e7ce0" stroke-width="1.1" stroke-linejoin="round"/></symbol>
     <symbol id="i-status-ok" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" fill="#fff" stroke="#5d9b54"/><path d="m4.8 8 2 2 4.4-4.5" stroke="#5d9b54" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-task-mesh" viewBox="0 0 16 16" fill="none"><path d="m8 1.5 5 3v7l-5 3-5-3v-7z" stroke="#5c8e66"/><path d="m3 4.5 5 3 5-3M8 7.5v7" stroke="#5c8e66"/></symbol>
-    <symbol id="i-task-fill" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c2.2 3.1 4.2 5.7 4.2 8a4.2 4.2 0 1 1-8.4 0c0-2.3 2-4.9 4.2-8z" fill="#f1d36a" stroke="#8a6d2f"/></symbol>
+    <symbol id="i-task-analysis-sequence" viewBox="0 0 26 26" fill="none"><path d="M4 20V6M4 20h18" stroke="#4a4a4a" stroke-width="1.1"/><path d="m6 16 5-5 3 3 6-7" stroke="#2e7ce0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-task-material" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.6" fill="#f0d491" stroke="#8a6d2f"/><circle cx="10.5" cy="5" r="2.6" fill="#dce9f7" stroke="#4a6f9f"/><path d="M2.5 13c.6-2 1.4-3 2.5-3s1.9 1 2.5 3M8 13c.6-2 1.4-3 2.5-3s1.9 1 2.5 3" stroke="#5a5a5a"/></symbol>
     <symbol id="i-task-injection" viewBox="0 0 16 16" fill="none"><path d="M8 1.5 13 6.5 8 14.5 3 6.5z" fill="#dce9f7" stroke="#4a6f9f"/><circle cx="8" cy="6.5" r="1.4" fill="#c8322b"/></symbol>
     <symbol id="i-task-settings" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="#4a4a4a"/><circle cx="5" cy="4" r="1.5" fill="#2e7ce0"/><circle cx="11" cy="8" r="1.5" fill="#2e7ce0"/><circle cx="7" cy="12" r="1.5" fill="#2e7ce0"/></symbol>
@@ -257,8 +257,13 @@ document.querySelectorAll("[data-dialog]").forEach((trigger) => {
   trigger.addEventListener("click", () => {
     const dialog = document.querySelector(`[data-dialog-panel="${trigger.dataset.dialog}"]`);
     if (!dialog) return;
+    if (trigger.dataset.dialog === "analysis-sequence") {
+      const options = dialog.querySelector("[data-analysis-sequence-options]");
+      options.value = document.querySelector("[data-analysis-sequence-current]").textContent;
+      dialog.querySelector("[data-analysis-sequence-candidate]").textContent = options.value;
+    }
     dialog.hidden = false;
-    dialog.querySelector("input, select, button")?.focus();
+    (dialog.querySelector("input, select") || dialog.querySelector("button"))?.focus();
   });
 });
 
@@ -594,4 +599,21 @@ document.querySelectorAll('[role="tablist"]').forEach((bar) => {
       tabs[next].focus();
     });
   });
+});
+
+const analysisSequenceOptions = document.querySelector("[data-analysis-sequence-options]");
+analysisSequenceOptions?.addEventListener("change", () => {
+  document.querySelector("[data-analysis-sequence-candidate]").textContent = analysisSequenceOptions.value;
+});
+document.querySelector("[data-analysis-sequence-accept]")?.addEventListener("click", () => {
+  document.querySelector("[data-analysis-sequence-current]").textContent = analysisSequenceOptions.value;
+  closeDialog(document.querySelector('[data-dialog-panel="analysis-sequence"]'));
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") document.querySelectorAll("[data-dialog-panel]").forEach(closeDialog);
+  const sequenceDialog = document.querySelector('[data-dialog-panel="analysis-sequence"]');
+  if (event.key === "Enter" && sequenceDialog && !sequenceDialog.hidden) {
+    event.preventDefault();
+    sequenceDialog.querySelector("[data-analysis-sequence-accept]").click();
+  }
 });

@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qtmetamacros.h>
 #include <cstddef>
@@ -57,11 +58,28 @@ QString activation_message_for(const QString& code) {
     return QStringLiteral("The saved STL asset could not be opened.");
 }
 
+QVariantList choice_catalog(const rust::Vec<panta::ffi::ChoiceDefinition>& catalog) {
+    QVariantList result;
+    for (const auto& entry : catalog) {
+        result.append(
+            QVariantMap{{QStringLiteral("id"), QString::fromUtf8(entry.id)},
+                        {QStringLiteral("sourceText"), QString::fromUtf8(entry.source_text)}});
+    }
+    return result;
+}
+
 } // namespace
 
 ProjectViewModel::ProjectViewModel(QObject* parent)
     : MeshSource(parent), m_defaultLocation(default_project_location()),
+      m_analysisSequences(choice_catalog(panta::ffi::analysis_sequence_catalog())),
+      m_meshTypes(choice_catalog(panta::ffi::mesh_type_catalog())),
+      m_defaultMeshType(QString::fromUtf8(panta::ffi::default_mesh_type())),
       m_service(panta::ffi::project_service_new()) {
+    connect(this, &ProjectViewModel::activeDocumentChanged, this,
+            &ProjectViewModel::refreshPlanSettings);
+    connect(this, &ProjectViewModel::projectChanged, this, &ProjectViewModel::refreshPlanSettings);
+
     // 激活结果为拉取式队列（073）；10ms 轮询与 TaskHost 节奏一致，仅在
     // 存在 Loading 文档时运转。
     m_activationPoll.setInterval(10);
@@ -132,6 +150,52 @@ const QStringList& ProjectViewModel::importedPartNames() const { return m_import
 const QString& ProjectViewModel::importedPartName() const { return m_importedPartName; }
 
 const QString& ProjectViewModel::importedAssetPath() const { return m_importedAssetPath; }
+
+QVariantList ProjectViewModel::meshTypes() const { return m_meshTypes; }
+
+QString ProjectViewModel::defaultMeshType() const { return m_defaultMeshType; }
+
+QVariantList ProjectViewModel::analysisSequences() const { return m_analysisSequences; }
+
+QVariantMap ProjectViewModel::planSettings() const { return m_planSettings; }
+
+void ProjectViewModel::refreshPlanSettings() {
+    const auto settings =
+        panta::ffi::project_service_plan_settings(*m_service, m_activeDocumentId.toStdString());
+    const QVariantMap next{
+        {QStringLiteral("projectPath"), QString::fromUtf8(settings.project_path)},
+        {QStringLiteral("revision"), QVariant::fromValue(settings.revision)},
+        {QStringLiteral("importId"), QString::fromUtf8(settings.import_id)},
+        {QStringLiteral("meshType"), QString::fromUtf8(settings.mesh_type)},
+        {QStringLiteral("sequenceId"), QString::fromUtf8(settings.sequence_id)},
+        {QStringLiteral("sequenceSourceText"), QString::fromUtf8(settings.sequence_source_text)}};
+    if (next != m_planSettings) {
+        m_planSettings = next;
+        emit planSettingsChanged();
+    }
+}
+
+bool ProjectViewModel::setAnalysisSequence(const QString& projectPath, quint64 revision,
+                                           const QString& importId, const QString& sequenceId) {
+    std::string path;
+    std::string id;
+    std::string sequence;
+    QString conversionError;
+    if (!toBoundaryText(projectPath, &path, &conversionError) ||
+        !toBoundaryText(importId, &id, &conversionError) ||
+        !toBoundaryText(sequenceId, &sequence, &conversionError)) {
+        return fail(conversionError);
+    }
+    try {
+        applySnapshot(panta::ffi::project_service_set_analysis_sequence(*m_service, path, revision,
+                                                                        id, sequence));
+        refreshPlanSettings();
+        clearError();
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
+}
 
 const QString& ProjectViewModel::importedMeshType() const { return m_importedMeshType; }
 
@@ -409,6 +473,7 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
 bool ProjectViewModel::refreshImports() {
     try {
         applyImports(panta::ffi::project_service_imports(*m_service));
+        refreshPlanSettings();
         // 网格内容只随文档（激活 / 快照变化）改变：由文档路径负责发射
         // meshChanged，避免与导入激活的发射重复。
         return true;

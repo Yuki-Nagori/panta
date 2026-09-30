@@ -96,8 +96,8 @@
         </div>
         <div class="inspector-list" data-inspector-list role="list">
           <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span class="inspector-part-name">Part (iPhone17_Pro_TPU_Case.stl)</span></div>
-          <button type="button" class="inspector-row mesh-tool-entry" role="listitem" aria-label="Create Mesh" data-demo-navigate="../mesh-tool/mesh-tool.html"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Create Mesh...</span></button>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-fill"/></svg><span>Fill</span></div>
+          <button type="button" class="inspector-row" role="listitem" aria-label="Create Mesh" data-demo-navigate="../mesh-tool/mesh-tool.html"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Mesh (Dual Domain)</span></button>
+          <button type="button" class="inspector-row" data-dialog="analysis-sequence" aria-label="Select Analysis Sequence"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis-sequence"/></svg><span data-analysis-sequence-current>Fill</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Material Data</span></div>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></div>
@@ -122,6 +122,36 @@
       <span class="model-hole"></span>
     </div>
     <span class="viewport-caption" data-viewport-caption></span>
+  </div>
+</template>
+
+<template id="page-dialog">
+  <div class="modal-backdrop" data-dialog-panel="analysis-sequence" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="analysis-sequence-title">
+      <div class="dialog-titlebar"><h2 id="analysis-sequence-title">Select Analysis Sequence</h2><button type="button" class="dialog-close" data-dialog-close aria-label="Close dialog">×</button></div>
+      <div class="dialog-body analysis-sequence-body">
+        <div class="analysis-sequence-content">
+          <select size="10" data-analysis-sequence-options aria-label="Analysis Sequence">
+            <option>Fill</option>
+            <option>Fill + Pack</option>
+            <option>Fast Fill</option>
+            <option>Fill + Pack + Warp</option>
+            <option>Cool</option>
+            <option>Cool + Fill + Pack + Warp</option>
+            <option>Molding Window</option>
+            <option>Gate Location</option>
+            <option>Cool (FEM)</option>
+            <option>Cool (FEM) + Fill + Pack + Warp</option>
+          </select>
+          <strong data-analysis-sequence-candidate>Fill</strong>
+        </div>
+        <div class="dialog-actions analysis-sequence-actions">
+          <button type="button" class="dialog-primary" data-analysis-sequence-accept>OK</button>
+          <button type="button" data-dialog-close>Cancel</button>
+          <button type="button" disabled>More...</button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 

@@ -2,7 +2,7 @@
 
 [架构总览](README.md) · [分层规则](../standards/layering.md) · [任务 066](../task/066-native-domain-boundaries.md)
 
-更新日期：2026-09-29。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
+更新日期：2026-09-30。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
 
 ## 分层与调用
 
@@ -51,6 +51,12 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 | 导入格式解析、领域网格 / 字段、显示选项与选择状态 | Rust；轻量解析 / 校验可自有实现 | 用泛型解析接口抹平不同格式的语义 |
 
 “薄适配”限制领域策略与重库算法重写，不禁止必要转换中的循环和计算。Netgen 输出索引归一化、异常封装和 native 锁是适配职责。VTK 的 C++ 模块还包含原生显示控制器；将每个鼠标事件、像素命中和相机插值搬到 Rust 不会使接口更清楚。
+
+## 方案分析序列与网格类型
+
+`panta-core::project` 拥有分析序列目录、默认值及按导入记录 ID 保存的选择；目录选项属于配置，执行阶段和任务生命周期才属于 FSM。CXX 传递轻量目录 / 方案快照及确认命令，`ProjectViewModel` 缓存 Qt 投影，QML 仅翻译并维护弹窗候选值。确认命令校验打开时的工程身份和修订，持久化成功后才发布新状态。
+
+网格类型目录及导入默认值由 `panta-import` 提供，导入弹窗和 Tasks 共用 Qt 目录投影。Tasks 的当前类型来自已经保存的 `ImportRecord.mesh_type`；它表示所选类型，不证明 Midplane、Dual Domain 或体网格已生成。当前以导入记录承接方案配置，独立方案实体和求解执行链路仍待后续任务。属性 getter 与渲染更新不经 Rust；只在工程 / 导入 / 活动文档变更或用户确认时读取领域快照。实施见 [092](../task/092-plan-analysis-sequence-and-mesh-settings.md)。
 
 ## 当前 VTK 审计
 

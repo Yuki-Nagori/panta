@@ -1,4 +1,5 @@
 // 开发侧真实窗口基准：测量工程 / Tasks / Layers 场景端到端的帧呈现间隔。
+#include "analysis_sequence_helpers.hpp"
 #include "quick_item_helpers.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
@@ -45,7 +46,15 @@ constexpr std::array kItemCounts = {0, 1, 100, 1000};
 // 1000px 窗口中前 3 个页签始终可见；切换必须触发实际可见内容更新。
 constexpr int kVisibleDocumentSwitchCount = 3;
 
-enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, DocTabs, MeshTool };
+enum class Panels : std::uint8_t {
+    Empty,
+    Tasks,
+    Layers,
+    Both,
+    DocTabs,
+    MeshTool,
+    AnalysisSequence
+};
 enum class TabWorkload : std::uint8_t { Static, Switch, CloseReopen };
 
 struct Scenario {
@@ -102,12 +111,16 @@ class ProjectDocksGpuBenchmark final : public QObject {
 
   private:
     QQmlEngine m_engine;
+    QVariantList m_analysisSequences;
     QQuickWindow m_window;
     QQmlComponent m_emptyComponent{&m_engine};
     QQmlComponent m_tasksComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
+    QQmlComponent m_analysisSequenceComponent{
+        &m_engine,
+        QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/AnalysisSequencePanel.qml"))};
     QQmlComponent m_meshToolComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/MeshToolPanel.qml"))};
     QQmlComponent m_documentTabBarComponent{
@@ -193,6 +206,10 @@ class ProjectDocksGpuBenchmark final : public QObject {
                        owner, QPoint(0, 0), QSize(1000, 39)));
         } else if (scenario.panels == Panels::Empty) {
             create(m_emptyComponent, {}, owner, QPoint(0, 0), QSize(440, 700));
+        } else if (scenario.panels == Panels::AnalysisSequence) {
+            create(m_analysisSequenceComponent,
+                   QVariantMap{{QStringLiteral("sequences"), m_analysisSequences}}, owner,
+                   QPoint(0, 0), QSize(440, 320));
         } else if (scenario.panels == Panels::MeshTool) {
             create(m_meshToolComponent, {}, owner, QPoint(0, 0), QSize(440, 700));
         } else {
@@ -316,6 +333,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
   private slots:
     void initTestCase() {
         panta::install_icon_provider(m_engine);
+        m_analysisSequences = analysis_sequence_catalog();
         m_emptyComponent.setData(QByteArrayLiteral("import QtQuick\nItem {}"),
                                  QUrl(QStringLiteral("qrc:/benchmark/Empty.qml")));
         QVERIFY(m_emptyComponent.isReady());
@@ -363,6 +381,16 @@ class ProjectDocksGpuBenchmark final : public QObject {
         for (const Scenario& scenario : cases) {
             run_scenario(scenario, api);
         }
+    }
+
+    void measures_analysis_sequence_frame_presentation() {
+#if !defined(PANTA_TEST_WITH_BRIDGE)
+        QSKIP("Analysis sequence catalog requires the enabled Bridge module");
+#endif
+        QVERIFY(!m_analysisSequences.isEmpty());
+        const char* api = graphics_api_name(m_window.rendererInterface()->graphicsApi());
+        run_scenario({"empty", Panels::Empty, 0}, api);
+        run_scenario({"analysis sequence", Panels::AnalysisSequence, 0}, api);
     }
 
     void measures_mesh_tool_frame_presentation() {

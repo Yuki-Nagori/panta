@@ -1,4 +1,5 @@
 // QML 组件的主题参数、资源解析及 Ribbon 页签组合边界回归。
+#include "analysis_sequence_helpers.hpp"
 #include "quick_item_helpers.hpp"
 #include <QColor>
 #include <QDir>
@@ -343,6 +344,54 @@ class ThemeComponentTest final : public QObject {
         panel->setProperty("activeDocumentId", QStringLiteral("import-1"));
         panel->setProperty("activeDocumentTitle", QStringLiteral("active.stl"));
         QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("active.stl"));
+    }
+
+    void analysis_sequence_confirmation_and_cancel() {
+#if !defined(PANTA_TEST_WITH_BRIDGE)
+        QSKIP("Analysis sequence catalog requires the enabled Bridge module");
+#endif
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        auto* dialog = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Dialogs/AnalysisSequenceDialog.qml"),
+            owner);
+        QVERIFY(dialog != nullptr);
+        auto* panel = dialog->findChild<QObject*>(QStringLiteral("analysisSequencePanel"));
+        QVERIFY(panel != nullptr);
+        const auto sequences = analysis_sequence_catalog();
+        QVERIFY(!sequences.isEmpty());
+        dialog->setProperty("sequences", sequences);
+        const QVariantMap settings{{QStringLiteral("projectPath"), QStringLiteral("/test.panta")},
+                                   {QStringLiteral("revision"), 1},
+                                   {QStringLiteral("importId"), QStringLiteral("import-1")},
+                                   {QStringLiteral("sequenceId"), QStringLiteral("fill")}};
+        dialog->setProperty("planSettings", settings);
+        QSignalSpy selection(dialog, SIGNAL(selectionRequested(QString, double, QString, QString)));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        auto* window = qobject_cast<QQuickWindow*>(dialog);
+        QVERIFY(window != nullptr);
+        QTest::keyClick(window, Qt::Key_Down);
+        QCOMPARE(panel->property("selectedIndex").toInt(), 1);
+        QTest::keyClick(window, Qt::Key_Return);
+        QCOMPARE(selection.count(), 1);
+        QCOMPARE(selection.at(0).at(3).toString(), QStringLiteral("fill-pack"));
+        panel->setProperty("selectedIndex", 4);
+        auto* cancel = dialog->findChild<QObject*>(QStringLiteral("analysisSequenceCancel"));
+        QVERIFY(cancel != nullptr);
+        QVERIFY(QMetaObject::invokeMethod(cancel, "clicked"));
+        QCOMPARE(selection.count(), 1);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QCOMPARE(panel->property("selectedIndex").toInt(), 0);
+        dialog->setProperty("visible", false);
+
+        auto* tasks = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+        QVERIFY(tasks != nullptr);
+        QSignalSpy requested(tasks, SIGNAL(analysisSequenceRequested()));
+        QVERIFY(
+            QMetaObject::invokeMethod(tasks, "openPlanTask", Q_ARG(QVariant, "analysis-sequence")));
+        QCOMPARE(requested.count(), 1);
     }
 
     void mesh_tool_requires_create_mesh_action() {

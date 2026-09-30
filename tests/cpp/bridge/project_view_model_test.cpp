@@ -110,14 +110,38 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     EXPECT_EQ(mesh->vertices.size(), 3U);
     EXPECT_EQ(mesh->vertices[1], (std::array<double, 3>{1.0, 0.0, 0.0}));
 
+    const auto firstPlan = view_model.planSettings();
+    QSignalSpy planChanged(&view_model, &ProjectViewModel::planSettingsChanged);
+    EXPECT_EQ(firstPlan.value(QStringLiteral("meshType")).toString(),
+              QStringLiteral("dual-domain"));
+    ASSERT_TRUE(view_model.setAnalysisSequence(
+        view_model.currentPath(), firstPlan.value(QStringLiteral("revision")).toULongLong(),
+        firstPlan.value(QStringLiteral("importId")).toString(), QStringLiteral("fill-pack")));
+    EXPECT_EQ(view_model.planSettings().value(QStringLiteral("sequenceId")).toString(),
+              QStringLiteral("fill-pack"));
+    EXPECT_EQ(planChanged.count(), 1);
+
     const QString secondSourcePath =
         QDir(fixture.path()).filePath(QStringLiteral("sample-second.stl"));
     ASSERT_TRUE(QFile::copy(sourcePath, secondSourcePath));
-    ASSERT_TRUE(view_model.importStl(secondSourcePath, QStringLiteral("dual-domain"),
+    ASSERT_TRUE(view_model.importStl(secondSourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
     EXPECT_EQ(view_model.importedPartNames(),
               QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl")}));
     EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample-second.stl"));
+
+    EXPECT_EQ(view_model.planSettings().value(QStringLiteral("meshType")).toString(),
+              QStringLiteral("solid-3d"));
+    EXPECT_EQ(view_model.planSettings().value(QStringLiteral("sequenceId")).toString(),
+              QStringLiteral("fill"));
+    view_model.activateDocument(firstPlan.value(QStringLiteral("importId")).toString());
+    EXPECT_EQ(view_model.planSettings().value(QStringLiteral("meshType")).toString(),
+              QStringLiteral("dual-domain"));
+    EXPECT_EQ(view_model.planSettings().value(QStringLiteral("sequenceId")).toString(),
+              QStringLiteral("fill-pack"));
+    view_model.activateDocument(QStringLiteral("welcome"));
+    EXPECT_EQ(view_model.planSettings().value(QStringLiteral("meshType")).toString(),
+              QStringLiteral("solid-3d"));
 
     ProjectViewModel reopened;
     ASSERT_TRUE(reopened.openProject(view_model.currentPath()));

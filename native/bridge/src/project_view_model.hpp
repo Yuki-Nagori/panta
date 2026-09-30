@@ -11,6 +11,7 @@
 #include <QTimer>
 #include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 #include <panta/visualization/mesh_source.hpp>
 #include <rust/cxx.h>
@@ -29,28 +30,26 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(bool dirty READ dirty NOTIFY projectChanged)
     Q_PROPERTY(QString lastCreatedPath READ lastCreatedPath NOTIFY projectCreated)
     Q_PROPERTY(QStringList importedPartNames READ importedPartNames NOTIFY importsChanged)
+    Q_PROPERTY(QStringList importedPartIds READ importedPartIds NOTIFY importsChanged)
     Q_PROPERTY(QString importedPartName READ importedPartName NOTIFY importsChanged)
     Q_PROPERTY(QString importedAssetPath READ importedAssetPath NOTIFY importsChanged)
     Q_PROPERTY(QString importedMeshType READ importedMeshType NOTIFY importsChanged)
     Q_PROPERTY(QString importedUnits READ importedUnits NOTIFY importsChanged)
     Q_PROPERTY(QString importedDimensions READ importedDimensions NOTIFY importsChanged)
     Q_PROPERTY(quint64 importedTriangleCount READ importedTriangleCount NOTIFY importsChanged)
+    Q_PROPERTY(QVariantList meshTypes READ meshTypes CONSTANT)
+    Q_PROPERTY(QString defaultMeshType READ defaultMeshType CONSTANT)
+    Q_PROPERTY(QVariantList analysisSequences READ analysisSequences CONSTANT)
+    Q_PROPERTY(QVariantMap planSettings READ planSettings NOTIFY planSettingsChanged)
     Q_PROPERTY(bool importPreviewReady READ importPreviewReady NOTIFY importPreviewChanged)
     Q_PROPERTY(QString importPreviewName READ importPreviewName NOTIFY importPreviewChanged)
     Q_PROPERTY(
         QString importPreviewDimensions READ importPreviewDimensions NOTIFY importPreviewChanged)
     Q_PROPERTY(quint64 importPreviewTriangleCount READ importPreviewTriangleCount NOTIFY
                    importPreviewChanged)
-    /// 打开的视口文档（含 Welcome）；元素为 {id, kind, state, title, message}，
-    /// state 可为 ready/loading/failed/unloaded；unloaded 由 Rust 缓存驻留结果投影。
-    /// 顺序即页签顺序；QML 只投影，不另存可分歧的副本。
     Q_PROPERTY(QVariantList openDocuments READ openDocuments NOTIFY documentsChanged)
-    /// 当前活动文档 ID；视口内容的唯一选择状态。空串表示全部关闭（空白视口）。
     Q_PROPERTY(QString activeDocumentId READ activeDocumentId NOTIFY activeDocumentChanged)
-    /// 活动文档标题（Welcome / 导入名）；空串表示无活动文档。
     Q_PROPERTY(QString activeDocumentTitle READ activeDocumentTitle NOTIFY activeDocumentChanged)
-    /// 导入记录稳定 ID，与 importedPartNames 按下标一一对应。
-    Q_PROPERTY(QStringList importedPartIds READ importedPartIds NOTIFY importsChanged)
 
   public:
     explicit ProjectViewModel(QObject* parent = nullptr);
@@ -73,6 +72,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] bool dirty() const;
     /// 名称按 Rust 工程导入记录顺序排列；QML 只负责呈现，不派生领域状态。
     [[nodiscard]] const QStringList& importedPartNames() const;
+    [[nodiscard]] QStringList importedPartIds() const;
     [[nodiscard]] const QString& importedPartName() const;
     [[nodiscard]] const QString& importedAssetPath() const;
     [[nodiscard]] const QString& importedMeshType() const;
@@ -83,6 +83,16 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] const QString& importPreviewName() const;
     [[nodiscard]] const QString& importPreviewDimensions() const;
     [[nodiscard]] quint64 importPreviewTriangleCount() const;
+
+    [[nodiscard]] QVariantList meshTypes() const;
+    [[nodiscard]] QString defaultMeshType() const;
+    [[nodiscard]] QVariantList analysisSequences() const; // Rust 目录：ID 与英文源文案。
+    [[nodiscard]] QVariantMap planSettings() const;       // Rust 当前方案快照。
+
+    [[nodiscard]] QVariantList openDocuments() const; // 视口文档的只读投影。
+    [[nodiscard]] QString activeDocumentId() const;
+    [[nodiscard]] QString activeDocumentTitle() const;
+    [[nodiscard]] bool placeholder_visible() const override;
 
     /// 通过 Rust 工程服务创建目录和初始清单；工程资产由后续命令负责。
     ///
@@ -116,6 +126,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 预检 STL 元数据供导入对话框展示，不改变当前工程。
     Q_INVOKABLE bool inspectStl(const QString& path);
 
+    /// 确认打开弹窗时的方案选择；Rust 校验工程身份与修订并事务保存。
+    /// 失败保留已确认值，错误由 error/errorCode 提供。
+    Q_INVOKABLE bool setAnalysisSequence(const QString& projectPath, quint64 revision,
+                                         const QString& importId, const QString& sequenceId);
+
     /// 激活一个就绪文档（Welcome 或已就绪导入页签）；Loading/Failed 文档
     /// 不可激活。同步 UI 操作，不经 Rust Flow。
     Q_INVOKABLE void activateDocument(const QString& documentId);
@@ -131,12 +146,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 拖拽重排的提交入口；from/to 为 openDocuments 下标。
     Q_INVOKABLE void moveDocument(int fromIndex, int toIndex);
 
-    QVariantList openDocuments() const;
-    QString activeDocumentId() const;
-    QString activeDocumentTitle() const;
-    QStringList importedPartIds() const;
-    [[nodiscard]] bool placeholder_visible() const override;
-
   signals:
     void errorChanged();
     void projectChanged();
@@ -144,6 +153,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void projectOpened(const QString& path);
     void projectSaved(const QString& path);
     void importsChanged();
+    void planSettingsChanged();
     void projectImported(const QString& path);
     void importPreviewChanged();
     void documentsChanged();
@@ -163,6 +173,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
+    void refreshPlanSettings();
     static QString userMessageFor(const QString& errorCode);
     static bool toBoundaryText(const QString& text, std::string* out, QString* error);
 
@@ -179,6 +190,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void sync_activation_poll();
 
     QString m_defaultLocation;
+    const QVariantList m_analysisSequences;
+    const QVariantList m_meshTypes;
+    const QString m_defaultMeshType;
     QString m_error;
     QString m_errorCode;
     QString m_currentPath;
@@ -199,6 +213,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_importPreviewTriangleCount = 0;
     QVector<DocumentEntry> m_documents;
     QString m_activeDocumentId;
+    /// Rust 当前方案快照的 Qt 投影，不拥有独立领域选择。
+    QVariantMap m_planSettings;
     /// 当前活动文档的 C++ 显示 DTO；Rust ProjectService 拥有所有驻留 Mesh 与缓存策略。
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_activeMesh;
     QMap<QString, quint64> m_activationAttempts;

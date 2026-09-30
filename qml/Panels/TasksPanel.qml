@@ -1,4 +1,4 @@
-// 工程 / 任务 Dock；上方列出工程和 STL，下方展示最新导入零件的任务。
+// 工程 / 任务 Dock；Tasks 展示工程树和当前零件任务，Tools 展示工具或使用说明。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -19,6 +19,14 @@ PanelSurface {
     property bool importedPartAvailable: importedPartNames.length > 0
     property string importedPartName: ""
     property bool meshToolOpen: false
+    property string analysisSequenceText: ""
+    property string meshType: ""
+    property var meshTypes: []
+
+    function meshTypeText() {
+        const entry = meshTypes.find(entry => entry.id === meshType);
+        return entry ? qsTranslate("MeshType", entry.sourceText) : meshType;
+    }
     readonly property var planTaskItems: [
         {
             id: "imported-part",
@@ -28,14 +36,14 @@ PanelSurface {
         },
         {
             id: "create-mesh",
-            text: qsTranslate("ImportTask", "Create Mesh..."),
+            text: panel.meshType.length > 0 ? qsTranslate("ImportTask", "Mesh (%1)").arg(panel.meshTypeText()) : qsTranslate("ImportTask", "Create Mesh..."),
             icon: "task-mesh",
             completed: false
         },
         {
-            id: "fill",
-            text: qsTranslate("ImportTask", "Fill"),
-            icon: "task-fill",
+            id: "analysis-sequence",
+            text: panel.analysisSequenceText,
+            icon: "task-analysis-sequence",
             completed: false
         },
         {
@@ -79,6 +87,7 @@ PanelSurface {
 
     signal closeRequested
     signal openProjectRequested
+    signal analysisSequenceRequested
     signal newProjectRequested
     signal openImportRequested(string recordId)
 
@@ -86,6 +95,8 @@ PanelSurface {
         if (taskId === "create-mesh") {
             panelTabs.currentIndex = 1;
             meshToolOpen = true;
+        } else if (taskId === "analysis-sequence") {
+            analysisSequenceRequested();
         }
     }
 
@@ -327,6 +338,7 @@ PanelSurface {
                                     iconName: taskRow.modelData.icon
                                     preserveIconColors: true
                                     iconSize: Theme.iconSizeSmall
+                                    accessibleName: taskRow.modelData.id === "analysis-sequence" ? qsTranslate("AnalysisSequenceDialog", "Select Analysis Sequence") : taskRow.modelData.id === "create-mesh" ? qsTranslate("ImportTask", "Create Mesh...") : text
                                     enabled: taskRow.modelData.enabled !== false
                                     contentAlignLeft: true
                                     contentColor: Theme.colorText

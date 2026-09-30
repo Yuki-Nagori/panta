@@ -238,21 +238,6 @@ file-filter:
   src: STL files (*.stl)
   tr: STL files (*.stl)
 
-[ImportMeshMidplane]
-label:
-  src: Midplane
-  tr: Midplane
-
-[ImportMeshDualDomain]
-label:
-  src: Dual Domain
-  tr: Dual Domain
-
-[ImportMeshSolid3D]
-label:
-  src: Solid 3D
-  tr: Solid 3D
-
 [DialogAction]
 ok:
   src: OK
@@ -263,6 +248,10 @@ cancel:
   tr: Cancel
 
 [ImportTask]
+mesh-type:
+  src: Mesh (%1)
+  tr: Mesh (%1)
+
 part:
   src: Part (%1)
   tr: Part (%1)
@@ -270,10 +259,6 @@ part:
 create-mesh:
   src: Create Mesh...
   tr: Create Mesh...
-
-fill:
-  src: Fill
-  tr: Fill
 
 material-data:
   src: Material Data
@@ -726,3 +711,66 @@ mesh-data-released:
 failed-to-load:
   src: Failed to load
   tr: Failed to load
+
+[AnalysisSequenceDialog]
+title:
+  src: Select Analysis Sequence
+  tr: Select Analysis Sequence
+
+more:
+  src: More...
+  tr: More...
+
+[AnalysisSequence]
+fill:
+  src: Fill
+  tr: Fill
+
+fill-pack:
+  src: Fill + Pack
+  tr: Fill + Pack
+
+fast-fill:
+  src: Fast Fill
+  tr: Fast Fill
+
+fill-pack-warp:
+  src: Fill + Pack + Warp
+  tr: Fill + Pack + Warp
+
+cool:
+  src: Cool
+  tr: Cool
+
+cool-fill-pack-warp:
+  src: Cool + Fill + Pack + Warp
+  tr: Cool + Fill + Pack + Warp
+
+molding-window:
+  src: Molding Window
+  tr: Molding Window
+
+gate-location:
+  src: Gate Location
+  tr: Gate Location
+
+cool-fem:
+  src: Cool (FEM)
+  tr: Cool (FEM)
+
+cool-fem-fill-pack-warp:
+  src: Cool (FEM) + Fill + Pack + Warp
+  tr: Cool (FEM) + Fill + Pack + Warp
+
+[MeshType]
+midplane:
+  src: Midplane
+  tr: Midplane
+
+dual-domain:
+  src: Dual Domain
+  tr: Dual Domain
+
+solid-3d:
+  src: Solid 3D
+  tr: Solid 3D
