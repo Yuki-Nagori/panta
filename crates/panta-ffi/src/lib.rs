@@ -314,13 +314,16 @@ pub mod bridge {
         fn mesh_type_catalog() -> Vec<ChoiceDefinition>;
         fn default_mesh_type() -> String;
         fn default_material() -> Result<MaterialDefinition>;
-        fn project_service_set_material(
+        fn project_service_begin_material_confirmation(
             service: &mut ProjectService,
             project_path: &str,
             revision: u64,
             import_id: &str,
             material_id: &str,
-        ) -> Result<ProjectSnapshot>;
+        ) -> Result<bool>;
+        fn project_service_finish_material_confirmation(
+            service: &mut ProjectService,
+        ) -> Result<bool>;
         fn project_service_plan_settings(
             service: &ProjectService,
             preferred_import_id: &str,
@@ -820,22 +823,30 @@ fn project_service_plan_settings(
     }
 }
 
-fn project_service_set_material(
+fn project_service_begin_material_confirmation(
     service: &mut ProjectService,
     project_path: &str,
     revision: u64,
     import_id: &str,
     material_id: &str,
-) -> Result<bridge::ProjectSnapshot, String> {
+) -> Result<bool, String> {
     service
         .service
-        .set_material(
+        .begin_material_confirmation(
             std::path::Path::new(project_path),
             revision,
             import_id,
             material_id,
         )
-        .map(project_snapshot)
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_finish_material_confirmation(
+    service: &mut ProjectService,
+) -> Result<bool, String> {
+    service
+        .service
+        .finish_material_confirmation()
         .map_err(|error| error.to_string())
 }
 

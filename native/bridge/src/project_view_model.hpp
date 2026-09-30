@@ -40,6 +40,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QVariantList meshTypes READ meshTypes CONSTANT)
     Q_PROPERTY(QString defaultMeshType READ defaultMeshType CONSTANT)
     Q_PROPERTY(QVariantMap defaultMaterial READ defaultMaterial CONSTANT)
+    Q_PROPERTY(bool materialConfirmationPending READ materialConfirmationPending NOTIFY
+                   materialConfirmationPendingChanged)
     Q_PROPERTY(QVariantList analysisSequences READ analysisSequences CONSTANT)
     Q_PROPERTY(QVariantMap planSettings READ planSettings NOTIFY planSettingsChanged)
     Q_PROPERTY(bool importPreviewReady READ importPreviewReady NOTIFY importPreviewChanged)
@@ -88,6 +90,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] QVariantList meshTypes() const;
     [[nodiscard]] QString defaultMeshType() const;
     [[nodiscard]] QVariantMap defaultMaterial() const;
+    [[nodiscard]] bool materialConfirmationPending() const;
     [[nodiscard]] QVariantList analysisSequences() const; // Rust 目录：ID 与英文源文案。
     [[nodiscard]] QVariantMap planSettings() const;       // Rust 当前方案快照。
 
@@ -133,7 +136,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_INVOKABLE bool setAnalysisSequence(const QString& projectPath, quint64 revision,
                                          const QString& importId, const QString& sequenceId);
 
-    /// 确认当前零件的材料引用；Rust 校验身份和修订后事务保存。
+    /// 启动 Rust 后台材料确认；返回值表示请求被接受，不表示已保存。
+    /// 完成由 materialConfirmationFinished 通知；失败保留旧配置。
     Q_INVOKABLE bool setMaterial(const QString& projectPath, quint64 revision,
                                  const QString& importId, const QString& materialId);
 
@@ -160,6 +164,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void projectSaved(const QString& path);
     void importsChanged();
     void planSettingsChanged();
+    void materialConfirmationPendingChanged();
+    void materialConfirmationFinished(bool succeeded);
     void projectImported(const QString& path);
     void importPreviewChanged();
     void documentsChanged();
@@ -180,6 +186,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     void refreshPlanSettings();
+    void finish_material_confirmation();
+    void set_material_confirmation_pending(bool pending);
     static QString userMessageFor(const QString& errorCode);
     static bool toBoundaryText(const QString& text, std::string* out, QString* error);
 
@@ -226,6 +234,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_activeMesh;
     QMap<QString, quint64> m_activationAttempts;
     QTimer m_activationPoll;
+    QTimer m_materialConfirmationPoll;
+    bool m_materialConfirmationPending = false;
     rust::Box<panta::ffi::ProjectService> m_service;
 };
 

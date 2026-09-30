@@ -833,6 +833,10 @@ entry-14:
   tr: Add material to commonly used list after selecting
 
 
+saving:
+  src: Saving material...
+  tr: Saving material...
+
 [Material]
 entry-1:
   src: PP — 25% mineral filler

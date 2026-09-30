@@ -7,6 +7,7 @@ Rectangle {
 
     required property Window window
     property string caption: ""
+    property bool closeEnabled: true
     signal closeRequested
 
     implicitHeight: Theme.titlebarHeight + Theme.spacingSmall
@@ -31,6 +32,7 @@ Rectangle {
         ThemedToolButton {
             id: closeButton
             objectName: "dialogCloseButton"
+            enabled: titleBar.closeEnabled
             Layout.preferredWidth: Theme.paneCloseSize
             Layout.preferredHeight: Theme.paneCloseSize
             controlHeight: Theme.paneCloseSize

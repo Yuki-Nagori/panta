@@ -51,6 +51,7 @@ impl ProjectService {
         expected_revision: u64,
         import_id: &str,
     ) -> Result<&ProjectState, ProjectError> {
+        self.ensure_project_writable()?;
         let state = self.current.as_ref().ok_or(ProjectError::NoProject)?;
         if state.path != expected_path || state.revision != expected_revision {
             return Err(ProjectError::CommandInvalid(

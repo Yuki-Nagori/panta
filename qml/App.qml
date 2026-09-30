@@ -14,6 +14,10 @@ ApplicationWindow {
     visibility: Window.Maximized
     title: qsTr("panta")
     color: Theme.colorPanel
+    onClosing: event => {
+        if (projectModel.materialConfirmationPending)
+            event.accepted = false;
+    }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property bool layersDockShown: layersPanel.dockOpen
     readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
@@ -37,6 +41,10 @@ ApplicationWindow {
         onProjectCreated: shellWindow.selectRibbonTab("home")
         onProjectOpened: shellWindow.selectRibbonTab("home")
         onProjectImported: layersPanel.dockOpen = true
+        onMaterialConfirmationFinished: succeeded => {
+            if (succeeded)
+                materialDialog.close();
+        }
     }
 
     NewProjectDialog {
@@ -69,9 +77,9 @@ ApplicationWindow {
         material: projectModel.defaultMaterial
         planSettings: projectModel.planSettings
         errorText: projectModel.error
+        saving: projectModel.materialConfirmationPending
         onSelectionRequested: (path, revision, importId, materialId) => {
-            if (projectModel.setMaterial(path, revision, importId, materialId))
-                materialDialog.close();
+            projectModel.setMaterial(path, revision, importId, materialId);
         }
     }
 

@@ -833,6 +833,10 @@ entry-14:
   tr: 选择后将材料添加到常用列表
 
 
+saving:
+  src: Saving material...
+  tr: 正在保存材料…
+
 [Material]
 entry-1:
   src: PP — 25% mineral filler

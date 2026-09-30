@@ -13,6 +13,7 @@ impl ProjectService {
         units: &str,
         show_import_log: bool,
     ) -> Result<ImportRecord, ProjectError> {
+        self.ensure_project_writable()?;
         if self.current.is_none() {
             return Err(ProjectError::NoProject);
         }

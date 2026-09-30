@@ -102,6 +102,9 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
     // 存在 Loading 文档时运转。
     m_activationPoll.setInterval(10);
     connect(&m_activationPoll, &QTimer::timeout, this, &ProjectViewModel::drain_activations);
+    m_materialConfirmationPoll.setInterval(10);
+    connect(&m_materialConfirmationPoll, &QTimer::timeout, this,
+            &ProjectViewModel::finish_material_confirmation);
     reset_documents();
 }
 
@@ -175,6 +178,8 @@ QString ProjectViewModel::defaultMeshType() const { return m_defaultMeshType; }
 
 QVariantMap ProjectViewModel::defaultMaterial() const { return m_defaultMaterial; }
 
+bool ProjectViewModel::materialConfirmationPending() const { return m_materialConfirmationPending; }
+
 QVariantList ProjectViewModel::analysisSequences() const { return m_analysisSequences; }
 
 QVariantMap ProjectViewModel::planSettings() const { return m_planSettings; }
@@ -221,6 +226,10 @@ bool ProjectViewModel::setAnalysisSequence(const QString& projectPath, quint64 r
 
 bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
                                    const QString& importId, const QString& materialId) {
+    // 发布完成快照会同步发出 Qt 通知；此时也不能重入启动下一次确认。
+    if (m_materialConfirmationPending) {
+        return false;
+    }
     std::string path;
     std::string id;
     std::string material;
@@ -231,14 +240,50 @@ bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
         return fail(conversionError);
     }
     try {
-        applySnapshot(
-            panta::ffi::project_service_set_material(*m_service, path, revision, id, material));
-        // 工程摘要不包含方案字段；即使 projectChanged 未发出，也要刷新已提交的配置。
-        refreshPlanSettings();
+        const bool pending = panta::ffi::project_service_begin_material_confirmation(
+            *m_service, path, revision, id, material);
         clearError();
+        if (pending) {
+            set_material_confirmation_pending(true);
+        } else {
+            // 相同材料无需写盘，仍按完成事件结束弹窗。
+            refreshPlanSettings();
+            emit materialConfirmationFinished(true);
+        }
         return true;
     } catch (const rust::Error& failure) {
         return fail(QString::fromUtf8(failure.what()));
+    }
+}
+
+void ProjectViewModel::set_material_confirmation_pending(bool pending) {
+    if (m_materialConfirmationPending == pending) {
+        return;
+    }
+    m_materialConfirmationPending = pending;
+    if (pending) {
+        m_materialConfirmationPoll.start();
+    } else {
+        m_materialConfirmationPoll.stop();
+    }
+    emit materialConfirmationPendingChanged();
+}
+
+void ProjectViewModel::finish_material_confirmation() {
+    try {
+        if (!panta::ffi::project_service_finish_material_confirmation(*m_service)) {
+            return;
+        }
+        applySnapshot(panta::ffi::project_service_current(*m_service));
+        // 工程摘要不包含方案字段；即使 projectChanged 未发出，也要刷新已提交配置。
+        refreshPlanSettings();
+        clearError();
+        set_material_confirmation_pending(false);
+        emit materialConfirmationFinished(true);
+    } catch (const rust::Error& failure) {
+        fail(QString::fromUtf8(failure.what()));
+        set_material_confirmation_pending(false);
+        emit materialConfirmationFinished(false);
     }
 }
 

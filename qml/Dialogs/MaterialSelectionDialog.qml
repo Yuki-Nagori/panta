@@ -1,4 +1,4 @@
-// 材料确认窗口；冻结工程目标，取消和关闭不提交候选值。
+// 材料确认窗口；提交前可放弃候选，后台写入期间保持窗口和目标有效。
 import QtQuick
 import QtQuick.Layouts
 
@@ -10,7 +10,8 @@ Window {
     property var planSettings: ({})
     property var openedSettings: ({})
     property string errorText: ""
-    readonly property bool canConfirm: !!material.id && !!openedSettings.importId
+    property bool saving: false
+    readonly property bool canConfirm: !saving && !!material.id && !!openedSettings.importId
     signal selectionRequested(string projectPath, double revision, string importId, string materialId)
     width: Theme.materialDialogWidth
     height: Theme.materialDialogHeight
@@ -21,9 +22,13 @@ Window {
     flags: Qt.Dialog | Qt.FramelessWindowHint
     title: qsTranslate("MaterialDialog", "Select Material")
     transientParent: ownerWindow
+    onClosing: event => {
+        if (saving)
+            event.accepted = false;
+    }
 
     function open() {
-        if (!material.id || !planSettings.importId)
+        if (saving || !material.id || !planSettings.importId)
             return;
         openedSettings = planSettings;
         materialPanel.reset();
@@ -50,13 +55,14 @@ Window {
                 Layout.fillWidth: true
                 window: dialog
                 caption: dialog.title
+                closeEnabled: !dialog.saving
                 onCloseRequested: dialog.close()
             }
             ThemedLabel {
                 Layout.fillWidth: true
                 Layout.margins: Theme.spacingLarge
-                text: dialog.errorText
-                textColor: Theme.colorError
+                text: dialog.saving ? qsTranslate("MaterialDialog", "Saving material...") : dialog.errorText
+                textColor: dialog.saving ? Theme.colorTextMuted : Theme.colorError
                 visible: text.length > 0
                 wrapMode: Text.Wrap
             }
@@ -66,6 +72,7 @@ Window {
                 Layout.fillHeight: true
                 Layout.margins: Theme.spacingLarge
                 material: dialog.material
+                enabled: !dialog.saving
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -86,6 +93,7 @@ Window {
                 }
                 ThemedToolButton {
                     objectName: "materialCancel"
+                    enabled: !dialog.saving
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     text: qsTranslate("DialogAction", "Cancel")
                     contentColor: Theme.colorText
@@ -103,7 +111,7 @@ Window {
         }
     }
     Shortcut {
-        enabled: dialog.visible
+        enabled: dialog.visible && !dialog.saving
         sequence: "Esc"
         onActivated: dialog.close()
     }

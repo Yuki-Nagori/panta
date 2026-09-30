@@ -286,11 +286,23 @@ pub struct ProjectService {
     mesh_cache: SurfaceMeshCache,
     activation_attempts: HashMap<String, u64>,
     activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
+    // 候选提交期间锁住工程元数据；Mesh 驻留和只读显示操作仍可继续。
+    pending_material: Option<std::sync::mpsc::Receiver<Result<ProjectState, ProjectError>>>,
 }
 
 impl ProjectService {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    // 后台候选已冻结；消费结果前，任何工程写入都会与候选清单竞争。
+    fn ensure_project_writable(&self) -> Result<(), ProjectError> {
+        if self.pending_material.is_some() {
+            return Err(ProjectError::CommandInvalid(
+                "material confirmation pending".to_owned(),
+            ));
+        }
+        Ok(())
     }
 
     #[cfg(test)]
@@ -303,6 +315,7 @@ impl ProjectService {
 
     /// 创建 `location/name/name.panta` 目录包和初始清单；目标已存在时拒绝覆盖。
     pub fn create(&mut self, location: &Path, name: &str) -> Result<ProjectSnapshot, ProjectError> {
+        self.ensure_project_writable()?;
         validate_name(name)?;
         if location.as_os_str().is_empty() {
             return Err(ProjectError::LocationEmpty);
@@ -363,6 +376,7 @@ impl ProjectService {
     /// [`Self::begin_asset_activation`] 异步按需重建（080 文档页签），
     /// 避免保留同步与异步两条重复加载路径。
     pub fn open(&mut self, path: &Path) -> Result<ProjectSnapshot, ProjectError> {
+        self.ensure_project_writable()?;
         if !path.is_absolute() || !path.is_file() {
             return Err(ProjectError::FileMissing(path.display().to_string()));
         }
@@ -405,6 +419,7 @@ impl ProjectService {
 
     /// 将当前模型以同目录临时文件写入后替换 `.panta` 主文件。
     pub fn save(&mut self) -> Result<ProjectSnapshot, ProjectError> {
+        self.ensure_project_writable()?;
         let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
         write_manifest(state)?;
         state.dirty = false;
@@ -413,6 +428,7 @@ impl ProjectService {
 
     /// 执行一个有校验的模型命令，并标记工程 dirty。
     pub fn execute(&mut self, command: ProjectCommand) -> Result<ProjectSnapshot, ProjectError> {
+        self.ensure_project_writable()?;
         let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
         match command {
             ProjectCommand::Rename { name } => {
