@@ -120,6 +120,21 @@ pub mod bridge {
         properties: Vec<MaterialProperty>,
     }
 
+    struct HoldingProfilePoint {
+        duration_seconds: f64,
+        pressure_percent: f64,
+    }
+
+    struct FillSettings {
+        mold_temperature_celsius: f64,
+        melt_temperature_celsius: f64,
+        flow_rate_cm3_per_second: f64,
+        switch_over_volume_percent: f64,
+        fiber_orientation: bool,
+        crystallization: bool,
+        holding_profile: Vec<HoldingProfilePoint>,
+    }
+
     struct PlanSettings {
         project_path: String,
         revision: u64,
@@ -129,6 +144,8 @@ pub mod bridge {
         sequence_source_text: String,
         material_id: String,
         material_source_text: String,
+        fill_settings: FillSettings,
+        fill_settings_confirmed: bool,
     }
 
     /// STL metadata shown by the import dialog before the file is copied.
@@ -322,6 +339,16 @@ pub mod bridge {
             material_id: &str,
         ) -> Result<bool>;
         fn project_service_finish_material_confirmation(
+            service: &mut ProjectService,
+        ) -> Result<bool>;
+        fn project_service_begin_fill_settings_confirmation(
+            service: &mut ProjectService,
+            project_path: &str,
+            revision: u64,
+            import_id: &str,
+            settings: FillSettings,
+        ) -> Result<bool>;
+        fn project_service_finish_fill_settings_confirmation(
             service: &mut ProjectService,
         ) -> Result<bool>;
         fn project_service_plan_settings(
@@ -809,6 +836,8 @@ fn project_service_plan_settings(
             sequence_source_text: settings.sequence_source_text,
             material_id: settings.material_id,
             material_source_text: settings.material_source_text,
+            fill_settings: fill_settings_dto(settings.fill_settings),
+            fill_settings_confirmed: settings.fill_settings_confirmed,
         },
         None => bridge::PlanSettings {
             project_path: String::new(),
@@ -819,6 +848,8 @@ fn project_service_plan_settings(
             sequence_source_text: String::new(),
             material_id: String::new(),
             material_source_text: String::new(),
+            fill_settings: fill_settings_dto(panta_core::project::FillSettings::default()),
+            fill_settings_confirmed: false,
         },
     }
 }
@@ -1183,6 +1214,67 @@ fn bridge_kind(category: panta_core::path::RootCategory) -> bridge::PathRootKind
         panta_core::path::RootCategory::Session => bridge::PathRootKind::Session,
         panta_core::path::RootCategory::Qrc => bridge::PathRootKind::Qrc,
     }
+}
+
+fn fill_settings_dto(settings: panta_core::project::FillSettings) -> bridge::FillSettings {
+    bridge::FillSettings {
+        mold_temperature_celsius: settings.mold_temperature_celsius,
+        melt_temperature_celsius: settings.melt_temperature_celsius,
+        flow_rate_cm3_per_second: settings.flow_rate_cm3_per_second,
+        switch_over_volume_percent: settings.switch_over_volume_percent,
+        fiber_orientation: settings.fiber_orientation,
+        crystallization: settings.crystallization,
+        holding_profile: settings
+            .holding_profile
+            .into_iter()
+            .map(|point| bridge::HoldingProfilePoint {
+                duration_seconds: point.duration_seconds,
+                pressure_percent: point.pressure_percent,
+            })
+            .collect(),
+    }
+}
+
+fn project_service_begin_fill_settings_confirmation(
+    service: &mut ProjectService,
+    project_path: &str,
+    revision: u64,
+    import_id: &str,
+    settings: bridge::FillSettings,
+) -> Result<bool, String> {
+    service
+        .service
+        .begin_fill_settings_confirmation(
+            std::path::Path::new(project_path),
+            revision,
+            import_id,
+            panta_core::project::FillSettings {
+                mold_temperature_celsius: settings.mold_temperature_celsius,
+                melt_temperature_celsius: settings.melt_temperature_celsius,
+                flow_rate_cm3_per_second: settings.flow_rate_cm3_per_second,
+                switch_over_volume_percent: settings.switch_over_volume_percent,
+                fiber_orientation: settings.fiber_orientation,
+                crystallization: settings.crystallization,
+                holding_profile: settings
+                    .holding_profile
+                    .into_iter()
+                    .map(|point| panta_core::project::HoldingProfilePoint {
+                        duration_seconds: point.duration_seconds,
+                        pressure_percent: point.pressure_percent,
+                    })
+                    .collect(),
+            },
+        )
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_finish_fill_settings_confirmation(
+    service: &mut ProjectService,
+) -> Result<bool, String> {
+    service
+        .service
+        .finish_fill_settings_confirmation()
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

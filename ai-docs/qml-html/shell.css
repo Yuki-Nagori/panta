@@ -711,3 +711,47 @@ button.inspector-row:hover { background: linear-gradient(to right, transparent c
 .material-selected dd { margin: 0; font-variant-numeric: tabular-nums; }
 .material-favorite { margin-top: 16px; color: var(--color-muted); }
 .material-body .dialog-actions .dialog-primary { background: var(--color-dialog-primary); border-color: var(--color-dialog-primary-border); }
+
+/* 工艺设置按参数分区；曲线编辑覆盖父弹窗，保留父级草稿。 */
+.process-dialog { width: min(720px, 100%); }
+.process-body { gap: 16px; }
+.process-section { margin: 0; padding: 14px 16px 16px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); }
+.process-section legend { padding: 0 6px; font-weight: 600; }
+.process-body input[type="number"], .process-body select { min-width: 0; width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); color: var(--color-text); font: inherit; }
+.process-body button { min-height: 30px; padding: 0 12px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); font: inherit; }
+.process-body button:not(:disabled):hover { background: var(--color-hover); }
+.process-temperature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.process-temperature-grid label { display: grid; gap: 8px; }
+.process-unit-input { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.process-unit-input > span { flex: none; min-width: 32px; color: var(--color-muted); }
+.process-control-grid { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(140px, 1fr) 126px; align-items: center; gap: 12px; }
+.process-profile-control { display: flex; gap: 12px; }
+.process-profile-control button { flex: none; }
+.process-section .dialog-note { margin-top: 10px; font-size: var(--font-small); }
+.process-section .checkbox-row + .checkbox-row { margin-top: 12px; }
+.process-secondary-actions { display: flex; gap: 8px; margin-top: 16px; }
+[data-process-status][data-completed="false"] { visibility: hidden; }
+.profile-backdrop { z-index: 21; }
+.profile-dialog { width: min(540px, 100%); }
+.profile-table-scroll { max-height: 250px; overflow: auto; border: 1px solid var(--color-panel-line); border-radius: var(--radius); }
+.profile-table { width: 100%; border-collapse: collapse; }
+.profile-table th { background: var(--color-chrome); text-align: left; padding: 10px; font-weight: 600; }
+.profile-table th span { display: block; color: var(--color-muted); font-size: var(--font-small); font-weight: 400; }
+.profile-table td { padding: 8px 10px; border-top: 1px solid var(--color-panel-line); }
+.profile-table td:first-child { width: 44px; color: var(--color-muted); }
+.profile-table td:last-child { width: 40px; }
+.profile-table td button { padding: 0 8px; }
+.profile-table .profile-remove-heading { font-size: 0; }
+.profile-toolbar { display: flex; gap: 8px; }
+.profile-toolbar button:last-child { margin-left: auto; }
+.profile-plot { margin: 0; padding: 10px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); }
+.profile-plot svg { width: 100%; display: block; }
+.profile-axis { stroke: var(--color-panel-line); fill: none; }
+.profile-plot polyline { fill: none; stroke: var(--color-focus); stroke-width: 2; }
+.profile-plot text, .profile-plot figcaption { fill: var(--color-muted); color: var(--color-muted); font-size: var(--font-small); }
+.profile-plot figcaption { text-align: center; }
+@media (max-width: 680px) {
+  .process-temperature-grid { grid-template-columns: 1fr; }
+  .process-control-grid { grid-template-columns: minmax(0, 1fr) 126px; }
+  .process-control-grid > label { grid-column: 1 / -1; }
+}

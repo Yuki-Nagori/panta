@@ -18,6 +18,8 @@ mod analysis_sequence;
 pub use analysis_sequence::{ANALYSIS_SEQUENCES, AnalysisSequenceDefinition};
 mod plan_settings;
 pub use plan_settings::PlanSettings;
+mod process_settings;
+pub use process_settings::{FillSettings, HoldingProfilePoint};
 mod material;
 pub use material::{MaterialDefinition, MaterialProperty, default_material};
 mod import;
@@ -59,6 +61,7 @@ struct ProjectState {
     imports: Vec<ImportRecord>,
     analysis_sequences: BTreeMap<String, String>,
     materials: BTreeMap<String, String>,
+    fill_settings: BTreeMap<String, FillSettings>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -74,6 +77,8 @@ struct ProjectManifest {
     // 只保存已确认的材料引用；空表表示尚未分配材料。
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     materials: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    fill_settings: BTreeMap<String, FillSettings>,
 }
 
 /// 工程 service 的可恢复错误；`Display` 的前缀是跨语言稳定错误码。
@@ -287,7 +292,7 @@ pub struct ProjectService {
     activation_attempts: HashMap<String, u64>,
     activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
     // 候选提交期间锁住工程元数据；Mesh 驻留和只读显示操作仍可继续。
-    pending_material: Option<std::sync::mpsc::Receiver<Result<ProjectState, ProjectError>>>,
+    pending_metadata: Option<storage::PendingMetadataWrite>,
 }
 
 impl ProjectService {
@@ -297,9 +302,9 @@ impl ProjectService {
 
     // 后台候选已冻结；消费结果前，任何工程写入都会与候选清单竞争。
     fn ensure_project_writable(&self) -> Result<(), ProjectError> {
-        if self.pending_material.is_some() {
+        if self.pending_metadata.is_some() {
             return Err(ProjectError::CommandInvalid(
-                "material confirmation pending".to_owned(),
+                "metadata confirmation pending".to_owned(),
             ));
         }
         Ok(())
@@ -355,6 +360,7 @@ impl ProjectService {
             imports: Vec::new(),
             analysis_sequences: BTreeMap::new(),
             materials: BTreeMap::new(),
+            fill_settings: BTreeMap::new(),
         };
         if let Err(error) = write_manifest(&state) {
             if let Some(project_root) = state.path.parent() {
@@ -400,6 +406,7 @@ impl ProjectService {
         validate_name(&manifest.name)?;
         analysis_sequence::validate_sequences(&manifest)?;
         material::validate_materials(&manifest)?;
+        process_settings::validate_settings(&manifest.imports, &manifest.fill_settings)?;
         self.current = Some(ProjectState {
             path: path.to_path_buf(),
             name: manifest.name,
@@ -408,6 +415,7 @@ impl ProjectService {
             imports: manifest.imports,
             analysis_sequences: manifest.analysis_sequences,
             materials: manifest.materials,
+            fill_settings: manifest.fill_settings,
         });
         self.latest_mesh_id = None;
         self.mesh_cache.clear();

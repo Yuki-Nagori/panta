@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QLatin1Char>
+#include <QMetaType>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -102,9 +103,9 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
     // 存在 Loading 文档时运转。
     m_activationPoll.setInterval(10);
     connect(&m_activationPoll, &QTimer::timeout, this, &ProjectViewModel::drain_activations);
-    m_materialConfirmationPoll.setInterval(10);
-    connect(&m_materialConfirmationPoll, &QTimer::timeout, this,
-            &ProjectViewModel::finish_material_confirmation);
+    m_metadataConfirmationPoll.setInterval(10);
+    connect(&m_metadataConfirmationPoll, &QTimer::timeout, this,
+            &ProjectViewModel::finish_metadata_confirmation);
     reset_documents();
 }
 
@@ -178,7 +179,13 @@ QString ProjectViewModel::defaultMeshType() const { return m_defaultMeshType; }
 
 QVariantMap ProjectViewModel::defaultMaterial() const { return m_defaultMaterial; }
 
-bool ProjectViewModel::materialConfirmationPending() const { return m_materialConfirmationPending; }
+bool ProjectViewModel::fillSettingsConfirmationPending() const {
+    return m_pendingConfirmation == ConfirmationKind::FillSettings;
+}
+
+bool ProjectViewModel::materialConfirmationPending() const {
+    return m_pendingConfirmation == ConfirmationKind::Material;
+}
 
 QVariantList ProjectViewModel::analysisSequences() const { return m_analysisSequences; }
 
@@ -187,6 +194,20 @@ QVariantMap ProjectViewModel::planSettings() const { return m_planSettings; }
 void ProjectViewModel::refreshPlanSettings() {
     const auto settings =
         panta::ffi::project_service_plan_settings(*m_service, m_activeDocumentId.toStdString());
+    QVariantList profile;
+    for (const auto& point : settings.fill_settings.holding_profile) {
+        profile.append(QVariantMap{{QStringLiteral("duration"), point.duration_seconds},
+                                   {QStringLiteral("pressure"), point.pressure_percent}});
+    }
+    const auto& fill = settings.fill_settings;
+    const QVariantMap fillSettings{
+        {QStringLiteral("moldTemperature"), fill.mold_temperature_celsius},
+        {QStringLiteral("meltTemperature"), fill.melt_temperature_celsius},
+        {QStringLiteral("flowRate"), fill.flow_rate_cm3_per_second},
+        {QStringLiteral("switchVolume"), fill.switch_over_volume_percent},
+        {QStringLiteral("fiberOrientation"), fill.fiber_orientation},
+        {QStringLiteral("crystallization"), fill.crystallization},
+        {QStringLiteral("holdingProfile"), profile}};
     const QVariantMap next{
         {QStringLiteral("projectPath"), QString::fromUtf8(settings.project_path)},
         {QStringLiteral("revision"), QVariant::fromValue(settings.revision)},
@@ -194,6 +215,8 @@ void ProjectViewModel::refreshPlanSettings() {
         {QStringLiteral("meshType"), QString::fromUtf8(settings.mesh_type)},
         {QStringLiteral("sequenceId"), QString::fromUtf8(settings.sequence_id)},
         {QStringLiteral("sequenceSourceText"), QString::fromUtf8(settings.sequence_source_text)},
+        {QStringLiteral("fillSettings"), fillSettings},
+        {QStringLiteral("fillSettingsConfirmed"), settings.fill_settings_confirmed},
         {QStringLiteral("materialId"), QString::fromUtf8(settings.material_id)},
         {QStringLiteral("materialSourceText"), QString::fromUtf8(settings.material_source_text)}};
     if (next != m_planSettings) {
@@ -227,7 +250,7 @@ bool ProjectViewModel::setAnalysisSequence(const QString& projectPath, quint64 r
 bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
                                    const QString& importId, const QString& materialId) {
     // 发布完成快照会同步发出 Qt 通知；此时也不能重入启动下一次确认。
-    if (m_materialConfirmationPending) {
+    if (m_pendingConfirmation != ConfirmationKind::None) {
         return false;
     }
     std::string path;
@@ -244,7 +267,7 @@ bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
             *m_service, path, revision, id, material);
         clearError();
         if (pending) {
-            set_material_confirmation_pending(true);
+            set_pending_confirmation(ConfirmationKind::Material);
         } else {
             // 相同材料无需写盘，仍按完成事件结束弹窗。
             refreshPlanSettings();
@@ -256,34 +279,109 @@ bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
     }
 }
 
-void ProjectViewModel::set_material_confirmation_pending(bool pending) {
-    if (m_materialConfirmationPending == pending) {
-        return;
+bool ProjectViewModel::setFillSettings(const QString& projectPath, quint64 revision,
+                                       const QString& importId, const QVariantMap& settings) {
+    if (m_pendingConfirmation != ConfirmationKind::None) {
+        return false;
     }
-    m_materialConfirmationPending = pending;
-    if (pending) {
-        m_materialConfirmationPoll.start();
-    } else {
-        m_materialConfirmationPoll.stop();
+    std::string path;
+    std::string id;
+    QString conversionError;
+    if (!toBoundaryText(projectPath, &path, &conversionError) ||
+        !toBoundaryText(importId, &id, &conversionError)) {
+        return fail(conversionError);
     }
-    emit materialConfirmationPendingChanged();
+    // 只适配 Qt 值类型；范围与工程有效性由 Rust 校验。
+    bool converted =
+        settings.value(QStringLiteral("fiberOrientation")).metaType().id() == QMetaType::Bool &&
+        settings.value(QStringLiteral("crystallization")).metaType().id() == QMetaType::Bool;
+    const auto number = [&](const QString& key) {
+        bool ok = false;
+        const double value = settings.value(key).toDouble(&ok);
+        converted = converted && ok;
+        return value;
+    };
+    panta::ffi::FillSettings candidate;
+    candidate.mold_temperature_celsius = number(QStringLiteral("moldTemperature"));
+    candidate.melt_temperature_celsius = number(QStringLiteral("meltTemperature"));
+    candidate.flow_rate_cm3_per_second = number(QStringLiteral("flowRate"));
+    candidate.switch_over_volume_percent = number(QStringLiteral("switchVolume"));
+    candidate.fiber_orientation = settings.value(QStringLiteral("fiberOrientation")).toBool();
+    candidate.crystallization = settings.value(QStringLiteral("crystallization")).toBool();
+    for (const auto& value : settings.value(QStringLiteral("holdingProfile")).toList()) {
+        const auto point = value.toMap();
+        bool durationOk = false;
+        bool pressureOk = false;
+        const double duration = point.value(QStringLiteral("duration")).toDouble(&durationOk);
+        const double pressure = point.value(QStringLiteral("pressure")).toDouble(&pressureOk);
+        converted = converted && durationOk && pressureOk;
+        candidate.holding_profile.push_back({duration, pressure});
+    }
+    if (!converted) {
+        return fail(QStringLiteral("project.command_invalid: invalid process settings value"));
+    }
+    try {
+        const bool pending = panta::ffi::project_service_begin_fill_settings_confirmation(
+            *m_service, path, revision, id, std::move(candidate));
+        clearError();
+        if (pending) {
+            set_pending_confirmation(ConfirmationKind::FillSettings);
+        } else {
+            refreshPlanSettings();
+            emit fillSettingsConfirmationFinished(true);
+        }
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
 }
 
-void ProjectViewModel::finish_material_confirmation() {
+void ProjectViewModel::set_pending_confirmation(ConfirmationKind kind) {
+    const auto previous = m_pendingConfirmation;
+    if (previous == kind) {
+        return;
+    }
+    m_pendingConfirmation = kind;
+    if (kind == ConfirmationKind::None) {
+        m_metadataConfirmationPoll.stop();
+    } else {
+        m_metadataConfirmationPoll.start();
+    }
+    if (previous == ConfirmationKind::Material || kind == ConfirmationKind::Material) {
+        emit materialConfirmationPendingChanged();
+    }
+    if (previous == ConfirmationKind::FillSettings || kind == ConfirmationKind::FillSettings) {
+        emit fillSettingsConfirmationPendingChanged();
+    }
+}
+
+void ProjectViewModel::finish_metadata_confirmation() {
+    const auto kind = m_pendingConfirmation;
+    if (kind == ConfirmationKind::None) {
+        return;
+    }
+    bool succeeded = false;
     try {
-        if (!panta::ffi::project_service_finish_material_confirmation(*m_service)) {
+        const bool finished =
+            kind == ConfirmationKind::Material
+                ? panta::ffi::project_service_finish_material_confirmation(*m_service)
+                : panta::ffi::project_service_finish_fill_settings_confirmation(*m_service);
+        if (!finished) {
             return;
         }
         applySnapshot(panta::ffi::project_service_current(*m_service));
-        // 工程摘要不包含方案字段；即使 projectChanged 未发出，也要刷新已提交配置。
+        // 当前待完成类型保持到快照通知结束，防止同步回调重入下一次写入。
         refreshPlanSettings();
         clearError();
-        set_material_confirmation_pending(false);
-        emit materialConfirmationFinished(true);
+        succeeded = true;
     } catch (const rust::Error& failure) {
         fail(QString::fromUtf8(failure.what()));
-        set_material_confirmation_pending(false);
-        emit materialConfirmationFinished(false);
+    }
+    set_pending_confirmation(ConfirmationKind::None);
+    if (kind == ConfirmationKind::Material) {
+        emit materialConfirmationFinished(succeeded);
+    } else {
+        emit fillSettingsConfirmationFinished(succeeded);
     }
 }
 

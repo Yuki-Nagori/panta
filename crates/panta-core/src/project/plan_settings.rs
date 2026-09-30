@@ -3,7 +3,7 @@ use super::analysis_sequence::{DEFAULT_SEQUENCE_ID, definition};
 use super::*;
 
 /// 当前任务面板关联零件的轻量快照；不读取或复制网格载荷。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PlanSettings {
     pub project_path: PathBuf,
     pub revision: u64,
@@ -13,6 +13,8 @@ pub struct PlanSettings {
     pub sequence_source_text: String,
     pub material_id: String,
     pub material_source_text: String,
+    pub fill_settings: FillSettings,
+    pub fill_settings_confirmed: bool,
 }
 
 impl ProjectService {
@@ -36,6 +38,12 @@ impl ProjectService {
             mesh_type: record.mesh_type.clone(),
             sequence_id: sequence.id.to_owned(),
             sequence_source_text: sequence.source_text.to_owned(),
+            fill_settings: state
+                .fill_settings
+                .get(&record.id)
+                .cloned()
+                .unwrap_or_default(),
+            fill_settings_confirmed: state.fill_settings.contains_key(&record.id),
             material_id: state.materials.get(&record.id).cloned().unwrap_or_default(),
             material_source_text: if state.materials.contains_key(&record.id) {
                 default_material().ok()?.source_text.clone()

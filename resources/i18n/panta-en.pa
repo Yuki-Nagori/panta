@@ -277,6 +277,10 @@ logs:
   tr: Logs*
 
 [ProcessTask]
+custom-settings:
+  src: Process Settings (Custom)
+  tr: Process Settings (Custom)
+
 process-settings:
   src: Process Settings (Default)
   tr: Process Settings (Default)
@@ -871,3 +875,134 @@ entry-5:
 entry-6:
   src: Maximum shear rate
   tr: Maximum shear rate
+
+[FillSettings]
+entry-1:
+  src: Process Settings · Fill
+  tr: Process Settings · Fill
+
+entry-2:
+  src: Temperatures
+  tr: Temperatures
+
+entry-3:
+  src: Mold surface temperature
+  tr: Mold surface temperature
+
+entry-4:
+  src: Melt temperature
+  tr: Melt temperature
+
+entry-5:
+  src: Filling & switch-over
+  tr: Filling & switch-over
+
+entry-6:
+  src: Filling control
+  tr: Filling control
+
+entry-7:
+  src: Flow rate
+  tr: Flow rate
+
+entry-8:
+  src: Velocity/pressure switch-over
+  tr: Velocity/pressure switch-over
+
+entry-9:
+  src: By volume filled
+  tr: By volume filled
+
+entry-10:
+  src: Volume filled
+  tr: Volume filled
+
+entry-11:
+  src: Pack/holding control
+  tr: Pack/holding control
+
+entry-12:
+  src: Filling pressure vs time (%)
+  tr: Filling pressure vs time (%)
+
+entry-13:
+  src: Edit Profile…
+  tr: Edit Profile…
+
+entry-14:
+  src: %1 steps · %2 s
+  tr: %1 steps · %2 s
+
+entry-15:
+  src: Analysis options
+  tr: Analysis options
+
+entry-16:
+  src: Fiber orientation analysis if fiber material
+  tr: Fiber orientation analysis if fiber material
+
+entry-17:
+  src: Crystallization analysis (requires material data)
+  tr: Crystallization analysis (requires material data)
+
+entry-18:
+  src: Advanced Options…
+  tr: Advanced Options…
+
+entry-19:
+  src: Fiber Solver Parameters…
+  tr: Fiber Solver Parameters…
+
+
+saving:
+  src: Saving process settings…
+  tr: Saving process settings…
+
+[HoldingProfile]
+entry-1:
+  src: Pack/Holding Control Profile
+  tr: Pack/Holding Control Profile
+
+entry-2:
+  src: Step
+  tr: Step
+
+entry-3:
+  src: Duration
+  tr: Duration
+
+entry-4:
+  src: Filling pressure
+  tr: Filling pressure
+
+entry-5:
+  src: Step %1 duration in seconds
+  tr: Step %1 duration in seconds
+
+entry-6:
+  src: Step %1 filling pressure in percent
+  tr: Step %1 filling pressure in percent
+
+entry-7:
+  src: Remove step
+  tr: Remove step
+
+entry-8:
+  src: Add Step
+  tr: Add Step
+
+entry-9:
+  src: Import Profile…
+  tr: Import Profile…
+
+entry-10:
+  src: Plot Profile
+  tr: Plot Profile
+
+entry-11:
+  src: Pressure vs cumulative time
+  tr: Pressure vs cumulative time
+
+duration-unit:
+  src: s · ≥ 0
+  tr: s · ≥ 0

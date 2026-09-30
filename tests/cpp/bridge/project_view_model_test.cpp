@@ -487,3 +487,48 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
     EXPECT_EQ(reopened.mesh_snapshot()->vertices.size(), 3U);
 }
+
+TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("part.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Text));
+    ASSERT_GT(source.write("solid case\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 "
+                           "0\nvertex 0 1 0\nendloop\nendfacet\nendsolid case\n"),
+              0);
+    source.close();
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(model.importStl(sourcePath, QStringLiteral("dual-domain"),
+                                QStringLiteral("millimeters"), false));
+    const auto initial = model.planSettings();
+    auto candidate = initial.value(QStringLiteral("fillSettings")).toMap();
+    candidate.insert(QStringLiteral("meltTemperature"), 235.0);
+    QSignalSpy finished(&model, &ProjectViewModel::fillSettingsConfirmationFinished);
+    ASSERT_TRUE(model.setFillSettings(
+        model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
+        initial.value(QStringLiteral("importId")).toString(), candidate));
+    EXPECT_TRUE(model.fillSettingsConfirmationPending());
+    EXPECT_EQ(model.planSettings(), initial);
+    EXPECT_FALSE(model.setFillSettings(
+        model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
+        initial.value(QStringLiteral("importId")).toString(), candidate));
+    ASSERT_TRUE(finished.wait(5000));
+    ASSERT_EQ(finished.count(), 1);
+    EXPECT_TRUE(finished.at(0).at(0).toBool());
+    EXPECT_FALSE(model.fillSettingsConfirmationPending());
+    EXPECT_TRUE(model.planSettings().value(QStringLiteral("fillSettingsConfirmed")).toBool());
+    EXPECT_EQ(model.planSettings().value(QStringLiteral("fillSettings")).toMap(), candidate);
+    ProjectViewModel reopened;
+    ASSERT_TRUE(reopened.openProjectUrl(QUrl::fromLocalFile(model.currentPath())));
+    EXPECT_EQ(reopened.planSettings(), model.planSettings());
+    candidate.insert(QStringLiteral("flowRate"), -1.0);
+    ASSERT_TRUE(model.setFillSettings(
+        model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
+        initial.value(QStringLiteral("importId")).toString(), candidate));
+    ASSERT_TRUE(finished.wait(5000));
+    EXPECT_FALSE(finished.at(1).at(0).toBool());
+    EXPECT_FALSE(model.fillSettingsConfirmationPending());
+    EXPECT_EQ(reopened.planSettings(), model.planSettings());
+}

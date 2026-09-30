@@ -10,6 +10,8 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QImageReader>
+#include <QJSValue>
+#include <QMetaType>
 #include <QObject>
 #include <QPointer>
 #include <QQmlComponent>
@@ -344,6 +346,96 @@ class ThemeComponentTest final : public QObject {
         panel->setProperty("activeDocumentId", QStringLiteral("import-1"));
         panel->setProperty("activeDocumentTitle", QStringLiteral("active.stl"));
         QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("active.stl"));
+    }
+
+    void fill_settings_drafts_profile_rows_and_button_geometry() {
+        const auto listProperty = [](QObject* object, const char* name) {
+            const auto value = object->property(name);
+            return value.metaType() == QMetaType::fromType<QJSValue>()
+                       ? value.value<QJSValue>().toVariant().toList()
+                       : value.toList();
+        };
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        auto* dialog = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Dialogs/FillProcessSettingsDialog.qml"),
+            owner);
+        QVERIFY(dialog != nullptr);
+        const QVariantList profile{
+            QVariantMap{{QStringLiteral("duration"), 0.0}, {QStringLiteral("pressure"), 100.0}},
+            QVariantMap{{QStringLiteral("duration"), 10.0}, {QStringLiteral("pressure"), 100.0}}};
+        const QVariantMap fill{
+            {QStringLiteral("moldTemperature"), 40.0},  {QStringLiteral("meltTemperature"), 230.0},
+            {QStringLiteral("flowRate"), 94.7},         {QStringLiteral("switchVolume"), 99.0},
+            {QStringLiteral("fiberOrientation"), true}, {QStringLiteral("crystallization"), false},
+            {QStringLiteral("holdingProfile"), profile}};
+        const QVariantMap target{{QStringLiteral("projectPath"), QStringLiteral("/test.panta")},
+                                 {QStringLiteral("revision"), 7},
+                                 {QStringLiteral("importId"), QStringLiteral("import-1")},
+                                 {QStringLiteral("sequenceId"), QStringLiteral("fill")},
+                                 {QStringLiteral("fillSettings"), fill}};
+        dialog->setProperty("planSettings", target);
+        QSignalSpy requested(dialog, SIGNAL(settingsRequested(QString, double, QString, QVariant)));
+        QVERIFY(requested.isValid());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QCOMPARE(dialog->property("height").toInt(), 600);
+        auto* accept = dialog->findChild<QObject*>(QStringLiteral("fillSettingsAccept"));
+        QVERIFY(accept != nullptr);
+        QTRY_COMPARE(accept->property("width").toInt(), 96);
+        QCOMPARE(accept->property("height").toInt(), 24);
+        auto* profileDialog = dialog->findChild<QObject*>(QStringLiteral("holdingProfileDialog"));
+        QVERIFY(profileDialog != nullptr);
+        QVERIFY(QMetaObject::invokeMethod(profileDialog, "open", Q_ARG(QVariant, profile)));
+        auto* profileWindow = qobject_cast<QQuickWindow*>(profileDialog);
+        QVERIFY(profileWindow != nullptr);
+        auto* duration =
+            visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration0"));
+        auto* pressure =
+            visual_item(profileWindow->contentItem(), QStringLiteral("profilePressure0"));
+        auto* third = visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration2"));
+        QVERIFY(duration && pressure && third);
+        QCOMPARE(third->property("text").toString(), QString{});
+        QTRY_VERIFY(qAbs(duration->property("width").toDouble() -
+                         pressure->property("width").toDouble()) < 1.0);
+        duration->setProperty("text", QStringLiteral("5"));
+        QVERIFY(QMetaObject::invokeMethod(duration, "textEdited"));
+        QVERIFY(QMetaObject::invokeMethod(profileDialog, "close"));
+        QCOMPARE(listProperty(dialog, "profile"), profile);
+        QVERIFY(QMetaObject::invokeMethod(profileDialog, "open", Q_ARG(QVariant, profile)));
+        duration = visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration2"));
+        QVERIFY(duration != nullptr);
+        duration->setProperty("text", QStringLiteral("5"));
+        QVERIFY(QMetaObject::invokeMethod(duration, "textEdited"));
+        QVERIFY(listProperty(profileDialog, "points").isEmpty());
+        pressure = visual_item(profileWindow->contentItem(), QStringLiteral("profilePressure2"));
+        QVERIFY(pressure != nullptr);
+        pressure->setProperty("text", QStringLiteral("80"));
+        QVERIFY(QMetaObject::invokeMethod(pressure, "textEdited"));
+        QVERIFY(QMetaObject::invokeMethod(profileDialog, "acceptProfile"));
+        QCOMPARE(listProperty(dialog, "profile").size(), 3);
+        dialog->setProperty("planSettings", QVariantMap{});
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSettings"));
+        QCOMPARE(requested.count(), 1);
+        QCOMPARE(requested.at(0).at(0).toString(), QStringLiteral("/test.panta"));
+        QCOMPARE(requested.at(0).at(1).toInt(), 7);
+        QCOMPARE(requested.at(0).at(2).toString(), QStringLiteral("import-1"));
+        dialog->setProperty("saving", true);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSettings"));
+        QCOMPARE(requested.count(), 1);
+        dialog->setProperty("saving", false);
+        auto* cancel = qobject_cast<QQuickItem*>(
+            dialog->findChild<QObject*>(QStringLiteral("fillSettingsCancel")));
+        auto* window = qobject_cast<QQuickWindow*>(dialog);
+        QVERIFY(cancel && window);
+        cancel->forceActiveFocus();
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_VERIFY(!window->isVisible());
+        QCOMPARE(requested.count(), 1);
+        dialog->setProperty("planSettings", target);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QCOMPARE(listProperty(dialog, "profile"), profile);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
     }
 
     void analysis_sequence_confirmation_and_cancel() {

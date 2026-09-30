@@ -249,8 +249,20 @@ if (document.body.classList.contains("project-workspace")) {
   layerPanel?.querySelector(".layer-tabs")?.toggleAttribute("hidden", !document.getElementById("page-layer-tab"));
 }
 
+const dialogFocus = new WeakMap();
+const openDialog = (dialog) => {
+  dialogFocus.set(dialog, document.activeElement);
+  document.querySelectorAll('[data-dialog-panel]:not([hidden])').forEach((parent) => { parent.inert = true; });
+  dialog.inert = false;
+  dialog.hidden = false;
+  (dialog.querySelector('input, select') || dialog.querySelector('button'))?.focus();
+};
 const closeDialog = (dialog) => {
-  if (dialog) dialog.hidden = true;
+  if (!dialog || dialog.hidden) return;
+  dialog.hidden = true;
+  const parent = [...document.querySelectorAll('[data-dialog-panel]:not([hidden])')].at(-1);
+  if (parent) parent.inert = false;
+  dialogFocus.get(dialog)?.focus();
 };
 
 document.querySelectorAll("[data-dialog]").forEach((trigger) => {
@@ -263,8 +275,9 @@ document.querySelectorAll("[data-dialog]").forEach((trigger) => {
       dialog.querySelector("[data-analysis-sequence-candidate]").textContent = options.value;
     }
     if (trigger.dataset.dialog === "material") resetMaterialDialog();
-    dialog.hidden = false;
-    (dialog.querySelector("input, select") || dialog.querySelector("button"))?.focus();
+    if (trigger.dataset.dialog === "process-settings") resetProcessDialog();
+    if (trigger.dataset.dialog === "holding-profile") resetProfileDialog();
+    openDialog(dialog);
   });
 });
 
@@ -611,15 +624,26 @@ document.querySelector("[data-analysis-sequence-accept]")?.addEventListener("cli
   closeDialog(document.querySelector('[data-dialog-panel="analysis-sequence"]'));
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") document.querySelectorAll("[data-dialog-panel]").forEach(closeDialog);
-  if (event.key === "Enter" && materialDialog && !materialDialog.hidden) {
+  const dialog = [...document.querySelectorAll('[data-dialog-panel]:not([hidden])')].at(-1);
+  if (!dialog) return;
+  if (event.key === 'Escape') {
     event.preventDefault();
-    materialDialog.querySelector("[data-material-accept]").click();
+    closeDialog(dialog);
   }
-  const sequenceDialog = document.querySelector('[data-dialog-panel="analysis-sequence"]');
-  if (event.key === "Enter" && sequenceDialog && !sequenceDialog.hidden) {
-    event.preventDefault();
-    sequenceDialog.querySelector("[data-analysis-sequence-accept]").click();
+  if (event.key === 'Tab') {
+    const controls = [...dialog.querySelectorAll('button, input, select, [tabindex="0"]')].filter((control) => !control.disabled && control.getClientRects().length);
+    const next = event.shiftKey ? controls.at(-1) : controls[0];
+    if (document.activeElement === (event.shiftKey ? controls[0] : controls.at(-1))) {
+      event.preventDefault();
+      next?.focus();
+    }
+  }
+  if (event.key === 'Enter' && !event.target.closest('button, form')) {
+    const accept = dialog.querySelector('[data-material-accept], [data-analysis-sequence-accept]');
+    if (accept) {
+      event.preventDefault();
+      accept.click();
+    }
   }
 });
 
@@ -647,3 +671,135 @@ materialDialog?.querySelector('[data-material-accept]')?.addEventListener('click
   document.querySelector('[data-material-status]').dataset.completed = 'true';
   closeDialog(materialDialog);
 });
+
+// 两层编辑各持有草稿，确认子弹窗后才更新父级，确认父级后才更新演示状态。
+const processDialog = document.querySelector('[data-dialog-panel="process-settings"]');
+const processForm = processDialog?.querySelector('[data-process-form]');
+const profileDialog = document.querySelector('[data-dialog-panel="holding-profile"]');
+const profileForm = profileDialog?.querySelector('[data-profile-form]');
+const profileRows = profileDialog?.querySelector('[data-profile-rows]');
+let confirmedProcess = null;
+let processProfile = [{ duration: 0, pressure: 100 }, { duration: 10, pressure: 100 }];
+let confirmedProfile = structuredClone(processProfile);
+
+function resetProcessDialog() {
+  processForm.reset();
+  if (confirmedProcess) {
+    Object.entries(confirmedProcess).forEach(([name, value]) => {
+      const field = processForm.elements.namedItem(name);
+      if (field.type === 'checkbox') field.checked = value;
+      else field.value = value;
+    });
+  }
+  processProfile = structuredClone(confirmedProfile);
+  updateProfileSummary();
+}
+function updateProfileSummary() {
+  const duration = processProfile.reduce((total, point) => total + point.duration, 0);
+  const pressures = processProfile.map((point) => point.pressure);
+  const min = Math.min(...pressures);
+  const max = Math.max(...pressures);
+  processDialog.querySelector('[data-profile-summary]').textContent = `${min === max ? min : `${min}–${max}`}% filling pressure · ${duration} s`;
+}
+function appendProfileRow(point) {
+  const row = document.createElement('tr');
+  row.innerHTML = `<td></td><td><input type="number" min="0" step="any" data-profile-duration required></td><td><input type="number" min="0" max="200" step="any" data-profile-pressure required></td><td><button type="button" data-profile-remove aria-label="Remove step">×</button></td>`;
+  row.querySelector('[data-profile-duration]').value = point.duration;
+  row.querySelector('[data-profile-pressure]').value = point.pressure;
+  row.querySelector('[data-profile-remove]').addEventListener('click', () => {
+    row.remove();
+    updateProfileRows();
+  });
+  profileRows.append(row);
+  updateProfileRows();
+}
+function updateProfileRows() {
+  validateProfileRows();
+  [...profileRows.children].forEach((row, index) => {
+    row.cells[0].textContent = index + 1;
+    row.querySelector('[data-profile-duration]').setAttribute('aria-label', `Step ${index + 1} duration in seconds`);
+    row.querySelector('[data-profile-pressure]').setAttribute('aria-label', `Step ${index + 1} filling pressure in percent`);
+    row.querySelector('button').disabled = profileRows.children.length <= 3;
+  });
+  updateProfilePlot();
+}
+function validateProfileRows() {
+  [...profileRows.children].forEach((row) => {
+    const duration = row.querySelector('[data-profile-duration]');
+    const pressure = row.querySelector('[data-profile-pressure]');
+    const occupied = duration.value !== '' || pressure.value !== '';
+    duration.required = occupied;
+    pressure.required = occupied;
+    duration.setCustomValidity('');
+  });
+  const occupied = [...profileRows.children].some((row) => row.querySelector('input').value !== '' || row.querySelector('[data-profile-pressure]').value !== '');
+  if (!occupied) profileRows.querySelector('input').setCustomValidity('Enter at least one profile step.');
+}
+function readProfile() {
+  return [...profileRows.children].filter((row) => row.querySelector('[data-profile-duration]').value !== '' || row.querySelector('[data-profile-pressure]').value !== '').map((row) => ({
+    duration: row.querySelector('[data-profile-duration]').valueAsNumber,
+    pressure: row.querySelector('[data-profile-pressure]').valueAsNumber,
+  }));
+}
+function resetProfileDialog() {
+  profileRows.replaceChildren();
+  processProfile.forEach(appendProfileRow);
+  if (profileRows.children.length < 3) {
+    while (profileRows.children.length < 3) appendProfileRow({ duration: '', pressure: '' });
+  }
+  profileDialog.querySelector('#profile-plot').hidden = true;
+  profileDialog.querySelector('[data-profile-plot]').setAttribute('aria-expanded', 'false');
+}
+function updateProfilePlot() {
+  const points = readProfile();
+  const line = profileDialog.querySelector('[data-profile-line]');
+  if (!points.every((point) => Number.isFinite(point.duration) && point.duration >= 0 && Number.isFinite(point.pressure) && point.pressure >= 0 && point.pressure <= 200)) {
+    line.removeAttribute('points');
+    profileDialog.querySelector('[data-profile-end-time]').textContent = '';
+    return;
+  }
+  const total = points.reduce((sum, point) => sum + point.duration, 0);
+  let time = 0;
+  line.setAttribute('points', points.map((point) => {
+    time += point.duration;
+    return `${40 + time / (total || 1) * 385},${120 - point.pressure / 200 * 110}`;
+  }).join(' '));
+  profileDialog.querySelector('[data-profile-end-time]').textContent = `${total} s`;
+}
+profileRows?.addEventListener('input', () => {
+  validateProfileRows();
+  updateProfilePlot();
+});
+profileDialog?.querySelector('[data-profile-add]').addEventListener('click', () => {
+  appendProfileRow({ duration: '', pressure: '' });
+  profileRows.lastElementChild.querySelector('input').focus();
+});
+profileDialog?.querySelector('[data-profile-plot]').addEventListener('click', (event) => {
+  const plot = profileDialog.querySelector('#profile-plot');
+  plot.hidden = !plot.hidden;
+  event.currentTarget.setAttribute('aria-expanded', String(!plot.hidden));
+  updateProfilePlot();
+});
+profileForm?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  processProfile = readProfile();
+  updateProfileSummary();
+  closeDialog(profileDialog);
+});
+processForm?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  confirmedProcess = Object.fromEntries([...processForm.elements].filter((field) => field.name).map((field) => [field.name, field.type === 'checkbox' ? field.checked : field.value]));
+  confirmedProfile = structuredClone(processProfile);
+  document.querySelector('[data-process-current]').textContent = 'Process Settings (Custom)';
+  document.querySelector('[data-process-status]').dataset.completed = 'true';
+  closeDialog(processDialog);
+});
+function updateProcessAvailability() {
+  const available = document.querySelector('[data-analysis-sequence-current]')?.textContent === 'Fill';
+  document.querySelectorAll('[data-dialog="process-settings"]').forEach((button) => {
+    button.disabled = !available;
+    button.title = available ? '' : 'Process settings for this analysis sequence are not included in this preview.';
+  });
+}
+document.querySelector('[data-analysis-sequence-accept]')?.addEventListener('click', updateProcessAvailability);
+if (processDialog) updateProcessAvailability();

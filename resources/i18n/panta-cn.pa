@@ -277,6 +277,10 @@ logs:
   tr: 日志*
 
 [ProcessTask]
+custom-settings:
+  src: Process Settings (Custom)
+  tr: 工艺设置（自定义）
+
 process-settings:
   src: Process Settings (Default)
   tr: 工艺设置（默认）
@@ -871,3 +875,134 @@ entry-5:
 entry-6:
   src: Maximum shear rate
   tr: 最大剪切速率
+
+[FillSettings]
+entry-1:
+  src: Process Settings · Fill
+  tr: 工艺设置 · 填充
+
+entry-2:
+  src: Temperatures
+  tr: 温度
+
+entry-3:
+  src: Mold surface temperature
+  tr: 模具表面温度
+
+entry-4:
+  src: Melt temperature
+  tr: 熔体温度
+
+entry-5:
+  src: Filling & switch-over
+  tr: 填充与切换
+
+entry-6:
+  src: Filling control
+  tr: 填充控制
+
+entry-7:
+  src: Flow rate
+  tr: 流量
+
+entry-8:
+  src: Velocity/pressure switch-over
+  tr: 速度 / 压力切换
+
+entry-9:
+  src: By volume filled
+  tr: 按填充体积百分比
+
+entry-10:
+  src: Volume filled
+  tr: 填充体积百分比
+
+entry-11:
+  src: Pack/holding control
+  tr: 保压控制
+
+entry-12:
+  src: Filling pressure vs time (%)
+  tr: 填充压力百分比与时间
+
+entry-13:
+  src: Edit Profile…
+  tr: 编辑曲线…
+
+entry-14:
+  src: %1 steps · %2 s
+  tr: %1 个步骤 · %2 秒
+
+entry-15:
+  src: Analysis options
+  tr: 分析选项
+
+entry-16:
+  src: Fiber orientation analysis if fiber material
+  tr: 纤维材料启用纤维取向分析
+
+entry-17:
+  src: Crystallization analysis (requires material data)
+  tr: 结晶分析（需要材料数据）
+
+entry-18:
+  src: Advanced Options…
+  tr: 高级选项…
+
+entry-19:
+  src: Fiber Solver Parameters…
+  tr: 纤维求解器参数…
+
+
+saving:
+  src: Saving process settings…
+  tr: 正在保存工艺设置…
+
+[HoldingProfile]
+entry-1:
+  src: Pack/Holding Control Profile
+  tr: 保压控制曲线
+
+entry-2:
+  src: Step
+  tr: 步骤
+
+entry-3:
+  src: Duration
+  tr: 持续时间
+
+entry-4:
+  src: Filling pressure
+  tr: 填充压力
+
+entry-5:
+  src: Step %1 duration in seconds
+  tr: 步骤 %1 持续时间（秒）
+
+entry-6:
+  src: Step %1 filling pressure in percent
+  tr: 步骤 %1 填充压力百分比
+
+entry-7:
+  src: Remove step
+  tr: 移除步骤
+
+entry-8:
+  src: Add Step
+  tr: 添加步骤
+
+entry-9:
+  src: Import Profile…
+  tr: 导入曲线…
+
+entry-10:
+  src: Plot Profile
+  tr: 绘制曲线
+
+entry-11:
+  src: Pressure vs cumulative time
+  tr: 压力与累计时间
+
+duration-unit:
+  src: s · ≥ 0
+  tr: 秒 · ≥ 0

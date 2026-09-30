@@ -633,3 +633,223 @@ fn plan_settings_are_per_record_and_transactional() -> Result<(), Box<dyn std::e
     assert_eq!(service.plan_settings(&first.id), Some(selected));
     Ok(())
 }
+
+fn wait_metadata_confirmation(
+    service: &mut ProjectService,
+    finish: fn(&mut ProjectService) -> Result<bool, ProjectError>,
+) -> Result<(), ProjectError> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        if finish(service)? {
+            return Ok(());
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "metadata confirmation timed out"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn fill_settings_round_trip_is_per_record_and_blocks_competing_writes()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"solid case\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid case\n")?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Demo")?;
+    let first = service.import_stl(&source, "midplane", "millimeters", false)?;
+    let second = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let initial = service
+        .plan_settings(&first.id)
+        .ok_or("missing first plan")?;
+    assert!(!initial.fill_settings_confirmed);
+    let mut settings = initial.fill_settings.clone();
+    settings.melt_temperature_celsius = 235.0;
+    settings
+        .holding_profile
+        .push(panta_core::project::HoldingProfilePoint {
+            duration_seconds: 5.0,
+            pressure_percent: 70.0,
+        });
+    assert!(service.begin_fill_settings_confirmation(
+        &project.path,
+        initial.revision,
+        &first.id,
+        settings.clone()
+    )?);
+    assert_eq!(service.plan_settings(&first.id), Some(initial.clone()));
+    assert!(service.save().is_err());
+    assert!(
+        service
+            .set_analysis_sequence(&project.path, initial.revision, &first.id, "cool")
+            .is_err()
+    );
+    assert!(
+        service
+            .begin_material_confirmation(
+                &project.path,
+                initial.revision,
+                &first.id,
+                &panta_core::project::default_material()?.id
+            )
+            .is_err()
+    );
+    assert!(service.finish_material_confirmation().is_err());
+    wait_metadata_confirmation(
+        &mut service,
+        ProjectService::finish_fill_settings_confirmation,
+    )?;
+    let saved = service
+        .plan_settings(&first.id)
+        .ok_or("missing saved plan")?;
+    assert!(saved.fill_settings_confirmed);
+    assert_eq!(saved.revision, initial.revision + 1);
+    assert_eq!(saved.fill_settings, settings);
+    assert!(
+        !service
+            .plan_settings(&second.id)
+            .ok_or("missing second plan")?
+            .fill_settings_confirmed
+    );
+    assert!(!service.begin_fill_settings_confirmation(
+        &project.path,
+        saved.revision,
+        &first.id,
+        settings.clone()
+    )?);
+    assert!(service.finish_fill_settings_confirmation().is_err());
+    let mut reopened = ProjectService::new();
+    reopened.open(&project.path)?;
+    assert_eq!(reopened.plan_settings(&first.id), Some(saved.clone()));
+    for (path, revision, id) in [
+        (&project.path, saved.revision - 1, first.id.as_str()),
+        (&fixture.root, saved.revision, first.id.as_str()),
+        (&project.path, saved.revision, "missing"),
+    ] {
+        assert!(
+            service
+                .begin_fill_settings_confirmation(path, revision, id, settings.clone())
+                .is_err()
+        );
+    }
+    service.set_analysis_sequence(&project.path, saved.revision, &first.id, "cool")?;
+    let other_sequence = service
+        .plan_settings(&first.id)
+        .ok_or("missing switched plan")?;
+    assert_eq!(other_sequence.fill_settings, settings);
+    assert!(
+        service
+            .begin_fill_settings_confirmation(
+                &project.path,
+                other_sequence.revision,
+                &first.id,
+                settings
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn fill_settings_invalid_candidates_and_io_failure_preserve_manifest_and_release_lock()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"solid case\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid case\n")?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Demo")?;
+    let record = service.import_stl(&source, "midplane", "millimeters", false)?;
+    let initial = service.plan_settings(&record.id).ok_or("missing plan")?;
+    let before = fs::read(&project.path)?;
+    let mut invalid = Vec::new();
+    let mut candidate = initial.fill_settings.clone();
+    candidate.mold_temperature_celsius = -274.0;
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate.melt_temperature_celsius = f64::NAN;
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate.flow_rate_cm3_per_second = 0.0;
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate.switch_over_volume_percent = 101.0;
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate.holding_profile.clear();
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate.holding_profile[0].pressure_percent = 201.0;
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate.holding_profile[0].duration_seconds = -1.0;
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate
+        .holding_profile
+        .resize(4097, candidate.holding_profile[0].clone());
+    invalid.push(candidate);
+    let mut candidate = initial.fill_settings.clone();
+    candidate
+        .holding_profile
+        .iter_mut()
+        .for_each(|point| point.duration_seconds = f64::MAX);
+    invalid.push(candidate);
+    for (index, candidate) in invalid.into_iter().enumerate() {
+        assert!(service.begin_fill_settings_confirmation(
+            &project.path,
+            initial.revision,
+            &record.id,
+            candidate
+        )?);
+        assert!(
+            matches!(
+                wait_metadata_confirmation(
+                    &mut service,
+                    ProjectService::finish_fill_settings_confirmation
+                ),
+                Err(ProjectError::ManifestInvalid(_))
+            ),
+            "invalid candidate {index} was not rejected by domain validation"
+        );
+        assert_eq!(service.plan_settings(&record.id), Some(initial.clone()));
+        assert_eq!(fs::read(&project.path)?, before);
+    }
+    fs::create_dir(project.path.with_extension("panta.tmp"))?;
+    assert!(service.begin_fill_settings_confirmation(
+        &project.path,
+        initial.revision,
+        &record.id,
+        initial.fill_settings.clone()
+    )?);
+    assert!(
+        wait_metadata_confirmation(
+            &mut service,
+            ProjectService::finish_fill_settings_confirmation
+        )
+        .is_err()
+    );
+    assert_eq!(service.plan_settings(&record.id), Some(initial.clone()));
+    assert_eq!(fs::read(&project.path)?, before);
+    fs::remove_dir(project.path.with_extension("panta.tmp"))?;
+    assert!(service.begin_material_confirmation(
+        &project.path,
+        initial.revision,
+        &record.id,
+        &panta_core::project::default_material()?.id
+    )?);
+    assert!(
+        service
+            .begin_fill_settings_confirmation(
+                &project.path,
+                initial.revision,
+                &record.id,
+                initial.fill_settings
+            )
+            .is_err()
+    );
+    wait_metadata_confirmation(&mut service, ProjectService::finish_material_confirmation)?;
+    service.save()?;
+    Ok(())
+}

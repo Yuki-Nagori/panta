@@ -39,7 +39,9 @@ set(PANTA_SHELL_QML_FILES
     Dialogs/NewProjectDialog.qml
     Dialogs/ImportDialog.qml
     Dialogs/AnalysisSequenceDialog.qml
-    Dialogs/MaterialSelectionDialog.qml)
+    Dialogs/MaterialSelectionDialog.qml
+    Dialogs/FillProcessSettingsDialog.qml
+    Dialogs/HoldingProfileDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)

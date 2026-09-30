@@ -4,6 +4,8 @@
 
 ## 当前状态与目标
 
+`FillProcessSettingsDialog` 与 `HoldingProfileDialog` 复用主题输入、按钮和标题栏；父弹窗持有候选参数，子弹窗确认才替换候选曲线。曲线表格默认至少三行，空白行不提交；绘图使用 Qt Quick Canvas，仅在编辑、显露和尺寸变化时重绘。Rust 提供已保存的 `PlanSettings.fillSettings`，确认命令经 ViewModel 后台写盘，成功后刷新任务行；QML 不保存第二份已确认配置。窗口尺寸在 Theme 的窗口约束分类中，确认与取消按钮共用材料弹窗的宽度和高度。实现与验收见 [094](../task/094-fill-process-settings.md)。
+
 `qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认布局/配色源于 050 复刻件 homepage.html 的 `:root`（029 迁入），图标与交互尺寸由 052 按用户反馈细化；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，运行期默认值迁 `.pa` 与切换由 030 的 C++ ThemeViewModel 发布，Theme 属性名即稳定契约。
 
 029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。

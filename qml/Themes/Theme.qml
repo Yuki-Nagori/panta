@@ -91,6 +91,9 @@ QtObject {
     readonly property int documentTabContentInset: 11
     readonly property int documentTabCloseSize: 19
     readonly property int documentTabCloseRightInset: 3
+    readonly property int profilePlotHeight: 140
+    readonly property int profileStepColumnWidth: 40
+    readonly property int processValueColumnWidth: 126
     readonly property int panelToolbarHeight: 32
     readonly property int titlebarMinimumContentWidth: 1100
     readonly property int logoWidth: 46
@@ -108,6 +111,14 @@ QtObject {
     readonly property real disabledOpacity: 0.4
 
     // 窗口尺寸与最小约束（逻辑像素）
+    readonly property int fillSettingsDialogWidth: 720
+    readonly property int fillSettingsDialogHeight: 600
+    readonly property int fillSettingsDialogMinimumWidth: 660
+    readonly property int fillSettingsDialogMinimumHeight: 480
+    readonly property int holdingProfileDialogWidth: 540
+    readonly property int holdingProfileDialogHeight: 400
+    readonly property int holdingProfileDialogMinimumWidth: 480
+    readonly property int holdingProfileDialogMinimumHeight: 320
     readonly property int materialDialogWidth: 680
     readonly property int materialDialogHeight: 540
     readonly property int materialDialogMinimumWidth: 640

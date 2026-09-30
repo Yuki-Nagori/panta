@@ -137,37 +137,12 @@ impl ProjectService {
             .insert(import_id.to_owned(), material_id.to_owned());
         candidate.revision = candidate.revision.saturating_add(1);
         candidate.dirty = false;
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let _worker = std::thread::Builder::new()
-            .name("panta-material-confirmation".to_owned())
-            .spawn(move || {
-                let result = write_manifest(&candidate).map(|()| candidate);
-                // 工作线程只拥有候选值，不借用服务或 Qt；接收端销毁后无需交付。
-                let _ = sender.send(result);
-            })
-            .map_err(|error| ProjectError::Io(format!("start material confirmation: {error}")))?;
-        self.pending_material = Some(receiver);
-        Ok(true)
+        self.start_metadata_write(candidate, storage::MetadataWriteKind::Material)
     }
 
     /// 非阻塞消费确认结果；尚未完成返回 false，成功发布已写盘状态并返回 true。
     /// 写盘或工作线程失败时解除写入锁并保留旧状态；结果只消费一次。
     pub fn finish_material_confirmation(&mut self) -> Result<bool, ProjectError> {
-        use std::sync::mpsc::TryRecvError;
-        let receiver = self.pending_material.as_ref().ok_or_else(|| {
-            ProjectError::CommandInvalid("no material confirmation pending".to_owned())
-        })?;
-        let result = match receiver.try_recv() {
-            Ok(result) => result,
-            Err(TryRecvError::Empty) => return Ok(false),
-            Err(TryRecvError::Disconnected) => Err(ProjectError::Io(
-                "material confirmation worker disconnected".to_owned(),
-            )),
-        };
-        self.pending_material = None;
-        // 其他元数据命令均由 ensure_project_writable 拒绝，候选不会覆盖新修订。
-        let candidate = result?;
-        self.current = Some(candidate);
-        Ok(true)
+        self.finish_metadata_write(storage::MetadataWriteKind::Material)
     }
 }

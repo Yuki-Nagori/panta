@@ -100,7 +100,7 @@
           <button type="button" class="inspector-row" data-dialog="analysis-sequence" aria-label="Select Analysis Sequence"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis-sequence"/></svg><span data-analysis-sequence-current>Fill</span></button>
           <button type="button" class="inspector-row" data-dialog="material" aria-label="Select Material"><svg class="status-icon icon" data-material-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span data-material-current>Material Data</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></div>
+          <button type="button" class="inspector-row" data-dialog="process-settings" aria-label="Edit Fill Process Settings"><svg class="status-icon icon" data-process-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span data-process-current>Process Settings (Default)</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></div>
           <div class="inspector-row inspector-muted" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></div>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></div>
@@ -193,6 +193,53 @@
         </fieldset>
         <div class="dialog-actions"><button type="button" class="dialog-primary" data-material-accept>OK</button><button type="button" data-dialog-close>Cancel</button><button type="button" disabled>Help</button></div>
       </div>
+    </section>
+  </div>
+  <div class="modal-backdrop" data-dialog-panel="process-settings" hidden>
+    <section class="dialog process-dialog" role="dialog" aria-modal="true" aria-labelledby="process-title">
+      <div class="dialog-titlebar"><h2 id="process-title">Process Settings · Fill</h2><button type="button" class="dialog-close" data-dialog-close aria-label="Close dialog">×</button></div>
+      <form class="dialog-body process-body" data-process-form>
+        <fieldset class="process-section">
+          <legend>Temperatures</legend>
+          <div class="process-temperature-grid">
+            <label>Mold surface temperature<span class="process-unit-input"><input name="moldTemperature" type="number" step="any" value="40" required><span>°C</span></span></label>
+            <label>Melt temperature<span class="process-unit-input"><input name="meltTemperature" type="number" step="any" value="230" required><span>°C</span></span></label>
+          </div>
+        </fieldset>
+        <fieldset class="process-section">
+          <legend>Filling &amp; switch-over</legend>
+          <div class="process-control-grid">
+            <label for="filling-control">Filling control</label><select id="filling-control"><option>Flow rate</option></select>
+            <span class="process-unit-input"><input name="flowRate" type="number" min="0.001" step="any" value="94.7" aria-label="Flow rate" required><span>cm³/s</span></span>
+            <label for="switch-control">Velocity/pressure switch-over</label><select id="switch-control"><option>By volume filled</option></select>
+            <span class="process-unit-input"><input name="switchVolume" type="number" min="0" max="100" step="any" value="99" aria-label="Volume filled" required><span>%</span></span>
+          </div>
+        </fieldset>
+        <fieldset class="process-section">
+          <legend>Pack/holding control</legend>
+          <div class="process-profile-control"><select aria-label="Pack/holding control"><option>Filling pressure vs time (%)</option></select><button type="button" data-dialog="holding-profile">Edit Profile…</button></div>
+          <p class="dialog-note" data-profile-summary>100% filling pressure · 10 s</p>
+        </fieldset>
+        <fieldset class="process-section">
+          <legend>Analysis options</legend>
+          <label class="checkbox-row"><input name="fiberOrientation" type="checkbox" checked>Fiber orientation analysis if fiber material</label>
+          <label class="checkbox-row"><input name="crystallization" type="checkbox">Crystallization analysis (requires material data)</label>
+          <div class="process-secondary-actions"><button type="button" disabled>Advanced Options…</button><button type="button" disabled>Fiber Solver Parameters…</button></div>
+        </fieldset>
+        <div class="dialog-actions"><button type="submit" class="dialog-primary">OK</button><button type="button" data-dialog-close>Cancel</button><button type="button" disabled>Help</button></div>
+      </form>
+    </section>
+  </div>
+  <div class="modal-backdrop profile-backdrop" data-dialog-panel="holding-profile" hidden>
+    <section class="dialog profile-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="dialog-titlebar"><h2 id="profile-title">Pack/Holding Control Profile</h2><button type="button" class="dialog-close" data-dialog-close aria-label="Close dialog">×</button></div>
+      <form class="dialog-body process-body" data-profile-form>
+        <p class="dialog-intro">Filling pressure vs time (%)</p>
+        <div class="profile-table-scroll"><table class="profile-table"><thead><tr><th scope="col">Step</th><th scope="col">Duration <span>s · ≥ 0</span></th><th scope="col">Filling pressure <span>% · 0–200</span></th><th scope="col"><span class="profile-remove-heading">Remove</span></th></tr></thead><tbody data-profile-rows></tbody></table></div>
+        <div class="profile-toolbar"><button type="button" data-profile-add>Add Step</button><button type="button" disabled>Import Profile…</button><button type="button" data-profile-plot aria-expanded="false" aria-controls="profile-plot">Plot Profile</button></div>
+        <figure class="profile-plot" id="profile-plot" hidden><svg viewBox="0 0 440 150" role="img" aria-label="Filling pressure over cumulative time"><path class="profile-axis" d="M40 10V120H425"/><polyline data-profile-line/><text x="40" y="142">0 s</text><text x="425" y="142" text-anchor="end" data-profile-end-time></text><text x="4" y="18">200%</text></svg><figcaption>Pressure vs cumulative time</figcaption></figure>
+        <div class="dialog-actions"><button type="submit" class="dialog-primary">OK</button><button type="button" data-dialog-close>Cancel</button><button type="button" disabled>Help</button></div>
+      </form>
     </section>
   </div>
 </template>

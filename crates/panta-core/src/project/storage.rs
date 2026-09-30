@@ -9,6 +9,7 @@ pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
         imports: state.imports.clone(),
         analysis_sequences: state.analysis_sequences.clone(),
         materials: state.materials.clone(),
+        fill_settings: state.fill_settings.clone(),
     };
     let bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|error| ProjectError::Io(format!("serialize manifest: {error}")))?;
@@ -23,4 +24,70 @@ pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
         return Err(ProjectError::Io(format!("{}: {error}", target.display())));
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MetadataWriteKind {
+    Material,
+    FillSettings,
+}
+
+#[derive(Debug)]
+pub(super) struct PendingMetadataWrite {
+    kind: MetadataWriteKind,
+    receiver: std::sync::mpsc::Receiver<Result<ProjectState, ProjectError>>,
+}
+
+impl ProjectService {
+    pub(super) fn start_metadata_write(
+        &mut self,
+        candidate: ProjectState,
+        kind: MetadataWriteKind,
+    ) -> Result<bool, ProjectError> {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let _worker = std::thread::Builder::new()
+            .name("panta-metadata-confirmation".to_owned())
+            .spawn(move || {
+                let result = (|| {
+                    if kind == MetadataWriteKind::FillSettings {
+                        process_settings::validate_settings(
+                            &candidate.imports,
+                            &candidate.fill_settings,
+                        )?;
+                    }
+                    write_manifest(&candidate)?;
+                    Ok(candidate)
+                })();
+                // 工作线程只拥有候选值；服务销毁后无需向 Qt 或旧接收端交付。
+                let _ = sender.send(result);
+            })
+            .map_err(|error| ProjectError::Io(format!("start metadata confirmation: {error}")))?;
+        self.pending_metadata = Some(PendingMetadataWrite { kind, receiver });
+        Ok(true)
+    }
+
+    pub(super) fn finish_metadata_write(
+        &mut self,
+        kind: MetadataWriteKind,
+    ) -> Result<bool, ProjectError> {
+        use std::sync::mpsc::TryRecvError;
+        let pending = self
+            .pending_metadata
+            .as_ref()
+            .filter(|pending| pending.kind == kind)
+            .ok_or_else(|| {
+                ProjectError::CommandInvalid("no matching metadata confirmation pending".to_owned())
+            })?;
+        let result = match pending.receiver.try_recv() {
+            Ok(result) => result,
+            Err(TryRecvError::Empty) => return Ok(false),
+            Err(TryRecvError::Disconnected) => Err(ProjectError::Io(
+                "metadata confirmation worker disconnected".to_owned(),
+            )),
+        };
+        self.pending_metadata = None;
+        // 候选写入期间其他元数据命令均被拒绝，不会覆盖更新的工程修订。
+        self.current = Some(result?);
+        Ok(true)
+    }
 }

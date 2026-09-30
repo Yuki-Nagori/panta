@@ -15,7 +15,7 @@ ApplicationWindow {
     title: qsTr("panta")
     color: Theme.colorPanel
     onClosing: event => {
-        if (projectModel.materialConfirmationPending)
+        if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending)
             event.accepted = false;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
@@ -41,6 +41,10 @@ ApplicationWindow {
         onProjectCreated: shellWindow.selectRibbonTab("home")
         onProjectOpened: shellWindow.selectRibbonTab("home")
         onProjectImported: layersPanel.dockOpen = true
+        onFillSettingsConfirmationFinished: succeeded => {
+            if (succeeded)
+                fillSettingsDialog.close();
+        }
         onMaterialConfirmationFinished: succeeded => {
             if (succeeded)
                 materialDialog.close();
@@ -68,6 +72,17 @@ ApplicationWindow {
         onSelectionRequested: (path, revision, importId, sequenceId) => {
             if (projectModel.setAnalysisSequence(path, revision, importId, sequenceId))
                 analysisSequenceDialog.close();
+        }
+    }
+
+    FillProcessSettingsDialog {
+        id: fillSettingsDialog
+        ownerWindow: shellWindow
+        planSettings: projectModel.planSettings
+        saving: projectModel.fillSettingsConfirmationPending
+        errorText: projectModel.error
+        onSettingsRequested: (path, revision, importId, settings) => {
+            projectModel.setFillSettings(path, revision, importId, settings);
         }
     }
 
@@ -151,6 +166,11 @@ ApplicationWindow {
                     analysisSequenceId: projectModel.planSettings.sequenceId ?? ""
                     materialText: qsTranslate("Material", projectModel.planSettings.materialSourceText ?? "")
                     materialId: projectModel.planSettings.materialId ?? ""
+                    fillSettingsConfirmed: projectModel.planSettings.fillSettingsConfirmed ?? false
+                    onProcessSettingsRequested: {
+                        projectModel.clearError();
+                        fillSettingsDialog.open();
+                    }
                     onMaterialRequested: {
                         projectModel.clearError();
                         materialDialog.open();
