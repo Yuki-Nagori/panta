@@ -371,6 +371,8 @@ QString AnalysisModel::activeDocumentTitle() const {
     return m_project ? m_project->activeDocumentTitle() : QString{};
 }
 void AnalysisModel::activateDocument(const QString& id) {
+    if (id == m_activeStudy && !id.isEmpty())
+        return;
     for (const auto& study : m_studies) {
         if (study.toMap().value(QStringLiteral("id")).toString() == id) {
             m_activeStudy = id;
@@ -423,13 +425,14 @@ void AnalysisModel::selectResult(const QString& id) {
     mesh->pressure_visible = id == "pressure" && !mesh->pressures.empty();
     mesh->fields_visible = (id == "fill-time" || id == "pressure") && m_resultReady;
     mesh->show_gates = id == "gate";
-    if (mesh->fields_visible) {
+    const bool documentChanged = mesh->fields_visible && m_activeStudy != m_importId + ":fill";
+    if (mesh->fields_visible)
         m_activeStudy = m_importId + ":fill";
-        emit documentsChanged();
-    }
     m_mesh = std::move(mesh);
     setPlaybackTime(m_duration);
     emit meshChanged();
+    if (documentChanged)
+        emit documentsChanged();
     emit stateChanged();
 }
 void AnalysisModel::play() {
