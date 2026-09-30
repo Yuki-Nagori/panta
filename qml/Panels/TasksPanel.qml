@@ -24,6 +24,9 @@ PanelSurface {
     property string materialText: ""
     property string materialId: ""
     property bool fillSettingsConfirmed: false
+    property bool gateLocationSettingsConfirmed: false
+    readonly property bool processSettingsConfirmed: analysisSequenceId === "fill" ? fillSettingsConfirmed : analysisSequenceId === "gate-location" && gateLocationSettingsConfirmed
+    readonly property bool processSettingsAvailable: analysisSequenceId === "fill" || analysisSequenceId === "gate-location"
     property string meshType: ""
     property var meshTypes: []
 
@@ -64,10 +67,10 @@ PanelSurface {
         },
         {
             id: "process-settings",
-            text: panel.fillSettingsConfirmed ? qsTranslate("ProcessTask", "Process Settings (Custom)") : qsTranslate("ProcessTask", "Process Settings (Default)"),
+            text: panel.processSettingsConfirmed ? qsTranslate("ProcessTask", "Process Settings (Custom)") : qsTranslate("ProcessTask", "Process Settings (Default)"),
             icon: "task-settings",
-            completed: panel.fillSettingsConfirmed && panel.analysisSequenceId === "fill",
-            enabled: panel.analysisSequenceId === "fill"
+            completed: panel.processSettingsConfirmed,
+            enabled: panel.processSettingsAvailable
         },
         {
             id: "optimization",
@@ -104,7 +107,7 @@ PanelSurface {
             meshToolOpen = true;
         } else if (taskId === "analysis-sequence") {
             analysisSequenceRequested();
-        } else if (taskId === "process-settings" && panel.analysisSequenceId === "fill") {
+        } else if (taskId === "process-settings" && panel.processSettingsAvailable) {
             processSettingsRequested();
         } else if (taskId === "material-data") {
             materialRequested();

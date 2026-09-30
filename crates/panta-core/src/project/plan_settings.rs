@@ -15,6 +15,8 @@ pub struct PlanSettings {
     pub material_source_text: String,
     pub fill_settings: FillSettings,
     pub fill_settings_confirmed: bool,
+    pub gate_location_settings: GateLocationSettings,
+    pub gate_location_settings_confirmed: bool,
 }
 
 impl ProjectService {
@@ -44,6 +46,12 @@ impl ProjectService {
                 .cloned()
                 .unwrap_or_default(),
             fill_settings_confirmed: state.fill_settings.contains_key(&record.id),
+            gate_location_settings: state
+                .gate_location_settings
+                .get(&record.id)
+                .cloned()
+                .unwrap_or_default(),
+            gate_location_settings_confirmed: state.gate_location_settings.contains_key(&record.id),
             material_id: state.materials.get(&record.id).cloned().unwrap_or_default(),
             material_source_text: if state.materials.contains_key(&record.id) {
                 default_material().ok()?.source_text.clone()

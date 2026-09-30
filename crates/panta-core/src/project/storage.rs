@@ -10,6 +10,7 @@ pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
         analysis_sequences: state.analysis_sequences.clone(),
         materials: state.materials.clone(),
         fill_settings: state.fill_settings.clone(),
+        gate_location_settings: state.gate_location_settings.clone(),
     };
     let bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|error| ProjectError::Io(format!("serialize manifest: {error}")))?;
@@ -30,6 +31,7 @@ pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
 pub(super) enum MetadataWriteKind {
     Material,
     FillSettings,
+    GateLocationSettings,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,12 @@ impl ProjectService {
                         process_settings::validate_settings(
                             &candidate.imports,
                             &candidate.fill_settings,
+                        )?;
+                    }
+                    if kind == MetadataWriteKind::GateLocationSettings {
+                        gate_location::validate_settings(
+                            &candidate.imports,
+                            &candidate.gate_location_settings,
                         )?;
                     }
                     write_manifest(&candidate)?;

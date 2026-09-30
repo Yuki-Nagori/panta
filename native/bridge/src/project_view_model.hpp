@@ -46,6 +46,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QVariantList analysisSequences READ analysisSequences CONSTANT)
     Q_PROPERTY(bool fillSettingsConfirmationPending READ fillSettingsConfirmationPending NOTIFY
                    fillSettingsConfirmationPendingChanged)
+    Q_PROPERTY(
+        bool gateLocationSettingsConfirmationPending READ gateLocationSettingsConfirmationPending
+            NOTIFY gateLocationSettingsConfirmationPendingChanged)
     Q_PROPERTY(QVariantMap planSettings READ planSettings NOTIFY planSettingsChanged)
     Q_PROPERTY(bool importPreviewReady READ importPreviewReady NOTIFY importPreviewChanged)
     Q_PROPERTY(QString importPreviewName READ importPreviewName NOTIFY importPreviewChanged)
@@ -95,6 +98,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] QVariantMap defaultMaterial() const;
     [[nodiscard]] bool materialConfirmationPending() const;
     [[nodiscard]] bool fillSettingsConfirmationPending() const;
+    [[nodiscard]] bool gateLocationSettingsConfirmationPending() const;
     [[nodiscard]] QVariantList analysisSequences() const; // Rust 目录：ID 与英文源文案。
     [[nodiscard]] QVariantMap planSettings() const;       // Rust 当前方案快照。
 
@@ -150,6 +154,10 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_INVOKABLE bool setFillSettings(const QString& projectPath, quint64 revision,
                                      const QString& importId, const QVariantMap& settings);
 
+    /// 启动 Rust 后台浇口定位确认；失败保留旧配置，完成由信号通知。
+    Q_INVOKABLE bool setGateLocationSettings(const QString& projectPath, quint64 revision,
+                                             const QString& importId, const QVariantMap& settings);
+
     /// 激活一个就绪文档（Welcome 或已就绪导入页签）；Loading/Failed 文档
     /// 不可激活。同步 UI 操作，不经 Rust Flow。
     Q_INVOKABLE void activateDocument(const QString& documentId);
@@ -177,6 +185,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void materialConfirmationFinished(bool succeeded);
     void fillSettingsConfirmationPendingChanged();
     void fillSettingsConfirmationFinished(bool succeeded);
+    void gateLocationSettingsConfirmationPendingChanged();
+    void gateLocationSettingsConfirmationFinished(bool succeeded);
     void projectImported(const QString& path);
     void importPreviewChanged();
     void documentsChanged();
@@ -197,7 +207,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     void refreshPlanSettings();
-    enum class ConfirmationKind : std::uint8_t { None, Material, FillSettings };
+    enum class ConfirmationKind : std::uint8_t {
+        None,
+        Material,
+        FillSettings,
+        GateLocationSettings
+    };
     void finish_metadata_confirmation();
     void set_pending_confirmation(ConfirmationKind kind);
     static QString userMessageFor(const QString& errorCode);

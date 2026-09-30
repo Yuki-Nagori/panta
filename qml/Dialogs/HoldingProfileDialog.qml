@@ -72,16 +72,6 @@ Window {
     ListModel {
         id: rows
     }
-    component Action: ThemedToolButton {
-        Keys.onReturnPressed: event => {
-            clicked();
-            event.accepted = true;
-        }
-        contentColor: Theme.colorText
-        borderColor: Theme.colorPanelLine
-        contentPadding: Theme.spacingLarge
-        controlHeight: Theme.controlHeight + Theme.spacingSmall
-    }
     Rectangle {
         anchors.fill: parent
         color: Theme.colorPanel
@@ -206,7 +196,7 @@ Window {
                                                 dialog.editRevision++;
                                             }
                                         }
-                                        Action {
+                                        ProcessSettingsControls.Action {
                                             Layout.preferredWidth: Theme.controlHeight
                                             text: "×"
                                             accessibleName: qsTranslate("HoldingProfile", "Remove step")
@@ -224,7 +214,7 @@ Window {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    Action {
+                    ProcessSettingsControls.Action {
                         text: qsTranslate("HoldingProfile", "Add Step")
                         onClicked: {
                             rows.append({
@@ -234,14 +224,14 @@ Window {
                             dialog.editRevision++;
                         }
                     }
-                    Action {
+                    ProcessSettingsControls.Action {
                         text: qsTranslate("HoldingProfile", "Import Profile…")
                         enabled: false
                     }
                     Item {
                         Layout.fillWidth: true
                     }
-                    Action {
+                    ProcessSettingsControls.Action {
                         text: qsTranslate("HoldingProfile", "Plot Profile")
                         enabled: dialog.points.length > 0
                         onClicked: dialog.plotVisible = !dialog.plotVisible
@@ -292,7 +282,7 @@ Window {
                     Item {
                         Layout.fillWidth: true
                     }
-                    Action {
+                    ProcessSettingsControls.Action {
                         objectName: "holdingProfileAccept"
                         Layout.preferredWidth: Theme.tabSegmentWidth
                         controlHeight: Theme.controlHeight
@@ -302,14 +292,14 @@ Window {
                         borderColor: Theme.colorDialogPrimaryBorder
                         onClicked: dialog.acceptProfile()
                     }
-                    Action {
+                    ProcessSettingsControls.Action {
                         Layout.preferredWidth: Theme.tabSegmentWidth
                         controlHeight: Theme.controlHeight
                         objectName: "holdingProfileCancel"
                         text: qsTranslate("DialogAction", "Cancel")
                         onClicked: dialog.close()
                     }
-                    Action {
+                    ProcessSettingsControls.Action {
                         Layout.preferredWidth: Theme.tabSegmentWidth
                         controlHeight: Theme.controlHeight
                         text: qsTranslate("UiCommonHelp", "Help")

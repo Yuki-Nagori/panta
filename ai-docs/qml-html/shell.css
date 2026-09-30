@@ -727,6 +727,9 @@ button.inspector-row:hover { background: linear-gradient(to right, transparent c
 .process-control-grid { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(140px, 1fr) 126px; align-items: center; gap: 12px; }
 .process-profile-control { display: flex; gap: 12px; }
 .process-profile-control button { flex: none; }
+.gate-machine-control { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.gate-locator-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; }
+.gate-locator-grid label { display: grid; gap: 8px; }
 .process-section .dialog-note { margin-top: 10px; font-size: var(--font-small); }
 .process-section .checkbox-row + .checkbox-row { margin-top: 12px; }
 .process-secondary-actions { display: flex; gap: 8px; margin-top: 16px; }

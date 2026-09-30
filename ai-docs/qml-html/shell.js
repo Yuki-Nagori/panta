@@ -267,7 +267,8 @@ const closeDialog = (dialog) => {
 
 document.querySelectorAll("[data-dialog]").forEach((trigger) => {
   trigger.addEventListener("click", () => {
-    const dialog = document.querySelector(`[data-dialog-panel="${trigger.dataset.dialog}"]`);
+    const dialogId = trigger.dataset.dialog === 'process-settings' && document.querySelector('[data-analysis-sequence-current]')?.textContent === 'Gate Location' ? 'gate-location-settings' : trigger.dataset.dialog;
+    const dialog = document.querySelector(`[data-dialog-panel="${dialogId}"]`);
     if (!dialog) return;
     if (trigger.dataset.dialog === "analysis-sequence") {
       const options = dialog.querySelector("[data-analysis-sequence-options]");
@@ -275,7 +276,8 @@ document.querySelectorAll("[data-dialog]").forEach((trigger) => {
       dialog.querySelector("[data-analysis-sequence-candidate]").textContent = options.value;
     }
     if (trigger.dataset.dialog === "material") resetMaterialDialog();
-    if (trigger.dataset.dialog === "process-settings") resetProcessDialog();
+    if (dialogId === "process-settings") resetProcessDialog();
+    if (dialogId === "gate-location-settings") resetGateLocationDialog();
     if (trigger.dataset.dialog === "holding-profile") resetProfileDialog();
     openDialog(dialog);
   });
@@ -675,6 +677,9 @@ materialDialog?.querySelector('[data-material-accept]')?.addEventListener('click
 // 两层编辑各持有草稿，确认子弹窗后才更新父级，确认父级后才更新演示状态。
 const processDialog = document.querySelector('[data-dialog-panel="process-settings"]');
 const processForm = processDialog?.querySelector('[data-process-form]');
+const gateLocationDialog = document.querySelector('[data-dialog-panel="gate-location-settings"]');
+const gateLocationForm = gateLocationDialog?.querySelector('[data-gate-location-form]');
+let confirmedGateLocation = null;
 const profileDialog = document.querySelector('[data-dialog-panel="holding-profile"]');
 const profileForm = profileDialog?.querySelector('[data-profile-form]');
 const profileRows = profileDialog?.querySelector('[data-profile-rows]');
@@ -790,12 +795,29 @@ processForm?.addEventListener('submit', (event) => {
   event.preventDefault();
   confirmedProcess = Object.fromEntries([...processForm.elements].filter((field) => field.name).map((field) => [field.name, field.type === 'checkbox' ? field.checked : field.value]));
   confirmedProfile = structuredClone(processProfile);
-  document.querySelector('[data-process-current]').textContent = 'Process Settings (Custom)';
-  document.querySelector('[data-process-status]').dataset.completed = 'true';
+  updateProcessAvailability();
   closeDialog(processDialog);
 });
+function resetGateLocationDialog() {
+  gateLocationForm.reset();
+  if (confirmedGateLocation) {
+    Object.entries(confirmedGateLocation).forEach(([name, value]) => {
+      gateLocationForm.elements.namedItem(name).value = value;
+    });
+  }
+}
+gateLocationForm?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  confirmedGateLocation = Object.fromEntries([...gateLocationForm.elements].filter((field) => field.name).map((field) => [field.name, field.value]));
+  updateProcessAvailability();
+  closeDialog(gateLocationDialog);
+});
 function updateProcessAvailability() {
-  const available = document.querySelector('[data-analysis-sequence-current]')?.textContent === 'Fill';
+  const sequence = document.querySelector('[data-analysis-sequence-current]')?.textContent;
+  const available = sequence === 'Fill' || sequence === 'Gate Location';
+  const confirmed = sequence === 'Fill' ? confirmedProcess : sequence === 'Gate Location' ? confirmedGateLocation : null;
+  document.querySelector('[data-process-current]').textContent = `Process Settings (${confirmed ? 'Custom' : 'Default'})`;
+  document.querySelector('[data-process-status]').dataset.completed = String(Boolean(confirmed));
   document.querySelectorAll('[data-dialog="process-settings"]').forEach((button) => {
     button.disabled = !available;
     button.title = available ? '' : 'Process settings for this analysis sequence are not included in this preview.';

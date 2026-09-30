@@ -135,6 +135,16 @@ pub mod bridge {
         holding_profile: Vec<HoldingProfilePoint>,
     }
 
+    struct GateLocationSettings {
+        machine_id: String,
+        machine_source_text: String,
+        mold_temperature_celsius: f64,
+        melt_temperature_celsius: f64,
+        algorithm_id: String,
+        algorithm_source_text: String,
+        number_of_gates: u32,
+    }
+
     struct PlanSettings {
         project_path: String,
         revision: u64,
@@ -146,6 +156,8 @@ pub mod bridge {
         material_source_text: String,
         fill_settings: FillSettings,
         fill_settings_confirmed: bool,
+        gate_location_settings: GateLocationSettings,
+        gate_location_settings_confirmed: bool,
     }
 
     /// STL metadata shown by the import dialog before the file is copied.
@@ -349,6 +361,16 @@ pub mod bridge {
             settings: FillSettings,
         ) -> Result<bool>;
         fn project_service_finish_fill_settings_confirmation(
+            service: &mut ProjectService,
+        ) -> Result<bool>;
+        fn project_service_begin_gate_location_settings_confirmation(
+            service: &mut ProjectService,
+            project_path: &str,
+            revision: u64,
+            import_id: &str,
+            settings: GateLocationSettings,
+        ) -> Result<bool>;
+        fn project_service_finish_gate_location_settings_confirmation(
             service: &mut ProjectService,
         ) -> Result<bool>;
         fn project_service_plan_settings(
@@ -838,6 +860,8 @@ fn project_service_plan_settings(
             material_source_text: settings.material_source_text,
             fill_settings: fill_settings_dto(settings.fill_settings),
             fill_settings_confirmed: settings.fill_settings_confirmed,
+            gate_location_settings: gate_location_settings_dto(settings.gate_location_settings),
+            gate_location_settings_confirmed: settings.gate_location_settings_confirmed,
         },
         None => bridge::PlanSettings {
             project_path: String::new(),
@@ -850,6 +874,10 @@ fn project_service_plan_settings(
             material_source_text: String::new(),
             fill_settings: fill_settings_dto(panta_core::project::FillSettings::default()),
             fill_settings_confirmed: false,
+            gate_location_settings: gate_location_settings_dto(
+                panta_core::project::GateLocationSettings::default(),
+            ),
+            gate_location_settings_confirmed: false,
         },
     }
 }
@@ -1214,6 +1242,55 @@ fn bridge_kind(category: panta_core::path::RootCategory) -> bridge::PathRootKind
         panta_core::path::RootCategory::Session => bridge::PathRootKind::Session,
         panta_core::path::RootCategory::Qrc => bridge::PathRootKind::Qrc,
     }
+}
+
+fn gate_location_settings_dto(
+    settings: panta_core::project::GateLocationSettings,
+) -> bridge::GateLocationSettings {
+    bridge::GateLocationSettings {
+        machine_source_text: settings.machine_source_text().to_owned(),
+        machine_id: settings.machine_id,
+        mold_temperature_celsius: settings.mold_temperature_celsius,
+        melt_temperature_celsius: settings.melt_temperature_celsius,
+        algorithm_id: settings.algorithm.id().to_owned(),
+        algorithm_source_text: settings.algorithm.source_text().to_owned(),
+        number_of_gates: settings.number_of_gates,
+    }
+}
+
+fn project_service_begin_gate_location_settings_confirmation(
+    service: &mut ProjectService,
+    project_path: &str,
+    revision: u64,
+    import_id: &str,
+    settings: bridge::GateLocationSettings,
+) -> Result<bool, String> {
+    let algorithm = panta_core::project::GateLocatorAlgorithm::from_id(&settings.algorithm_id)
+        .map_err(|error| error.to_string())?;
+    service
+        .service
+        .begin_gate_location_settings_confirmation(
+            std::path::Path::new(project_path),
+            revision,
+            import_id,
+            panta_core::project::GateLocationSettings {
+                machine_id: settings.machine_id,
+                mold_temperature_celsius: settings.mold_temperature_celsius,
+                melt_temperature_celsius: settings.melt_temperature_celsius,
+                algorithm,
+                number_of_gates: settings.number_of_gates,
+            },
+        )
+        .map_err(|error| error.to_string())
+}
+
+fn project_service_finish_gate_location_settings_confirmation(
+    service: &mut ProjectService,
+) -> Result<bool, String> {
+    service
+        .service
+        .finish_gate_location_settings_confirmation()
+        .map_err(|error| error.to_string())
 }
 
 fn fill_settings_dto(settings: panta_core::project::FillSettings) -> bridge::FillSettings {

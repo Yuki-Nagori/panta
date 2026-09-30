@@ -25,6 +25,7 @@ set(PANTA_SHELL_QML_FILES
     Components/Composites/InformationPanel.qml
     Components/Composites/PaneCloseButton.qml
     Components/Composites/DialogTitleBar.qml
+    Components/Composites/ProcessSettingsControls.qml
     Panels/TopChromePanel.qml
     Panels/RibbonPanel.qml
     Panels/Ribbon/HomeRibbon.qml
@@ -41,6 +42,7 @@ set(PANTA_SHELL_QML_FILES
     Dialogs/AnalysisSequenceDialog.qml
     Dialogs/MaterialSelectionDialog.qml
     Dialogs/FillProcessSettingsDialog.qml
+    Dialogs/GateLocationSettingsDialog.qml
     Dialogs/HoldingProfileDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)

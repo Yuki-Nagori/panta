@@ -1006,3 +1006,41 @@ entry-11:
 duration-unit:
   src: s · ≥ 0
   tr: s · ≥ 0
+
+[GateLocationSettings]
+
+entry-1:
+  src: Process Settings · Gate Location
+  tr: Process Settings · Gate Location
+
+entry-2:
+  src: Injection molding machine
+  tr: Injection molding machine
+
+entry-3:
+  src: Default machine
+  tr: Default machine
+
+entry-4:
+  src: Edit…
+  tr: Edit…
+
+entry-5:
+  src: Select…
+  tr: Select…
+
+entry-6:
+  src: Gate locator
+  tr: Gate locator
+
+entry-7:
+  src: Algorithm
+  tr: Algorithm
+
+entry-8:
+  src: Advanced gate locator
+  tr: Advanced gate locator
+
+entry-9:
+  src: Number of gates
+  tr: Number of gates

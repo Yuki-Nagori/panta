@@ -15,7 +15,7 @@ ApplicationWindow {
     title: qsTr("panta")
     color: Theme.colorPanel
     onClosing: event => {
-        if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending)
+        if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
             event.accepted = false;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
@@ -41,6 +41,10 @@ ApplicationWindow {
         onProjectCreated: shellWindow.selectRibbonTab("home")
         onProjectOpened: shellWindow.selectRibbonTab("home")
         onProjectImported: layersPanel.dockOpen = true
+        onGateLocationSettingsConfirmationFinished: succeeded => {
+            if (succeeded)
+                gateLocationSettingsDialog.close();
+        }
         onFillSettingsConfirmationFinished: succeeded => {
             if (succeeded)
                 fillSettingsDialog.close();
@@ -73,6 +77,15 @@ ApplicationWindow {
             if (projectModel.setAnalysisSequence(path, revision, importId, sequenceId))
                 analysisSequenceDialog.close();
         }
+    }
+
+    GateLocationSettingsDialog {
+        id: gateLocationSettingsDialog
+        ownerWindow: shellWindow
+        planSettings: projectModel.planSettings
+        saving: projectModel.gateLocationSettingsConfirmationPending
+        errorText: projectModel.error
+        onSettingsRequested: (path, revision, importId, settings) => projectModel.setGateLocationSettings(path, revision, importId, settings)
     }
 
     FillProcessSettingsDialog {
@@ -167,9 +180,13 @@ ApplicationWindow {
                     materialText: qsTranslate("Material", projectModel.planSettings.materialSourceText ?? "")
                     materialId: projectModel.planSettings.materialId ?? ""
                     fillSettingsConfirmed: projectModel.planSettings.fillSettingsConfirmed ?? false
+                    gateLocationSettingsConfirmed: projectModel.planSettings.gateLocationSettingsConfirmed ?? false
                     onProcessSettingsRequested: {
                         projectModel.clearError();
-                        fillSettingsDialog.open();
+                        if (projectModel.planSettings.sequenceId === "gate-location")
+                            gateLocationSettingsDialog.open();
+                        else
+                            fillSettingsDialog.open();
                     }
                     onMaterialRequested: {
                         projectModel.clearError();

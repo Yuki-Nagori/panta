@@ -60,6 +60,8 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 
 Fill 工艺设置由 `panta-core::project::FillSettings` 提供默认值、字段单位和校验，按导入记录 ID 保存到 `.panta` 的 `fill_settings` 表。`PlanSettings` 一次返回配置及确认状态；QML 只编辑打开时冻结目标的候选，C++ 适配完整 DTO 并发起后台确认。材料与工艺设置复用 Rust 元数据写入锁、工作线程和成功发布流程；校验、序列化、写盘在工作线程进行，失败保留旧工程。Qt 仅在存在待完成命令时轮询，不接入渲染热路径。切换到其他分析序列保留 Fill 配置，但当前只在 Fill 下开放工艺入口；求解执行尚未接入。实施见 [094](../task/094-fill-process-settings.md)。
 
+Gate Location 使用 Rust 的 `GateLocationSettings` 与 `GateLocatorAlgorithm`，配置保存在 `.panta.gate_location_settings`，按导入记录隔离；设备引用与算法标识由 Rust 校验。默认值及英文源文案随 `PlanSettings` 一次投影，QML 打开时冻结目标并编辑候选，确认复用后台元数据事务。当前只支持默认设备和高级浇口定位配置，设备目录、高级参数与求解执行未接入。实施见 [095](../task/095-gate-location-process-settings.md)。
+
 ## 当前 VTK 审计
 
 路径均相对于仓库根目录；审计基于 065 提交后的源码。表中已删除的符号保留为 066 的迁移依据，实际代码状态见 067。

@@ -1006,3 +1006,41 @@ entry-11:
 duration-unit:
   src: s · ≥ 0
   tr: 秒 · ≥ 0
+
+[GateLocationSettings]
+
+entry-1:
+  src: Process Settings · Gate Location
+  tr: 工艺设置 · 浇口定位
+
+entry-2:
+  src: Injection molding machine
+  tr: 注塑机
+
+entry-3:
+  src: Default machine
+  tr: 默认设备
+
+entry-4:
+  src: Edit…
+  tr: 编辑…
+
+entry-5:
+  src: Select…
+  tr: 选择…
+
+entry-6:
+  src: Gate locator
+  tr: 浇口定位
+
+entry-7:
+  src: Algorithm
+  tr: 算法
+
+entry-8:
+  src: Advanced gate locator
+  tr: 高级浇口定位
+
+entry-9:
+  src: Number of gates
+  tr: 浇口数量

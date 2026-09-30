@@ -100,7 +100,7 @@
           <button type="button" class="inspector-row" data-dialog="analysis-sequence" aria-label="Select Analysis Sequence"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis-sequence"/></svg><span data-analysis-sequence-current>Fill</span></button>
           <button type="button" class="inspector-row" data-dialog="material" aria-label="Select Material"><svg class="status-icon icon" data-material-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span data-material-current>Material Data</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
-          <button type="button" class="inspector-row" data-dialog="process-settings" aria-label="Edit Fill Process Settings"><svg class="status-icon icon" data-process-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span data-process-current>Process Settings (Default)</span></button>
+          <button type="button" class="inspector-row" data-dialog="process-settings" aria-label="Edit Process Settings"><svg class="status-icon icon" data-process-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span data-process-current>Process Settings (Default)</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></div>
           <div class="inspector-row inspector-muted" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></div>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></div>
@@ -225,6 +225,33 @@
           <label class="checkbox-row"><input name="fiberOrientation" type="checkbox" checked>Fiber orientation analysis if fiber material</label>
           <label class="checkbox-row"><input name="crystallization" type="checkbox">Crystallization analysis (requires material data)</label>
           <div class="process-secondary-actions"><button type="button" disabled>Advanced Options…</button><button type="button" disabled>Fiber Solver Parameters…</button></div>
+        </fieldset>
+        <div class="dialog-actions"><button type="submit" class="dialog-primary">OK</button><button type="button" data-dialog-close>Cancel</button><button type="button" disabled>Help</button></div>
+      </form>
+    </section>
+  </div>
+  <div class="modal-backdrop" data-dialog-panel="gate-location-settings" hidden>
+    <section class="dialog process-dialog" role="dialog" aria-modal="true" aria-labelledby="gate-location-title">
+      <div class="dialog-titlebar"><h2 id="gate-location-title">Process Settings · Gate Location</h2><button type="button" class="dialog-close" data-dialog-close aria-label="Close dialog">×</button></div>
+      <form class="dialog-body process-body" data-gate-location-form>
+        <fieldset class="process-section">
+          <legend>Injection molding machine</legend>
+          <div class="gate-machine-control"><select name="machineId" aria-label="Injection molding machine"><option value="default-machine">Default machine</option></select><button type="button" disabled>Edit…</button><button type="button" disabled>Select…</button></div>
+        </fieldset>
+        <fieldset class="process-section">
+          <legend>Temperatures</legend>
+          <div class="process-temperature-grid">
+            <label>Mold surface temperature<span class="process-unit-input"><input name="moldTemperature" type="number" min="-273.15" step="any" value="40" required><span>°C</span></span></label>
+            <label>Melt temperature<span class="process-unit-input"><input name="meltTemperature" type="number" min="-273.15" step="any" value="230" required><span>°C</span></span></label>
+          </div>
+        </fieldset>
+        <fieldset class="process-section">
+          <legend>Gate locator</legend>
+          <div class="gate-locator-grid">
+            <label>Algorithm<select name="algorithm"><option value="advanced-gate-locator">Advanced gate locator</option></select></label>
+            <label>Number of gates<span class="process-unit-input"><input name="numberOfGates" type="number" min="1" max="10" step="1" value="1" required><span>1–10</span></span></label>
+          </div>
+          <div class="process-secondary-actions"><button type="button" disabled>Advanced Options…</button></div>
         </fieldset>
         <div class="dialog-actions"><button type="submit" class="dialog-primary">OK</button><button type="button" data-dialog-close>Cancel</button><button type="button" disabled>Help</button></div>
       </form>

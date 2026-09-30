@@ -111,6 +111,10 @@ QtObject {
     readonly property real disabledOpacity: 0.4
 
     // 窗口尺寸与最小约束（逻辑像素）
+    readonly property int gateLocationSettingsDialogWidth: 720
+    readonly property int gateLocationSettingsDialogHeight: 480
+    readonly property int gateLocationSettingsDialogMinimumWidth: 660
+    readonly property int gateLocationSettingsDialogMinimumHeight: 400
     readonly property int fillSettingsDialogWidth: 720
     readonly property int fillSettingsDialogHeight: 600
     readonly property int fillSettingsDialogMinimumWidth: 660

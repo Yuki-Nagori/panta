@@ -69,74 +69,6 @@ Window {
         });
     }
 
-    component Action: ThemedToolButton {
-        Keys.onReturnPressed: event => {
-            clicked();
-            event.accepted = true;
-        }
-        contentColor: Theme.colorText
-        borderColor: Theme.colorPanelLine
-        contentPadding: Theme.spacingLarge
-        controlHeight: Theme.controlHeight + Theme.spacingSmall
-    }
-    component Section: GroupBox {
-        id: section
-        Layout.fillWidth: true
-        padding: Theme.spacingLarge
-        topPadding: label.implicitHeight + Theme.spacingLarge
-        label: ThemedLabel {
-            text: section.title
-            font.weight: Font.DemiBold
-            leftPadding: Theme.spacingSmall
-            rightPadding: Theme.spacingSmall
-            background: Rectangle {
-                color: Theme.colorPanel
-            }
-        }
-        background: Rectangle {
-            y: section.label.implicitHeight / 2
-            height: section.height - y
-            color: Theme.colorPanel
-            border.color: Theme.colorPanelLine
-            border.width: Theme.borderWidth
-            radius: Theme.radiusSmall
-        }
-    }
-    component ValueField: ThemedTextField {
-        Layout.fillWidth: true
-        Layout.preferredHeight: Theme.controlHeight + Theme.spacingSmall
-        selectByMouse: true
-        invalid: text.length > 0 && !acceptableInput
-        validator: DoubleValidator {
-            locale: "C"
-            notation: DoubleValidator.StandardNotation
-        }
-    }
-    component Choice: ComboBox {
-        id: choice
-        Layout.fillWidth: true
-        implicitHeight: Theme.controlHeight + Theme.spacingSmall
-        leftPadding: Theme.spacingMedium
-        rightPadding: Theme.iconSizeSmall + 2 * Theme.spacingSmall
-        contentItem: ThemedLabel {
-            text: choice.displayText
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-        }
-        indicator: ThemedIcon {
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacingSmall
-            anchors.verticalCenter: parent.verticalCenter
-            name: "caret"
-            iconSize: Theme.iconSizeSmall
-        }
-        background: Rectangle {
-            color: Theme.colorPanel
-            border.width: choice.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-            border.color: choice.visualFocus ? Theme.colorFocus : Theme.colorPanelLine
-            radius: Theme.radiusSmall
-        }
-    }
     component Option: CheckBox {
         id: option
         padding: 0
@@ -191,15 +123,16 @@ Window {
                 wrapMode: Text.Wrap
             }
             ScrollView {
+                id: fillSettingsScroll
                 enabled: !dialog.saving
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 contentWidth: availableWidth
                 clip: true
                 ColumnLayout {
-                    width: parent.width
+                    width: fillSettingsScroll.availableWidth
                     spacing: Theme.spacingLarge
-                    Section {
+                    ProcessSettingsControls.Section {
                         Layout.margins: Theme.spacingLarge
                         title: qsTranslate("FillSettings", "Temperatures")
                         GridLayout {
@@ -216,7 +149,7 @@ Window {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: 0
-                                ValueField {
+                                ProcessSettingsControls.ValueField {
                                     id: moldTemperature
                                     objectName: "moldSurfaceTemperature"
                                     Accessible.name: qsTranslate("FillSettings", "Mold surface temperature")
@@ -229,7 +162,7 @@ Window {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: 0
-                                ValueField {
+                                ProcessSettingsControls.ValueField {
                                     id: meltTemperature
                                     objectName: "meltTemperature"
                                     Accessible.name: qsTranslate("FillSettings", "Melt temperature")
@@ -241,7 +174,7 @@ Window {
                             }
                         }
                     }
-                    Section {
+                    ProcessSettingsControls.Section {
                         Layout.leftMargin: Theme.spacingLarge
                         Layout.rightMargin: Theme.spacingLarge
                         title: qsTranslate("FillSettings", "Filling & switch-over")
@@ -253,13 +186,13 @@ Window {
                             ThemedLabel {
                                 text: qsTranslate("FillSettings", "Filling control")
                             }
-                            Choice {
+                            ProcessSettingsControls.Choice {
                                 model: [qsTranslate("FillSettings", "Flow rate")]
                                 Accessible.name: qsTranslate("FillSettings", "Filling control")
                             }
                             RowLayout {
                                 Layout.preferredWidth: Theme.processValueColumnWidth
-                                ValueField {
+                                ProcessSettingsControls.ValueField {
                                     id: flowRate
                                     objectName: "fillFlowRate"
                                     Accessible.name: qsTranslate("FillSettings", "Flow rate")
@@ -279,12 +212,12 @@ Window {
                                 wrapMode: Text.Wrap
                                 Layout.maximumWidth: Theme.processValueColumnWidth + Theme.tabSegmentWidth
                             }
-                            Choice {
+                            ProcessSettingsControls.Choice {
                                 model: [qsTranslate("FillSettings", "By volume filled")]
                                 Accessible.name: qsTranslate("FillSettings", "Velocity/pressure switch-over")
                             }
                             RowLayout {
-                                ValueField {
+                                ProcessSettingsControls.ValueField {
                                     id: switchVolume
                                     objectName: "switchOverVolume"
                                     Accessible.name: qsTranslate("FillSettings", "Volume filled")
@@ -302,18 +235,18 @@ Window {
                             }
                         }
                     }
-                    Section {
+                    ProcessSettingsControls.Section {
                         Layout.leftMargin: Theme.spacingLarge
                         Layout.rightMargin: Theme.spacingLarge
                         title: qsTranslate("FillSettings", "Pack/holding control")
                         ColumnLayout {
                             anchors.fill: parent
                             RowLayout {
-                                Choice {
+                                ProcessSettingsControls.Choice {
                                     model: [qsTranslate("FillSettings", "Filling pressure vs time (%)")]
                                     Accessible.name: qsTranslate("FillSettings", "Pack/holding control")
                                 }
-                                Action {
+                                ProcessSettingsControls.Action {
                                     objectName: "editHoldingProfile"
                                     text: qsTranslate("FillSettings", "Edit Profile…")
                                     onClicked: profileDialog.open(dialog.profile)
@@ -325,7 +258,7 @@ Window {
                             }
                         }
                     }
-                    Section {
+                    ProcessSettingsControls.Section {
                         Layout.leftMargin: Theme.spacingLarge
                         Layout.rightMargin: Theme.spacingLarge
                         Layout.bottomMargin: Theme.spacingLarge
@@ -344,11 +277,11 @@ Window {
                                 text: qsTranslate("FillSettings", "Crystallization analysis (requires material data)")
                             }
                             RowLayout {
-                                Action {
+                                ProcessSettingsControls.Action {
                                     text: qsTranslate("FillSettings", "Advanced Options…")
                                     enabled: false
                                 }
-                                Action {
+                                ProcessSettingsControls.Action {
                                     text: qsTranslate("FillSettings", "Fiber Solver Parameters…")
                                     enabled: false
                                 }
@@ -363,7 +296,7 @@ Window {
                 Item {
                     Layout.fillWidth: true
                 }
-                Action {
+                ProcessSettingsControls.Action {
                     objectName: "fillSettingsAccept"
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     controlHeight: Theme.controlHeight
@@ -373,7 +306,7 @@ Window {
                     borderColor: Theme.colorDialogPrimaryBorder
                     onClicked: dialog.acceptSettings()
                 }
-                Action {
+                ProcessSettingsControls.Action {
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     controlHeight: Theme.controlHeight
                     objectName: "fillSettingsCancel"
@@ -381,7 +314,7 @@ Window {
                     enabled: !dialog.saving
                     onClicked: dialog.close()
                 }
-                Action {
+                ProcessSettingsControls.Action {
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     controlHeight: Theme.controlHeight
                     text: qsTranslate("UiCommonHelp", "Help")

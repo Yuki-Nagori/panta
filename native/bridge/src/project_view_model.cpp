@@ -13,7 +13,10 @@
 #include <QVariantMap>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qtmetamacros.h>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <panta/qt_adapter/standard_paths.hpp>
 #include <qlogging.h>
@@ -183,6 +186,10 @@ bool ProjectViewModel::fillSettingsConfirmationPending() const {
     return m_pendingConfirmation == ConfirmationKind::FillSettings;
 }
 
+bool ProjectViewModel::gateLocationSettingsConfirmationPending() const {
+    return m_pendingConfirmation == ConfirmationKind::GateLocationSettings;
+}
+
 bool ProjectViewModel::materialConfirmationPending() const {
     return m_pendingConfirmation == ConfirmationKind::Material;
 }
@@ -208,6 +215,15 @@ void ProjectViewModel::refreshPlanSettings() {
         {QStringLiteral("fiberOrientation"), fill.fiber_orientation},
         {QStringLiteral("crystallization"), fill.crystallization},
         {QStringLiteral("holdingProfile"), profile}};
+    const auto& gate = settings.gate_location_settings;
+    const QVariantMap gateSettings{
+        {QStringLiteral("machineId"), QString::fromUtf8(gate.machine_id)},
+        {QStringLiteral("machineSourceText"), QString::fromUtf8(gate.machine_source_text)},
+        {QStringLiteral("algorithmId"), QString::fromUtf8(gate.algorithm_id)},
+        {QStringLiteral("algorithmSourceText"), QString::fromUtf8(gate.algorithm_source_text)},
+        {QStringLiteral("moldTemperature"), gate.mold_temperature_celsius},
+        {QStringLiteral("meltTemperature"), gate.melt_temperature_celsius},
+        {QStringLiteral("numberOfGates"), gate.number_of_gates}};
     const QVariantMap next{
         {QStringLiteral("projectPath"), QString::fromUtf8(settings.project_path)},
         {QStringLiteral("revision"), QVariant::fromValue(settings.revision)},
@@ -217,6 +233,9 @@ void ProjectViewModel::refreshPlanSettings() {
         {QStringLiteral("sequenceSourceText"), QString::fromUtf8(settings.sequence_source_text)},
         {QStringLiteral("fillSettings"), fillSettings},
         {QStringLiteral("fillSettingsConfirmed"), settings.fill_settings_confirmed},
+        {QStringLiteral("gateLocationSettings"), gateSettings},
+        {QStringLiteral("gateLocationSettingsConfirmed"),
+         settings.gate_location_settings_confirmed},
         {QStringLiteral("materialId"), QString::fromUtf8(settings.material_id)},
         {QStringLiteral("materialSourceText"), QString::fromUtf8(settings.material_source_text)}};
     if (next != m_planSettings) {
@@ -336,6 +355,56 @@ bool ProjectViewModel::setFillSettings(const QString& projectPath, quint64 revis
     }
 }
 
+bool ProjectViewModel::setGateLocationSettings(const QString& projectPath, quint64 revision,
+                                               const QString& importId,
+                                               const QVariantMap& settings) {
+    if (m_pendingConfirmation != ConfirmationKind::None)
+        return false;
+    std::string path;
+    std::string id;
+    std::string machine;
+    std::string algorithm;
+    QString conversionError;
+    if (!toBoundaryText(projectPath, &path, &conversionError) ||
+        !toBoundaryText(importId, &id, &conversionError) ||
+        !toBoundaryText(settings.value(QStringLiteral("machineId")).toString(), &machine,
+                        &conversionError) ||
+        !toBoundaryText(settings.value(QStringLiteral("algorithmId")).toString(), &algorithm,
+                        &conversionError))
+        return fail(conversionError);
+    bool moldOk = false;
+    bool meltOk = false;
+    bool gatesOk = false;
+    const double mold = settings.value(QStringLiteral("moldTemperature")).toDouble(&moldOk);
+    const double melt = settings.value(QStringLiteral("meltTemperature")).toDouble(&meltOk);
+    const double gates = settings.value(QStringLiteral("numberOfGates")).toDouble(&gatesOk);
+    // 拒绝 DTO 整数转换中的截断；业务范围由 Rust 校验。
+    if (!moldOk || !meltOk || !gatesOk || !std::isfinite(gates) || gates < 0 ||
+        gates > std::numeric_limits<std::uint32_t>::max() || std::floor(gates) != gates)
+        return fail(
+            QStringLiteral("project.command_invalid: invalid gate location settings value"));
+    panta::ffi::GateLocationSettings candidate;
+    candidate.machine_id = machine;
+    candidate.algorithm_id = algorithm;
+    candidate.mold_temperature_celsius = mold;
+    candidate.melt_temperature_celsius = melt;
+    candidate.number_of_gates = static_cast<std::uint32_t>(gates);
+    try {
+        const bool pending = panta::ffi::project_service_begin_gate_location_settings_confirmation(
+            *m_service, path, revision, id, std::move(candidate));
+        clearError();
+        if (pending)
+            set_pending_confirmation(ConfirmationKind::GateLocationSettings);
+        else {
+            refreshPlanSettings();
+            emit gateLocationSettingsConfirmationFinished(true);
+        }
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
+}
+
 void ProjectViewModel::set_pending_confirmation(ConfirmationKind kind) {
     const auto previous = m_pendingConfirmation;
     if (previous == kind) {
@@ -350,6 +419,10 @@ void ProjectViewModel::set_pending_confirmation(ConfirmationKind kind) {
     if (previous == ConfirmationKind::Material || kind == ConfirmationKind::Material) {
         emit materialConfirmationPendingChanged();
     }
+    if (previous == ConfirmationKind::GateLocationSettings ||
+        kind == ConfirmationKind::GateLocationSettings) {
+        emit gateLocationSettingsConfirmationPendingChanged();
+    }
     if (previous == ConfirmationKind::FillSettings || kind == ConfirmationKind::FillSettings) {
         emit fillSettingsConfirmationPendingChanged();
     }
@@ -362,10 +435,21 @@ void ProjectViewModel::finish_metadata_confirmation() {
     }
     bool succeeded = false;
     try {
-        const bool finished =
-            kind == ConfirmationKind::Material
-                ? panta::ffi::project_service_finish_material_confirmation(*m_service)
-                : panta::ffi::project_service_finish_fill_settings_confirmation(*m_service);
+        bool finished = false;
+        switch (kind) {
+        case ConfirmationKind::Material:
+            finished = panta::ffi::project_service_finish_material_confirmation(*m_service);
+            break;
+        case ConfirmationKind::FillSettings:
+            finished = panta::ffi::project_service_finish_fill_settings_confirmation(*m_service);
+            break;
+        case ConfirmationKind::GateLocationSettings:
+            finished =
+                panta::ffi::project_service_finish_gate_location_settings_confirmation(*m_service);
+            break;
+        case ConfirmationKind::None:
+            return;
+        }
         if (!finished) {
             return;
         }
@@ -380,8 +464,10 @@ void ProjectViewModel::finish_metadata_confirmation() {
     set_pending_confirmation(ConfirmationKind::None);
     if (kind == ConfirmationKind::Material) {
         emit materialConfirmationFinished(succeeded);
-    } else {
+    } else if (kind == ConfirmationKind::FillSettings) {
         emit fillSettingsConfirmationFinished(succeeded);
+    } else {
+        emit gateLocationSettingsConfirmationFinished(succeeded);
     }
 }
 

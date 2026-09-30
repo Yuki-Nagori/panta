@@ -20,6 +20,8 @@ mod plan_settings;
 pub use plan_settings::PlanSettings;
 mod process_settings;
 pub use process_settings::{FillSettings, HoldingProfilePoint};
+mod gate_location;
+pub use gate_location::{GateLocationSettings, GateLocatorAlgorithm};
 mod material;
 pub use material::{MaterialDefinition, MaterialProperty, default_material};
 mod import;
@@ -62,6 +64,7 @@ struct ProjectState {
     analysis_sequences: BTreeMap<String, String>,
     materials: BTreeMap<String, String>,
     fill_settings: BTreeMap<String, FillSettings>,
+    gate_location_settings: BTreeMap<String, GateLocationSettings>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -79,6 +82,8 @@ struct ProjectManifest {
     materials: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     fill_settings: BTreeMap<String, FillSettings>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    gate_location_settings: BTreeMap<String, GateLocationSettings>,
 }
 
 /// 工程 service 的可恢复错误；`Display` 的前缀是跨语言稳定错误码。
@@ -361,6 +366,7 @@ impl ProjectService {
             analysis_sequences: BTreeMap::new(),
             materials: BTreeMap::new(),
             fill_settings: BTreeMap::new(),
+            gate_location_settings: BTreeMap::new(),
         };
         if let Err(error) = write_manifest(&state) {
             if let Some(project_root) = state.path.parent() {
@@ -407,6 +413,7 @@ impl ProjectService {
         analysis_sequence::validate_sequences(&manifest)?;
         material::validate_materials(&manifest)?;
         process_settings::validate_settings(&manifest.imports, &manifest.fill_settings)?;
+        gate_location::validate_settings(&manifest.imports, &manifest.gate_location_settings)?;
         self.current = Some(ProjectState {
             path: path.to_path_buf(),
             name: manifest.name,
@@ -416,6 +423,7 @@ impl ProjectService {
             analysis_sequences: manifest.analysis_sequences,
             materials: manifest.materials,
             fill_settings: manifest.fill_settings,
+            gate_location_settings: manifest.gate_location_settings,
         });
         self.latest_mesh_id = None;
         self.mesh_cache.clear();
