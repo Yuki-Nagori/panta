@@ -606,6 +606,59 @@ multi-select:
   src: Hold Ctrl while clicking to select multiple entities.
   tr: Hold Ctrl while clicking to select multiple entities.
 
+[MeshTool]
+generate-mesh:
+  src: Generate Mesh
+  tr: Generate Mesh
+
+operation:
+  src: Mesh operation
+  tr: Mesh operation
+
+more-options:
+  src: More mesh options
+  tr: More mesh options
+
+mesh:
+  src: Mesh
+  tr: Mesh
+
+help:
+  src: Help
+  tr: Help
+
+preview:
+  src: Preview
+  tr: Preview
+
+remesh:
+  src: Remesh already meshed parts of the model
+  tr: Remesh already meshed parts of the model
+
+active-layer:
+  src: Place mesh in active layer
+  tr: Place mesh in active layer
+
+general:
+  src: General
+  tr: General
+
+edge-length-help:
+  src: Set curve edge lengths on the Curves tab. Set CAD edge lengths on the CAD tab or in Mesh > Density. The global edge length applies when geometry has no local edge length.
+  tr: Set curve edge lengths on the Curves tab. Set CAD edge lengths on the CAD tab or in Mesh > Density. The global edge length applies when geometry has no local edge length.
+
+global-edge-length:
+  src: Global edge length:
+  tr: Global edge length:
+
+match-mesh:
+  src: Match mesh
+  tr: Match mesh
+
+dual-domain-thickness:
+  src: Calculate thickness for Dual Domain meshes
+  tr: Calculate thickness for Dual Domain meshes
+
 [LayerPanelTitle]
 label:
   src: Layers

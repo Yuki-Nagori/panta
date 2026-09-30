@@ -1,4 +1,4 @@
-/* 两页共用的设计 token、壳层与 Ribbon 样式；homepage 为视觉基准。 */
+/* 各状态共用的设计 token、壳层与 Ribbon 样式；homepage 为视觉基准。 */
 :root {
   --color-chrome: #e9e9e9;
   --color-chrome-line: #d0d0d0;
@@ -224,11 +224,22 @@ button:disabled { opacity: var(--disabled-opacity); }
 .output-panel { flex: 0 0 var(--output-height); border-top: 1px solid var(--color-panel-line); }
 .layer-panel { flex: 1; border-top: 1px solid var(--color-panel-line); }
 .panel-content { flex: 1; min-height: 0; overflow: auto; }
+.task-panel-pages { overflow: hidden; }
+.task-panel-page { height: 100%; min-height: 0; overflow: auto; }
+.task-panel-information { margin: 10px 8px; padding: 12px; border: 1px solid var(--color-panel-line); line-height: 1.4; }
+.task-panel-information h2 { margin: 0 0 12px; font-size: var(--font-small); font-weight: 600; }
+.task-panel-information p { margin: 0 0 12px; }
+.task-panel-information p:last-child { margin-bottom: 0; }
 body.project-workspace .task-workspace-dock { flex: 0 0 56%; }
 body.project-workspace .tasks-panel { flex: 0 0 39%; }
 body.project-workspace .output-panel { flex: 1; }
 body.project-workspace .output-toolbar { display: none; }
 body.project-workspace .output-panel > .pane-close { display: none; }
+body.imported-project-workspace .tasks-panel { flex: 1; }
+body.imported-project-workspace .output-panel { display: none; }
+body.imported-project-workspace .tasks-panel .panel-content { overflow: hidden; }
+body.mesh-tool-workspace .tasks-panel { flex: 1; }
+body.mesh-tool-workspace .output-panel { display: none; }
 .pane-close {
   position: absolute;
   top: 4px;
@@ -469,15 +480,102 @@ body.project-workspace .output-panel > .pane-close { display: none; }
 .tree-node[aria-selected="true"] { background: var(--color-selected); }
 .tree-children { margin-left: 12px; }
 .project-parts { margin-left: 18px; }
+.task-page-split { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.task-page-project { flex: 0 0 36%; min-height: 0; overflow: auto; }
+.task-page-plan { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--color-panel-line); }
 .part-inspector { min-width: 0; padding: 0 0 12px; }
 .inspector-heading { display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 3px 8px; border-bottom: 1px solid var(--color-panel-line); font-weight: 500; }
 .inspector-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inspector-list { padding-top: 2px; }
 .inspector-row { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 8px; }
+.mesh-tool-entry { width: 100%; color: inherit; text-align: left; cursor: pointer; }
+.mesh-tool-entry:hover { background: var(--color-hover); }
 .inspector-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-row > .status-placeholder { flex: none; width: var(--icon-size-small); }
 .inspector-indent { margin-left: 52px; }
 .inspector-muted { color: var(--color-muted); }
 .empty-checkbox { flex: none; width: 12px; height: 12px; border: 1px solid var(--color-panel-line); background: var(--color-panel); }
+
+/* Mesh Tool 沿用当前 Shell 风格；参考截图只确定分区和控件关系。 */
+.mesh-tool-workspace .mesh-tool-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 100%;
+  padding: 10px;
+}
+.mesh-tool-mode-row { display: flex; align-items: center; gap: 6px; }
+.mesh-tool-mode { position: relative; flex: 1; min-width: 0; }
+.mesh-tool-mode select {
+  appearance: none;
+  width: 100%;
+  height: calc(var(--control-height) + 6px);
+  padding: 0 82px 0 12px;
+  border: 1px solid var(--color-panel-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+}
+.mesh-tool-mode kbd {
+  position: absolute;
+  top: 50%;
+  right: 32px;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  color: var(--color-muted);
+  border-radius: var(--radius);
+  background: var(--color-chrome);
+  font: inherit;
+  font-size: var(--font-small);
+  pointer-events: none;
+}
+.mesh-tool-select-arrow {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 0;
+  height: 0;
+  transform: translateY(-25%);
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  border-top: 5px solid var(--color-icon);
+  pointer-events: none;
+}
+.mesh-tool-more {
+  flex: none;
+  width: calc(var(--control-height) + 6px);
+  height: calc(var(--control-height) + 6px);
+  border: 1px solid var(--color-panel-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+  font-size: 17px;
+  line-height: 1;
+}
+.mesh-tool-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; padding: 4px 2px; }
+.mesh-tool-actions button { min-width: 0; min-height: 28px; padding: 0 10px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); }
+.mesh-tool-actions .mesh-primary { border-color: var(--color-dialog-primary-border); background: var(--color-dialog-primary); font-weight: 600; }
+.mesh-tool-checks { display: grid; gap: 7px; padding: 0 2px; }
+.mesh-tool-checks .checkbox-row { gap: 6px; min-width: 0; }
+.mesh-tool-checks input { flex: none; }
+.mesh-tool-general { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.mesh-tool-tabs { display: flex; flex: none; align-items: end; min-height: 28px; border-bottom: 1px solid var(--color-panel-line); }
+.mesh-tool-tab { min-height: 27px; margin-bottom: -1px; padding: 0 12px; color: var(--color-muted); border: 1px solid transparent; border-radius: var(--radius) var(--radius) 0 0; }
+.mesh-tool-tab[aria-selected="true"] { color: var(--color-text); border-color: var(--color-panel-line); border-bottom-color: var(--color-panel); background: var(--color-panel); font-weight: 600; }
+.mesh-tool-settings { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 260px; padding: 12px; border: 1px solid var(--color-panel-line); border-top: 0; }
+.mesh-tool-description { max-width: 38em; margin: 0; color: var(--color-muted); line-height: 1.45; }
+.mesh-tool-global-length { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; margin-block: auto; }
+.mesh-tool-global-length > label { font-weight: 600; }
+.mesh-tool-number { display: flex; align-items: center; gap: 10px; }
+.mesh-tool-number input { width: 82px; height: 28px; padding: 0 8px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); text-align: right; }
+.mesh-tool-number span { min-width: 22px; color: var(--color-muted); }
+.mesh-tool-options { display: grid; gap: 7px; margin-top: auto; }
+.mesh-tool-options .checkbox-row { gap: 6px; }
+@media (max-width: 420px) {
+  .mesh-tool-workspace .mesh-tool-page { padding: 8px; gap: 8px; }
+  .mesh-tool-settings { padding: 10px; }
+  .mesh-tool-global-length { grid-template-columns: 1fr; row-gap: 6px; }
+}
 
 /* 导入后的 STL 只用几何 CSS 占位，避免设计参考依赖外部模型或图片。 */
 .viewport-scene {

@@ -18,6 +18,7 @@ PanelSurface {
     property string activeDocumentTitle: ""
     property bool importedPartAvailable: importedPartNames.length > 0
     property string importedPartName: ""
+    property bool meshToolOpen: false
     readonly property var planTaskItems: [
         {
             id: "imported-part",
@@ -81,6 +82,13 @@ PanelSurface {
     signal newProjectRequested
     signal openImportRequested(string recordId)
 
+    function openPlanTask(taskId) {
+        if (taskId === "create-mesh") {
+            panelTabs.currentIndex = 1;
+            meshToolOpen = true;
+        }
+    }
+
     // Welcome 或空白视口没有对应导入记录，此时仍显示最近导入项。
     readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 ? activeDocumentTitle : importedPartName
 
@@ -99,6 +107,8 @@ PanelSurface {
             Layout.fillWidth: true
             rightPadding: Theme.paneCloseSize + 2 * Theme.spacingXSmall
             tabs: [qsTranslate("TaskPanelTitle", "Tasks"), qsTranslate("UiCommonNavigation", "Tools"), qsTranslate("UiCommonNavigation", "Shared Views")]
+            onCurrentIndexChanged: panel.meshToolOpen = false
+            onTabActivated: panel.meshToolOpen = false
         }
 
         StackLayout {
@@ -322,6 +332,7 @@ PanelSurface {
                                     contentColor: Theme.colorText
                                     contentPadding: Theme.spacingSmall
                                     hoverColor: Theme.colorHover
+                                    onClicked: panel.openPlanTask(taskRow.modelData.id)
                                 }
                             }
                         }
@@ -335,8 +346,14 @@ PanelSurface {
                 InformationPanel {
                     objectName: "tasksToolsInformation"
                     anchors.fill: parent
+                    visible: !panel.meshToolOpen
                     titleText: qsTranslate("TaskPanelInformation", "Information")
                     messages: [qsTranslate("TaskPanelToolsHelp", "Use the tools above to access each tool."), qsTranslate("TaskPanelToolsHelp", "Open a tool's help to learn how to use it."), qsTranslate("TaskPanelToolsHelp", "Hold Ctrl while clicking to select multiple entities.")]
+                }
+
+                MeshToolPanel {
+                    anchors.fill: parent
+                    visible: panel.meshToolOpen
                 }
             }
 

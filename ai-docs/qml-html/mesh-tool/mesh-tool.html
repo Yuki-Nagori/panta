@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<!-- 项目工作区与视口文档页签的视觉、交互状态参考；见任务 080。 -->
+<!-- Mesh Tool 的布局参考；实际功能与导航信号由后续 QML task 接入。 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>panta 2027 · Project '01'</title>
+  <title>panta 2027 · Mesh Tool</title>
   <link rel="stylesheet" href="../shell.css">
   <script src="../shell.js" defer></script>
 </head>
-<body class="project-workspace imported-project-workspace">
+<body class="project-workspace mesh-tool-workspace" data-panel-tab="tools">
 <template id="page-menu">
   <button type="button" aria-current="page">Home</button>
   <button type="button">Tools</button>
@@ -76,54 +76,59 @@
   </section>
 </template>
 
-<template id="page-tasks">
-  <div class="task-page-split">
-    <div class="task-page-project">
-      <div class="task-tree" role="tree" aria-label="Imported project tasks">
-        <button type="button" class="tree-node tree-root" role="treeitem" aria-expanded="true"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-project-folder"/></svg><span>Project '01'</span></button>
-        <div class="tree-children project-studies" role="group" aria-label="Imported studies">
-          <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="true" data-import-id="import-1" data-study-name="iPhone17_Pro_TPU_Case_study" data-source-name="iPhone17_Pro_TPU_Case.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span>iPhone17_Pro_TPU_Case_study</span></button>
-          <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-import-id="import-2" data-study-name="housing_study" data-source-name="housing.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span>housing_study</span></button>
-          <button type="button" class="tree-node study-node part-node" role="treeitem" aria-selected="false" data-import-id="import-3" data-study-name="bracket_study" data-source-name="bracket.stl"><svg class="tree-caret icon" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span>bracket_study</span></button>
-        </div>
-      </div>
+<template id="page-tools">
+  <section class="mesh-tool-page" aria-label="Mesh Tool">
+    <div class="mesh-tool-mode-row">
+      <label class="mesh-tool-mode">
+        <span class="visually-hidden">Mesh operation</span>
+        <select aria-label="Mesh operation">
+          <option selected>Generate Mesh</option>
+        </select>
+        <kbd aria-label="Keyboard shortcut F2">F2</kbd>
+        <span class="mesh-tool-select-arrow" aria-hidden="true"></span>
+      </label>
+      <button type="button" class="mesh-tool-more" aria-label="More mesh options" title="More options">…</button>
     </div>
-    <div class="task-page-plan">
-      <div class="part-inspector" aria-label="Selected part tasks">
-        <div class="inspector-heading">
-          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plan-tasks"/></svg>
-          <strong data-inspector-heading>Plan tasks: iPhone17_Pro_TPU_Case_study</strong>
-        </div>
-        <div class="inspector-list" data-inspector-list role="list">
-          <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span class="inspector-part-name">Part (iPhone17_Pro_TPU_Case.stl)</span></div>
-          <button type="button" class="inspector-row mesh-tool-entry" role="listitem" aria-label="Create Mesh" data-demo-navigate="../mesh-tool/mesh-tool.html"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Create Mesh...</span></button>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-fill"/></svg><span>Fill</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Material Data</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></div>
-          <div class="inspector-row inspector-muted" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></div>
-        </div>
-      </div>
+
+    <div class="mesh-tool-actions" role="group" aria-label="Mesh actions">
+      <button type="button" class="mesh-primary">Mesh</button>
+      <button type="button">Help</button>
+      <button type="button">Preview</button>
+      <button type="button" data-demo-navigate="../imported-project/imported-project.html">Cancel</button>
     </div>
-  </div>
+
+    <div class="mesh-tool-checks">
+      <label class="checkbox-row"><input type="checkbox">Remesh already meshed parts of the model</label>
+      <label class="checkbox-row"><input type="checkbox">Place mesh in active layer</label>
+    </div>
+
+    <div class="mesh-tool-general">
+      <div class="mesh-tool-tabs" role="tablist" aria-label="Mesh settings">
+        <button type="button" id="mesh-general-tab" class="mesh-tool-tab" role="tab" aria-controls="mesh-general-settings" aria-selected="true" tabindex="0">General</button>
+      </div>
+
+      <section id="mesh-general-settings" class="mesh-tool-settings" role="tabpanel" aria-labelledby="mesh-general-tab">
+        <p class="mesh-tool-description">Set curve edge lengths on the Curves tab. Set CAD edge lengths on the CAD tab or in Mesh &gt; Density. The global edge length applies when geometry has no local edge length.</p>
+
+        <div class="mesh-tool-global-length">
+          <label for="global-edge-length">Global edge length:</label>
+          <div class="mesh-tool-number">
+            <input id="global-edge-length" type="number" value="12.00" min="0" step="0.01" inputmode="decimal">
+            <span>mm</span>
+          </div>
+        </div>
+
+        <div class="mesh-tool-options">
+          <label class="checkbox-row"><input type="checkbox" checked>* Match mesh</label>
+          <label class="checkbox-row"><input type="checkbox" checked>* Calculate thickness for Dual Domain meshes</label>
+        </div>
+      </section>
+    </div>
+  </section>
 </template>
 
 <template id="page-layers"></template>
 <template id="page-layer-tab"></template>
-
-<template id="page-viewport">
-  <div class="viewport-scene" data-document-view="part" aria-label="STL model preview" hidden>
-    <div class="scene-grid" aria-hidden="true"></div>
-    <div class="stl-model" aria-label="Imported STL preview">
-      <span class="model-facet facet-one"></span>
-      <span class="model-facet facet-two"></span>
-      <span class="model-hole"></span>
-    </div>
-    <span class="viewport-caption" data-viewport-caption></span>
-  </div>
-</template>
 
 <noscript>This design reference requires JavaScript to display the shared layout.</noscript>
 </body>

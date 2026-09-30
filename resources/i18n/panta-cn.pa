@@ -606,6 +606,59 @@ multi-select:
   src: Hold Ctrl while clicking to select multiple entities.
   tr: 按住 Ctrl 并单击可选择多个实体。
 
+[MeshTool]
+generate-mesh:
+  src: Generate Mesh
+  tr: 生成网格
+
+operation:
+  src: Mesh operation
+  tr: 网格操作
+
+more-options:
+  src: More mesh options
+  tr: 更多网格选项
+
+mesh:
+  src: Mesh
+  tr: 网格划分
+
+help:
+  src: Help
+  tr: 帮助
+
+preview:
+  src: Preview
+  tr: 预览
+
+remesh:
+  src: Remesh already meshed parts of the model
+  tr: 重新划分模型中已有网格的零件
+
+active-layer:
+  src: Place mesh in active layer
+  tr: 将网格放入当前图层
+
+general:
+  src: General
+  tr: 常规
+
+edge-length-help:
+  src: Set curve edge lengths on the Curves tab. Set CAD edge lengths on the CAD tab or in Mesh > Density. The global edge length applies when geometry has no local edge length.
+  tr: 在 Curves 选项卡设置曲线边长；在 CAD 选项卡或 Mesh > Density 中设置 CAD 边长。几何体未设置局部边长时，使用全局边长。
+
+global-edge-length:
+  src: Global edge length:
+  tr: 全局边长：
+
+match-mesh:
+  src: Match mesh
+  tr: 匹配网格
+
+dual-domain-thickness:
+  src: Calculate thickness for Dual Domain meshes
+  tr: 计算双层面网格厚度
+
 [LayerPanelTitle]
 label:
   src: Layers

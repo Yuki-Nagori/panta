@@ -10,6 +10,7 @@ TabBar {
 
     property alias tabs: repeater.model
     property int edge: Qt.TopEdge
+    signal tabActivated(int index)
 
     implicitWidth: count * Theme.tabSegmentWidth + leftPadding + rightPadding
     implicitHeight: Theme.panelToolbarHeight
@@ -57,9 +58,11 @@ TabBar {
         delegate: TabButton {
             id: tab
             hoverEnabled: true
+            required property int index
             required property string modelData
 
             text: modelData
+            onClicked: bar.tabActivated(index)
             width: Math.min(Theme.tabSegmentWidth, bar.availableWidth / Math.max(1, bar.count))
             // 与 ListView 内容高度同源，避免 TabBar 按旧隐式高度居中而产生负 y。
             implicitHeight: Theme.panelToolbarHeight - 2 * Theme.spacingTiny

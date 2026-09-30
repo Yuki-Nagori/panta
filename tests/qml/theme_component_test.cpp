@@ -345,6 +345,54 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("active.stl"));
     }
 
+    void mesh_tool_requires_create_mesh_action() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QObject* panel = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+        QVERIFY(panel != nullptr);
+        auto* tabs = panel->findChild<QObject*>(QStringLiteral("panelTabs"));
+        auto* information = panel->findChild<QObject*>(QStringLiteral("tasksToolsInformation"));
+        auto* mesh_tool = panel->findChild<QObject*>(QStringLiteral("meshToolPanel"));
+        QVERIFY(tabs != nullptr);
+        QVERIFY(information != nullptr);
+        QVERIFY(mesh_tool != nullptr);
+
+        tabs->setProperty("currentIndex", 1);
+        QVERIFY(information->property("visible").toBool());
+        QVERIFY(!mesh_tool->property("visible").toBool());
+
+        tabs->setProperty("currentIndex", 0);
+        QVERIFY(QMetaObject::invokeMethod(
+            panel, "openPlanTask", Q_ARG(QVariant, QVariant(QStringLiteral("create-mesh")))));
+        QCOMPARE(tabs->property("currentIndex").toInt(), 1);
+        QVERIFY(!information->property("visible").toBool());
+        QVERIFY(mesh_tool->property("visible").toBool());
+
+        QVERIFY(QMetaObject::invokeMethod(tabs, "tabActivated", Q_ARG(int, 1)));
+        QVERIFY(information->property("visible").toBool());
+        QVERIFY(!mesh_tool->property("visible").toBool());
+
+        tabs->setProperty("currentIndex", 0);
+        tabs->setProperty("currentIndex", 1);
+        QVERIFY(information->property("visible").toBool());
+        QVERIFY(!mesh_tool->property("visible").toBool());
+    }
+
+    void mesh_tool_scrolls_in_narrow_dock() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        auto* mesh_tool = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/MeshToolPanel.qml"), owner);
+        QVERIFY(mesh_tool != nullptr);
+        mesh_tool->setProperty("width", 320);
+        mesh_tool->setProperty("height", 240);
+        QCoreApplication::processEvents();
+        QVERIFY(mesh_tool->property("contentHeight").toReal() > 240);
+    }
+
     void button_font_size_reaches_its_label() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);
@@ -539,7 +587,8 @@ class ThemeComponentTest final : public QObject {
                 const QString icon_id = qml_icon_literal(expression);
                 const QString mode = qml_binding(block, "preserveIconColors");
                 if (icon_id.isEmpty()) {
-                    if (expression == QStringLiteral("modelData.icon") &&
+                    if ((expression == QStringLiteral("modelData.icon") ||
+                         expression == QStringLiteral("taskRow.modelData.icon")) &&
                         path.endsWith(QStringLiteral("/TasksPanel.qml"))) {
                         QCOMPARE(mode, QStringLiteral("true"));
                         task_model_uses_source_colors = mode == QStringLiteral("true");

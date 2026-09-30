@@ -117,13 +117,28 @@ shellTemplate.innerHTML = `
         <button type="button" class="pane-close" aria-label="Close tasks" title="Close tasks"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
         <div class="tabs tabs-closable">
           <div class="tab-strip" role="tablist" aria-label="Task panel">
-            <button type="button" role="tab" aria-selected="true" tabindex="0">Tasks</button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1">Tools</button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1">Shared Views</button>
+            <button type="button" role="tab" data-panel-tab="tasks" aria-selected="true" tabindex="0">Tasks</button>
+            <button type="button" role="tab" data-panel-tab="tools" aria-selected="false" tabindex="-1">Tools</button>
+            <button type="button" role="tab" data-panel-tab="shared-views" aria-selected="false" tabindex="-1">Shared Views</button>
           </div>
         </div>
-        <div class="panel-content">
-          <template data-slot="tasks"></template>
+        <div class="panel-content task-panel-pages">
+          <div class="task-panel-page" data-panel-page="tasks"><template data-slot="tasks"></template></div>
+          <div class="task-panel-page" data-panel-page="tools">
+            <template data-slot="tools"></template>
+            <section class="task-panel-information" aria-label="Information">
+              <h2>Information</h2>
+              <p>Use the tools above to access each tool.</p>
+              <p>Open a tool's help to learn how to use it.</p>
+              <p>Hold Ctrl while clicking to select multiple entities.</p>
+            </section>
+          </div>
+          <div class="task-panel-page" data-panel-page="shared-views">
+            <section class="task-panel-information" aria-label="Information">
+              <h2>Information</h2>
+              <p>Access Shared Views from the Shared panel on the Home tab.</p>
+            </section>
+          </div>
         </div>
       </section>
       <section class="panel output-panel" aria-label="Output">
@@ -189,13 +204,43 @@ const shell = shellTemplate.content.cloneNode(true);
 shell.querySelector(".caption").textContent = document.title;
 shell.querySelectorAll("[data-slot]").forEach((slot) => {
   const content = document.getElementById("page-" + slot.dataset.slot);
-  if (content) slot.replaceWith(content.content.cloneNode(true));
-  else slot.remove();
+  if (content) {
+    slot.replaceWith(content.content.cloneNode(true));
+  } else {
+    slot.remove();
+  }
 });
 document.body.append(shell);
 
+const selectedPanelTab = document.body.dataset.panelTab || "tasks";
+const selectPanelTab = (tabName, showMeshTool = false) => {
+  document.querySelectorAll(".tasks-panel [data-panel-tab]").forEach((tab) => {
+    const selected = tab.dataset.panelTab === tabName;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  document.querySelectorAll(".tasks-panel [data-panel-page]").forEach((page) => {
+    page.hidden = page.dataset.panelPage !== tabName;
+  });
+  const meshToolPage = document.querySelector(".mesh-tool-page");
+  if (meshToolPage) {
+    meshToolPage.hidden = !showMeshTool;
+    document.querySelector('[data-panel-page="tools"] .task-panel-information').hidden = showMeshTool;
+  }
+};
+selectPanelTab(selectedPanelTab, document.body.classList.contains("mesh-tool-workspace"));
+document.querySelectorAll(".tasks-panel [data-panel-tab]").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    if (document.body.classList.contains("mesh-tool-workspace") && tab.dataset.panelTab === "tasks") {
+      window.location.href = "../imported-project/imported-project.html";
+      return;
+    }
+    selectPanelTab(tab.dataset.panelTab);
+  });
+});
+
 if (document.body.classList.contains("project-workspace")) {
-  document.querySelector(".tasks-panel")?.setAttribute("aria-label", "Project tree");
+  document.querySelector(".tasks-panel")?.setAttribute("aria-label", "Tasks and tools");
   const partTasks = document.querySelector(".output-panel");
   partTasks?.setAttribute("aria-label", "Part tasks");
   partTasks?.querySelector(".pane-close")?.remove();

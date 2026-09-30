@@ -45,7 +45,7 @@ constexpr std::array kItemCounts = {0, 1, 100, 1000};
 // 1000px 窗口中前 3 个页签始终可见；切换必须触发实际可见内容更新。
 constexpr int kVisibleDocumentSwitchCount = 3;
 
-enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, DocTabs };
+enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, DocTabs, MeshTool };
 enum class TabWorkload : std::uint8_t { Static, Switch, CloseReopen };
 
 struct Scenario {
@@ -108,6 +108,8 @@ class ProjectDocksGpuBenchmark final : public QObject {
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
+    QQmlComponent m_meshToolComponent{
+        &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/MeshToolPanel.qml"))};
     QQmlComponent m_documentTabBarComponent{
         &m_engine,
         QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
@@ -191,6 +193,8 @@ class ProjectDocksGpuBenchmark final : public QObject {
                        owner, QPoint(0, 0), QSize(1000, 39)));
         } else if (scenario.panels == Panels::Empty) {
             create(m_emptyComponent, {}, owner, QPoint(0, 0), QSize(440, 700));
+        } else if (scenario.panels == Panels::MeshTool) {
+            create(m_meshToolComponent, {}, owner, QPoint(0, 0), QSize(440, 700));
         } else {
             if (scenario.panels == Panels::Tasks || scenario.panels == Panels::Both) {
                 QVariantMap properties = names_property;
@@ -317,6 +321,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
         QVERIFY(m_emptyComponent.isReady());
         QVERIFY2(m_tasksComponent.isReady(), qPrintable(m_tasksComponent.errorString()));
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
+        QVERIFY2(m_meshToolComponent.isReady(), qPrintable(m_meshToolComponent.errorString()));
 
         if (QGuiApplication::platformName() == QStringLiteral("offscreen") ||
             QGuiApplication::platformName() == QStringLiteral("minimal")) {
@@ -358,6 +363,12 @@ class ProjectDocksGpuBenchmark final : public QObject {
         for (const Scenario& scenario : cases) {
             run_scenario(scenario, api);
         }
+    }
+
+    void measures_mesh_tool_frame_presentation() {
+        const char* api = graphics_api_name(m_window.rendererInterface()->graphicsApi());
+        run_scenario({"empty", Panels::Empty, 0}, api);
+        run_scenario({"mesh tool", Panels::MeshTool, 0}, api);
     }
 };
 

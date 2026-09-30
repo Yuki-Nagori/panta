@@ -30,6 +30,7 @@ set(PANTA_SHELL_QML_FILES
     Panels/Ribbon/HomeRibbon.qml
     Panels/Ribbon/StartLearnRibbon.qml
     Panels/TasksPanel.qml
+    Panels/MeshToolPanel.qml
     Panels/LayersPanel.qml
     Panels/ViewportPane.qml
     Panels/PlaceholderPanel.qml

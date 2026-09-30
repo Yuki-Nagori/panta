@@ -41,7 +41,7 @@ constexpr int kDocumentTabCounts[] = {1, 8, 24};
 constexpr int kDocumentSwitchRounds = 32;
 constexpr int kIconCounts[] = {1, 8, 24};
 
-enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both };
+enum class Panels : std::uint8_t { Empty, Tasks, Layers, Both, MeshTool };
 enum class DocumentTabWorkload : std::uint8_t { Construct, Switch, Close };
 enum class IconSourceMode : std::uint8_t { Empty, MonochromeProvider, SourceColors };
 
@@ -100,6 +100,8 @@ class QmlPerformanceBenchmark final : public QObject {
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
+    QQmlComponent m_meshToolComponent{
+        &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/MeshToolPanel.qml"))};
     QQmlComponent m_documentTabBarComponent{
         &m_engine,
         QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
@@ -133,6 +135,9 @@ class QmlPerformanceBenchmark final : public QObject {
         if (panels == Panels::Empty) {
             create(m_emptyComponent, {}, owner);
         } else {
+            if (panels == Panels::MeshTool) {
+                create(m_meshToolComponent, {}, owner);
+            }
             if (panels == Panels::Tasks || panels == Panels::Both) {
                 QVariantMap properties = names_property;
                 properties.insert(QStringLiteral("projectOpen"), true);
@@ -457,6 +462,7 @@ class QmlPerformanceBenchmark final : public QObject {
         QVERIFY(m_emptyComponent.isReady());
         QVERIFY2(m_tasksComponent.isReady(), qPrintable(m_tasksComponent.errorString()));
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
+        QVERIFY2(m_meshToolComponent.isReady(), qPrintable(m_meshToolComponent.errorString()));
         QVERIFY2(m_themedIconComponent.isReady(), qPrintable(m_themedIconComponent.errorString()));
     }
 
@@ -498,6 +504,16 @@ class QmlPerformanceBenchmark final : public QObject {
     }
 
     void measures_icon_loading() { run_icon_loading_scenarios(); }
+
+    void measures_mesh_tool_construct() {
+        for (const auto [panels, name] :
+             {std::pair{Panels::Empty, "empty"}, std::pair{Panels::MeshTool, "mesh tool"}}) {
+            run_scenario(
+                {QStringLiteral("mesh tool"), QString::fromLatin1(name), 1,
+                 [this, panels] { return measure_once(panels, {}); },
+                 [this, panels](const Sample& sample) { verify_sample(panels, 0, sample); }});
+        }
+    }
 };
 
 QTEST_MAIN(QmlPerformanceBenchmark)

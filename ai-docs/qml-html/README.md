@@ -5,11 +5,12 @@ QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每�
 
 ## 文件组织
 
-- [shell.css](shell.css)：两页共用的设计 token、Ribbon、面板和工具栏样式。
+- [shell.css](shell.css)：各状态共用的设计 token、Ribbon、面板和工具栏样式。
 - [shell.js](shell.js)：公共壳层、SVG 图标、通用页签状态和视口文档页签交互。
 - [homepage/homepage.html](homepage/homepage.html)：启动 / 学习首页。
 - [open-project/open-project.html](open-project/open-project.html)：工程任务项与项目工具 Ribbon。
-- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入完成后的工程树与视口状态。
+- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入后的工程树与视口状态，Create Mesh 可进入 Mesh Tool。
+- [mesh-tool/mesh-tool.html](mesh-tool/mesh-tool.html)：Mesh Tool 操作与 General 网格参数布局。
 
 HTML 只保留标题、菜单、Ribbon、任务、视口和对话框状态模板，脚本将模板嵌入公共壳层。
 这些入口通过相对路径引用公共文件，无网络资源和构建步骤；浏览器需启用
@@ -23,6 +24,7 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 （拖动非活动页签时会先激活它；被拖标签不透明并持续跟随指针，跨过相邻标签时平滑让位直至松开，标题始终保持固定宽度并截断，垂直拖动不改变位置），全部关闭后
 视口与标签栏留空。关闭标签不会删除示例工程树记录。这些页面只演示交互状态，不写工程文件，
 不执行 STL 读取、解析或真实 VTK 渲染。
+`mesh-tool` 用相同 Shell 组合 Mesh Tool 页面；从 Plan tasks 点击 Create Mesh 后，上方页签选中 Tools，原 Tasks 页的工程树和 Plan tasks 一并切换为工具内容。Cancel 返回导入工程。截图只作为控件与分区参考，页面样式沿用当前 Shell。
 
 ## 工作流
 
