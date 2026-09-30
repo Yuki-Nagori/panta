@@ -64,6 +64,13 @@ class WelcomeSceneTest final : public QObject {
         auto* title = vtkBillboardTextActor3D::SafeDownCast(props->GetNextProp());
         QVERIFY(title != nullptr);
         QCOMPARE(QString::fromUtf8(title->GetInput()), QStringLiteral("Fill time [s]\n= 2.087"));
+        mesh.pressures = {0.5, 1.234};
+        mesh.pressure_visible = true;
+        scene.set_result_legend(&mesh, 1000, 700);
+        QCOMPARE(QString::fromUtf8(title->GetInput()), QStringLiteral("Pressure [MPa]\n= 1.234"));
+        mesh.pressure_visible = false;
+        scene.set_result_legend(&mesh, 1000, 700);
+        QCOMPARE(QString::fromUtf8(title->GetInput()), QStringLiteral("Fill time [s]\n= 2.087"));
         mesh.fields_visible = false;
         scene.set_result_legend(&mesh, 1000, 700);
         QVERIFY(!legend->GetVisibility());
