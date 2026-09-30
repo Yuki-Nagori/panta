@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-xy-curve；内部绘制，保留原始几何与颜色。 -->
+  <path d="M4 4v18h18" stroke="#555"/>
+  <path d="m6 18 4-7 4 4 6-10" stroke="#2e7ce0" stroke-width="1.7"/>
+  <circle cx="14" cy="15" r="2" fill="#c8322b"/>
+</svg>

@@ -1044,3 +1044,209 @@ entry-8:
 entry-9:
   src: Number of gates
   tr: Number of gates
+
+[ResultsRibbon]
+
+entry-1:
+  src: New Plot
+  tr: New Plot
+
+entry-2:
+  src: Notes
+  tr: Notes
+
+entry-3:
+  src: Add XY Curve
+  tr: Add XY Curve
+
+entry-4:
+  src: Plots
+  tr: Plots
+
+entry-5:
+  src: "Plot\nProperties"
+  tr: "Plot\nProperties"
+
+entry-6:
+  src: "Save\nDefaults"
+  tr: "Save\nDefaults"
+
+entry-7:
+  src: Properties
+  tr: Properties
+
+entry-8:
+  src: First frame
+  tr: First frame
+
+entry-9:
+  src: Last frame
+  tr: Last frame
+
+entry-10:
+  src: Play
+  tr: Play
+
+entry-11:
+  src: Pause
+  tr: Pause
+
+entry-12:
+  src: Stop
+  tr: Stop
+
+entry-13:
+  src: Loop
+  tr: Loop
+
+entry-14:
+  src: Ping-pong
+  tr: Ping-pong
+
+entry-15:
+  src: Animation time
+  tr: Animation time
+
+entry-16:
+  src: Animation
+  tr: Animation
+
+entry-17:
+  src: Examine
+  tr: Examine
+
+entry-18:
+  src: "Show\nMin/Max"
+  tr: "Show\nMin/Max"
+
+entry-19:
+  src: Histogram
+  tr: Histogram
+
+entry-21:
+  src: Set Scale
+  tr: Set Scale
+
+entry-22:
+  src: Reset Scale
+  tr: Reset Scale
+
+entry-23:
+  src: Scaling
+  tr: Scaling
+
+entry-24:
+  src: Visualize
+  tr: Visualize
+
+entry-25:
+  src: Restore
+  tr: Restore
+
+entry-26:
+  src: Warpage
+  tr: Warpage
+
+entry-27:
+  src: "Defect\nVisualization"
+  tr: "Defect\nVisualization"
+
+entry-28:
+  src: "Export\nResults"
+  tr: "Export\nResults"
+
+entry-29:
+  src: Mark
+  tr: Mark
+
+entry-30:
+  src: Unmark
+  tr: Unmark
+
+entry-31:
+  src: XY Plot
+  tr: XY Plot
+
+entry-32:
+  src: Export and Publish
+  tr: Export and Publish
+
+entry-33:
+  src: Edit
+  tr: Edit
+
+entry-34:
+  src: Move
+  tr: Move
+
+entry-35:
+  src: Cutting Plane
+  tr: Cutting Plane
+
+entry-36:
+  src: Tile horizontally
+  tr: Tile horizontally
+
+entry-37:
+  src: Arrange windows
+  tr: Arrange windows
+
+entry-38:
+  src: Tile vertically
+  tr: Tile vertically
+
+entry-39:
+  src: Split horizontally
+  tr: Split horizontally
+
+entry-40:
+  src: Synchronize windows
+  tr: Synchronize windows
+
+entry-41:
+  src: Split vertically
+  tr: Split vertically
+
+entry-42:
+  src: Windows
+  tr: Windows
+
+entry-43:
+  src: Lock window
+  tr: Lock window
+
+entry-44:
+  src: Lock legend
+  tr: Lock legend
+
+entry-45:
+  src: Lock mesh
+  tr: Lock mesh
+
+entry-46:
+  src: Synchronize lock window
+  tr: Synchronize lock window
+
+entry-47:
+  src: Synchronize lock legend
+  tr: Synchronize lock legend
+
+entry-48:
+  src: Synchronize lock mesh
+  tr: Synchronize lock mesh
+
+entry-49:
+  src: Release lock window
+  tr: Release lock window
+
+entry-50:
+  src: Release lock legend
+  tr: Release lock legend
+
+entry-51:
+  src: Release lock mesh
+  tr: Release lock mesh
+
+entry-52:
+  src: Locking
+  tr: Locking

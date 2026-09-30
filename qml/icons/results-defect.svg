@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-defect；内部绘制，保留原始几何与颜色。 -->
+  <path d="m13 3 9 5v10l-9 5-9-5V8z" fill="#dce9f7" stroke="#555"/>
+  <path d="m4 8 9 5 9-5M13 13v10" stroke="#555"/>
+  <circle cx="17" cy="13" r="4" fill="#f9e4df" stroke="#c8322b"/>
+  <path d="M17 10v4m0 1v1" stroke="#c8322b"/>
+</svg>

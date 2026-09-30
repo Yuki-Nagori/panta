@@ -1044,3 +1044,209 @@ entry-8:
 entry-9:
   src: Number of gates
   tr: 浇口数量
+
+[ResultsRibbon]
+
+entry-1:
+  src: New Plot
+  tr: 新建图
+
+entry-2:
+  src: Notes
+  tr: 备注
+
+entry-3:
+  src: Add XY Curve
+  tr: 添加 XY 曲线
+
+entry-4:
+  src: Plots
+  tr: 绘图
+
+entry-5:
+  src: "Plot\nProperties"
+  tr: "图形\n属性"
+
+entry-6:
+  src: "Save\nDefaults"
+  tr: "保存\n默认值"
+
+entry-7:
+  src: Properties
+  tr: 属性
+
+entry-8:
+  src: First frame
+  tr: 首帧
+
+entry-9:
+  src: Last frame
+  tr: 尾帧
+
+entry-10:
+  src: Play
+  tr: 播放
+
+entry-11:
+  src: Pause
+  tr: 暂停
+
+entry-12:
+  src: Stop
+  tr: 停止
+
+entry-13:
+  src: Loop
+  tr: 循环
+
+entry-14:
+  src: Ping-pong
+  tr: 往返播放
+
+entry-15:
+  src: Animation time
+  tr: 动画时间
+
+entry-16:
+  src: Animation
+  tr: 动画
+
+entry-17:
+  src: Examine
+  tr: 检查
+
+entry-18:
+  src: "Show\nMin/Max"
+  tr: "显示\n最小/最大值"
+
+entry-19:
+  src: Histogram
+  tr: 直方图
+
+entry-21:
+  src: Set Scale
+  tr: 设置比例
+
+entry-22:
+  src: Reset Scale
+  tr: 重置比例
+
+entry-23:
+  src: Scaling
+  tr: 缩放
+
+entry-24:
+  src: Visualize
+  tr: 可视化
+
+entry-25:
+  src: Restore
+  tr: 恢复
+
+entry-26:
+  src: Warpage
+  tr: 翘曲
+
+entry-27:
+  src: "Defect\nVisualization"
+  tr: "缺陷\n可视化"
+
+entry-28:
+  src: "Export\nResults"
+  tr: "导出\n结果"
+
+entry-29:
+  src: Mark
+  tr: 标记
+
+entry-30:
+  src: Unmark
+  tr: 取消标记
+
+entry-31:
+  src: XY Plot
+  tr: XY 图
+
+entry-32:
+  src: Export and Publish
+  tr: 导出与发布
+
+entry-33:
+  src: Edit
+  tr: 编辑
+
+entry-34:
+  src: Move
+  tr: 移动
+
+entry-35:
+  src: Cutting Plane
+  tr: 切面
+
+entry-36:
+  src: Tile horizontally
+  tr: 水平平铺
+
+entry-37:
+  src: Arrange windows
+  tr: 排列窗口
+
+entry-38:
+  src: Tile vertically
+  tr: 垂直平铺
+
+entry-39:
+  src: Split horizontally
+  tr: 水平分割
+
+entry-40:
+  src: Synchronize windows
+  tr: 同步窗口
+
+entry-41:
+  src: Split vertically
+  tr: 垂直分割
+
+entry-42:
+  src: Windows
+  tr: 窗口
+
+entry-43:
+  src: Lock window
+  tr: 锁定窗口
+
+entry-44:
+  src: Lock legend
+  tr: 锁定色标
+
+entry-45:
+  src: Lock mesh
+  tr: 锁定网格
+
+entry-46:
+  src: Synchronize lock window
+  tr: 同步锁定窗口
+
+entry-47:
+  src: Synchronize lock legend
+  tr: 同步锁定色标
+
+entry-48:
+  src: Synchronize lock mesh
+  tr: 同步锁定网格
+
+entry-49:
+  src: Release lock window
+  tr: 解除锁定窗口
+
+entry-50:
+  src: Release lock legend
+  tr: 解除锁定色标
+
+entry-51:
+  src: Release lock mesh
+  tr: 解除锁定网格
+
+entry-52:
+  src: Locking
+  tr: 锁定

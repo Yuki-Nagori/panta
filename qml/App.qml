@@ -25,8 +25,8 @@ ApplicationWindow {
     property string activeRibbonTab: "start-learn"
 
     function selectRibbonTab(tab) {
-        // 页面统一校验可达状态；未接入的菜单不能产生空白或无工程的 Home。
-        if (tab === "start-learn" || (tab === "home" && projectOpen))
+        // 工程工具仅在打开工程后可达，开始页始终可达。
+        if (tab === "start-learn" || ((tab === "home" || tab === "results") && projectOpen))
             activeRibbonTab = tab;
     }
 
@@ -140,6 +140,7 @@ ApplicationWindow {
             onOpenProjectRequested: openProjectFileDialog.open()
             onNewProjectRequested: newProjectDialog.open()
             onImportRequested: importDialog.open()
+            onResultsRequested: shellWindow.selectRibbonTab("results")
         }
 
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。

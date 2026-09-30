@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-min-max；内部绘制，保留原始几何与颜色。 -->
+  <rect x="3" y="5" width="8" height="7" fill="#e8f2ff" stroke="#555"/>
+  <rect x="15" y="14" width="8" height="7" fill="#e8f2ff" stroke="#555"/>
+  <path d="m15 7 3-4 3 4M5 19l3 4 3-4" stroke="#2e7ce0" stroke-width="1.5"/>
+</svg>

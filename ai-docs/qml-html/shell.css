@@ -40,6 +40,9 @@
   --ribbon-text-lines: 2;
   --ribbon-content-spacing: 3px;
   --ribbon-caret-height: 5px;
+  --results-control-width: 210px;
+  --results-time-width: 44px;
+  --results-scale-value-width: 28px;
   --toolbar-height: 32px;
   --tab-width: 96px;
   --tab-slide-duration: 120ms;
@@ -758,3 +761,33 @@ button.inspector-row:hover { background: linear-gradient(to right, transparent c
   .process-control-grid { grid-template-columns: minmax(0, 1fr) 126px; }
   .process-control-grid > label { grid-column: 1 / -1; }
 }
+
+/* Results 草稿使用现有 Ribbon 尺寸；紧凑区承载播放、缩放与窗口工具。 */
+.results-ribbon .ribbon-button:disabled, .results-ribbon .tool-button:disabled { opacity: .4; cursor: default; }
+.results-small-stack { display: flex; flex-direction: column; gap: 1px; }
+.results-small-stack .ribbon-button { display: flex; flex-direction: row; height: 21px; min-width: 0; justify-content: flex-start; gap: 5px; padding: 0 6px; }
+.results-small-stack .ribbon-button > .icon { width: 16px; height: 16px; }
+.results-small-stack .ribbon-button .label { text-align: left; }
+.results-small-stack .ribbon-button > .caret { width: 7px; height: 5px; }
+.results-animation { width: var(--results-control-width); padding: 0 6px; }
+.results-transport { display: flex; justify-content: center; gap: 1px; }
+.results-transport .tool-button { width: 24px; height: 22px; padding: 1px; }
+.results-transport .icon { width: 20px; height: 20px; }
+.results-slider-row { display: flex; align-items: center; gap: 6px; color: var(--color-muted); }
+.results-slider-row input { width: 100%; min-width: 0; accent-color: var(--color-focus); }
+.results-scaling { width: var(--results-control-width); padding: 0 6px; }
+.results-scale-actions { display: flex; gap: 6px; }
+.results-scale-actions > .results-small-stack { flex: 1; }
+.results-scale-actions .ribbon-button { width: 100%; justify-content: center; }
+.results-time-display { flex: 0 0 var(--results-time-width); }
+.results-scale-value { flex: 0 0 var(--results-scale-value-width); }
+.results-scale-range { flex: 1; min-width: 0; height: 22px; opacity: .4; }
+.results-window-grid, .results-lock-grid { display: grid; gap: 1px; }
+.results-window-grid { grid-template-columns: repeat(2, 24px); }
+.results-lock-grid { grid-template-columns: repeat(3, 24px); }
+.results-window-grid .tool-button, .results-lock-grid .tool-button {
+  width: 24px;
+  height: 22px;
+  padding: 1px;
+}
+.results-window-grid .icon, .results-lock-grid .icon { width: 20px; height: 20px; }

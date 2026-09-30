@@ -66,6 +66,45 @@ shellTemplate.innerHTML = `
     <symbol id="i-task-optimization" viewBox="0 0 16 16" fill="none"><path d="M3 13V3M3 13h10" stroke="#4a4a4a"/><path d="m5 10 2-2 2 1 3-4" stroke="#2e7ce0" stroke-width="1.3" stroke-linecap="round"/></symbol>
     <symbol id="i-task-analysis" viewBox="0 0 16 16" fill="none"><path d="M3 13V3M3 13h10" stroke="#5c8e66"/><path d="m5 10 2-3 2 2 3-5" stroke="#5c8e66" stroke-width="1.3" stroke-linecap="round"/></symbol>
     <symbol id="i-log" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/><path d="M10 1.5v3h3M5 8h6M5 10.5h5" stroke="#7b858a"/></symbol>
+    <symbol id="i-results-new-plot" viewBox="0 0 26 26" fill="none"><defs><linearGradient id="legend-0" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c8322b"/><stop offset=".45" stop-color="#f5c518"/><stop offset=".7" stop-color="#46a35e"/><stop offset="1" stop-color="#2e7ce0"/></linearGradient></defs><rect x="5" y="3" width="14" height="20" rx="1" fill="url(#legend-0)" stroke="#555"/><path d="M19 2v8M15 6h8" stroke="#2e7ce0" stroke-width="2"/></symbol>
+    <symbol id="i-results-notes" viewBox="0 0 26 26" fill="none"><path d="M5 3h12l4 4v16H5z" fill="#f2f2f2" stroke="#666"/><path d="M17 3v5h4M8 12h10M8 16h10M8 20h6" stroke="#2e7ce0" stroke-width="1.3"/></symbol>
+    <symbol id="i-results-xy-curve" viewBox="0 0 26 26" fill="none"><path d="M4 4v18h18" stroke="#555"/><path d="m6 18 4-7 4 4 6-10" stroke="#2e7ce0" stroke-width="1.7"/><circle cx="14" cy="15" r="2" fill="#c8322b"/></symbol>
+    <symbol id="i-results-plot-properties" viewBox="0 0 26 26" fill="none"><defs><linearGradient id="legend-3" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c8322b"/><stop offset=".45" stop-color="#f5c518"/><stop offset=".7" stop-color="#46a35e"/><stop offset="1" stop-color="#2e7ce0"/></linearGradient></defs><rect x="3" y="3" width="10" height="20" fill="url(#legend-3)" stroke="#555"/><path d="M15 7h8M15 13h8M15 19h8" stroke="#555"/><circle cx="18" cy="7" r="2" fill="#2e7ce0"/><circle cx="21" cy="13" r="2" fill="#46a35e"/><circle cx="17" cy="19" r="2" fill="#c8322b"/></symbol>
+    <symbol id="i-results-save-defaults" viewBox="0 0 26 26" fill="none"><path d="M4 3h16l3 3v17H4z" fill="#dce9f7" stroke="#555"/><path d="M8 3v7h10V3M8 16h11v7H8z" fill="#fff" stroke="#555"/><path d="m13 13 2 2 4-4" stroke="#46a35e" stroke-width="1.7"/></symbol>
+    <symbol id="i-results-examine" viewBox="0 0 26 26" fill="none"><defs><linearGradient id="legend-5" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c8322b"/><stop offset=".45" stop-color="#f5c518"/><stop offset=".7" stop-color="#46a35e"/><stop offset="1" stop-color="#2e7ce0"/></linearGradient></defs><rect x="3" y="3" width="11" height="19" fill="url(#legend-5)" stroke="#555"/><circle cx="17" cy="16" r="5" fill="#e8f2ff" stroke="#555"/><path d="m21 20 3 4" stroke="#2e7ce0" stroke-width="2"/></symbol>
+    <symbol id="i-results-min-max" viewBox="0 0 26 26" fill="none"><rect x="3" y="5" width="8" height="7" fill="#e8f2ff" stroke="#555"/><rect x="15" y="14" width="8" height="7" fill="#e8f2ff" stroke="#555"/><path d="m15 7 3-4 3 4M5 19l3 4 3-4" stroke="#2e7ce0" stroke-width="1.5"/></symbol>
+    <symbol id="i-results-histogram" viewBox="0 0 26 26" fill="none"><path d="M4 3v20h19" stroke="#555"/><path d="M5 6h14v3H5zM5 12h9v3H5zM5 18h17v3H5z" fill="#dce9f7" stroke="#2e7ce0"/></symbol>
+    <symbol id="i-results-scale" viewBox="0 0 26 26" fill="none"><path d="M3 17h20M5 17v6M9 17v4M13 17v6M17 17v4M21 17v6" stroke="#657480" stroke-width="1.2"/><path d="m5 10 5 4L21 3" stroke="#46a35e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-warpage" viewBox="0 0 26 26" fill="none"><path d="m4 9 15-4 4 11-15 5z" fill="#dce9f7" stroke="#555"/><path d="M5 10q8-7 16 4M7 15q8-6 15 2" stroke="#2e7ce0" stroke-width="1.4"/></symbol>
+    <symbol id="i-results-defect" viewBox="0 0 26 26" fill="none"><path d="m13 3 9 5v10l-9 5-9-5V8z" fill="#dce9f7" stroke="#555"/><path d="m4 8 9 5 9-5M13 13v10" stroke="#555"/><circle cx="17" cy="13" r="4" fill="#f9e4df" stroke="#c8322b"/><path d="M17 10v4m0 1v1" stroke="#c8322b"/></symbol>
+    <symbol id="i-results-export" viewBox="0 0 26 26" fill="none"><path d="M4 3h12l4 4v16H4z" fill="#f2f2f2" stroke="#555"/><path d="M9 14h14m-4-4 4 4-4 4" stroke="#2e7ce0" stroke-width="2"/></symbol>
+    <symbol id="i-results-mark" viewBox="0 0 26 26" fill="none"><rect x="4" y="4" width="17" height="18" fill="#dce9f7" stroke="#555"/><path d="m8 13 4 4 7-9" stroke="#46a35e" stroke-width="2"/></symbol>
+    <symbol id="i-results-unmark" viewBox="0 0 26 26" fill="none"><rect x="4" y="4" width="17" height="18" fill="#dce9f7" stroke="#555"/><path d="m9 9 8 8m0-8-8 8" stroke="#c8322b" stroke-width="1.7"/></symbol>
+    <symbol id="i-results-cutting-plane" viewBox="0 0 26 26" fill="none"><path d="m13 3 9 5v10l-9 5-9-5V8z" fill="#dce9f7" stroke="#555"/><path d="m2 16 15-8 7 3-15 8z" fill="#edf5fc" stroke="#2e7ce0"/></symbol>
+    <symbol id="i-results-first" viewBox="0 0 26 26" fill="none"><path d="M8 5v16M20 5 10 13l10 8z" fill="#dce9f7" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-last" viewBox="0 0 26 26" fill="none"><path d="M18 5v16M6 5 16 13 6 21z" fill="#dce9f7" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-play" viewBox="0 0 26 26" fill="none"><path d="M8 5 20 13 8 21z" fill="#dce9f7" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-pause" viewBox="0 0 26 26" fill="none"><path d="M7 5h4v16H7zM15 5h4v16h-4z" fill="#dce9f7" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-stop" viewBox="0 0 26 26" fill="none"><path d="M6 6h14v14H6z" fill="#dce9f7" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-loop" viewBox="0 0 26 26" fill="none"><path d="M21 12a8 8 0 1 0-2 7M21 4v8h-8" fill="none" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-ping-pong" viewBox="0 0 26 26" fill="none"><path d="M3 9h20l-4-4m4 4-4 4M23 18H3l4-4m-4 4 4 4" fill="none" stroke="#2e7ce0" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-tile-horizontal" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M6 6h14v5H6zM6 15h14v5H6z" stroke="#657480" stroke-width="1.5"/></symbol>
+    <symbol id="i-results-tile-vertical" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M6 6h5v14H6zM15 6h5v14h-5z" stroke="#657480" stroke-width="1.5"/></symbol>
+    <symbol id="i-results-window-grid" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M3 10h20M3 16h20M10 3v20M16 3v20" stroke="#657480" stroke-width="1.5" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-results-window-horizontal" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M3 13h20" stroke="#657480" stroke-width="1.5" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-results-window-vertical" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M13 3v20" stroke="#657480" stroke-width="1.5" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-results-window-sync" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M7 12a6 6 0 0 1 11-4M18 4v5h-5M19 14a6 6 0 0 1-11 4M8 22v-5h5" stroke="#657480" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-lock-window" viewBox="0 0 26 26" fill="none"><rect x="2" y="3" width="18" height="17" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M2 7h18" stroke="#657480" stroke-width="1.5"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-results-lock-legend" viewBox="0 0 26 26" fill="none"><rect x="3" y="3" width="12" height="18" fill="url(#legend-0)" stroke="#657480" stroke-width="1.3"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-results-lock-mesh" viewBox="0 0 26 26" fill="none"><path d="m3 13 10-10 10 10-10 10zM6 10l10 10M10 6l10 10M6 16 16 6M10 20 20 10" fill="#edf3f7" stroke="#657480" stroke-width="1.2"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-results-sync-lock-window" viewBox="0 0 26 26" fill="none"><path d="M1 1h17v15H1zM3 3h17v15H3z" fill="#fafafa" stroke="#657480"/><rect x="2" y="3" width="18" height="17" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M2 7h18" stroke="#657480" stroke-width="1.5"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-results-sync-lock-legend" viewBox="0 0 26 26" fill="none"><path d="M1 1h17v15H1zM3 3h17v15H3z" fill="#fafafa" stroke="#657480"/><rect x="3" y="3" width="12" height="18" fill="url(#legend-0)" stroke="#657480" stroke-width="1.3"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-results-sync-lock-mesh" viewBox="0 0 26 26" fill="none"><path d="M1 1h17v15H1zM3 3h17v15H3z" fill="#fafafa" stroke="#657480"/><path d="m3 13 10-10 10 10-10 10zM6 10l10 10M10 6l10 10M6 16 16 6M10 20 20 10" fill="#edf3f7" stroke="#657480" stroke-width="1.2"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-results-release-lock-window" viewBox="0 0 26 26" fill="none"><g opacity=".45"><rect x="2" y="3" width="18" height="17" fill="#fafafa" stroke="#657480" stroke-width="1.3"/><path d="M2 7h18" stroke="#657480" stroke-width="1.5"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></g></symbol>
+    <symbol id="i-results-release-lock-legend" viewBox="0 0 26 26" fill="none"><g opacity=".45"><rect x="3" y="3" width="12" height="18" fill="url(#legend-0)" stroke="#657480" stroke-width="1.3"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></g></symbol>
+    <symbol id="i-results-release-lock-mesh" viewBox="0 0 26 26" fill="none"><g opacity=".45"><path d="m3 13 10-10 10 10-10 10zM6 10l10 10M10 6l10 10M6 16 16 6M10 20 20 10" fill="#edf3f7" stroke="#657480" stroke-width="1.2"/><path d="M17 15v-2a3 3 0 0 1 6 0v2" stroke="#657480" stroke-width="1.4"/><rect x="15" y="15" width="10" height="9" rx="1.5" fill="#f5d97d" stroke="#657480"/><path d="M20 18v3" stroke="#526779" stroke-width="1.5" stroke-linecap="round"/></g></symbol>
+    <symbol id="i-results-reset-scale" viewBox="0 0 26 26" fill="none"><path d="M3 17h20M5 17v6M9 17v4M13 17v6M17 17v4M21 17v6" stroke="#657480" stroke-width="1.2"/><path d="M20 10a7 7 0 0 0-12-5M8 1v5h5" stroke="#657480" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-results-scale-range" viewBox="0 0 120 24" fill="none"><path d="m7 3-5 6 5 6zM113 3l5 6-5 6z" fill="#657480"/><path d="M14 15v7 M24 15v4 M34 15v7 M44 15v4 M54 15v7 M64 15v4 M74 15v7 M84 15v4 M94 15v7 M104 15v4" stroke="#657480" stroke-width="1.4"/></symbol>
   </defs>
 </svg>
 
@@ -211,6 +250,26 @@ shell.querySelectorAll("[data-slot]").forEach((slot) => {
   }
 });
 document.body.append(shell);
+
+// 页签只切换工具栏，两份 DOM 保持存活，工程与视口交互状态不随之重建。
+const resultsRibbonTemplate = document.getElementById("page-ribbon-results");
+if (resultsRibbonTemplate) {
+  const homeRibbon = document.querySelector(".ribbon");
+  homeRibbon.dataset.ribbonPage = "home";
+  homeRibbon.after(resultsRibbonTemplate.content.cloneNode(true));
+  document.addEventListener("click", event => {
+    const trigger = event.target.closest("[data-ribbon-tab]");
+    if (!trigger) return;
+    const tab = trigger.dataset.ribbonTab;
+    document.querySelectorAll(".ribbon[data-ribbon-page]").forEach(ribbon => {
+      ribbon.hidden = ribbon.dataset.ribbonPage !== tab;
+    });
+    document.querySelectorAll(".menubar [data-ribbon-tab]").forEach(button => {
+      if (button.dataset.ribbonTab === tab) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    });
+  });
+}
 
 const selectedPanelTab = document.body.dataset.panelTab || "tasks";
 const selectPanelTab = (tabName, showMeshTool = false) => {

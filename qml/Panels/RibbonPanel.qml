@@ -11,6 +11,7 @@ Rectangle {
     signal newProjectRequested
     signal openProjectRequested
     signal importRequested
+    signal resultsRequested
 
     implicitHeight: Theme.ribbonHeight
     gradient: Gradient {
@@ -37,7 +38,16 @@ Rectangle {
             height: ribbonStrip.height
             // 不约束宽度，由页签内容决定滚动范围；Loader 的 focus scope 放行工具键盘焦点。
             focus: true
-            sourceComponent: panel.activeRibbonTab === "home" ? homeComponent : startLearnComponent
+            sourceComponent: {
+                switch (panel.activeRibbonTab) {
+                case "home":
+                    return homeComponent;
+                case "results":
+                    return resultsComponent;
+                default:
+                    return startLearnComponent;
+                }
+            }
         }
     }
 
@@ -45,7 +55,13 @@ Rectangle {
         id: homeComponent
         HomeRibbon {
             onImportRequested: panel.importRequested()
+            onResultsRequested: panel.resultsRequested()
         }
+    }
+
+    Component {
+        id: resultsComponent
+        ResultsRibbon {}
     }
 
     Component {

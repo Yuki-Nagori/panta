@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="24" viewBox="0 0 120 24" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-scale-range；内部绘制，保留原始几何与颜色。 -->
+  <path d="m7 3-5 6 5 6zM113 3l5 6-5 6z" fill="#657480"/>
+  <path d="M14 15v7 M24 15v4 M34 15v7 M44 15v4 M54 15v7 M64 15v4 M74 15v7 M84 15v4 M94 15v7 M104 15v4" stroke="#657480" stroke-width="1.4"/>
+</svg>

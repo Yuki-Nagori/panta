@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-window-horizontal；内部绘制，保留原始几何与颜色。 -->
+  <rect x="3" y="3" width="20" height="20" rx="1" fill="#fafafa" stroke="#657480" stroke-width="1.3"/>
+  <path d="M3 13h20" stroke="#657480" stroke-width="1.5" stroke-dasharray="2 2"/>
+</svg>

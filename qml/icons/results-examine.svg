@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-examine；内部绘制，保留原始几何与颜色。 -->
+  <defs>
+  <linearGradient id="legend-5" x1="0" y1="0" x2="0" y2="1">
+  <stop stop-color="#c8322b"/>
+  <stop offset=".45" stop-color="#f5c518"/>
+  <stop offset=".7" stop-color="#46a35e"/>
+  <stop offset="1" stop-color="#2e7ce0"/>
+  </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="11" height="19" fill="url(#legend-5)" stroke="#555"/>
+  <circle cx="17" cy="16" r="5" fill="#e8f2ff" stroke="#555"/>
+  <path d="m21 20 3 4" stroke="#2e7ce0" stroke-width="2"/>
+</svg>

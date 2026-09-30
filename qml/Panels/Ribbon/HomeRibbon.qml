@@ -5,6 +5,7 @@ RibbonContent {
     id: homeRibbon
 
     signal importRequested
+    signal resultsRequested
 
     groups: [
         {
@@ -140,5 +141,7 @@ RibbonContent {
     onActionRequested: key => {
         if (key === "import")
             homeRibbon.importRequested();
+        else if (key === "results")
+            homeRibbon.resultsRequested();
     }
 }

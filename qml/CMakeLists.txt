@@ -29,6 +29,7 @@ set(PANTA_SHELL_QML_FILES
     Panels/TopChromePanel.qml
     Panels/RibbonPanel.qml
     Panels/Ribbon/HomeRibbon.qml
+    Panels/Ribbon/ResultsRibbon.qml
     Panels/Ribbon/StartLearnRibbon.qml
     Panels/TasksPanel.qml
     Panels/MeshToolPanel.qml

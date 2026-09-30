@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-reset-scale；内部绘制，保留原始几何与颜色。 -->
+  <path d="M3 17h20M5 17v6M9 17v4M13 17v6M17 17v4M21 17v6" stroke="#657480" stroke-width="1.2"/>
+  <path d="M20 10a7 7 0 0 0-12-5M8 1v5h5" stroke="#657480" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

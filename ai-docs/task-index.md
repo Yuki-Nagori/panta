@@ -117,6 +117,7 @@ ai-docs/
 | 093 | [材料选择弹窗与默认材料](task/093-material-selection-dialog.md) | 应用平台扩展 | 068, 081, 092 | in-progress |
 | 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | in-progress |
 | 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | in-progress |
+| 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | in-progress |
 
 ## 验证与质量扩展队列
 

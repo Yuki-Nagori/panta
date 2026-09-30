@@ -10,14 +10,14 @@
 </head>
 <body class="project-workspace imported-project-workspace">
 <template id="page-menu">
-  <button type="button" aria-current="page">Home</button>
+  <button type="button" data-ribbon-tab="home" aria-current="page">Home</button>
   <button type="button">Tools</button>
   <button type="button">View</button>
   <button type="button">Geometry</button>
   <button type="button">Mesh</button>
   <button type="button">Boundary Conditions</button>
   <button type="button">Optimization</button>
-  <button type="button">Results</button>
+  <button type="button" data-ribbon-tab="results">Results</button>
   <button type="button">Reports</button>
   <button type="button">Start &amp; Learn</button>
   <button type="button">Community</button>
@@ -62,7 +62,7 @@
     </div>
     <div class="ribbon-group">
       <div class="ribbon-tools">
-        <button type="button" class="ribbon-button" aria-label="Results"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-results"/></svg><span class="label">Results</span></button>
+        <button type="button" class="ribbon-button" aria-label="Results" data-ribbon-tab="results"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-results"/></svg><span class="label">Results</span></button>
         <button type="button" class="ribbon-button" aria-label="Reports"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-reports"/></svg><span class="label">Reports</span></button>
       </div>
       <span class="ribbon-label">Reporting</span>
@@ -72,6 +72,55 @@
         <button type="button" class="ribbon-button" aria-label="Shared Views"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-shared-views"/></svg><span class="label">Shared<br>Views</span></button>
       </div>
       <span class="ribbon-label">Share</span>
+    </div>
+  </section>
+</template>
+
+<template id="page-ribbon-results">
+  <section class="ribbon results-ribbon" data-ribbon-page="results" aria-label="Result tools" hidden>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><button type="button" class="ribbon-button" aria-label="New Plot" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-new-plot"/></svg><span class="label">New Plot</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button><div class="results-small-stack"><button type="button" class="ribbon-button" aria-label="Notes" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-notes"/></svg><span class="label">Notes</span></button><button type="button" class="ribbon-button" aria-label="Add XY Curve" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-xy-curve"/></svg><span class="label">Add XY Curve</span></button></div></div>
+      <span class="ribbon-label">Plots</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><button type="button" class="ribbon-button" aria-label="Plot / Properties" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-plot-properties"/></svg><span class="label">Plot<br>Properties</span></button><button type="button" class="ribbon-button" aria-label="Save / Defaults" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-save-defaults"/></svg><span class="label">Save<br>Defaults</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button></div>
+      <span class="ribbon-label">Properties</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><div class="results-animation"><div class="results-transport"><button type="button" class="tool-button" aria-label="First frame" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-first"/></svg></button><button type="button" class="tool-button" aria-label="Last frame" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-last"/></svg></button><button type="button" class="tool-button" aria-label="Play" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-play"/></svg></button><button type="button" class="tool-button" aria-label="Pause" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-pause"/></svg></button><button type="button" class="tool-button" aria-label="Stop" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-stop"/></svg></button><button type="button" class="tool-button" aria-label="Loop" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-loop"/></svg></button><button type="button" class="tool-button" aria-label="Ping-pong" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-ping-pong"/></svg></button></div><div class="results-slider-row"><input type="range" aria-label="Animation time" disabled><span class="results-time-display"></span></div></div></div>
+      <span class="ribbon-label">Animation</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><button type="button" class="ribbon-button" aria-label="Examine" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-examine"/></svg><span class="label">Examine</span></button><button type="button" class="ribbon-button" aria-label="Show / Min/Max" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-min-max"/></svg><span class="label">Show<br>Min/Max</span></button></div>
+      <span class="ribbon-label">Examine</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><button type="button" class="ribbon-button" aria-label="Histogram" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-histogram"/></svg><span class="label">Histogram</span></button></div>
+      <span class="ribbon-label">Histogram</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><div class="results-scaling"><div class="results-slider-row"><span class="results-scale-value"></span><svg class="results-scale-range" viewBox="0 0 120 24" aria-hidden="true" focusable="false"><use href="#i-results-scale-range"/></svg><span class="results-scale-value"></span></div><div class="results-scale-actions"><div class="results-small-stack"><button type="button" class="ribbon-button" aria-label="Set Scale" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-scale"/></svg><span class="label">Set Scale</span></button></div><div class="results-small-stack"><button type="button" class="ribbon-button" aria-label="Reset Scale" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-reset-scale"/></svg><span class="label">Reset Scale</span></button></div></div></div></div>
+      <span class="ribbon-label">Scaling</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><div class="results-small-stack"><button type="button" class="ribbon-button" aria-label="Visualize" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-warpage"/></svg><span class="label">Visualize</span></button><button type="button" class="ribbon-button" aria-label="Restore" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-warpage"/></svg><span class="label">Restore</span></button></div></div>
+      <span class="ribbon-label">Warpage</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><button type="button" class="ribbon-button" aria-label="Defect / Visualization" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-defect"/></svg><span class="label">Defect<br>Visualization</span></button><button type="button" class="ribbon-button" aria-label="Export / Results" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-export"/></svg><span class="label">Export<br>Results</span></button><div class="results-small-stack"><button type="button" class="ribbon-button" aria-label="Mark" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-mark"/></svg><span class="label">Mark</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button><button type="button" class="ribbon-button" aria-label="Unmark" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-unmark"/></svg><span class="label">Unmark</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button><button type="button" class="ribbon-button" aria-label="XY Plot" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-xy-curve"/></svg><span class="label">XY Plot</span></button></div></div>
+      <span class="ribbon-label">Export and Publish</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><div class="results-small-stack"><button type="button" class="ribbon-button" aria-label="Edit" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-cutting-plane"/></svg><span class="label">Edit</span></button><button type="button" class="ribbon-button" aria-label="Move" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-cutting-plane"/></svg><span class="label">Move</span></button></div></div>
+      <span class="ribbon-label">Cutting Plane</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><div class="results-window-grid"><button type="button" class="tool-button" aria-label="Tile horizontally" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-tile-horizontal"/></svg></button><button type="button" class="tool-button" aria-label="Arrange windows" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-window-grid"/></svg></button><button type="button" class="tool-button" aria-label="Tile vertically" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-tile-vertical"/></svg></button><button type="button" class="tool-button" aria-label="Split horizontally" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-window-horizontal"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize windows" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-window-sync"/></svg></button><button type="button" class="tool-button" aria-label="Split vertically" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-window-vertical"/></svg></button></div></div>
+      <span class="ribbon-label">Windows</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools"><div class="results-lock-grid"><button type="button" class="tool-button" aria-label="Lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-mesh"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-mesh"/></svg></button><button type="button" class="tool-button" aria-label="Release lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Release lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Release lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-mesh"/></svg></button></div></div>
+      <span class="ribbon-label">Locking</span>
     </div>
   </section>
 </template>

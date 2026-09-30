@@ -78,6 +78,12 @@ QtObject {
     readonly property int ribbonTextLines: 2
     readonly property int ribbonCaretHeight: 5
     readonly property int ribbonTrailingWidth: 64
+    readonly property int ribbonCompactHeight: 22
+    readonly property int ribbonCompactWidth: 24
+    readonly property int ribbonCompactIconSize: 20
+    readonly property int ribbonResultsControlWidth: 210
+    readonly property int ribbonTimeDisplayWidth: 44
+    readonly property int ribbonScaleValueWidth: 28
     readonly property int statusbarHeight: 26
     readonly property int controlHeight: 24
     readonly property int searchHeight: 22

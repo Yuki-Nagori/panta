@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-histogram；内部绘制，保留原始几何与颜色。 -->
+  <path d="M4 3v20h19" stroke="#555"/>
+  <path d="M5 6h14v3H5zM5 12h9v3H5zM5 18h17v3H5z" fill="#dce9f7" stroke="#2e7ce0"/>
+</svg>
