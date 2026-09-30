@@ -242,7 +242,7 @@ class QmlPerformanceBenchmark final : public QObject {
             QStringLiteral("project-file"),
             QStringLiteral("project-folder"),
             QStringLiteral("stl-file"),
-            QStringLiteral("study"),
+            QStringLiteral("plan-tasks"),
             QStringLiteral("status-ok"),
             QStringLiteral("task-analysis"),
             QStringLiteral("task-fill"),

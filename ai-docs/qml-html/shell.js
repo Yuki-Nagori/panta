@@ -55,7 +55,7 @@ shellTemplate.innerHTML = `
     <symbol id="i-ribbon-shared-views" viewBox="0 0 26 26" fill="none"><path d="m13 3 8 4.5v9L13 21l-8-4.5v-9z" fill="#dce9f7" stroke="#3e6996" stroke-width="1.2"/><path d="m5 7.5 8 4.5 8-4.5M13 12v9" stroke="#3e6996" stroke-width="1.1"/></symbol>
     <symbol id="i-project-file" viewBox="0 0 16 16" fill="none"><path d="M4 1h7l3 3v11H4z" fill="#fff" stroke="#7b858a"/><path d="M11 1v3h3M6 6h6M9 8h3M9 10h3" stroke="#a9b5bc"/><path d="M1 6h4l3 3v4H4l-3-3z" fill="#b9d89b" stroke="#65854c"/><path d="M1 6l3 3h4M4 9v4" stroke="#7d9c61"/></symbol>
     <symbol id="i-project-folder" viewBox="0 0 16 16" fill="none"><path d="M1.5 4h5l1.5 1.7h6.5v8.8h-13z" fill="#e2c47b" stroke="#8a6d2f"/><path d="M1.5 5.7h13" stroke="#8a6d2f"/></symbol>
-    <symbol id="i-study" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/><path d="M10 1.5v3h3M5 7h6M5 9.5h6M5 12h4" stroke="#6d8ba8"/></symbol>
+    <symbol id="i-plan-tasks" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/><path d="M10 1.5v3h3M5 7h6M5 9.5h6M5 12h4" stroke="#6d8ba8"/></symbol>
     <symbol id="i-stl-file" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#e8f0f7" stroke="#4a6f9f"/><path d="M10 1.5v3h3M5 11l2-3 2 2 1.5-2 1.5 3z" stroke="#2e7ce0" stroke-width="1.1" stroke-linejoin="round"/></symbol>
     <symbol id="i-status-ok" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" fill="#fff" stroke="#5d9b54"/><path d="m4.8 8 2 2 4.4-4.5" stroke="#5d9b54" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-task-mesh" viewBox="0 0 16 16" fill="none"><path d="m8 1.5 5 3v7l-5 3-5-3v-7z" stroke="#5c8e66"/><path d="m3 4.5 5 3 5-3M8 7.5v7" stroke="#5c8e66"/></symbol>
@@ -269,7 +269,7 @@ const inspectorList = document.querySelector("[data-inspector-list]");
 const updateInspector = (part) => {
   if (!part) return;
   partNodes.forEach((item) => item.setAttribute("aria-selected", String(item === part)));
-  if (inspectorHeading) inspectorHeading.textContent = `Study Tasks: ${part.dataset.studyName || part.dataset.sourceName || "STL"}`;
+  if (inspectorHeading) inspectorHeading.textContent = `Plan tasks: ${part.dataset.studyName || part.dataset.sourceName || "STL"}`;
   const partLabel = document.querySelector(".inspector-part-name");
   if (partLabel && part) partLabel.textContent = `Part (${part.dataset.sourceName || "STL"})`;
   if (inspectorList) inspectorList.hidden = false;

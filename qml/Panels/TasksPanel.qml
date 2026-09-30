@@ -18,39 +18,61 @@ PanelSurface {
     property string activeDocumentTitle: ""
     property bool importedPartAvailable: importedPartNames.length > 0
     property string importedPartName: ""
-    readonly property var importedTaskItems: [
+    readonly property var planTaskItems: [
         {
+            id: "imported-part",
+            text: qsTranslate("ImportTask", "Part (%1)").arg(panel.activePartTitle),
+            icon: "stl-file",
+            completed: true
+        },
+        {
+            id: "create-mesh",
             text: qsTranslate("ImportTask", "Create Mesh..."),
-            icon: "task-mesh"
+            icon: "task-mesh",
+            completed: false
         },
         {
+            id: "fill",
             text: qsTranslate("ImportTask", "Fill"),
-            icon: "task-fill"
+            icon: "task-fill",
+            completed: false
         },
         {
+            id: "material-data",
             text: qsTranslate("ImportTask", "Material Data"),
-            icon: "task-material"
+            icon: "task-material",
+            completed: false
         },
         {
+            id: "injection-locations",
             text: qsTranslate("ImportTask", "Set Injection Locations..."),
-            icon: "task-injection"
+            icon: "task-injection",
+            completed: false
         },
         {
+            id: "process-settings",
             text: qsTranslate("ProcessTask", "Process Settings (Default)"),
-            icon: "task-settings"
+            icon: "task-settings",
+            completed: false
         },
         {
+            id: "optimization",
             text: qsTranslate("ImportTask", "Optimization (None)"),
-            icon: "task-optimization"
+            icon: "task-optimization",
+            completed: false
         },
         {
+            id: "analyze",
             text: qsTranslate("UiCommonAnalysis", "Analyze"),
             icon: "task-analysis",
+            completed: false,
             enabled: false
         },
         {
+            id: "logs",
             text: qsTranslate("ImportTask", "Logs*"),
-            icon: "log"
+            icon: "log",
+            completed: false
         }
     ]
 
@@ -73,219 +95,259 @@ PanelSurface {
         spacing: 0
 
         PanelTabBar {
+            id: panelTabs
             Layout.fillWidth: true
             rightPadding: Theme.paneCloseSize + 2 * Theme.spacingXSmall
             tabs: [qsTranslate("TaskPanelTitle", "Tasks"), qsTranslate("UiCommonNavigation", "Tools"), qsTranslate("UiCommonNavigation", "Shared Views")]
         }
 
-        ColumnLayout {
+        StackLayout {
             id: dockContent
+            objectName: "tasksPanelPages"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 0
+            currentIndex: panelTabs.currentIndex
 
-            ListView {
-                id: projectTree
-                objectName: "projectTreeSection"
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.max(0, dockContent.height - (panel.projectOpen ? Theme.borderWidth : 0)) * 0.36
-                clip: true
-                model: panel.importedPartNames
-                reuseItems: true
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
+            ColumnLayout {
+                spacing: 0
 
-                header: ColumnLayout {
-                    width: projectTree.width
-                    spacing: 0
+                ListView {
+                    id: projectTree
+                    objectName: "projectTreeSection"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.max(0, dockContent.height - (panel.projectOpen ? Theme.borderWidth : 0)) * 0.36
+                    clip: true
+                    model: panel.importedPartNames
+                    reuseItems: true
+                    ScrollBar.vertical: ScrollBar {
+                        policy: ScrollBar.AsNeeded
+                    }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
+                    header: ColumnLayout {
+                        width: projectTree.width
                         spacing: 0
-                        visible: !panel.projectOpen
 
-                        ThemedToolButton {
+                        // Tasks 的空工程入口；工程打开后由工程树和 Plan tasks 接替。
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: qsTranslate("IconActionOpenProject", "Open Project")
-                            dimText: "…"
-                            iconName: "open"
-                            preserveIconColors: true
-                            iconSize: Theme.iconSizeSmall
-                            contentAlignLeft: true
-                            contentColor: Theme.colorText
-                            contentPadding: Theme.spacingLarge
-                            hoverColor: Theme.colorHover
-                            onClicked: panel.openProjectRequested()
-                        }
-                        ThemedToolButton {
-                            Layout.fillWidth: true
-                            text: qsTranslate("UiCommonNavigation", "New Project")
-                            dimText: "…"
-                            iconName: "new"
-                            preserveIconColors: true
-                            iconSize: Theme.iconSizeSmall
-                            contentAlignLeft: true
-                            contentColor: Theme.colorText
-                            contentPadding: Theme.spacingLarge
-                            hoverColor: Theme.colorHover
-                            onClicked: panel.newProjectRequested()
-                        }
-                    }
+                            spacing: 0
+                            visible: !panel.projectOpen
 
-                    ThemedToolButton {
-                        id: projectEntry
-                        objectName: "projectTaskItem"
-                        Layout.fillWidth: true
-                        visible: panel.projectOpen
-                        text: qsTranslate("ProjectTaskItem", "Project '%1'").arg(panel.projectName)
-                        iconName: "project-file"
-                        preserveIconColors: true
-                        iconSize: Theme.iconSizeSmall
-                        contentAlignLeft: true
-                        contentColor: Theme.colorText
-                        contentPadding: Theme.spacingLarge
-                        hoverColor: Theme.colorHover
-                        contentItem: RowLayout {
-                            spacing: Theme.spacingMedium
-                            ThemedIcon {
-                                name: projectEntry.iconName
-                                iconSize: projectEntry.iconSize
-                                preserveSourceColors: true
-                                color: projectEntry.contentColor
-                            }
-                            ThemedLabel {
+                            ThemedToolButton {
+                                objectName: "openProjectTaskAction"
                                 Layout.fillWidth: true
-                                text: projectEntry.text
-                                textSize: projectEntry.font.pixelSize
-                                elide: Text.ElideRight
+                                text: qsTranslate("IconActionOpenProject", "Open Project")
+                                dimText: "…"
+                                iconName: "open"
+                                preserveIconColors: true
+                                iconSize: Theme.iconSizeSmall
+                                contentAlignLeft: true
+                                contentColor: Theme.colorText
+                                contentPadding: Theme.spacingLarge
+                                hoverColor: Theme.colorHover
+                                onClicked: panel.openProjectRequested()
+                            }
+                            ThemedToolButton {
+                                objectName: "newProjectTaskAction"
+                                Layout.fillWidth: true
+                                text: qsTranslate("UiCommonNavigation", "New Project")
+                                dimText: "…"
+                                iconName: "new"
+                                preserveIconColors: true
+                                iconSize: Theme.iconSizeSmall
+                                contentAlignLeft: true
+                                contentColor: Theme.colorText
+                                contentPadding: Theme.spacingLarge
+                                hoverColor: Theme.colorHover
+                                onClicked: panel.newProjectRequested()
+                            }
+                        }
+
+                        ThemedToolButton {
+                            id: projectEntry
+                            objectName: "projectTaskItem"
+                            Layout.fillWidth: true
+                            visible: panel.projectOpen
+                            text: qsTranslate("ProjectTaskItem", "Project '%1'").arg(panel.projectName)
+                            iconName: "project-file"
+                            preserveIconColors: true
+                            iconSize: Theme.iconSizeSmall
+                            contentAlignLeft: true
+                            contentColor: Theme.colorText
+                            contentPadding: Theme.spacingLarge
+                            hoverColor: Theme.colorHover
+                            contentItem: RowLayout {
+                                spacing: Theme.spacingMedium
+                                ThemedIcon {
+                                    name: projectEntry.iconName
+                                    iconSize: projectEntry.iconSize
+                                    preserveSourceColors: true
+                                    color: projectEntry.contentColor
+                                }
+                                ThemedLabel {
+                                    Layout.fillWidth: true
+                                    text: projectEntry.text
+                                    textSize: projectEntry.font.pixelSize
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
                     }
-                }
 
-                delegate: Rectangle {
-                    id: importedPartEntry
-                    objectName: "importedPartEntry"
-                    required property var modelData
-                    required property int index
+                    delegate: Rectangle {
+                        id: importedPartEntry
+                        objectName: "importedPartEntry"
+                        required property var modelData
+                        required property int index
 
-                    readonly property string recordId: panel.importedPartIds[index] ?? ""
-                    readonly property bool isActiveDocument: recordId !== "" && recordId === panel.activeDocumentId
+                        readonly property string recordId: panel.importedPartIds[index] ?? ""
+                        readonly property bool isActiveDocument: recordId !== "" && recordId === panel.activeDocumentId
 
-                    width: projectTree.width
-                    height: Theme.controlHeight
-                    color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : Theme.colorTransparent
+                        width: projectTree.width
+                        height: Theme.controlHeight
+                        color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : Theme.colorTransparent
 
-                    HoverHandler {
-                        id: partHover
-                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                    }
-                    TapHandler {
-                        id: partTap
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: panel.openImportRequested(importedPartEntry.recordId)
-                    }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: Theme.spacingLarge * 2
-                        anchors.rightMargin: Theme.spacingSmall
-                        spacing: Theme.spacingSmall
-
-                        ThemedIcon {
-                            name: "stl-file"
-                            iconSize: Theme.iconSizeSmall
-                            preserveSourceColors: true
+                        HoverHandler {
+                            id: partHover
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                         }
-                        ThemedLabel {
-                            Layout.fillWidth: true
-                            text: importedPartEntry.modelData
-                            textSize: Theme.fontBody
-                            elide: Text.ElideRight
+                        TapHandler {
+                            id: partTap
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: panel.openImportRequested(importedPartEntry.recordId)
                         }
-                    }
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.borderWidth
-                visible: panel.projectOpen
-                color: Theme.colorPanelLine
-            }
-
-            ScrollView {
-                id: studyTaskSection
-                objectName: "studyTasksSection"
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredHeight: Math.max(0, dockContent.height - (panel.projectOpen ? Theme.borderWidth : 0)) * 0.64
-                clip: true
-                contentWidth: availableWidth
-                ScrollBar.vertical.policy: ScrollBar.AsNeeded
-
-                ColumnLayout {
-                    width: studyTaskSection.availableWidth
-                    spacing: 0
-                    visible: panel.projectOpen && panel.importedPartAvailable
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Theme.panelToolbarHeight
-                        color: Theme.colorChrome
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: Theme.spacingMedium
-                            anchors.rightMargin: Theme.paneCloseSize + Theme.spacingMedium
+                            anchors.leftMargin: Theme.spacingLarge * 2
+                            anchors.rightMargin: Theme.spacingSmall
                             spacing: Theme.spacingSmall
 
                             ThemedIcon {
-                                name: "study"
+                                name: "stl-file"
                                 iconSize: Theme.iconSizeSmall
                                 preserveSourceColors: true
                             }
                             ThemedLabel {
                                 Layout.fillWidth: true
-                                text: qsTranslate("ProjectTaskItem", "Study Tasks: %1").arg(panel.activePartTitle)
+                                text: importedPartEntry.modelData
                                 textSize: Theme.fontBody
                                 elide: Text.ElideRight
                             }
                         }
                     }
+                }
 
-                    ThemedToolButton {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Theme.spacingMedium
-                        text: qsTranslate("ImportTask", "Part (%1)").arg(panel.activePartTitle)
-                        iconName: "stl-file"
-                        preserveIconColors: true
-                        iconSize: Theme.iconSizeSmall
-                        contentAlignLeft: true
-                        contentColor: Theme.colorText
-                        contentPadding: Theme.spacingSmall
-                        hoverColor: Theme.colorHover
-                    }
-                    Repeater {
-                        model: panel.importedTaskItems
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.borderWidth
+                    visible: panel.projectOpen
+                    color: Theme.colorPanelLine
+                }
 
-                        delegate: ThemedToolButton {
-                            required property var modelData
+                ScrollView {
+                    id: planTaskSection
+                    objectName: "planTasksSection"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredHeight: Math.max(0, dockContent.height - (panel.projectOpen ? Theme.borderWidth : 0)) * 0.64
+                    clip: true
+                    contentWidth: availableWidth
+                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
+                    ColumnLayout {
+                        width: planTaskSection.availableWidth
+                        spacing: 0
+                        visible: panel.projectOpen && panel.importedPartAvailable
+
+                        Rectangle {
                             Layout.fillWidth: true
-                            Layout.leftMargin: Theme.spacingLarge
-                            text: modelData.text
-                            iconName: modelData.icon
-                            preserveIconColors: true
-                            iconSize: Theme.iconSizeSmall
-                            enabled: modelData.enabled !== false
-                            contentAlignLeft: true
-                            contentColor: Theme.colorText
-                            contentPadding: Theme.spacingSmall
-                            hoverColor: Theme.colorHover
+                            Layout.preferredHeight: Theme.panelToolbarHeight
+                            color: Theme.colorChrome
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.spacingMedium
+                                anchors.rightMargin: Theme.paneCloseSize + Theme.spacingMedium
+                                spacing: Theme.spacingSmall
+
+                                ThemedIcon {
+                                    name: "plan-tasks"
+                                    iconSize: Theme.iconSizeSmall
+                                    preserveSourceColors: true
+                                }
+                                ThemedLabel {
+                                    Layout.fillWidth: true
+                                    text: qsTranslate("ProjectTaskItem", "Plan tasks: %1").arg(panel.activePartTitle)
+                                    textSize: Theme.fontBody
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Repeater {
+                            model: panel.planTaskItems
+
+                            delegate: RowLayout {
+                                id: taskRow
+                                required property var modelData
+                                objectName: "planTaskItem_" + taskRow.modelData.id
+
+                                Layout.fillWidth: true
+                                Layout.leftMargin: Theme.spacingMedium
+                                Layout.rightMargin: Theme.spacingSmall
+                                spacing: Theme.spacingSmall
+
+                                Item {
+                                    Layout.preferredWidth: Theme.iconSizeSmall
+                                    Layout.preferredHeight: Theme.iconSizeSmall
+
+                                    ThemedIcon {
+                                        anchors.centerIn: parent
+                                        visible: taskRow.modelData.completed === true
+                                        name: "status-ok"
+                                        iconSize: Theme.iconSizeSmall
+                                        preserveSourceColors: true
+                                    }
+                                }
+
+                                ThemedToolButton {
+                                    Layout.fillWidth: true
+                                    text: taskRow.modelData.text
+                                    iconName: taskRow.modelData.icon
+                                    preserveIconColors: true
+                                    iconSize: Theme.iconSizeSmall
+                                    enabled: taskRow.modelData.enabled !== false
+                                    contentAlignLeft: true
+                                    contentColor: Theme.colorText
+                                    contentPadding: Theme.spacingSmall
+                                    hoverColor: Theme.colorHover
+                                }
+                            }
                         }
                     }
+                }
+            }
+
+            Item {
+                objectName: "tasksToolsPage"
+
+                InformationPanel {
+                    objectName: "tasksToolsInformation"
+                    anchors.fill: parent
+                    titleText: qsTranslate("TaskPanelInformation", "Information")
+                    messages: [qsTranslate("TaskPanelToolsHelp", "Use the tools above to access each tool."), qsTranslate("TaskPanelToolsHelp", "Open a tool's help to learn how to use it."), qsTranslate("TaskPanelToolsHelp", "Hold Ctrl while clicking to select multiple entities.")]
+                }
+            }
+
+            Item {
+                objectName: "sharedViewsPage"
+
+                InformationPanel {
+                    objectName: "sharedViewsInformation"
+                    anchors.fill: parent
+                    titleText: qsTranslate("TaskPanelInformation", "Information")
+                    messages: [qsTranslate("TaskPanelInformation", "Access Shared Views from the Shared panel on the Home tab.")]
                 }
             }
         }

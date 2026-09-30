@@ -7,7 +7,7 @@
 采用紧凑、几何化、轻量多色的线性图标：主要轮廓清楚，使用少量蓝、红、黄、绿等语义点缀与浅色填充；色块帮助识别，不依靠色相单独传达操作状态。保留`shell.js` symbol 中的自然构图、比例、描边与配色，不为匹配旧的 24 网格把原始图形强行拉伸或再次单色化。不同功能可以有小图标、Ribbon 图标与 Start & Learn 入口图标三档画布，最终显示尺寸由 Theme 和宿主上下文控制。
 
 - 操作图标使用明确的主体轮廓与少量语义色；同一动作在菜单、工具栏和 Ribbon 中复用同一概念资源。
-- 工程树、STL、study 与任务图标允许按本身语义保留不同形状和颜色；任务状态仍须有形状/符号提示，不能只靠绿/灰等颜色。
+- 工程树、STL、Plan tasks 与任务图标允许按本身语义保留不同形状和颜色；任务状态仍须有形状/符号提示，不能只靠绿/灰等颜色。
 - caret、关闭、翻页等辅助符号可保持单色；它们也使用 shell.js 对应 glyph 和统一的宿主交互色。
 - Welcome `panta` 3D 标志不是操作图标；它的真实几何由任务 053 实现，颜色与表面方向遵循任务 081 的视觉规范。
 - 不引用、描摹或嵌入第三方应用品牌、专有字形、图标字体或无明确来源的图标包。截图只作为布局与风格方向。
@@ -19,10 +19,10 @@
 | 组 | symbol ID |
 |---|---|
 | 通用与窗口操作 | `account`、`cart`、`globe`、`help`、`search`、`right`、`caret`、`close`、`minimize`、`maximize`、`undo`、`redo`、`new`、`open`、`save`、`print`、`preview`、`split` |
-| 工程树与状态 | `project-folder`、`project-file`、`stl-file`、`study`、`status-ok`、`layers` |
+| 工程树与状态 | `project-folder`、`project-file`、`stl-file`、`plan-tasks`、`status-ok`、`layers` |
 | Ribbon：工程与开始 | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help` |
 | Ribbon：CAE 工具 | `ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` |
-| Study Tasks | `task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings` |
+| Plan tasks | `task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings` |
 | 输出操作 | `check`、`copy`、`delete`、`export`、`image`、`log`、`wizard` |
 
 新增图标先确认清单中没有相同概念；若需增加，先在 `shell.js` 加入原型 glyph、登记此规范中的 ID 和含义，再将同一几何迁入独立 QML SVG。HTML sprite 与 QML 资源不可长期各自演变成不同图样。
@@ -36,7 +36,7 @@
 | 壳层与操作 | `account`、`cart`、`globe`、`help`、`search`、`right`、`caret`、`close`、`minimize`、`maximize`、`undo`、`redo`、`new`、`open`、`save`、`print`、`preview`、`split` | 顶部工具区、对话框、面板关闭、页签与下拉指示 |
 | 页签与工具状态 | `layers` | Layers 工具条与页签 |
 | Ribbon | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help`、`ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` | Start & Learn 与 Home Ribbon |
-| 工程与任务 | `project-file`、`project-folder`、`stl-file`、`study`、`status-ok`、`task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
+| 工程与任务 | `project-file`、`project-folder`、`stl-file`、`plan-tasks`、`status-ok`、`task-analysis`、`task-fill`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
 | Layers 操作 | `check`、`copy`、`delete`、`export`、`image`、`wizard` | Layers 输出操作按钮 |
 
 `ThemedIcon.preserveSourceColors` 是颜色加载模式的唯一开关，不另设彩色图标组件。默认模式将允许的单色 utility glyph 交给 `image://panta-icons/<name>/<argb>`；provider 内的白名单与颜色图标清单保持一致，未知和多色 ID 均拒绝着色。设置为 `true` 时直接从 `qrc:/qt/qml/Panta/Shell/icons/<name>.svg` 加载并保留 SVG 源色。QtTest 校验 SVG 文件名与 `shell.js` symbol 集合一一对应，QML 字面图标引用均有资源，静态加载模式与 provider 白名单一致；Ribbon、任务列表和 Layers 的动态模型模式也单独校验。单色集合检查缩放、着色与错误路径。
@@ -80,7 +80,7 @@
 | `document-report.svg` / `job-manager.svg` / `analysis-results.svg` / `shared-views.svg` | `ribbon-reports` / `ribbon-job-manager` / `ribbon-results` / `ribbon-shared-views` |
 | `media-video.svg` | `ribbon-videos` |
 
-工程文件夹、STL、study、任务动作与状态在当前 HTML symbol 清单中有专用资源；迁移时一并创建其 QML 文件映射。`ribbon-logs` 与 `ribbon-reports` 按实际功能分别使用，不能把日志和报告合并成一个概念。
+工程文件夹、STL、Plan tasks、任务动作与状态在当前 HTML symbol 清单中有专用资源；迁移时一并创建其 QML 文件映射。`ribbon-logs` 与 `ribbon-reports` 按实际功能分别使用，不能把日志和报告合并成一个概念。
 
 ## 来源与商业使用记录
 

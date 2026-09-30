@@ -580,9 +580,31 @@ label:
   src: Project '%1'
   tr: Project '%1'
 
-study-tasks:
-  src: Study Tasks: %1
-  tr: Study Tasks: %1
+plan-tasks:
+  src: Plan tasks: %1
+  tr: Plan tasks: %1
+
+[TaskPanelInformation]
+title:
+  src: Information
+  tr: Information
+
+shared-views-guidance:
+  src: Access Shared Views from the Shared panel on the Home tab.
+  tr: Access Shared Views from the Shared panel on the Home tab.
+
+[TaskPanelToolsHelp]
+use-tools:
+  src: Use the tools above to access each tool.
+  tr: Use the tools above to access each tool.
+
+tool-help:
+  src: Open a tool's help to learn how to use it.
+  tr: Open a tool's help to learn how to use it.
+
+multi-select:
+  src: Hold Ctrl while clicking to select multiple entities.
+  tr: Hold Ctrl while clicking to select multiple entities.
 
 [LayerPanelTitle]
 label:

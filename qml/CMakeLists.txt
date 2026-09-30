@@ -22,6 +22,7 @@ set(PANTA_SHELL_QML_FILES
     Components/Composites/HorizontalToolStrip.qml
     Components/Composites/DocumentTabBar.qml
     Components/Composites/PanelTabBar.qml
+    Components/Composites/InformationPanel.qml
     Components/Composites/PaneCloseButton.qml
     Components/Composites/DialogTitleBar.qml
     Panels/TopChromePanel.qml

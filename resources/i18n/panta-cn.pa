@@ -580,9 +580,31 @@ label:
   src: Project '%1'
   tr: 工程“%1”
 
-study-tasks:
-  src: Study Tasks: %1
-  tr: Study 任务：%1
+plan-tasks:
+  src: Plan tasks: %1
+  tr: 方案任务：%1
+
+[TaskPanelInformation]
+title:
+  src: Information
+  tr: 信息
+
+shared-views-guidance:
+  src: Access Shared Views from the Shared panel on the Home tab.
+  tr: 请从主页选项卡上的 Shared 面板访问共享视图。
+
+[TaskPanelToolsHelp]
+use-tools:
+  src: Use the tools above to access each tool.
+  tr: 请使用上方工具访问各项工具。
+
+tool-help:
+  src: Open a tool's help to learn how to use it.
+  tr: 查看各工具的帮助以了解如何使用。
+
+multi-select:
+  src: Hold Ctrl while clicking to select multiple entities.
+  tr: 按住 Ctrl 并单击可选择多个实体。
 
 [LayerPanelTitle]
 label:

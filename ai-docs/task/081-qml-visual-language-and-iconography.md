@@ -25,10 +25,13 @@
 包含：
 
 - 审计 `qml/Themes/Theme.qml`、现有 QML 组件、Ribbon、工程/任务/Layers Dock、对话框、视口与 080 页签；建立可追溯的色彩、字号、图标比例、圆角、间距、层级、边框与交互状态规范。
-- 以 `shell.js` 的全部内联 SVG symbol 作为唯一图标造型基准，将现有 QML 图标全集替换为对应 symbol 的独立多色 SVG 资源；为 HTML 树与任务区中尚未进入 QML 清单的工程文件夹、STL、Study、任务操作和状态符号补全 QML 映射。形成应用内资源清单，记录内部绘制/第三方来源、许可证、修改情况和对应功能；无法确认来源的资源不得直接作为可发布资产沿用。
+- 以 `shell.js` 的全部内联 SVG symbol 作为唯一图标造型基准，将现有 QML 图标全集替换为对应 symbol 的独立多色 SVG 资源；为 HTML 树与任务区中尚未进入 QML 清单的工程文件夹、STL、任务操作和状态符号补全 QML 映射。形成应用内资源清单，记录内部绘制/第三方来源、许可证、修改情况和对应功能；无法确认来源的资源不得直接作为可发布资产沿用。
 - 适配 QML 图标加载组件，避免彩色 SVG 经过当前单色 `panta-icons` 渲染路径而丢失颜色；颜色表达语义，不依赖色相作为唯一状态信息。
 - 更新 `ai-docs/qml-html/` 中适用参考页面，先稳定视觉底稿，再将规则映射至 Theme token 和 QML 组件；保留 HTML 与 QML 一致的 token 与图标语义。
 - 统一常态、悬停、按下、选中、禁用、焦点、关闭和空白视口等可见状态；覆盖英文/中文长度、键盘焦点与高 DPI 布局。
+- `TasksPanel` 默认打开 Tasks 页签：空工程时显示 Open Project / New Project；工程打开后由工程树和 Plan tasks 内容替代这两个入口。Tools 与 Shared Views 各自显示带 Information 标题的信息框：Tools 提供三段英文工具使用说明，Shared Views 引导用户从 Home 页的 Shared 面板访问共享视图。工程入口继续复用已有 ViewModel 信号。
+- Plan tasks 标题图标使用 `plan-tasks` 正式 symbol ID，保持 `shell.js`、QML SVG、QML/HTML 调用与性能场景清单一致。
+- 导入任务列表将 Part 与后续步骤放在同一列表模型和行组件中，保持同一层级；只对已有成功导入记录证明完成的 Part 行显示完成勾，没有业务完成状态的后续占位步骤不推测其状态。所有步骤共用独立固定宽度的状态列，完成勾不受按钮悬停态影响，未完成项保留空位以对齐内容。
 - 为 053 的 VTK Welcome 标志规定渐变语义、表面质感、浅挤出、背景/投影关系和留白约束；具体几何实现与真实窗口验收归 053。
 - 依据 [QML 性能规范](../standards/qml.md#性能基准)，把本任务新增或影响创建、布局、绑定、更新与绘制的 QML 组件纳入 069 CPU / GPU 手动基准场景。
 
@@ -74,7 +77,10 @@
 - [ ] 关键界面与所给风格方向一致：浅色工作区、轻量 chrome、分组工具条、清晰图标层级、统一圆角/边框/悬停反馈；Welcome 3D 标志由 053 使用约定外观实现。
 - [x] 所有实际使用图标在清单中有唯一语义、功能映射、来源/许可证及修改记录；第三方素材满足许可证和署名要求，未确认来源的资源已移除或原创重绘。
 - [x] 自动一致性检查覆盖 SVG 资源 ID、QML 图标引用及彩色/单色加载模式，确保单色 provider 白名单与 QML 调用约定一致；新增或误配图标时检查失败并指出位置。
+- [x] Plan tasks 图标以 `plan-tasks` 作为正式 symbol ID，并与 HTML symbol、QML SVG、调用点及性能场景清单一致；STL 零件行使用 `stl-file`。
 - [ ] 多色图标的正常、禁用、焦点和高对比场景可辨；颜色不作为唯一的信息通道；键盘焦点和可访问名称完整。
+- [ ] `TasksPanel` 默认选中 Tasks；空工程的 Tasks 显示 Open Project / New Project，工程打开后切换到工程树和 Plan tasks 内容；Tools 与 Shared Views 均显示 Information 标题，前者显示英文工具使用说明，后者显示 Home / Shared 面板入口说明；工程入口复用现有 ViewModel 信号。
+- [ ] Part 与后续步骤共用同一列表模型和行组件并保持同一层级；成功导入的 Part 行在左侧状态列显示完成勾；后续步骤仅按权威状态标记，未完成时保留空位；状态列不受任务按钮悬停反馈影响。
 - [x] QML 打包后 Shell / Viewport 模块资源可载入，`qmllint` 与组件行为测试通过。
 - [ ] HTML 参考与真实 QML 在相关组件层级、颜色、图标和交互状态一致。
 - [ ] 窄宽度、长英文/中文、至少 1.0/1.5/2.0 DPR、焦点/禁用态与真实图形窗口无截断、重叠或看不清的状态。
@@ -90,12 +96,16 @@
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-24 | 参考图来源核验与仓库资产盘点 | 区分用户提供参考图、CSS 字样、HTML 内联 SVG 与 QML 图标文件 | 已初步核实 HTML Welcome 是 CSS 立体文字，Ribbon 图标是 `shell.js` 内联手写 SVG；完整 QML SVG 来源审计待实施 |
+| 2026-09-30 | `cargo format`、`cargo build --locked`、`cargo lint --check` | QML 页面与组件能打包；格式、qmllint 和聚合 lint 通过 | 全部通过；8 项 lint 阶段通过。未运行行为测试或真实窗口验收 |
+| — | `TasksPanel` Tasks / Tools / Shared Views 页签与工程状态切换 | 默认空工程 Tasks 显示 Open / New；工程打开后显示工程与步骤；Tools 与 Shared Views 均显示 Information 信息框及各自说明；入口命令行为保持不变 | QML 构建与 qmllint 通过；实际交互与真窗口视觉验收待完成 |
+| — | STL 导入后 Plan tasks 的完成状态列 | Part 与后续步骤复用列表模型和行并保持同一层级；Part 显示完成勾；所有步骤预留同宽状态位，悬停底色仅作用于任务按钮 | QML 构建与 qmllint 通过；悬停边界及文本对齐尚未做窗口视觉验收 |
 | — | 关键页面真窗口视觉对照、窄屏 / 多 DPI、键盘 / 无障碍及剩余性能场景 | 对照以上未完成验收标准执行 | 尚未实施；自动资源与颜色模式检查、图标 CPU 基准及 Cargo 聚合检查见下方记录 |
 | 2026-09-29 | 盘点 029/050/069/078/080/053 的已交付组件、基准与交接边界 | 在已有组件库、主题 token、页签和 benchmark 上完成剩余统一工作 | 核心实现可开始；080 的 VoiceOver 验收与 053 的 3D Welcome 完整验收仍按各自 task 记录，不阻止本任务完成图标、HTML 与 QML 视觉体系 |
 | 2026-09-30 | `qml/icons/` SVG 资源首批与 `shell.js` caret symbol | 独立资源可与正式 symbol 对照，应用已有资源仍保持可用 | 新增 61 个正式 symbol SVG，并同步 caret 的内缩 path；保留现有资源，避免在消费者迁移前改变运行引用。`layers.svg` 与 `project-file.svg` 两个同名资源在调用迁移批次替换；旧资源清理、Qt 加载测试与性能测量随后完成 |
 | 2026-09-30 | `Qml.ThemeComponentParameters` 与 `panta_qml_cpu_benchmark measures_icon_loading` | 验证 Qt 可以解码全部打包 SVG，并比较空 source、单色 provider 和原色 qrc 的首轮及缓存路径 | QtTest 通过；CPU 基准通过。环境：macOS 26.3.1 arm64、Qt 6.11.2、`target/native/debug`。首轮样本包含进程/路径初始化；缓存后采样 31 次，p50/p95 见下表。场景在 offscreen 下测 Image 创建至 Ready，不测 GPU 呈现 |
 | 2026-09-30 | 旧图标资源 cleanup commit 与 QML 调用审计 | 旧路径无消费者，打包目录仅保留 63 个正式 symbol | 删除 43 个旧 SVG；源码引用扫描未发现旧图标 ID，`Qml.ThemeComponentParameters` 断言 qrc 中恰有 63 个 SVG |
 | 2026-09-30 | `Qml.ThemeComponentParameters`；`cargo build --locked`、`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace` | 对齐 `shell.js` symbol、Qt 打包 SVG、QML 图标引用、单色 provider 白名单及静态/动态颜色模式；适用聚合检查通过 | 一致性 QtTest 通过；SVG 集合与正式 symbol 集合逐项相等，图标文件名与 SVG 内来源标记相符；QML 引用均有资源，provider 着色模式、Ribbon / 任务 / 图层数据和动态转发链路匹配。`cargo build --locked`、`cargo format --check`、`cargo lint --check` 的 8 个阶段及 `cargo test --locked --workspace` 通过，CTest 66/66。默认会自动修复的 `cargo lint` 因沙箱拒绝绑定本地锁 listener 未能启动；只读 lint 全检查通过 |
+| 2026-09-30 | `plan-tasks` 图标 ID 静态引用审计；`cargo format`、`cargo build --locked`、`cargo lint --check` | `shell.js`、SVG 文件名与来源注释、QML、HTML 方案任务标题及 CPU 性能场景使用同一 ID；零件行使用 `stl-file` | 已统一为 `plan-tasks`；旧 `i-study` / `study.svg` / QML `study` 图标引用已清除，HTML STL 零件行改用 `stl-file`。格式、构建和 8 阶段 lint 通过；未运行测试 |
 
 ### 图标加载 CPU 消融
 
@@ -123,6 +133,15 @@
 - 2026-09-24：检查当前 HTML 原型：Welcome 文字由 CSS 样式绘制，Ribbon glyph 为 `shell.js` 手写内联 SVG；二者不是 ImageGen 位图。现存 QML SVG 仍需对照图标规范和 029 记录核验来源。
 - 2026-09-24：053 负责 VTK 立体几何落地并依赖本任务的外观方向；080 负责文档页签行为，本任务为其提供统一视觉契约。
 - 2026-09-30：正式 SVG 资源先提交；按维护者要求，在 QML 调用迁移完成后将旧 SVG 删除作为独立 cleanup commit。图标性能采用 069 CPU harness，GPU 帧计时不用于没有连续更新的静态资源加载问题。
+- 2026-09-30：维护者明确三页职责：默认 Tasks 在空工程时显示 Open / New、打开工程后显示工程和步骤；Tools 显示带 Information 标题的三段英文使用说明；Shared Views 显示带同名标题的入口提示，引导用户从 Home 页的 Shared 面板进入。
+- 2026-09-30：完成状态列固定在每行按钮左侧；勾选状态不参与按钮悬停背景，未完成步骤保留相同宽度以稳定对齐。
+- 2026-09-30：按维护者要求将 Part 与后续步骤合并到同一数据模型和行 Repeater，并统一显示层级，避免单独处理 Part。
+- 2026-09-30：维护者将任务列表标题更正为 `Plan tasks`；同步更新界面文案与语言目录。
+- 2026-09-30：将任务列表数据属性命名为 `planTaskItems`，与 `Plan tasks` 标题统一。
+- 2026-09-30：将任务区域、列表模型、行标识及 HTML 底稿标题统一为 Plan 命名；维护者要求把正式图标 symbol ID 从 `study` 更名为 `plan-tasks`，工程领域字段仍保留其原义。
+- 2026-09-30：将图标资源文件、正式 HTML symbol 和所有方案任务调用统一命名为 `plan-tasks`；HTML STL 零件行使用 `stl-file`，避免将方案任务图标复用于零件项。
+- 2026-09-30：确认架构中的 Study 指规划中的可编辑分析配置领域对象；当前图标用于 Plan tasks 标题而非 Study 对象行，因此保留 `plan-tasks` ID，待出现独立 Study 行时再使用 Study 图标。
+- 2026-09-30：维护者要求 STL 导入完成后在步骤前显示勾。当前后端只提供成功导入记录，不提供 Fill、Material 等步骤状态；因此仅标记已导入的 Part 行，避免展示虚构完成状态。
 
 ## 完成摘要
 
