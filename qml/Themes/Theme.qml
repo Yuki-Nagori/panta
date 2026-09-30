@@ -36,6 +36,9 @@ QtObject {
     readonly property color colorDialogPrimary: "#e5f1fb"
     readonly property color colorDialogPrimaryBorder: "#5d9fc7"
 
+    // 字体
+    readonly property string analysisLogFontFamily: "monospace"
+
     // 字号（逻辑像素）
     readonly property int fontTitle: 13
     readonly property int fontBody: 13
@@ -66,7 +69,7 @@ QtObject {
     readonly property int focusBorderWidth: 2
     readonly property int documentTabBottomLineHeight: 3
 
-    // 布局尺寸（逻辑像素）与栏宽比例
+    // 布局尺寸（逻辑像素）
     readonly property int titlebarHeight: 30
     readonly property int menubarHeight: 24
     readonly property int ribbonHeight: 96
@@ -103,9 +106,16 @@ QtObject {
     readonly property int panelToolbarHeight: 32
     readonly property int titlebarMinimumContentWidth: 1100
     readonly property int logoWidth: 46
-    readonly property real leftPanelRatio: 0.26
     readonly property int leftPanelMinimumWidth: 320
+
+    // 日志面板尺寸（逻辑像素）
+    readonly property int analysisLogHeight: 220
+    readonly property int analysisLogRunWidth: 100
+
+    // 布局比例
+    readonly property real leftPanelRatio: 0.26
     readonly property real layersPanelRatio: 0.42
+    readonly property real analysisLogMaximumRatio: 0.45
 
     // 交互阈值（逻辑像素）与时长（毫秒）
     readonly property int tabSlideDuration: 120

@@ -40,6 +40,7 @@
   --ribbon-text-lines: 2;
   --ribbon-content-spacing: 3px;
   --ribbon-caret-height: 5px;
+  --analysis-log-height: 220px;
   --results-control-width: 210px;
   --results-time-width: 44px;
   --results-scale-value-width: 28px;
@@ -791,3 +792,34 @@ button.inspector-row:hover { background: linear-gradient(to right, transparent c
   padding: 1px;
 }
 .results-window-grid .icon, .results-lock-grid .icon { width: 20px; height: 20px; }
+
+/* 日志在视口与文档页签之间占位，关闭后将空间交还视口。 */
+.analysis-log-dock { flex: 0 0 var(--analysis-log-height); min-height: 100px; max-height: 45%; display: flex; flex-direction: column; border-top: 1px solid var(--color-panel-line); background: var(--color-panel); }
+.analysis-log-header { flex: none; display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 3px 6px; background: var(--color-chrome); border-bottom: 1px solid var(--color-panel-line); }
+.analysis-log-tabs { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; }
+.analysis-log-tab { flex: none; font-size: var(--font-small); min-height: 26px; padding: 2px 12px; border-radius: 999px; color: var(--color-muted); white-space: nowrap; }
+.analysis-log-tab:hover { background: var(--color-hover); }
+.analysis-log-tab[aria-selected="true"] { background: var(--color-panel); color: var(--color-text); font-weight: 600; }
+.analysis-log-header select { max-width: 180px; min-width: 90px; height: 26px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); color: var(--color-text); }
+.analysis-log-preview { color: var(--color-muted); font-size: var(--font-ribbon); }
+.analysis-log-close { width: 26px; height: 26px; }
+.analysis-log-content { flex: 1; min-height: 0; overflow: auto; }
+.analysis-log-content pre { margin: 0; padding: 12px 16px; font: 12px/1.65 ui-monospace, monospace; white-space: pre; tab-size: 4; }
+.logs-visibility-check { display: flex; align-items: center; justify-content: center; }
+.logs-visibility-check .icon { width: 14px; height: 14px; visibility: hidden; }
+[data-logs-toggle][aria-expanded="true"] .logs-visibility-check .icon { visibility: visible; }
+.analysis-results { padding: 4px 8px 8px 30px; font-size: var(--font-small); }
+.analysis-results details > summary { display: flex; align-items: center; gap: 5px; min-height: 24px; cursor: pointer; list-style: none; }
+.analysis-results summary::-webkit-details-marker { display: none; }
+.analysis-results summary::before { content: "▸"; width: 10px; color: var(--color-muted); }
+.analysis-results details[open] > summary::before { content: "▾"; }
+.analysis-results .icon { width: 16px; height: 16px; }
+.analysis-results .result-children { margin-left: 18px; }
+.analysis-result-item { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 4px; border-radius: var(--radius); }
+.analysis-result-item:hover { background: var(--color-hover); }
+/* 原生单选语义保留键盘互斥行为，外观沿用结果树的方框勾选。 */
+.analysis-result-item input { appearance: none; position: relative; flex: none; width: 16px; height: 16px; margin: 0; border: 1px solid var(--color-muted); border-radius: 3px; background: var(--color-panel); }
+.analysis-result-item input:checked { background: var(--color-focus); border-color: var(--color-focus); }
+.analysis-result-item input:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.analysis-result-item input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.analysis-result-item:has(input:checked) { font-weight: 600; }

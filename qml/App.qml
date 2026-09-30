@@ -141,6 +141,7 @@ ApplicationWindow {
             onNewProjectRequested: newProjectDialog.open()
             onImportRequested: importDialog.open()
             onResultsRequested: shellWindow.selectRibbonTab("results")
+            onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
         }
 
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。
@@ -171,6 +172,10 @@ ApplicationWindow {
                     Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * (1 - Theme.layersPanelRatio) : 0
                     projectOpen: shellWindow.projectOpen
                     projectName: projectModel.currentName
+                    logsOpen: viewportPane.logsOpen
+                    logRunCount: viewportPane.logRunCount
+                    resultRun: viewportPane.selectedLogRun
+                    onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
                     importedPartNames: projectModel.importedPartNames
                     importedPartIds: projectModel.importedPartIds
                     importedPartName: projectModel.importedPartName
@@ -238,6 +243,7 @@ ApplicationWindow {
 
                 meshSource: projectModel
                 reducedMotion: Settings.reducedMotion
+                logContextId: projectModel.currentPath + ":" + (projectModel.planSettings.importId ?? "")
                 anchors.left: workspaceSplit.right
                 anchors.right: parent.right
                 anchors.top: parent.top

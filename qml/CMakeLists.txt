@@ -36,6 +36,8 @@ set(PANTA_SHELL_QML_FILES
     Panels/AnalysisSequencePanel.qml
     Panels/MaterialSelectionPanel.qml
     Panels/LayersPanel.qml
+    Panels/AnalysisLogPanel.qml
+    Panels/AnalysisResultsTree.qml
     Panels/ViewportPane.qml
     Panels/PlaceholderPanel.qml
     Dialogs/NewProjectDialog.qml

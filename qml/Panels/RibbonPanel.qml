@@ -12,6 +12,7 @@ Rectangle {
     signal openProjectRequested
     signal importRequested
     signal resultsRequested
+    signal logsRequested
 
     implicitHeight: Theme.ribbonHeight
     gradient: Gradient {
@@ -56,6 +57,7 @@ Rectangle {
         HomeRibbon {
             onImportRequested: panel.importRequested()
             onResultsRequested: panel.resultsRequested()
+            onLogsRequested: panel.logsRequested()
         }
     }
 

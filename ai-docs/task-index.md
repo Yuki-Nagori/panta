@@ -118,6 +118,7 @@ ai-docs/
 | 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | in-progress |
 | 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | in-progress |
 | 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | in-progress |
+| 097 | [分析日志面板与结果目录](task/097-analysis-logs-dock.md) | 应用平台扩展 | 080, 091, 096 | done |
 
 ## 验证与质量扩展队列
 

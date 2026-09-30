@@ -224,6 +224,7 @@ shellTemplate.innerHTML = `
       </div>
       <template data-slot="viewport"></template>
     </div>
+    <template data-slot="logs"></template>
     <div class="tabs tabs-bottom document-tabs">
       <div class="document-tab-list" role="tablist" aria-label="Viewport documents">
         <div class="document-tab-item is-active" role="presentation">
@@ -398,6 +399,7 @@ const updateInspector = (part) => {
   const partLabel = document.querySelector(".inspector-part-name");
   if (partLabel && part) partLabel.textContent = `Part (${part.dataset.sourceName || "STL"})`;
   if (inspectorList) inspectorList.hidden = false;
+  document.dispatchEvent(new Event("plan-selection-changed"));
 };
 
 const activateDocument = (documentId) => {
@@ -884,3 +886,172 @@ function updateProcessAvailability() {
 }
 document.querySelector('[data-analysis-sequence-accept]')?.addEventListener('click', updateProcessAvailability);
 if (processDialog) updateProcessAvailability();
+
+// HTML 演示记录与各方案隔离；Analyze 只演示输出结构，不调用求解器。
+const analysisLogDock = document.querySelector("#analysis-log-dock");
+if (analysisLogDock) {
+  const planOutputs = new Map();
+  const logTabs = analysisLogDock.querySelector(".analysis-log-tabs");
+  const logContent = analysisLogDock.querySelector(".analysis-log-content");
+  const logText = analysisLogDock.querySelector("[data-log-text]");
+  const runSelect = analysisLogDock.querySelector("[data-log-run]");
+  const resultTree = document.querySelector("[data-analysis-results]");
+  const toggles = [...document.querySelectorAll("[data-logs-toggle]")];
+  let activeCategory = "Analysis Log";
+  let returnFocus = null;
+  const fillResults = ["Fill time", "Pressure at V/P switchover", "Temperature at flow front", "Bulk temperature", "Shear rate, bulk", "Pressure at injection location: XY Plot", "Time to reach ejection temperature", "Frozen layer fraction", "% Shot weight: XY Plot", "Air traps", "Average velocity", "Bulk temperature at end of fill", "Clamp force: XY Plot", "Frozen layer fraction at end of fill"];
+
+  const currentOutput = () => {
+    const part = document.querySelector(".study-node[aria-selected='true']");
+    const key = part?.dataset.importId;
+    if (!key) return null;
+    if (!planOutputs.has(key)) planOutputs.set(key, { runs: [], selected: 0 });
+    return planOutputs.get(key);
+  };
+  const selectedRun = () => {
+    const output = currentOutput();
+    return output?.runs[output.selected] || null;
+  };
+  const setLogsVisible = (visible) => {
+    analysisLogDock.hidden = !visible;
+    toggles.forEach(button => button.setAttribute("aria-expanded", String(visible)));
+  };
+  const renderLogContent = () => {
+    const run = selectedRun();
+    logText.textContent = run ? run.logs[activeCategory] : "No analysis logs yet. Run Analyze to preview the output layout.";
+    [...logTabs.children].forEach((button, index) => {
+      const active = button.dataset.logCategory === activeCategory;
+      button.setAttribute("aria-selected", String(active));
+      button.tabIndex = active ? 0 : -1;
+      button.id = `analysis-log-tab-${index}`;
+      if (active) logContent.setAttribute("aria-labelledby", button.id);
+    });
+  };
+  const resultGroup = (title, symbol) => {
+    const group = document.createElement("details");
+    group.open = true;
+    const summary = document.createElement("summary");
+    summary.append(createIcon(symbol), document.createTextNode(title));
+    group.append(summary);
+    return group;
+  };
+  const renderResults = () => {
+    const run = selectedRun();
+    resultTree.replaceChildren();
+    resultTree.hidden = !run;
+    if (!run) return;
+    const root = resultGroup("Results", "i-ribbon-results");
+    const children = document.createElement("div");
+    children.className = "result-children";
+    const group = run.sequence === "Gate Location" ? children : resultGroup("Flow", "i-project-folder");
+    const list = document.createElement("div");
+    list.className = "result-children";
+    run.results.forEach(name => {
+      const label = document.createElement("label");
+      label.className = "analysis-result-item";
+      const check = document.createElement("input");
+      check.type = "radio";
+      check.name = "analysis-result";
+      check.checked = run.selectedResult === name;
+      check.addEventListener("change", () => { run.selectedResult = name; });
+      label.append(check, document.createTextNode(name));
+      list.append(label);
+    });
+    group.append(list);
+    if (group !== children) children.append(group);
+    root.append(children);
+    resultTree.append(root);
+  };
+  const refreshOutput = () => {
+    const output = currentOutput();
+    const run = selectedRun();
+    runSelect.replaceChildren();
+    if (!output?.runs.length) runSelect.append(new Option("No runs", ""));
+    else output.runs.forEach((item, index) => runSelect.append(new Option(`Run ${index + 1} · ${item.sequence}`, String(index))));
+    runSelect.disabled = !run;
+    runSelect.value = run ? String(output.selected) : "";
+    const categories = run ? Object.keys(run.logs) : ["Mesh Log", "Analysis Log"];
+    if (!categories.includes(activeCategory)) activeCategory = "Analysis Log";
+    logTabs.replaceChildren();
+    categories.forEach(category => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "analysis-log-tab";
+      button.dataset.logCategory = category;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-controls", "analysis-log-content");
+      button.textContent = category;
+      logTabs.append(button);
+    });
+    logContent.id = "analysis-log-content";
+    document.querySelector("[data-logs-label]").textContent = output?.runs.length ? `Logs (${output.runs.length})` : "Logs";
+    renderLogContent();
+    renderResults();
+  };
+  toggles.forEach(button => button.addEventListener("click", () => {
+    returnFocus = button;
+    refreshOutput();
+    setLogsVisible(analysisLogDock.hidden);
+    if (!analysisLogDock.hidden) logTabs.querySelector("[aria-selected='true']")?.focus();
+  }));
+  analysisLogDock.querySelector("[data-logs-close]").addEventListener("click", () => {
+    setLogsVisible(false);
+    returnFocus?.focus();
+  });
+  runSelect.addEventListener("change", () => {
+    const output = currentOutput();
+    if (!output) return;
+    output.selected = Number(runSelect.value);
+    refreshOutput();
+  });
+  logTabs.addEventListener("click", event => {
+    const button = event.target.closest("[data-log-category]");
+    if (!button) return;
+    activeCategory = button.dataset.logCategory;
+    renderLogContent();
+  });
+  logTabs.addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const buttons = [...logTabs.children];
+    const index = buttons.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+    activeCategory = buttons[next].dataset.logCategory;
+    renderLogContent();
+    buttons[next].focus();
+  });
+  document.querySelectorAll("[data-preview-analyze]").forEach(button => button.addEventListener("click", () => {
+    const output = currentOutput();
+    const sequence = document.querySelector("[data-analysis-sequence-current]").textContent;
+    if (!output) return;
+    // 当前目录草稿仅覆盖两种已设计工艺设置的序列。
+    if (sequence !== "Fill" && sequence !== "Gate Location") return;
+    const results = sequence === "Gate Location" ? ["Flow resistance indicator", "Gating suitability"] : [...fillResults];
+    const number = output.runs.length + 1;
+    const prefix = `Preview run ${number}\nAnalysis sequence: ${sequence}\n\n`;
+    output.runs.push({ sequence, results, selectedResult: results[0], logs: {
+      "Mesh Log": prefix + "Mesh input\n  Imported model and mesh type\n\nMesh checks\n  Geometry and mesh diagnostics appear here.",
+      "Analysis Log": prefix + "Solver parameters\n  Process settings\n  Output options\n\nRun messages\n  Progress, warnings and errors appear here.",
+      [sequence]: prefix + "Analysis output\n  Stage messages appear here.\n\nResult directory\n" + results.map(name => `  ${name}`).join("\n"),
+      "Machine Settings": prefix + "Injection molding machine\n  Machine configuration appears here.",
+      [`${sequence} Check`]: prefix + "Input checks\n  Material, process and mesh diagnostics appear here."
+    }});
+    output.selected = output.runs.length - 1;
+    activeCategory = "Analysis Log";
+    returnFocus = document.querySelector("[data-logs-toggle].inspector-row");
+    refreshOutput();
+    setLogsVisible(true);
+  }));
+  const updateAnalyzeAvailability = () => {
+    const sequence = document.querySelector("[data-analysis-sequence-current]").textContent;
+    const supported = sequence === "Fill" || sequence === "Gate Location";
+    document.querySelectorAll("[data-preview-analyze]").forEach(button => {
+      button.disabled = !supported;
+      button.title = supported ? "Generate sample output for this HTML preview" : "Output preview is available for Fill and Gate Location.";
+    });
+  };
+  document.querySelector("[data-analysis-sequence-accept]")?.addEventListener("click", updateAnalyzeAvailability);
+  document.addEventListener("plan-selection-changed", refreshOutput);
+  updateAnalyzeAvailability();
+  refreshOutput();
+}

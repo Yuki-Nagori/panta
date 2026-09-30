@@ -6,6 +6,7 @@ RibbonContent {
 
     signal importRequested
     signal resultsRequested
+    signal logsRequested
 
     groups: [
         {
@@ -143,5 +144,7 @@ RibbonContent {
             homeRibbon.importRequested();
         else if (key === "results")
             homeRibbon.resultsRequested();
+        else if (key === "logs")
+            homeRibbon.logsRequested();
     }
 }

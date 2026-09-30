@@ -54,8 +54,8 @@
       <div class="ribbon-tools">
         <button type="button" class="ribbon-button" aria-label="Optimization"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-optimization"/></svg><span class="label">Optimization</span></button>
         <button type="button" class="ribbon-button" aria-label="Boundary Conditions"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-boundary-conditions"/></svg><span class="label">Boundary<br>Conditions</span></button>
-        <button type="button" class="ribbon-button" aria-label="Analyze" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-analyze"/></svg><span class="label">Analyze</span></button>
-        <button type="button" class="ribbon-button" aria-label="Logs"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-logs"/></svg><span class="label">Logs</span></button>
+        <button type="button" class="ribbon-button" aria-label="Analyze" data-preview-analyze title="Generate sample output for this HTML preview"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-analyze"/></svg><span class="label">Analyze</span></button>
+        <button type="button" class="ribbon-button" aria-label="Logs" data-logs-toggle aria-controls="analysis-log-dock" aria-expanded="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-logs"/></svg><span class="label">Logs</span></button>
         <button type="button" class="ribbon-button" aria-label="Job Manager"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ribbon-job-manager"/></svg><span class="label">Job<br>Manager</span></button>
       </div>
       <span class="ribbon-label">Results</span>
@@ -151,12 +151,27 @@
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
           <button type="button" class="inspector-row" data-dialog="process-settings" aria-label="Edit Process Settings"><svg class="status-icon icon" data-process-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span data-process-current>Process Settings (Default)</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></div>
-          <div class="inspector-row inspector-muted" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></div>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span>Logs*</span></div>
+          <button type="button" class="inspector-row" data-preview-analyze title="Generate sample output for this HTML preview"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis"/></svg><span>Analyze</span></button>
+          <button type="button" class="inspector-row" data-logs-toggle aria-controls="analysis-log-dock" aria-expanded="false"><span class="logs-visibility-check status-placeholder" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-log"/></svg><span data-logs-label>Logs</span></button>
+          <div class="analysis-results" data-analysis-results hidden></div>
         </div>
       </div>
     </div>
   </div>
+</template>
+
+<template id="page-logs">
+  <section class="analysis-log-dock" id="analysis-log-dock" aria-label="Analysis logs" hidden>
+    <header class="analysis-log-header">
+      <div class="analysis-log-tabs" role="tablist" aria-label="Log categories"></div>
+      <span class="analysis-log-preview">Preview</span>
+      <select data-log-run aria-label="Analysis run"><option>No runs</option></select>
+      <button type="button" class="tool-button analysis-log-close" data-logs-close aria-label="Close logs" title="Close logs"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="analysis-log-content" role="tabpanel" tabindex="0">
+      <pre data-log-text>No analysis logs yet.</pre>
+    </div>
+  </section>
 </template>
 
 <template id="page-layers"></template>

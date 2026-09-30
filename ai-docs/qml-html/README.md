@@ -52,3 +52,9 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 [任务 059](../task/059-open-project-html-reference.md)，HTML 已经维护者手工验收，
 作为 [QML 同步任务 060](../task/060-qml-project-workspace-reference.md) 的底稿。
 布局与状态由 QML 实现。`shell.js` 中的 SVG symbol 是正式图标造型来源，QML 按相同 ID 从 `qml/icons/` 加载独立资源；彩色图标保留源色，单色 utility glyph 由 `panta-icons` provider 按 Theme 着色。资源和来源登记见[`../standards/icons.md`](../standards/icons.md)。
+
+## 日志演示（任务 097）
+
+在 `imported-project.html` 单击 Plan tasks 或 Home 的 Logs 打开视口下方日志区，再次点击或使用右上角关闭按钮收起；Logs 的勾选跟随可见性，关闭不删除记录。分类页签沿用现有圆角风格。
+
+HTML 中的 Analyze 用于生成 Preview 示例记录，不执行求解。每次点击追加一条运行，可从日志标题栏选择历史记录；Fill 生成 Flow 结果目录，Gate Location 生成流动阻力与浇口适应性目录。切换方案时日志与结果隔离，初始不显示 Results。QML 已完成展示壳子与 Logs 显隐接线，正式界面保持空态；真实数据服务待求解器接入。

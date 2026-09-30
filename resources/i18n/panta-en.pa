@@ -273,8 +273,8 @@ optimization:
   tr: Optimization (None)
 
 logs:
-  src: Logs*
-  tr: Logs*
+  src: Logs
+  tr: Logs
 
 [ProcessTask]
 custom-settings:
@@ -1250,3 +1250,129 @@ entry-51:
 entry-52:
   src: Locking
   tr: Locking
+
+[AnalysisLogPanel]
+
+entry-1:
+  src: No analysis logs yet.
+  tr: No analysis logs yet.
+
+entry-2:
+  src: Run %1
+  tr: Run %1
+
+entry-3:
+  src: No runs
+  tr: No runs
+
+entry-4:
+  src: Close logs
+  tr: Close logs
+
+entry-5:
+  src: Logs (%1)
+  tr: Logs (%1)
+
+entry-6:
+  src: Analysis run
+  tr: Analysis run
+
+[AnalysisLogCategory]
+
+entry-1:
+  src: Mesh Log
+  tr: Mesh Log
+
+entry-2:
+  src: Analysis Log
+  tr: Analysis Log
+
+entry-3:
+  src: Fill
+  tr: Fill
+
+entry-4:
+  src: Gate Location
+  tr: Gate Location
+
+entry-5:
+  src: Machine Settings
+  tr: Machine Settings
+
+entry-6:
+  src: Fill Check
+  tr: Fill Check
+
+entry-7:
+  src: Gate Location Check
+  tr: Gate Location Check
+
+[AnalysisResult]
+
+entry-1:
+  src: Flow
+  tr: Flow
+
+entry-2:
+  src: Flow resistance indicator
+  tr: Flow resistance indicator
+
+entry-3:
+  src: Gating suitability
+  tr: Gating suitability
+
+entry-4:
+  src: Fill time
+  tr: Fill time
+
+entry-5:
+  src: Pressure at V/P switchover
+  tr: Pressure at V/P switchover
+
+entry-6:
+  src: Temperature at flow front
+  tr: Temperature at flow front
+
+entry-7:
+  src: Bulk temperature
+  tr: Bulk temperature
+
+entry-8:
+  src: Shear rate, bulk
+  tr: Shear rate, bulk
+
+entry-9:
+  src: Pressure at injection location: XY Plot
+  tr: Pressure at injection location: XY Plot
+
+entry-10:
+  src: Time to reach ejection temperature
+  tr: Time to reach ejection temperature
+
+entry-11:
+  src: Frozen layer fraction
+  tr: Frozen layer fraction
+
+entry-12:
+  src: % Shot weight: XY Plot
+  tr: % Shot weight: XY Plot
+
+entry-13:
+  src: Air traps
+  tr: Air traps
+
+entry-14:
+  src: Average velocity
+  tr: Average velocity
+
+entry-15:
+  src: Bulk temperature at end of fill
+  tr: Bulk temperature at end of fill
+
+entry-16:
+  src: Clamp force: XY Plot
+  tr: Clamp force: XY Plot
+
+entry-17:
+  src: Frozen layer fraction at end of fill
+  tr: Frozen layer fraction at end of fill

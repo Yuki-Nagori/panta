@@ -9,6 +9,11 @@ PanelSurface {
 
     property var meshSource: null
     property bool reducedMotion: false
+    property bool logsOpen: false
+    property string logContextId: ""
+    property alias logRuns: analysisLogs.runs
+    readonly property int logRunCount: analysisLogs.contextRuns.length
+    readonly property var selectedLogRun: analysisLogs.currentRun
     signal closeRequested
 
     PaneCloseButton {
@@ -28,6 +33,15 @@ PanelSurface {
                 anchors.fill: parent
                 meshSource: panel.meshSource
             }
+        }
+
+        AnalysisLogPanel {
+            id: analysisLogs
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(Theme.analysisLogHeight, panel.height * Theme.analysisLogMaximumRatio)
+            visible: panel.logsOpen
+            contextId: panel.logContextId
+            onCloseRequested: panel.logsOpen = false
         }
 
         DocumentTabBar {

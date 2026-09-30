@@ -29,6 +29,9 @@ PanelSurface {
     readonly property bool processSettingsAvailable: analysisSequenceId === "fill" || analysisSequenceId === "gate-location"
     property string meshType: ""
     property var meshTypes: []
+    property bool logsOpen: false
+    property int logRunCount: 0
+    property var resultRun: null
 
     function meshTypeText() {
         const entry = meshTypes.find(entry => entry.id === meshType);
@@ -87,7 +90,7 @@ PanelSurface {
         },
         {
             id: "logs",
-            text: qsTranslate("ImportTask", "Logs*"),
+            text: panel.logRunCount > 0 ? qsTranslate("AnalysisLogPanel", "Logs (%1)").arg(panel.logRunCount) : qsTranslate("ImportTask", "Logs"),
             icon: "log",
             completed: false
         }
@@ -97,6 +100,8 @@ PanelSurface {
     signal openProjectRequested
     signal analysisSequenceRequested
     signal processSettingsRequested
+    signal logsRequested
+    signal resultSelected(string resultId)
     signal materialRequested
     signal newProjectRequested
     signal openImportRequested(string recordId)
@@ -111,6 +116,8 @@ PanelSurface {
             processSettingsRequested();
         } else if (taskId === "material-data") {
             materialRequested();
+        } else if (taskId === "logs") {
+            logsRequested();
         }
     }
 
@@ -339,15 +346,34 @@ PanelSurface {
 
                                     ThemedIcon {
                                         anchors.centerIn: parent
-                                        visible: taskRow.modelData.completed === true
+                                        visible: taskRow.modelData.id !== "logs" && taskRow.modelData.completed === true
                                         name: "status-ok"
                                         iconSize: Theme.iconSizeSmall
                                         preserveSourceColors: true
+                                    }
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: Theme.iconSizeSmall
+                                        height: width
+                                        objectName: taskRow.modelData.id === "logs" ? "logsVisibilityIndicator" : ""
+                                        visible: taskRow.modelData.id === "logs"
+                                        radius: Theme.radiusSmall
+                                        color: panel.logsOpen ? Theme.colorFocus : Theme.colorPanel
+                                        border.color: panel.logsOpen ? Theme.colorFocus : Theme.colorPanelLine
+                                        border.width: Theme.borderWidth
+                                        ThemedIcon {
+                                            anchors.centerIn: parent
+                                            name: "check"
+                                            iconSize: Theme.iconSizeCompact
+                                            color: Theme.colorPanel
+                                            visible: panel.logsOpen
+                                        }
                                     }
                                 }
 
                                 ThemedToolButton {
                                     Layout.fillWidth: true
+                                    objectName: "planTaskAction_" + taskRow.modelData.id
                                     text: taskRow.modelData.text
                                     iconName: taskRow.modelData.icon
                                     preserveIconColors: true
@@ -361,6 +387,14 @@ PanelSurface {
                                     onClicked: panel.openPlanTask(taskRow.modelData.id)
                                 }
                             }
+                        }
+                        AnalysisResultsTree {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Theme.iconSizeSmall + Theme.spacingMedium + Theme.spacingSmall
+                            Layout.rightMargin: Theme.spacingSmall
+                            visible: panel.resultRun !== null && panel.resultRun.resultGroups.length > 0
+                            run: panel.resultRun
+                            onResultSelected: resultId => panel.resultSelected(resultId)
                         }
                     }
                 }

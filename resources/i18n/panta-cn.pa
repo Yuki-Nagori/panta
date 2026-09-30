@@ -273,8 +273,8 @@ optimization:
   tr: 优化（无）
 
 logs:
-  src: Logs*
-  tr: 日志*
+  src: Logs
+  tr: 日志
 
 [ProcessTask]
 custom-settings:
@@ -1250,3 +1250,129 @@ entry-51:
 entry-52:
   src: Locking
   tr: 锁定
+
+[AnalysisLogPanel]
+
+entry-1:
+  src: No analysis logs yet.
+  tr: 暂无分析日志。
+
+entry-2:
+  src: Run %1
+  tr: 运行 %1
+
+entry-3:
+  src: No runs
+  tr: 暂无运行
+
+entry-4:
+  src: Close logs
+  tr: 关闭日志
+
+entry-5:
+  src: Logs (%1)
+  tr: 日志 (%1)
+
+entry-6:
+  src: Analysis run
+  tr: 分析运行
+
+[AnalysisLogCategory]
+
+entry-1:
+  src: Mesh Log
+  tr: 网格日志
+
+entry-2:
+  src: Analysis Log
+  tr: 分析日志
+
+entry-3:
+  src: Fill
+  tr: 填充
+
+entry-4:
+  src: Gate Location
+  tr: 浇口定位
+
+entry-5:
+  src: Machine Settings
+  tr: 机器设置
+
+entry-6:
+  src: Fill Check
+  tr: 填充检查
+
+entry-7:
+  src: Gate Location Check
+  tr: 浇口定位检查
+
+[AnalysisResult]
+
+entry-1:
+  src: Flow
+  tr: 流动
+
+entry-2:
+  src: Flow resistance indicator
+  tr: 流动阻力指标
+
+entry-3:
+  src: Gating suitability
+  tr: 浇口适应性
+
+entry-4:
+  src: Fill time
+  tr: 填充时间
+
+entry-5:
+  src: Pressure at V/P switchover
+  tr: 速度/压力切换时的压力
+
+entry-6:
+  src: Temperature at flow front
+  tr: 流动前沿温度
+
+entry-7:
+  src: Bulk temperature
+  tr: 整体温度
+
+entry-8:
+  src: Shear rate, bulk
+  tr: 整体剪切速率
+
+entry-9:
+  src: Pressure at injection location: XY Plot
+  tr: 注射位置压力：XY 图
+
+entry-10:
+  src: Time to reach ejection temperature
+  tr: 达到脱模温度的时间
+
+entry-11:
+  src: Frozen layer fraction
+  tr: 冻结层比例
+
+entry-12:
+  src: % Shot weight: XY Plot
+  tr: 注射重量百分比：XY 图
+
+entry-13:
+  src: Air traps
+  tr: 气穴
+
+entry-14:
+  src: Average velocity
+  tr: 平均速度
+
+entry-15:
+  src: Bulk temperature at end of fill
+  tr: 填充结束时的整体温度
+
+entry-16:
+  src: Clamp force: XY Plot
+  tr: 锁模力：XY 图
+
+entry-17:
+  src: Frozen layer fraction at end of fill
+  tr: 填充结束时的冻结层比例
