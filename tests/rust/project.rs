@@ -853,3 +853,178 @@ fn fill_settings_invalid_candidates_and_io_failure_preserve_manifest_and_release
     service.save()?;
     Ok(())
 }
+
+#[test]
+fn gate_location_confirmation_round_trips_and_rejects_invalid_candidates()
+-> Result<(), Box<dyn std::error::Error>> {
+    use panta_core::project::GateLocatorAlgorithm;
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("gate.stl");
+    fs::write(
+        &source,
+        b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+    )?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Gate")?;
+    let imported = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let initial = service.plan_settings(&imported.id).ok_or("missing plan")?;
+    assert!(!initial.gate_location_settings_confirmed);
+    assert_eq!(initial.gate_location_settings.number_of_gates, 1);
+    assert_eq!(
+        initial.gate_location_settings.machine_source_text(),
+        "Default machine"
+    );
+    assert_eq!(
+        GateLocatorAlgorithm::from_id("advanced-gate-locator")?,
+        GateLocatorAlgorithm::AdvancedGateLocator
+    );
+    assert!(GateLocatorAlgorithm::from_id("unknown").is_err());
+    assert!(
+        service
+            .finish_gate_location_settings_confirmation()
+            .is_err()
+    );
+    assert!(
+        service
+            .begin_gate_location_settings_confirmation(
+                &project.path,
+                initial.revision,
+                &imported.id,
+                initial.gate_location_settings.clone()
+            )
+            .is_err()
+    );
+    service.set_analysis_sequence(
+        &project.path,
+        initial.revision,
+        &imported.id,
+        "gate-location",
+    )?;
+    let before = service.plan_settings(&imported.id).ok_or("missing plan")?;
+    let mut settings = before.gate_location_settings.clone();
+    settings.number_of_gates = 3;
+    settings.melt_temperature_celsius = 240.0;
+    assert!(service.begin_gate_location_settings_confirmation(
+        &project.path,
+        before.revision,
+        &imported.id,
+        settings.clone()
+    )?);
+    assert_eq!(service.plan_settings(&imported.id), Some(before.clone()));
+    assert!(service.save().is_err());
+    assert!(service.finish_fill_settings_confirmation().is_err());
+    wait_metadata_confirmation(
+        &mut service,
+        ProjectService::finish_gate_location_settings_confirmation,
+    )?;
+    let saved = service.plan_settings(&imported.id).ok_or("missing plan")?;
+    assert!(saved.gate_location_settings_confirmed);
+    assert_eq!(saved.gate_location_settings, settings);
+    assert_eq!(saved.revision, before.revision + 1);
+    assert!(!service.begin_gate_location_settings_confirmation(
+        &project.path,
+        saved.revision,
+        &imported.id,
+        settings.clone()
+    )?);
+    let mut reopened = ProjectService::new();
+    reopened.open(&project.path)?;
+    assert_eq!(reopened.plan_settings(&imported.id), Some(saved.clone()));
+    for (path, revision, id) in [
+        (&fixture.root, saved.revision, imported.id.as_str()),
+        (&project.path, saved.revision - 1, imported.id.as_str()),
+        (&project.path, saved.revision, "missing"),
+    ] {
+        assert!(
+            service
+                .begin_gate_location_settings_confirmation(path, revision, id, settings.clone())
+                .is_err()
+        );
+    }
+    let mut invalid = Vec::new();
+    for number_of_gates in [0, 11] {
+        let mut value = settings.clone();
+        value.number_of_gates = number_of_gates;
+        invalid.push(value);
+    }
+    let mut value = settings.clone();
+    value.machine_id = "unknown".into();
+    invalid.push(value);
+    for temperature in [f64::NAN, f64::INFINITY, -274.0] {
+        let mut value = settings.clone();
+        value.mold_temperature_celsius = temperature;
+        invalid.push(value);
+        let mut value = settings.clone();
+        value.melt_temperature_celsius = temperature;
+        invalid.push(value);
+    }
+    let manifest = fs::read(&project.path)?;
+    for value in invalid {
+        assert!(service.begin_gate_location_settings_confirmation(
+            &project.path,
+            saved.revision,
+            &imported.id,
+            value
+        )?);
+        assert!(
+            wait_metadata_confirmation(
+                &mut service,
+                ProjectService::finish_gate_location_settings_confirmation
+            )
+            .is_err()
+        );
+        assert_eq!(service.plan_settings(&imported.id), Some(saved.clone()));
+        assert_eq!(fs::read(&project.path)?, manifest);
+    }
+    fs::create_dir(project.path.with_extension("panta.tmp"))?;
+    settings.number_of_gates = 4;
+    assert!(service.begin_gate_location_settings_confirmation(
+        &project.path,
+        saved.revision,
+        &imported.id,
+        settings
+    )?);
+    assert!(
+        wait_metadata_confirmation(
+            &mut service,
+            ProjectService::finish_gate_location_settings_confirmation
+        )
+        .is_err()
+    );
+    assert_eq!(service.plan_settings(&imported.id), Some(saved));
+    fs::remove_dir(project.path.with_extension("panta.tmp"))?;
+    assert!(service.save().is_ok());
+    Ok(())
+}
+
+#[test]
+fn gate_location_manifest_rejects_missing_import_and_invalid_settings()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Gate")?;
+    let source = fixture.root.join("part.stl");
+    fs::write(
+        &source,
+        b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+    )?;
+    let imported = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let before = service.current()?;
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+    let mut manifest = original.clone();
+    manifest["gate_location_settings"] =
+        serde_json::json!({"missing": panta_core::project::GateLocationSettings::default()});
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+    assert!(service.open(&project.path).is_err());
+    assert_eq!(service.current()?, before);
+    let mut manifest = original;
+    let invalid = panta_core::project::GateLocationSettings {
+        number_of_gates: 0,
+        ..Default::default()
+    };
+    manifest["gate_location_settings"] = serde_json::json!({imported.id: invalid});
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+    assert!(service.open(&project.path).is_err());
+    assert_eq!(service.current()?, before);
+    Ok(())
+}

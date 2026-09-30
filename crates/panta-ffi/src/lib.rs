@@ -1698,6 +1698,239 @@ mod tests {
         Ok(())
     }
 
+    fn wait_confirmation(
+        service: &mut super::ProjectService,
+        finish: fn(&mut super::ProjectService) -> Result<bool, String>,
+    ) -> Result<(), String> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !finish(service)? {
+            if std::time::Instant::now() >= deadline {
+                return Err("metadata confirmation timed out".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn language_bridge_validates_before_committing() -> Result<(), String> {
+        let mut service = super::language_service_new();
+        assert_eq!(super::language_service_supported_locales(), ["en", "zh-CN"]);
+        assert_eq!(super::language_service_current(&service), "en");
+        assert_eq!(
+            super::language_service_validate(&service, "zh-CN".into())?,
+            "zh-CN"
+        );
+        assert_eq!(super::language_service_current(&service), "en");
+        assert!(super::language_service_validate(&service, "unknown".into()).is_err());
+        assert!(super::language_service_commit(&mut service, "unknown".into()).is_err());
+        assert_eq!(
+            super::language_service_commit(&mut service, "zh-CN".into())?,
+            "zh-CN"
+        );
+        assert_eq!(super::language_service_current(&service), "zh-CN");
+        Ok(())
+    }
+
+    #[test]
+    fn plan_bridge_preserves_catalogs_confirmation_and_reopened_values()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use super::{
+            project_service_begin_fill_settings_confirmation,
+            project_service_begin_gate_location_settings_confirmation,
+            project_service_begin_material_confirmation,
+            project_service_finish_fill_settings_confirmation,
+            project_service_finish_gate_location_settings_confirmation,
+            project_service_finish_material_confirmation, project_service_plan_settings,
+            project_service_set_analysis_sequence,
+        };
+        let root = std::env::temp_dir().join(format!("panta-ffi-plan-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+        let source = root.join("part.stl");
+        fs::write(
+            &source,
+            b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+        )?;
+        assert_eq!(super::default_mesh_type(), "dual-domain");
+        assert_eq!(super::mesh_type_catalog().len(), 3);
+        assert_eq!(super::analysis_sequence_catalog().len(), 10);
+        let material = super::default_material()?;
+        assert!(!material.properties.is_empty());
+        let mut service = project_service_new();
+        let empty = project_service_plan_settings(&service, "");
+        assert!(empty.import_id.is_empty());
+        assert_eq!(empty.fill_settings.holding_profile.len(), 2);
+        assert_eq!(empty.gate_location_settings.number_of_gates, 1);
+        assert!(project_service_finish_material_confirmation(&mut service).is_err());
+        assert!(project_service_finish_fill_settings_confirmation(&mut service).is_err());
+        assert!(project_service_finish_gate_location_settings_confirmation(&mut service).is_err());
+        let project =
+            project_service_create(&mut service, root.display().to_string(), "Demo".into())?;
+        let record = super::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".into(),
+            "millimeters".into(),
+            false,
+        )?;
+        let initial = project_service_plan_settings(&service, &record.id);
+        assert_eq!(initial.mesh_type, "solid-3d");
+        assert_eq!(initial.sequence_id, "fill");
+        assert!(
+            project_service_set_analysis_sequence(
+                &mut service,
+                &project.path,
+                initial.revision,
+                &record.id,
+                "unknown"
+            )
+            .is_err()
+        );
+        assert!(
+            project_service_begin_material_confirmation(
+                &mut service,
+                &project.path,
+                initial.revision,
+                &record.id,
+                "unknown"
+            )
+            .is_err()
+        );
+        assert!(project_service_begin_material_confirmation(
+            &mut service,
+            &project.path,
+            initial.revision,
+            &record.id,
+            &material.id
+        )?);
+        assert!(
+            project_service_begin_fill_settings_confirmation(
+                &mut service,
+                &project.path,
+                initial.revision,
+                &record.id,
+                initial.fill_settings
+            )
+            .is_err()
+        );
+        wait_confirmation(&mut service, project_service_finish_material_confirmation)?;
+        let selected = project_service_plan_settings(&service, &record.id);
+        assert_eq!(selected.material_id, material.id);
+        assert_eq!(selected.material_source_text, material.source_text);
+        assert!(!project_service_begin_material_confirmation(
+            &mut service,
+            &project.path,
+            selected.revision,
+            &record.id,
+            &material.id
+        )?);
+        let mut fill = selected.fill_settings;
+        fill.melt_temperature_celsius = 240.0;
+        fill.holding_profile.push(bridge::HoldingProfilePoint {
+            duration_seconds: 5.0,
+            pressure_percent: 70.0,
+        });
+        assert!(project_service_begin_fill_settings_confirmation(
+            &mut service,
+            &project.path,
+            selected.revision,
+            &record.id,
+            fill
+        )?);
+        wait_confirmation(
+            &mut service,
+            project_service_finish_fill_settings_confirmation,
+        )?;
+        let saved = project_service_plan_settings(&service, &record.id);
+        assert!(saved.fill_settings_confirmed);
+        assert_eq!(saved.fill_settings.melt_temperature_celsius, 240.0);
+        assert_eq!(
+            saved.fill_settings.holding_profile[2].pressure_percent,
+            70.0
+        );
+        let revision = saved.revision;
+        assert!(!project_service_begin_fill_settings_confirmation(
+            &mut service,
+            &project.path,
+            revision,
+            &record.id,
+            saved.fill_settings
+        )?);
+        let mut invalid = project_service_plan_settings(&service, &record.id).fill_settings;
+        invalid.flow_rate_cm3_per_second = -1.0;
+        assert!(project_service_begin_fill_settings_confirmation(
+            &mut service,
+            &project.path,
+            revision,
+            &record.id,
+            invalid
+        )?);
+        assert!(
+            wait_confirmation(
+                &mut service,
+                project_service_finish_fill_settings_confirmation
+            )
+            .is_err()
+        );
+        assert_eq!(
+            project_service_plan_settings(&service, &record.id).revision,
+            revision
+        );
+        let changed = project_service_set_analysis_sequence(
+            &mut service,
+            &project.path,
+            revision,
+            &record.id,
+            "gate-location",
+        )?;
+        let mut gate = project_service_plan_settings(&service, &record.id).gate_location_settings;
+        gate.algorithm_id = "unknown".into();
+        assert!(
+            project_service_begin_gate_location_settings_confirmation(
+                &mut service,
+                &project.path,
+                changed.revision,
+                &record.id,
+                gate
+            )
+            .is_err()
+        );
+        let mut gate = project_service_plan_settings(&service, &record.id).gate_location_settings;
+        gate.number_of_gates = 3;
+        assert!(project_service_begin_gate_location_settings_confirmation(
+            &mut service,
+            &project.path,
+            changed.revision,
+            &record.id,
+            gate
+        )?);
+        wait_confirmation(
+            &mut service,
+            project_service_finish_gate_location_settings_confirmation,
+        )?;
+        let gate_saved = project_service_plan_settings(&service, &record.id);
+        assert!(gate_saved.gate_location_settings_confirmed);
+        assert_eq!(gate_saved.gate_location_settings.number_of_gates, 3);
+        let mut reopened = project_service_new();
+        project_service_open(&mut reopened, project.path)?;
+        let snapshot = project_service_plan_settings(&reopened, &record.id);
+        assert_eq!(snapshot.revision, gate_saved.revision);
+        assert_eq!(snapshot.material_id, material.id);
+        assert_eq!(snapshot.fill_settings.holding_profile.len(), 3);
+        assert_eq!(snapshot.fill_settings.melt_temperature_celsius, 240.0);
+        assert_eq!(snapshot.gate_location_settings.number_of_gates, 3);
+        assert!(snapshot.fill_settings_confirmed && snapshot.gate_location_settings_confirmed);
+        assert!(super::project_service_activate_mesh_document(
+            &mut service,
+            &record.id
+        ));
+        super::project_service_deactivate_mesh_document(&mut service);
+        super::project_service_release_mesh_document(&mut service, &record.id);
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
     #[test]
     fn project_service_bridge_maps_snapshots_and_errors() -> Result<(), Box<dyn std::error::Error>>
     {

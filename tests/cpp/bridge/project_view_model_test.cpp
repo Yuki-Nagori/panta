@@ -5,12 +5,14 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QIODevice>
 #include <QSignalSpy>
 #include <QString>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QVariantMap>
+#include <QtCore/qcontainerfwd.h>
 #include <QtTest/qtest.h>
 #include <array>
 #include <gtest/gtest.h>
@@ -18,6 +20,26 @@
 #include <qtestcase.h>
 
 using panta::bridge::ProjectViewModel;
+
+namespace {
+
+void expect_same_plan_settings(QVariantMap actual, QVariantMap expected) {
+    // 创建路径与 QUrl 重开路径在 Windows 可使用不同分隔符；比较同一文件身份。
+    const auto canonical = [](const QVariantMap& settings) {
+        return QFileInfo(settings.value(QStringLiteral("projectPath")).toString())
+            .canonicalFilePath();
+    };
+    const auto actualPath = canonical(actual);
+    const auto expectedPath = canonical(expected);
+    ASSERT_FALSE(actualPath.isEmpty());
+    ASSERT_FALSE(expectedPath.isEmpty());
+    EXPECT_EQ(actualPath, expectedPath);
+    actual.remove(QStringLiteral("projectPath"));
+    expected.remove(QStringLiteral("projectPath"));
+    EXPECT_EQ(actual, expected);
+}
+
+} // namespace
 
 TEST(ProjectViewModelTest, CreatesOpensRenamesAndSavesThroughRustService) {
     QTemporaryDir fixture;
@@ -522,7 +544,7 @@ TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
     EXPECT_EQ(model.planSettings().value(QStringLiteral("fillSettings")).toMap(), candidate);
     ProjectViewModel reopened;
     ASSERT_TRUE(reopened.openProjectUrl(QUrl::fromLocalFile(model.currentPath())));
-    EXPECT_EQ(reopened.planSettings(), model.planSettings());
+    expect_same_plan_settings(reopened.planSettings(), model.planSettings());
     candidate.insert(QStringLiteral("flowRate"), -1.0);
     ASSERT_TRUE(model.setFillSettings(
         model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
@@ -530,5 +552,5 @@ TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
     ASSERT_TRUE(finished.wait(5000));
     EXPECT_FALSE(finished.at(1).at(0).toBool());
     EXPECT_FALSE(model.fillSettingsConfirmationPending());
-    EXPECT_EQ(reopened.planSettings(), model.planSettings());
+    expect_same_plan_settings(reopened.planSettings(), model.planSettings());
 }
