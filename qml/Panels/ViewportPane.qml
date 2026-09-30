@@ -10,13 +10,16 @@ PanelSurface {
 
     property var meshSource: null
     property var documentSource: panel.meshSource
-    property FillingPreviewModel previewModel: null
+    property AnalysisModel analysisModel: null
     property bool reducedMotion: false
     property bool logsOpen: false
     property string logContextId: ""
     property alias logRuns: analysisLogs.runs
     readonly property int logRunCount: analysisLogs.contextRuns.length
     readonly property var selectedLogRun: analysisLogs.currentRun
+    function selectLatestLog() {
+        analysisLogs.selectLatestRun();
+    }
     signal closeRequested
 
     PaneCloseButton {
@@ -35,7 +38,7 @@ PanelSurface {
                 objectName: "caeViewport"
                 anchors.fill: parent
                 meshSource: panel.meshSource
-                playbackTime: panel.previewModel ? panel.previewModel.playbackTime : 0
+                playbackTime: panel.analysisModel ? panel.analysisModel.playbackTime : 0
             }
         }
 
@@ -43,19 +46,12 @@ PanelSurface {
             id: analysisLogs
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(Theme.analysisLogHeight, panel.height * Theme.analysisLogMaximumRatio)
-            visible: panel.logsOpen && panel.previewModel === null
+            visible: panel.logsOpen
             contextId: panel.logContextId
             onCloseRequested: panel.logsOpen = false
         }
 
-        FillingPlaybackBar {
-            Layout.fillWidth: true
-            Layout.margins: Theme.spacingMedium
-            previewModel: panel.previewModel
-        }
-
         DocumentTabBar {
-            visible: panel.previewModel === null
             objectName: "documentTabBar"
             Layout.fillWidth: true
             documents: panel.documentSource ? panel.documentSource.openDocuments : []

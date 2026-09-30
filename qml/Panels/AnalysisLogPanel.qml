@@ -111,12 +111,14 @@ PanelSurface {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            contentWidth: availableWidth
             TextArea {
                 objectName: "analysisLogText"
+                width: logScroll.availableWidth
                 text: panel.currentText
                 readOnly: true
                 selectByMouse: true
-                wrapMode: TextEdit.NoWrap
+                wrapMode: TextEdit.WrapAnywhere
                 font.family: Theme.analysisLogFontFamily
                 font.pixelSize: Theme.fontSmall
                 color: Theme.colorText

@@ -162,6 +162,27 @@ class WelcomeWordmarkTest final : public QObject {
         }
     }
 
+    void pressure_colors_do_not_follow_playback_time_and_hidden_fields_have_no_scalars() {
+        panta::visualization::SurfaceMeshSnapshot snapshot;
+        snapshot.vertices = {{{0, 0, 0}}, {{1, 0, 0}}, {{0, 1, 0}}};
+        snapshot.fill_times = {0, 1, 1};
+        snapshot.fill_duration = 1;
+        snapshot.pressures = {0, 1, 2};
+        snapshot.pressure_visible = true;
+        const auto mesh = panta::visualization::make_filling_poly_data(snapshot, 0);
+        QCOMPARE(mesh->GetNumberOfPoints(), vtkIdType(3));
+        auto* colors = mesh->GetPointData()->GetScalars();
+        QVERIFY(colors != nullptr);
+        double low[3], high[3];
+        colors->GetTuple(0, low);
+        colors->GetTuple(2, high);
+        QCOMPARE(low[2], 210.0);
+        QCOMPARE(high[0], 215.0);
+        snapshot.fields_visible = false;
+        const auto plain = panta::visualization::make_filling_poly_data(snapshot, 0);
+        QVERIFY(plain->GetPointData()->GetScalars() == nullptr);
+    }
+
     void ignores_detached_and_invalid_cube_picks() {
         panta::visualization::ViewportOrientation orientation;
         QVERIFY(!orientation.cube_direction(940, 704, 1000, 800).has_value());

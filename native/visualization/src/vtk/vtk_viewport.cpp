@@ -122,6 +122,7 @@ struct VtkViewport::Impl {
     vtkSmartPointer<vtkWebGPURenderer> renderer;
     vtkSmartPointer<vtkRenderWindowInteractor> interactor;
     vtkSmartPointer<vtkActor> primitive_actor;
+    vtkSmartPointer<vtkActor> gate_actor;
     vtkWeakPointer<vtkObject> previous_mapper;
     vtkWeakPointer<vtkObject> webgpu_configuration;
     vtkWeakPointer<vtkObject> retired_actor;
@@ -337,6 +338,11 @@ void VtkViewport::ensure_render_window() {
     update_mesh_actor();
     impl_->applied_mesh = impl_->pending.mesh;
     impl_->renderer->AddActor(impl_->primitive_actor);
+    impl_->gate_actor = vtkSmartPointer<vtkActor>::New();
+    impl_->gate_actor->GetProperty()->SetColor(0.9, 0.16, 0.12);
+    impl_->gate_actor->SetVisibility(false);
+    impl_->gate_actor->PickableOff();
+    impl_->renderer->AddActor(impl_->gate_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
     impl_->orientation.attach(impl_->render_window);
 
@@ -429,6 +435,16 @@ void VtkViewport::update_mesh_actor() {
         previous_mapper->ReleaseGraphicsResources(impl_->render_window.GetPointer());
     }
     impl_->primitive_actor->SetMapper(mapper);
+    if (impl_->gate_actor) {
+        const bool gateVisible = imported_mesh && impl_->pending.mesh->show_gates &&
+                                 !impl_->pending.mesh->gate_points.empty();
+        impl_->gate_actor->SetVisibility(gateVisible);
+        if (gateVisible) {
+            vtkNew<vtkPolyDataMapper> gateMapper;
+            gateMapper->SetInputData(make_gate_poly_data(*impl_->pending.mesh));
+            impl_->gate_actor->SetMapper(gateMapper);
+        }
+    }
     if (imported_mesh) {
         impl_->primitive_actor->SetOrientation(0.0, 0.0, 0.0);
     } else {
@@ -657,6 +673,8 @@ void VtkViewport::sync_native_surface() {
                                                                 : kModelCameraFitMargin,
                                  impl_->pending.mesh && impl_->pending.mesh->z_up);
     }
+    impl_->welcome_scene.set_result_legend(impl_->pending.mesh.get(), pixel_size.width(),
+                                           pixel_size.height());
     impl_->orientation.update(impl_->renderer->GetActiveCamera());
     impl_->renderer->SetBackground(impl_->pending.background.redF(),
                                    impl_->pending.background.greenF(),
@@ -697,6 +715,7 @@ void VtkViewport::destroy_render_window() {
     }
     impl_->renderer = nullptr;
     impl_->interactor = nullptr;
+    impl_->gate_actor = nullptr;
     impl_->primitive_actor = nullptr;
     impl_->applied_mesh.reset();
     if (impl_->hardware_window != nullptr) {

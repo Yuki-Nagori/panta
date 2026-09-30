@@ -100,7 +100,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] bool fillSettingsConfirmationPending() const;
     [[nodiscard]] bool gateLocationSettingsConfirmationPending() const;
     [[nodiscard]] QVariantList analysisSequences() const; // Rust 目录：ID 与英文源文案。
-    [[nodiscard]] QVariantMap planSettings() const;       // Rust 当前方案快照。
+    /// 当前方案零件的来源与单位，供分析请求冻结输入。
+    [[nodiscard]] QVariantMap analysisInput() const;
+    [[nodiscard]] QVariantMap planSettings() const; // Rust 当前方案快照。
 
     [[nodiscard]] QVariantList openDocuments() const; // 视口文档的只读投影。
     [[nodiscard]] QString activeDocumentId() const;

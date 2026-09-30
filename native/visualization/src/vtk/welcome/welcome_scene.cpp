@@ -1,5 +1,6 @@
 #include "welcome_scene.hpp"
 
+#include "mesh_source.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <algorithm>
@@ -7,8 +8,10 @@
 #include <cmath>
 #include <cstddef>
 #include <map>
+#include <qobject.h>
 #include <utility>
 #include <vector>
+#include <vtkActor.h>
 #include <vtkBillboardTextActor3D.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
@@ -16,6 +19,8 @@
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
 #include <vtkTextProperty.h>
@@ -211,6 +216,23 @@ void WelcomeScene::attach(vtkRenderWindow* render_window) {
     text_actor_->SetTextProperty(property);
     text_actor_->ForceOpaqueOn();
     renderer_->AddActor(text_actor_);
+    legend_actor_ = vtkSmartPointer<vtkActor>::New();
+    legend_actor_->PickableOff();
+    legend_actor_->GetProperty()->SetAmbient(1);
+    legend_actor_->GetProperty()->SetDiffuse(0);
+    legend_actor_->SetVisibility(false);
+    renderer_->AddActor(legend_actor_);
+    for (int i = 0; i < 6; ++i) {
+        auto label = vtkSmartPointer<vtkBillboardTextActor3D>::New();
+        label->GetTextProperty()->SetFontSize(i == 0 ? 18 : 16);
+        label->GetTextProperty()->SetColor(0.12, 0.16, 0.22);
+        label->GetTextProperty()->SetJustificationToLeft();
+        label->GetTextProperty()->SetVerticalJustificationToCentered();
+        label->PickableOff();
+        label->SetVisibility(false);
+        renderer_->AddActor(label);
+        legend_labels_.push_back(label);
+    }
     render_window_->AddRenderer(renderer_);
 }
 
@@ -218,6 +240,8 @@ void WelcomeScene::detach() {
     if (render_window_ != nullptr && renderer_ != nullptr) {
         render_window_->RemoveRenderer(renderer_);
     }
+    legend_actor_ = nullptr;
+    legend_labels_.clear();
     text_actor_ = nullptr;
     renderer_ = nullptr;
     render_window_ = nullptr;
@@ -226,6 +250,72 @@ void WelcomeScene::detach() {
 void WelcomeScene::set_visible(bool visible) {
     if (text_actor_ != nullptr) {
         text_actor_->SetVisibility(visible);
+    }
+}
+
+void WelcomeScene::set_result_legend(const SurfaceMeshSnapshot* mesh, int width, int height) {
+    if (!legend_actor_ || height <= 0)
+        return;
+    const double aspect = static_cast<double>(width) / height;
+    const double left = -aspect + 0.08;
+    const bool visible = mesh && mesh->fields_visible && !mesh->fill_times.empty();
+    legend_actor_->SetVisibility(visible);
+    for (auto& label : legend_labels_)
+        label->SetVisibility(visible);
+    if (!visible)
+        return;
+    double maximum = mesh->fill_duration;
+    if (mesh->pressure_visible) {
+        maximum = 0;
+        for (double p : mesh->pressures)
+            if (std::isfinite(p))
+                maximum = std::max(maximum, p);
+    }
+    const QString title =
+        mesh->pressure_visible ? QStringLiteral("Pressure [MPa]") : QStringLiteral("Fill time [s]");
+    const QString summary = title + "\n= " + QString::number(maximum, 'f', 3);
+    legend_labels_[0]->SetInput(summary.toUtf8().constData());
+    legend_labels_[0]->SetPosition(left, 0.85, 0);
+    const double top = 0.6;
+    const double bottom = top - 0.9;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> faces;
+    vtkNew<vtkUnsignedCharArray> colors;
+    colors->SetNumberOfComponents(3);
+    constexpr std::array<std::array<double, 3>, 4> palette{
+        {{35, 83, 210}, {20, 183, 204}, {249, 214, 66}, {215, 49, 46}}};
+    for (int i = 0; i < 64; ++i) {
+        const double fraction = static_cast<double>(i) / 63;
+        const double y = bottom + fraction * (top - bottom);
+        vtkIdType ids[4];
+        ids[0] = points->InsertNextPoint(left, y, 0);
+        ids[1] = points->InsertNextPoint(left + 0.06, y, 0);
+        ids[2] = points->InsertNextPoint(left + 0.06, y + (top - bottom) / 64, 0);
+        ids[3] = points->InsertNextPoint(left, y + (top - bottom) / 64, 0);
+        faces->InsertNextCell(4, ids);
+        const double scaled = fraction * 3;
+        const auto index = std::min(static_cast<std::size_t>(scaled), std::size_t{2});
+        const double t = scaled - static_cast<double>(index);
+        std::array<unsigned char, 3> color{};
+        for (std::size_t c = 0; c < 3; ++c)
+            color[c] =
+                static_cast<unsigned char>(palette[index][c] * (1 - t) + palette[index + 1][c] * t);
+        for (int vertex = 0; vertex < 4; ++vertex)
+            colors->InsertNextTypedTuple(color.data());
+    }
+    vtkNew<vtkPolyData> data;
+    data->SetPoints(points);
+    data->SetPolys(faces);
+    data->GetPointData()->SetScalars(colors);
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(data);
+    mapper->SetColorModeToDirectScalars();
+    legend_actor_->SetMapper(mapper);
+    for (std::size_t i = 0; i < 5; ++i) {
+        const double fraction = static_cast<double>(i) / 4;
+        legend_labels_[i + 1]->SetPosition(left + 0.09, bottom + fraction * (top - bottom), 0);
+        legend_labels_[i + 1]->SetInput(
+            QString::number(maximum * fraction, 'f', 3).toUtf8().constData());
     }
 }
 

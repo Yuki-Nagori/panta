@@ -1,88 +1,80 @@
-# 充填演示 MVP 使用说明书
+# 工作区充填 MVP 使用说明书
 
 - 分支：`preview`
-- 用途：使用固定 Cover 示例，展示「载入模型 → 生成网格 → 充填计算 → 结果回放」。
-- 入口：Panta 窗口中，功能区下方的 **Filling MVP · default example**。
-- 分析、实现范围与验证记录：[preview.md](preview.md)。
+- 流程：创建工程 → 导入 Cover → Mesh → Gate Location Analyze → Fill Analyze → Results Play。
+- 默认算例：`target/Moldfill_HITL_v1/examples/cover/cover_fast.case.yaml`。
+- 现在使用 main 的正常工作区；独立 **Filling MVP** 页面已移除。
 
-## 1. 本机准备
+## 1. 准备与启动
 
-本次开发已在当前工作区准备好求解器环境。已有 `target/moldfill-venv` 时，不必重复安装。
+当前工作区已有求解器和 `target/moldfill-venv`，无需重复安装。新工作区需要单独准备外部求解器；Panta 仓库不会分发忽略目录下的求解器、Python 环境或大模型文件。不要在演示前执行 `cargo clean`。
 
-如果重新准备工作区，需要先将相同版本的求解器放到 `target/Moldfill_HITL_v1`。本次验证的提交为 `022cfa39a6c15a8da1f7f33063a38e8dc422d7ad`，程序版本 `0.3.1.dev1`。求解器目录、Python 环境和运行结果均位于忽略的 `target/`，单独拉取 Panta 仓库不会自动获得它们，也不要在演示前运行 `cargo clean`。
-
-在 Panta 根目录执行（macOS / Linux）：
+首次准备环境时，在仓库根目录执行（macOS / Linux）：
 
 ```sh
 uv venv --python python3 target/moldfill-venv
 uv pip install --python target/moldfill-venv/bin/python -e target/Moldfill_HITL_v1
 cargo build --locked
-./target/native/debug/app/panta-native
+cargo run --locked
 ```
 
-Python 要求以求解器的 `pyproject.toml` 为准；本机已验证 Python 3.14.7、NumPy 2.5.3、SciPy 1.18.1、PyYAML 6.0.3、meshio 5.3.5、mmgpy 0.17.0。Panta 自身的 Qt / VTK 等构建环境按 [README](README.md) 准备。
+Python 版本要求以求解器的 `pyproject.toml` 为准。Qt / VTK 构建环境见 [README](README.md)。代码修改后要退出旧窗口，再启动最新构建；已经打开的窗口不会自动加载新原生代码。
 
-本次实际验收平台为 macOS arm64。Windows 尚未进行真实窗口验收，启动路径和环境安装命令不能直接照搬上述 Unix 示例。
+## 2. 按默认值演示
 
-## 2. 按默认值完成一次演示
+1. **New Project** 创建工程，进入 Home。
+2. **Import** 导入 `target/Moldfill_HITL_v1/examples/cover/cover.STL`，单位选 **Millimeters**，网格类型使用 **Dual Domain**。点击导入零件，使其页签处于活动状态。
+3. 点击 Home 的 **Mesh** 或 Tasks 中的 Mesh，打开 Tools 网格面板。保留 **Global edge length = 12 mm**，点击 **Mesh**。成功后视口显示真实重划网格与三角边线，Tasks 的 Mesh 显示完成标记。
+4. 在 **Analysis Sequence** 选择 **Gate Location**。打开 **Process Settings**，保留模具 **40 °C**、熔体 **230 °C**、**Advanced gate locator**、**Number of gates = 1**，确认。
+5. 点击 **Analyze**。求解器只执行配对与自动浇口推荐；成功后工程树出现 **cover.STL (Gate Location)** 子方案，红色球形标记显示选中的推荐位置。完整候选、节点和配对诊断见 Solver Log / `gate_recommend.yaml`。
+6. 在 **Analysis Sequence** 切到 **Fill**。**Select Material** 确认默认 **POLYFLAM RIPP 3625 CS1**。打开 **Process Settings**，保留下面的默认值并确认；保压曲线保留两行：`0 s / 100%`、`10 s / 100%`。
+7. 点击 **Analyze**。本次复用刚才的重划网格和推荐节点，真实执行充填。结束后出现 **cover.STL (Fill)** 子方案，结果目录提供 **Fill time** 和 **Pressure**。
+8. 点击结果目录中的 **Fill time**，VTK 显示充填时间云图、最大时间、`[s]` 色标。切换到顶部 **Results**，点击 **Play** 回放充填前沿；支持 Pause、Stop、首帧、末帧与时间轴。
+9. 点击 **Pressure** 查看最终节点压力云图与 `[MPa]` 色标。它是最终压力场，不是逐帧压力动画；峰值压力摘要是整个充填过程的峰值，两者数值可以不同。
 
-不需要先创建工程，不需要选择 STL、材料或填写边界条件。
+浇口子方案只改变当前视图；后续 Analyze 仍使用同一导入零件的当前方案参数。建议一次演示只操作一个零件。求解产物会落盘，但子方案页签、运行日志列表和结果选择目前是会话状态；重新打开工程后需要重新运行流程。
 
-| 操作 | 界面应出现什么 |
-|---|---|
-| 点击 **Filling MVP · default example** | 左侧四步流程和算例配置路径；右侧显示区域和底部回放条 |
-| 点击 **Load default example** | Cover 模型，原始网格 164 个三角面 |
-| 点击 **Generate mesh** | 实际调用 MMG 重划；默认参数下本机结果为 2,638 个三角面 |
-| 点击 **Start filling** | 后台启动求解器；显示阶段、真实充填进度及运行耗时；运行时按钮禁用以防重复提交 |
-| 等待 **Filling complete** | 显示已充满、物理充填时间、峰值压力及充填时间云图；底部回放按钮可用 |
-| 点击 **Play filling** | 从起点回放充填过程；再次点击 **Pause** 可暂停 |
-| 拖动底部时间轴 | 查看任意物理时刻的已充填区域；到结尾后再点击播放即可重播 |
+## 3. 默认参数与生效范围
 
-左侧面板内容超出窗口高度时，可以滚动查看操作、结果和产物目录。**Back to workspace** 返回原工作区，当前演示状态保留；再次进入可继续。**Start over** 清空演示显示和步骤，重新开始；已经落盘的运行记录仍保留。
+| 设置 | 默认值 | 当前计算行为 |
+|---|---|---|
+| 求解路线 | surface-pair | 实际调用外部求解器 |
+| 网格边长 | 12 mm | 实际调用 MMG 重划；边长是目标尺寸，不是强制每条边都为 12 mm |
+| 厚度范围 | 2.4–15 mm | 来自算例 |
+| 模具 / 熔体温度 | 40 / 230 °C | 分别使用当前 Gate Location / Fill 工艺设置 |
+| 流量 | 94.7 cm³/s | Fill 工艺设置映射到 YAML |
+| V/P 切换 | 已充填体积 99% | 映射到 YAML 的 `by_volume: 0.99` |
+| 压力 / 锁模限制 | 140 MPa / 350 t | 来自算例 |
+| 自动浇口 | `mode: auto`, `top_k: 3` | 推荐最多 3 个候选，选择首个候选作为一个实际浇口 |
+| 热计算 | 非等温，`nz: 12` | 来自算例 |
+| 快速数值参数 | Picard 4、CFL 0.9、步长增长 0.5 | 与算例一致 |
+| 保压 / 纤维取向 / 结晶 | 界面保留默认配置 | 当前只求解 Fill，不计算这些阶段 / 物理量 |
 
-## 3. 固定参数与示例来源
+**Number of gates** 是实际浇口数量，不是候选 `top_k`。本次集成支持 1 个实际浇口；填入其他数量会给出明确错误，不会将多个候选伪装为多浇口充填。Gate Location 的算法标签映射到求解器的 `auto` 推荐方法。
 
-直接复用求解器自带的 [快速非等温 Cover 算例](target/Moldfill_HITL_v1/benchmarks/cover_noniso_quick.case.yaml)，没有另外生成演示模型。
+每次运行由 `cover_fast.case.yaml` 生成独立 `case.yaml`；几何改为当前工程导入的 STL，材料路径转为绝对路径，界面中已生效的温度、流量、V/P 和网格尺寸覆盖对应参数。Fill 的 `gate.mode` 改为 `nodes`，使用 Gate Location 的 `resolved_gate_nodes`。检查本次 `case.yaml` 即可核对真实输入；不会锁定模板 YAML 哈希。
 
-| 项目 | 值 |
-|---|---|
-| 模型 | [cover.STL](target/Moldfill_HITL_v1/examples/cover/cover.STL)，202 × 6 × 152 mm |
-| 材料 | [POLYFLAM RIPP 3625 CS1](target/Moldfill_HITL_v1/materials/polyflam-ripp-3625-cs1.yaml) |
-| 路线 / 网格 | surface-pair / MMG，目标边长 12 mm |
-| 浇口 | nearest，(102, 3, 82) mm |
-| 熔体 / 模具温度 | 230 / 40 °C |
-| 注射流量 | 94.7 cm³/s |
-| V/P 切换 / 限制 | 99% 体积；140 MPa；350 t |
-| 热计算 | 非等温，厚度方向 12 层 |
-| 输出 | 当前运行的最终结果及 VTK 场 |
+## 4. 进度、日志与结果
 
-启动器固定使用 CPU 快速预设：`MOLDFILL_DEVICE=cpu`、`MOLDFILL_PRESSURE_DEVICE=cpu`、`MOLDFILL_PRESSURE_SOLVER=direct`、`MOLDFILL_FAST_SOLVER=1`、`MOLDFILL_PICARD_MAX=4`、`MOLDFILL_CFL=0.9`、`MOLDFILL_DT_GROWTH=0.5`。无需用户设置环境变量；其他继承的 `MOLDFILL_*` 覆盖会被清除。
+- 网格运行期间，Mesh 工具面板显示循环进度条。当前 MMG 不输出真实百分比；产物写入阶段来自求解器事件，不伪造线性进度。
+- 下方 Mesh Log / Analysis Log 摘要显示当前阶段、已用时间和可用的充填百分比；视口不再显示浮动进度卡片。结束后日志保留终态与总耗时。
+- 正在运行时再次点击 **Analyze** 可以停止；Mesh 面板的 **Cancel** 也可停止。关闭窗口时需先停止当前作业。
+- Logs 的 **Mesh Log / Analysis Log** 显示参数、状态、耗时和结果摘要；**Solver Log** 显示真实求解器输出。长路径自动换行，可选择复制。
+- 蓝 → 青 → 黄 → 红表示到达时间从早到晚；回放时灰色区域表示尚未充填。动画使用真实 `fill_time_s` 字段在线性三角面内插值，约 10 秒播完整段，不在 GUI 中重新求解。
+- Pressure 使用求解器导出的最终 `pressure_Pa` 字段，转换成 MPa。只列出已读到的真实结果，不生成虚假的冷却、翘曲等结果。
 
-算例配置 `benchmarks/cover_noniso_quick.case.yaml` 不锁定 SHA-256；网格和充填操作每次都会读取当前文件，可直接修改数值参数做试算。修改网格参数后，点击 **Start over** 并重新生成网格，再运行充填；充填阶段会复用刚生成的网格。实际生效值记录在本次 run 的 `manifest.json`、`case.snapshot.yaml` 和 `remesh_report.yaml`。默认 STL 与材料文件仍校验 SHA-256；参数试算时保持算例中的几何和材料引用指向默认文件。
+默认 Cover 的本次独立验证结果为 **1.915 s** 物理充填时间、**2.147 MPa** 峰值压力。它们不等于电脑实际运行时间。本轮不做性能验收。
 
-## 4. 怎样读结果
+## 5. 输出、重试与限制
 
-- **Elapsed**：本次操作的电脑运行耗时，单位秒。
-- **Filling time**：模拟中的物理充填时间，单位秒。
-- **Peak pressure**：本次计算的峰值压力，单位 MPa。
-- 云图颜色从蓝、青、黄到红表示熔体到达时间从早到晚，灰色表示当前回放时刻尚未充填。
-- 回放依据真实结果中的 `fill_time_s` 字段，在三角面内部线性插值；不是在界面中重新计算流场。完整回放约 10 秒，时间轴显示的仍是物理时间。
-- 首版先完成计算再回放；运行期间显示进度，网格视图不实时显示流动前沿。
-
-本机首次命令行基线的纯求解阶段约 212 秒，完整 run 约 215 秒；结果为 `filled: true`、物理充填时间 **1.915 s**、峰值压力 **2.147 MPa**。GUI 验收的一次运行在并发构建/检查期间用了 **344.7 秒**，产出的 YAML 摘要和 VTK 文件与 CLI 基线逐字节一致。耗时会随硬件和并发负载变化，不作为固定性能保证。12 mm 粗网格和快速预设用于展示流程；工程精度评估及 3 mm 标准算例不属于本次 MVP。
-
-CPU 没有占满所有核心是当前求解路径的正常现象：时间步及主要迭代按顺序执行，CPU 稀疏直接解法不会自动把整段求解变成多进程；部分 NumPy / SciPy 底层运算可使用库自身线程。增加线程环境变量不等于完整求解会按核心数加速，本次没有修改物理内核的并行实现。
-
-## 5. 停止、重试与排查
-
-计算时点击 **Stop** 会终止并回收当前求解进程；保留上一步有效状态，原按钮可重试该步骤。退出应用也会回收该应用启动的求解进程。失败和取消不会显示为“充填完成”。
-
-每次生成网格或求解分别使用新的输出目录：
+每次操作写入工程所在目录：
 
 ```text
-target/moldfill-preview/gui-<进程号>-<时间戳>/
-  preview-settings.json
-  console.log
+analyses/<import-id>/run-<pid>-<timestamp>/
+  request.json             # 冻结的 GUI 参数
+  case.yaml                # 实际运行的 YAML
+  console.log              # 完整 stdout / stderr
+  gate-display.json        # 浇口运行的显示位置，mm
   runs/<run-id>/
     manifest.json
     logs/events.jsonl
@@ -90,14 +82,15 @@ target/moldfill-preview/gui-<进程号>-<时间戳>/
     artifacts/...
 ```
 
-左侧 **Run artifacts** 下方是本次目录，可以选中文本复制。重划产物会供下一步直接复用，充填阶段不会再重划网格。结果只从当前操作的成功 manifest 读取，并校验产物哈希；不会通过搜索“最近的结果”复用旧运行。
+每次使用独立目录，只有成功提交的 manifest 与哈希验证通过的产物才发布到界面。STL 后缀大小写都可读取。网格生成成功后再次划网格，会使旧浇口和充填结果失效；需要重新按 Gate Location → Fill 运行。失败或取消保留上一有效网格，不显示为成功。
 
 | 现象 | 处理 |
 |---|---|
-| 缺少 solver environment | 检查第 1 节的求解器目录和 Python 虚拟环境 |
-| Default input changed | 恢复本说明指定版本的默认配置、STL 或材料文件 |
-| 阶段进度暂时未变化 | 看 Elapsed 是否继续更新；查看该目录的 `console.log` 和 `logs/events.jsonl` |
-| 求解失败或没有充满 | 查看界面错误和当前运行日志，再重试；不要靠放宽质量门禁来制造成功 |
-| 看不到新入口或回放控件 | 重新构建并启动最新的 native 可执行文件；不要继续使用构建前已打开的窗口 |
+| Generate the mesh first | 先在 Mesh 工具中成功生成网格 |
+| Run Gate Location Analyze first | 先切到 Gate Location 并成功 Analyze |
+| Open the imported part | 激活导入零件页签后再操作 |
+| 缺少 solver environment | 准备 `target/Moldfill_HITL_v1` 与 `target/moldfill-venv` |
+| 几何配对或充填失败 | 检查本次 Solver Log 和 `console.log`；默认演示请使用 cover.STL |
+| 界面仍是旧布局 / 旧错误 | 退出旧窗口，重新构建并启动 |
 
-本版不提供任意零件导入求解、参数编辑、保压/冷却/翘曲流程、工程包内仿真持久化或结果重新打开入口。保存的 VTK、YAML、CSV 和日志仍可在输出目录中检查。
+其他毫米单位 STL 可以尝试真实重划，但充填仍使用 Cover 的材料、厚度范围和默认工艺，不能据此保证任意模型的配对和求解成功。当前不包含保压、冷却、翘曲、完整工程 Study 持久化、历史结果重新加载或性能调优。

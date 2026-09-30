@@ -15,14 +15,13 @@ ApplicationWindow {
     title: qsTr("panta")
     color: Theme.colorPanel
     onClosing: event => {
-        if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
+        if (analysisController.busy || projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
             event.accepted = false;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property bool layersDockShown: layersPanel.dockOpen
-    readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
+    readonly property string statusMessage: analysisController.error.length > 0 ? analysisController.error : projectModel.error.length > 0 ? projectModel.error : viewModel.error
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
-    property bool fillingPreview: false
     property string activeRibbonTab: "start-learn"
 
     function selectRibbonTab(tab) {
@@ -35,9 +34,14 @@ ApplicationWindow {
         id: viewModel
     }
 
-    FillingPreviewModel {
-        id: fillingModel
-        objectName: "fillingPreviewModel"
+    AnalysisModel {
+        id: analysisController
+        objectName: "analysisModel"
+        projectModel: projectModel
+        onRunStarted: {
+            viewportPane.selectLatestLog();
+            viewportPane.logsOpen = true;
+        }
     }
 
     ProjectViewModel {
@@ -148,23 +152,20 @@ ApplicationWindow {
             onImportRequested: importDialog.open()
             onResultsRequested: shellWindow.selectRibbonTab("results")
             onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.leftMargin: Theme.spacingLarge
-            ThemedToolButton {
-                objectName: "openFillingPreview"
-                text: shellWindow.fillingPreview ? qsTr("Back to workspace") : qsTr("Filling MVP · default example")
-                borderColor: Theme.colorPanelLine
-                onClicked: shellWindow.fillingPreview = !shellWindow.fillingPreview
+            analysisAvailable: projectModel.planSettings.importId?.length > 0
+            analysisBusy: analysisController.busy
+            onAnalyzeRequested: {
+                analysisController.analyze();
+                viewportPane.logsOpen = true;
             }
-            ThemedLabel {
-                text: shellWindow.fillingPreview ? qsTr("Load → Mesh → Fill → Replay · all settings are preset") : ""
-                textColor: Theme.colorTextMuted
-                Layout.fillWidth: true
-                elide: Text.ElideRight
+            onMeshRequested: tasksPanel.openMeshTool()
+            onSequenceRequested: analysisSequenceDialog.open()
+            onMaterialRequested: {
+                projectModel.clearError();
+                materialDialog.open();
             }
+            onProcessSettingsRequested: tasksPanel.processSettingsRequested()
+            analysisModel: analysisController
         }
 
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。
@@ -186,17 +187,9 @@ ApplicationWindow {
                 width: Math.max(workspace.width * Theme.leftPanelRatio, Theme.leftPanelMinimumWidth)
                 spacing: 0
 
-                FillingPreviewPanel {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    visible: shellWindow.fillingPreview
-                    previewModel: fillingModel
-                }
-
                 TasksPanel {
                     id: tasksPanel
                     objectName: "tasksPanel"
-                    visible: !shellWindow.fillingPreview
 
                     Layout.fillWidth: true
                     Layout.fillHeight: !shellWindow.layersDockShown
@@ -206,12 +199,26 @@ ApplicationWindow {
                     logsOpen: viewportPane.logsOpen
                     logRunCount: viewportPane.logRunCount
                     resultRun: viewportPane.selectedLogRun
+                    analysisBusy: analysisController.busy
+                    analysisOperation: analysisController.operation
+                    analysisAvailable: projectModel.planSettings.importId?.length > 0
+                    meshGenerated: analysisController.meshReady
+                    gateGenerated: analysisController.gateReady
+                    studies: analysisController.studies
+                    onStudyRequested: studyId => analysisController.activateDocument(studyId)
+                    onMeshRequested: edgeLength => analysisController.generateMesh(edgeLength)
+                    onCancelRequested: analysisController.cancel()
+                    onAnalyzeRequested: {
+                        analysisController.analyze();
+                        viewportPane.logsOpen = true;
+                    }
+                    onResultSelected: resultId => analysisController.selectResult(resultId)
                     onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
                     importedPartNames: projectModel.importedPartNames
                     importedPartIds: projectModel.importedPartIds
                     importedPartName: projectModel.importedPartName
-                    activeDocumentId: projectModel.activeDocumentId
-                    activeDocumentTitle: projectModel.activeDocumentTitle
+                    activeDocumentId: analysisController.activeDocumentId
+                    activeDocumentTitle: analysisController.activeDocumentTitle
                     analysisSequenceText: qsTranslate("AnalysisSequence", projectModel.planSettings.sequenceSourceText ?? "")
                     analysisSequenceId: projectModel.planSettings.sequenceId ?? ""
                     materialText: qsTranslate("Material", projectModel.planSettings.materialSourceText ?? "")
@@ -235,7 +242,7 @@ ApplicationWindow {
                         projectModel.clearError();
                         analysisSequenceDialog.open();
                     }
-                    onOpenImportRequested: recordId => projectModel.openImportRecord(recordId)
+                    onOpenImportRequested: recordId => analysisController.openImportRecord(recordId)
                     onCloseRequested: tasksPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
                     onNewProjectRequested: newProjectDialog.open()
@@ -244,14 +251,14 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Theme.borderWidth
-                    visible: !shellWindow.fillingPreview && shellWindow.layersDockShown
+                    visible: shellWindow.layersDockShown
                     color: Theme.colorPanelLine
                 }
 
                 LayersPanel {
                     id: layersPanel
                     objectName: "layersPanel"
-                    visible: !shellWindow.fillingPreview && dockOpen
+                    visible: dockOpen
                     Layout.fillWidth: true
                     Layout.fillHeight: shellWindow.layersDockShown
                     Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * Theme.layersPanelRatio : 0
@@ -273,9 +280,10 @@ ApplicationWindow {
             ViewportPane {
                 id: viewportPane
 
-                documentSource: projectModel
-                meshSource: shellWindow.fillingPreview ? fillingModel : projectModel
-                previewModel: shellWindow.fillingPreview ? fillingModel : null
+                documentSource: analysisController
+                meshSource: analysisController
+                analysisModel: analysisController
+                logRuns: analysisController.logRuns
                 reducedMotion: Settings.reducedMotion
                 logContextId: projectModel.currentPath + ":" + (projectModel.planSettings.importId ?? "")
                 anchors.left: workspaceSplit.right

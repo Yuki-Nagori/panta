@@ -12,6 +12,14 @@ Rectangle {
     signal openProjectRequested
     signal importRequested
     signal resultsRequested
+    property bool analysisAvailable: false
+    property bool analysisBusy: false
+    property var analysisModel: null
+    signal analyzeRequested
+    signal meshRequested
+    signal sequenceRequested
+    signal materialRequested
+    signal processSettingsRequested
     signal logsRequested
 
     implicitHeight: Theme.ribbonHeight
@@ -55,6 +63,13 @@ Rectangle {
     Component {
         id: homeComponent
         HomeRibbon {
+            analysisAvailable: panel.analysisAvailable
+            analysisBusy: panel.analysisBusy
+            onAnalyzeRequested: panel.analyzeRequested()
+            onMeshRequested: panel.meshRequested()
+            onSequenceRequested: panel.sequenceRequested()
+            onMaterialRequested: panel.materialRequested()
+            onProcessSettingsRequested: panel.processSettingsRequested()
             onImportRequested: panel.importRequested()
             onResultsRequested: panel.resultsRequested()
             onLogsRequested: panel.logsRequested()
@@ -63,7 +78,9 @@ Rectangle {
 
     Component {
         id: resultsComponent
-        ResultsRibbon {}
+        ResultsRibbon {
+            analysisModel: panel.analysisModel
+        }
     }
 
     Component {

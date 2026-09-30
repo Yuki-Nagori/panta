@@ -32,6 +32,20 @@ PanelSurface {
     property bool logsOpen: false
     property int logRunCount: 0
     property var resultRun: null
+    property var studies: []
+    property bool analysisAvailable: false
+    property bool analysisBusy: false
+    property string analysisOperation: ""
+    property bool meshGenerated: false
+    property bool gateGenerated: false
+    signal studyRequested(string studyId)
+    signal meshRequested(real edgeLength)
+    signal cancelRequested
+    signal analyzeRequested
+    function openMeshTool() {
+        panelTabs.currentIndex = 1;
+        meshToolOpen = true;
+    }
 
     function meshTypeText() {
         const entry = meshTypes.find(entry => entry.id === meshType);
@@ -48,7 +62,7 @@ PanelSurface {
             id: "create-mesh",
             text: panel.meshType.length > 0 ? qsTranslate("ImportTask", "Mesh (%1)").arg(panel.meshTypeText()) : qsTranslate("ImportTask", "Create Mesh..."),
             icon: "task-mesh",
-            completed: false
+            completed: panel.meshGenerated
         },
         {
             id: "analysis-sequence",
@@ -66,7 +80,7 @@ PanelSurface {
             id: "injection-locations",
             text: qsTranslate("ImportTask", "Set Injection Locations..."),
             icon: "task-injection",
-            completed: false
+            completed: panel.gateGenerated
         },
         {
             id: "process-settings",
@@ -83,10 +97,10 @@ PanelSurface {
         },
         {
             id: "analyze",
-            text: qsTranslate("UiCommonAnalysis", "Analyze"),
+            text: panel.analysisBusy ? qsTr("Stop analysis") : qsTranslate("UiCommonAnalysis", "Analyze"),
             icon: "task-analysis",
             completed: false,
-            enabled: false
+            enabled: panel.analysisAvailable
         },
         {
             id: "logs",
@@ -108,8 +122,9 @@ PanelSurface {
 
     function openPlanTask(taskId) {
         if (taskId === "create-mesh") {
-            panelTabs.currentIndex = 1;
-            meshToolOpen = true;
+            openMeshTool();
+        } else if (taskId === "analyze") {
+            analyzeRequested();
         } else if (taskId === "analysis-sequence") {
             analysisSequenceRequested();
         } else if (taskId === "process-settings" && panel.processSettingsAvailable) {
@@ -122,7 +137,7 @@ PanelSurface {
     }
 
     // Welcome 或空白视口没有对应导入记录，此时仍显示最近导入项。
-    readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 ? activeDocumentTitle : importedPartName
+    readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 || studies.some(study => study.id === activeDocumentId) ? activeDocumentTitle : importedPartName
 
     implicitWidth: Theme.leftPanelMinimumWidth
 
@@ -246,7 +261,7 @@ PanelSurface {
                         readonly property bool isActiveDocument: recordId !== "" && recordId === panel.activeDocumentId
 
                         width: projectTree.width
-                        height: Theme.controlHeight
+                        height: Theme.controlHeight * (1 + panel.studies.filter(study => study.parentId === recordId).length)
                         color: isActiveDocument ? Theme.colorSelected : partHover.hovered ? Theme.colorDocumentHover : Theme.colorTransparent
 
                         HoverHandler {
@@ -256,11 +271,37 @@ PanelSurface {
                         TapHandler {
                             id: partTap
                             gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: panel.openImportRequested(importedPartEntry.recordId)
+                            onTapped: eventPoint => {
+                                if (eventPoint.position.y < Theme.controlHeight)
+                                    panel.openImportRequested(importedPartEntry.recordId);
+                            }
+                        }
+                        Column {
+                            anchors.top: parent.top
+                            anchors.topMargin: Theme.controlHeight
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            Repeater {
+                                model: panel.studies.filter(study => study.parentId === importedPartEntry.recordId)
+                                delegate: ThemedToolButton {
+                                    required property var modelData
+                                    width: importedPartEntry.width
+                                    text: modelData.title
+                                    iconName: "stl-file"
+                                    preserveIconColors: true
+                                    contentAlignLeft: true
+                                    contentPadding: Theme.spacingLarge * 3
+                                    contentColor: Theme.colorText
+                                    hoverColor: Theme.colorDocumentHover
+                                    onClicked: panel.studyRequested(modelData.id)
+                                }
+                            }
                         }
 
                         RowLayout {
-                            anchors.fill: parent
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: Theme.controlHeight
                             anchors.leftMargin: Theme.spacingLarge * 2
                             anchors.rightMargin: Theme.spacingSmall
                             spacing: Theme.spacingSmall
@@ -414,6 +455,11 @@ PanelSurface {
                 MeshToolPanel {
                     anchors.fill: parent
                     visible: panel.meshToolOpen
+                    busy: panel.analysisBusy
+                    meshing: panel.analysisBusy && panel.analysisOperation === "mesh"
+                    meshAvailable: panel.analysisAvailable
+                    onMeshRequested: edgeLength => panel.meshRequested(edgeLength)
+                    onCancelRequested: panel.cancelRequested()
                 }
             }
 

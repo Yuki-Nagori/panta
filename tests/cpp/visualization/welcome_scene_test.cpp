@@ -1,3 +1,4 @@
+#include "panta/visualization/mesh_source.hpp"
 #include "welcome/welcome_scene.hpp"
 #include <QString>
 #include <QtCore/qobject.h>
@@ -45,6 +46,28 @@ class WelcomeSceneTest final : public QObject {
         scene.detach();
         QCOMPARE(render_window->GetRenderers()->GetNumberOfItems(), 0);
         scene.detach();
+    }
+    void fill_legend_uses_real_range_and_hides_for_geometry() {
+        vtkNew<vtkRenderWindow> render_window;
+        panta::visualization::WelcomeScene scene;
+        scene.attach(render_window);
+        scene.set_visible(false);
+        auto* props = render_window->GetRenderers()->GetFirstRenderer()->GetViewProps();
+        props->InitTraversal();
+        props->GetNextProp();
+        panta::visualization::SurfaceMeshSnapshot mesh;
+        mesh.fill_times = {0, 2.087};
+        mesh.fill_duration = 2.087;
+        scene.set_result_legend(&mesh, 1000, 700);
+        auto* legend = props->GetNextProp();
+        QVERIFY(legend->GetVisibility());
+        auto* title = vtkBillboardTextActor3D::SafeDownCast(props->GetNextProp());
+        QVERIFY(title != nullptr);
+        QCOMPARE(QString::fromUtf8(title->GetInput()), QStringLiteral("Fill time [s]\n= 2.087"));
+        mesh.fields_visible = false;
+        scene.set_result_legend(&mesh, 1000, 700);
+        QVERIFY(!legend->GetVisibility());
+        QVERIFY(!title->GetVisibility());
     }
 };
 

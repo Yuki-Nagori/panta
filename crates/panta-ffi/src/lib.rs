@@ -240,9 +240,10 @@ pub mod bridge {
         fn cpp_prefix() -> String;
     }
 
-    pub enum PreviewEventKind {
+    pub enum AnalysisEventKind {
         Progress,
-        ModelReady,
+        Log,
+        GateReady,
         MeshReady,
         Completed,
         Failed,
@@ -250,8 +251,8 @@ pub mod bridge {
     }
 
     /// 求解器粗粒度事件；坐标 mm，充填时间 s，压力 MPa。
-    pub struct PreviewEvent {
-        pub kind: PreviewEventKind,
+    pub struct AnalysisEvent {
+        pub kind: AnalysisEventKind,
         pub message: String,
         pub progress: f64,
         pub elapsed: f64,
@@ -260,16 +261,20 @@ pub mod bridge {
         pub output_dir: String,
         pub coordinates: Vec<f64>,
         pub fill_times: Vec<f64>,
+        pub pressures: Vec<f64>,
+        pub gate_points: Vec<f64>,
     }
 
     extern "Rust" {
-        type PreviewService;
-        fn preview_service_new() -> Box<PreviewService>;
-        fn preview_load(service: &mut PreviewService) -> Result<()>;
-        fn preview_remesh(service: &mut PreviewService) -> Result<()>;
-        fn preview_fill(service: &mut PreviewService) -> Result<()>;
-        fn preview_cancel(service: &PreviewService);
-        fn preview_drain(service: &mut PreviewService) -> Vec<PreviewEvent>;
+        type AnalysisService;
+        fn analysis_service_new() -> Box<AnalysisService>;
+        fn analysis_start(
+            service: &mut AnalysisService,
+            operation: &str,
+            settings: &str,
+        ) -> Result<()>;
+        fn analysis_cancel(service: &AnalysisService);
+        fn analysis_drain(service: &mut AnalysisService) -> Vec<AnalysisEvent>;
 
         /// Rust 侧拥有的 opaque 句柄：C++ 经 `rust::Box` 持有唯一所有权，
         /// 释放只能把 Box move 回 Rust；不暴露指针或复制语义。
@@ -1384,40 +1389,39 @@ fn project_service_finish_fill_settings_confirmation(
         .map_err(|error| error.to_string())
 }
 
-/// 固定演示服务的 CXX 所有者；释放时取消并回收外部进程。
-pub struct PreviewService(panta_solver::PreviewService);
+/// 工作区求解服务的 CXX 所有者；释放时取消并回收外部进程。
+pub struct AnalysisService(panta_solver::AnalysisService);
 
-fn preview_service_new() -> Box<PreviewService> {
+fn analysis_service_new() -> Box<AnalysisService> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    Box::new(PreviewService(panta_solver::PreviewService::new(
+    Box::new(AnalysisService(panta_solver::AnalysisService::new(
         root.canonicalize().unwrap_or(root),
     )))
 }
-fn preview_load(service: &mut PreviewService) -> Result<(), String> {
-    service.0.load()
+fn analysis_start(
+    service: &mut AnalysisService,
+    operation: &str,
+    settings: &str,
+) -> Result<(), String> {
+    service.0.start(operation, settings)
 }
-fn preview_remesh(service: &mut PreviewService) -> Result<(), String> {
-    service.0.remesh()
-}
-fn preview_fill(service: &mut PreviewService) -> Result<(), String> {
-    service.0.fill()
-}
-fn preview_cancel(service: &PreviewService) {
+fn analysis_cancel(service: &AnalysisService) {
     service.0.cancel();
 }
-fn preview_drain(service: &mut PreviewService) -> Vec<bridge::PreviewEvent> {
+fn analysis_drain(service: &mut AnalysisService) -> Vec<bridge::AnalysisEvent> {
     service
         .0
         .drain()
         .into_iter()
-        .map(|event| bridge::PreviewEvent {
+        .map(|event| bridge::AnalysisEvent {
             kind: match event.kind {
-                panta_solver::EventKind::Progress => bridge::PreviewEventKind::Progress,
-                panta_solver::EventKind::ModelReady => bridge::PreviewEventKind::ModelReady,
-                panta_solver::EventKind::MeshReady => bridge::PreviewEventKind::MeshReady,
-                panta_solver::EventKind::Completed => bridge::PreviewEventKind::Completed,
-                panta_solver::EventKind::Failed => bridge::PreviewEventKind::Failed,
-                panta_solver::EventKind::Cancelled => bridge::PreviewEventKind::Cancelled,
+                panta_solver::EventKind::Progress => bridge::AnalysisEventKind::Progress,
+                panta_solver::EventKind::Log => bridge::AnalysisEventKind::Log,
+                panta_solver::EventKind::GateReady => bridge::AnalysisEventKind::GateReady,
+                panta_solver::EventKind::MeshReady => bridge::AnalysisEventKind::MeshReady,
+                panta_solver::EventKind::Completed => bridge::AnalysisEventKind::Completed,
+                panta_solver::EventKind::Failed => bridge::AnalysisEventKind::Failed,
+                panta_solver::EventKind::Cancelled => bridge::AnalysisEventKind::Cancelled,
             },
             message: event.message,
             progress: event.progress,
@@ -1427,6 +1431,8 @@ fn preview_drain(service: &mut PreviewService) -> Vec<bridge::PreviewEvent> {
             output_dir: event.output_dir,
             coordinates: event.mesh.coordinates,
             fill_times: event.mesh.fill_times,
+            pressures: event.mesh.pressures,
+            gate_points: event.mesh.gate_points,
         })
         .collect()
 }

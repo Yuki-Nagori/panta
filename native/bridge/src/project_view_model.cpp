@@ -198,6 +198,18 @@ QVariantList ProjectViewModel::analysisSequences() const { return m_analysisSequ
 
 QVariantMap ProjectViewModel::planSettings() const { return m_planSettings; }
 
+QVariantMap ProjectViewModel::analysisInput() const {
+    const auto id = m_planSettings.value(QStringLiteral("importId")).toString();
+    const QDir directory(QFileInfo(m_currentPath).absolutePath());
+    for (const auto& record : panta::ffi::project_service_imports(*m_service)) {
+        if (QString::fromUtf8(record.id) == id)
+            return {{QStringLiteral("source"), directory.filePath(QString::fromUtf8(record.asset))},
+                    {QStringLiteral("units"), QString::fromUtf8(record.units)},
+                    {QStringLiteral("output"), directory.filePath("analyses/" + id)}};
+    }
+    return {};
+}
+
 void ProjectViewModel::refreshPlanSettings() {
     const auto settings =
         panta::ffi::project_service_plan_settings(*m_service, m_activeDocumentId.toStdString());

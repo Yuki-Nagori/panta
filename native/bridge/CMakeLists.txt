@@ -25,8 +25,8 @@ qt_add_qml_module(
   src/shell_view_model.cpp
   src/settings.hpp
   src/settings.cpp
-  src/filling_preview_model.hpp
-  src/filling_preview_model.cpp
+  src/analysis_model.hpp
+  src/analysis_model.cpp
   src/task_host.hpp
   src/task_host.cpp
   src/path_host.hpp
