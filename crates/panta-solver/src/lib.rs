@@ -1,11 +1,8 @@
-//! 固定 cover 充填演示：工作线程管理输入、外部进程和结果，GUI 只拉取事件。
-//! 默认输入及实施记录见仓库根 preview.md；不作为任意求解器的通用协议。
-
+//! Moldfill 工作区分析：后台执行网格、浇口推荐与充填，按已提交产物发布结果。
 mod result;
 
 use panta_foundation::process::run_observed;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -15,18 +12,7 @@ use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-const CASE: &str = "benchmarks/cover_noniso_quick.case.yaml";
-// 参数算例允许编辑；默认几何与材料仍校验哈希，避免资产被静默替换。
-const FIXED_ASSETS: [(&str, &str); 2] = [
-    (
-        "examples/cover/cover.STL",
-        "4102bfe5acccad37ca3a0eed80ddd43997a7dcf42a518cfd58398fb53a5c227f",
-    ),
-    (
-        "materials/polyflam-ripp-3625-cs1.yaml",
-        "f516ce22ed2690dd0051c256a678940a52ef0753443bfd3814db234b01281f17",
-    ),
-];
+const CASE: &str = "examples/cover/cover_fast.case.yaml";
 const CPU_SETTINGS: [(&str, &str); 7] = [
     ("MOLDFILL_DEVICE", "cpu"),
     ("MOLDFILL_PRESSURE_DEVICE", "cpu"),
@@ -37,24 +23,27 @@ const CPU_SETTINGS: [(&str, &str); 7] = [
     ("MOLDFILL_DT_GROWTH", "0.5"),
 ];
 
-/// 展开后的三角面坐标 mm；fill_times 为空或与顶点一一对应，单位 s。
+/// 展开的三角面坐标 mm；字段与展开顶点一一对应。
 #[derive(Default)]
 pub struct DisplayMesh {
     pub coordinates: Vec<f64>,
     pub fill_times: Vec<f64>,
+    pub pressures: Vec<f64>,
+    pub gate_points: Vec<f64>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum EventKind {
     Progress,
-    ModelReady,
+    Log,
     MeshReady,
+    GateReady,
     Completed,
     Failed,
     Cancelled,
 }
 
-/// 每个终态最多携带一次显示快照。非 Progress 事件结束当前工作线程。
+/// Progress / Log 非终态；其他事件完成当前操作。
 pub struct Event {
     pub kind: EventKind,
     pub message: String,
@@ -65,8 +54,8 @@ pub struct Event {
     pub output_dir: String,
     pub mesh: DisplayMesh,
     remeshed: Option<PathBuf>,
+    gate: Option<PathBuf>,
 }
-
 impl Event {
     fn new(kind: EventKind, message: impl Into<String>) -> Self {
         Self {
@@ -79,23 +68,15 @@ impl Event {
             output_dir: String::new(),
             mesh: DisplayMesh::default(),
             remeshed: None,
+            gate: None,
         }
     }
 }
-
-#[derive(Clone, Copy)]
-enum Operation {
-    Load,
-    Remesh,
-    Fill,
-}
-
 struct Worker {
     cancelled: Arc<AtomicBool>,
     events: mpsc::Receiver<Event>,
     handle: Option<JoinHandle<()>>,
 }
-
 impl Drop for Worker {
     fn drop(&mut self) {
         self.cancelled.store(true, Ordering::Release);
@@ -105,65 +86,67 @@ impl Drop for Worker {
     }
 }
 
-/// 单作业演示服务。重复提交被拒绝；释放服务时停止并回收求解器。
-/// 所有方法由同一宿主线程调用；只有工作线程接触进程和输入/结果文件。
-pub struct PreviewService {
+/// 单活动零件的运行服务；GUI 线程提交 / 拉取，后台线程持有外部进程。
+/// 重新划网格成功后使旧浇口失效；失败和取消保留上一有效产物。
+pub struct AnalysisService {
     root: PathBuf,
-    loaded: bool,
     remeshed: Option<PathBuf>,
+    gate: Option<PathBuf>,
     worker: Option<Worker>,
 }
-
-impl PreviewService {
+impl AnalysisService {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
-            loaded: false,
             remeshed: None,
+            gate: None,
             worker: None,
         }
     }
 
-    pub fn load(&mut self) -> Result<(), String> {
-        self.start(Operation::Load)
-    }
-
-    pub fn remesh(&mut self) -> Result<(), String> {
-        if !self.loaded {
-            return Err("Load the default example first".into());
+    /// 请求 JSON 为单次冻结快照；参数校验和依赖检查在启动前完成。
+    pub fn start(&mut self, operation: &str, settings: &str) -> Result<(), String> {
+        if self.worker.is_some() {
+            return Err("An analysis is already running".into());
         }
-        self.start(Operation::Remesh)
-    }
-
-    pub fn fill(&mut self) -> Result<(), String> {
-        if self.remeshed.is_none() {
+        let mode = match operation {
+            "mesh" => "remesh_only",
+            "gate" => "gate_only",
+            "fill" => "solve",
+            _ => return Err("Unknown analysis operation".into()),
+        };
+        let mut request: Value = serde_json::from_str(settings).map_err(|e| e.to_string())?;
+        validate_settings(&request)?;
+        if mode != "remesh_only" && self.remeshed.is_none() {
             return Err("Generate the mesh first".into());
         }
-        self.start(Operation::Fill)
-    }
-
-    pub fn cancel(&self) {
-        if let Some(worker) = &self.worker {
-            worker.cancelled.store(true, Ordering::Release);
+        if mode == "solve" && self.gate.is_none() {
+            return Err("Run Gate Location Analyze first".into());
         }
-    }
-
-    fn start(&mut self, operation: Operation) -> Result<(), String> {
-        if self.worker.is_some() {
-            return Err("A preview operation is already running".into());
-        }
+        request["mode"] = mode.into();
+        request["mesh"] = self
+            .remeshed
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default()
+            .into();
+        request["gate"] = self
+            .gate
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default()
+            .into();
         let root = self.root.clone();
-        let remeshed = self.remeshed.clone();
         let cancelled = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&cancelled);
         let (sender, events) = mpsc::channel();
         let handle = std::thread::Builder::new()
-            .name("moldfill-preview".into())
+            .name("moldfill-analysis".into())
             .spawn(move || {
                 let start = Instant::now();
-                let result = perform(&root, operation, remeshed.as_deref(), &flag, &sender);
+                let result = perform(&root, request, &flag, &sender);
                 let mut event = if flag.load(Ordering::Acquire) {
-                    Event::new(EventKind::Cancelled, "Stopped. You can retry this step.")
+                    Event::new(EventKind::Cancelled, "Analysis stopped")
                 } else {
                     result.unwrap_or_else(|e| Event::new(EventKind::Failed, e))
                 };
@@ -178,8 +161,13 @@ impl PreviewService {
         });
         Ok(())
     }
+    pub fn cancel(&self) {
+        if let Some(worker) = &self.worker {
+            worker.cancelled.store(true, Ordering::Release);
+        }
+    }
 
-    /// 非阻塞拉取。终态更新服务的可执行步骤，并回收已退出的工作线程。
+    /// 只消费就绪事件；终态释放已退出线程，不阻塞 GUI 等待计算。
     pub fn drain(&mut self) -> Vec<Event> {
         let Some(worker) = &self.worker else {
             return Vec::new();
@@ -189,7 +177,7 @@ impl PreviewService {
         loop {
             match worker.events.try_recv() {
                 Ok(event) => {
-                    terminal |= event.kind != EventKind::Progress;
+                    terminal = !matches!(event.kind, EventKind::Progress | EventKind::Log);
                     events.push(event);
                     if terminal {
                         break;
@@ -200,20 +188,18 @@ impl PreviewService {
                     terminal = true;
                     events.push(Event::new(
                         EventKind::Failed,
-                        "Preview worker exited unexpectedly",
+                        "Analysis worker exited unexpectedly",
                     ));
                     break;
                 }
             }
         }
         for event in &events {
-            match event.kind {
-                EventKind::ModelReady => {
-                    self.loaded = true;
-                    self.remeshed = None;
-                }
-                EventKind::MeshReady => self.remeshed.clone_from(&event.remeshed),
-                _ => {}
+            if event.kind == EventKind::MeshReady {
+                self.remeshed.clone_from(&event.remeshed);
+                self.gate = None;
+            } else if event.kind == EventKind::GateReady {
+                self.gate.clone_from(&event.gate);
             }
         }
         if terminal {
@@ -223,49 +209,51 @@ impl PreviewService {
     }
 }
 
+fn validate_settings(request: &Value) -> Result<(), String> {
+    for key in ["source", "output"] {
+        if request[key].as_str().is_none_or(str::is_empty) {
+            return Err(format!("Missing {key}"));
+        }
+    }
+    for key in [
+        "edgeLength",
+        "moldTemperature",
+        "meltTemperature",
+        "flowRate",
+        "switchVolume",
+    ] {
+        if !request[key].as_f64().is_some_and(f64::is_finite) {
+            return Err(format!("Invalid {key}"));
+        }
+    }
+    if request["edgeLength"].as_f64().unwrap_or_default() <= 0.0
+        || request["flowRate"].as_f64().unwrap_or_default() <= 0.0
+        || !(0.0..=100.0).contains(&request["switchVolume"].as_f64().unwrap_or(-1.0))
+    {
+        return Err("Invalid mesh or fill control settings".into());
+    }
+    if request["numberOfGates"] != 1 {
+        return Err("This solver integration supports one injection gate; top_k is a recommendation count, not multiple injection gates".into());
+    }
+    Ok(())
+}
+
 fn read_stl(path: &Path) -> Result<DisplayMesh, String> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mesh = panta_mesh::parse_stl(&bytes).map_err(|e| e.to_string())?;
     Ok(DisplayMesh {
         coordinates: mesh.triangles.into_iter().flatten().flatten().collect(),
-        fill_times: Vec::new(),
+        ..DisplayMesh::default()
     })
-}
-
-fn unique_output(root: &Path) -> Result<PathBuf, String> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_nanos();
-    let parent = root.join("target/moldfill-preview");
-    fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
-    let output = parent.join(format!("gui-{}-{stamp}", std::process::id()));
-    fs::create_dir(&output).map_err(|e| e.to_string())?;
-    Ok(output)
 }
 
 fn perform(
     root: &Path,
-    operation: Operation,
-    mesh: Option<&Path>,
+    mut request: Value,
     cancelled: &AtomicBool,
     sender: &mpsc::Sender<Event>,
 ) -> Result<Event, String> {
     let solver = root.join("target/Moldfill_HITL_v1");
-    for (relative, expected) in FIXED_ASSETS {
-        let bytes = fs::read(solver.join(relative))
-            .map_err(|e| format!("Default input {relative}: {e}"))?;
-        if format!("{:x}", Sha256::digest(bytes)) != expected {
-            return Err(format!(
-                "Default input changed: {relative}. Restore the validated example described in MVP使用说明书.md."
-            ));
-        }
-    }
-    if matches!(operation, Operation::Load) {
-        let mut event = Event::new(EventKind::ModelReady, "Cover loaded · 202 × 6 × 152 mm");
-        event.mesh = read_stl(&solver.join("examples/cover/cover.STL"))?;
-        return Ok(event);
-    }
     let python = root.join(if cfg!(windows) {
         "target/moldfill-venv/Scripts/python.exe"
     } else {
@@ -274,13 +262,24 @@ fn perform(
     if !python.is_file() || !solver.join(CASE).is_file() {
         return Err("Solver environment is missing. Follow MVP使用说明书.md to prepare it.".into());
     }
-    let output = unique_output(root)?;
+    let parent = PathBuf::from(request["output"].as_str().ok_or("Missing output")?);
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let output = parent.join(format!("run-{}-{stamp}", std::process::id()));
+    fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+    request["output"] = output.to_string_lossy().into_owned().into();
+    request["template"] = solver.join(CASE).to_string_lossy().into_owned().into();
+    let request_path = output.join("request.json");
+    fs::write(&request_path, request.to_string()).map_err(|e| e.to_string())?;
     let log = File::create(output.join("console.log")).map_err(|e| e.to_string())?;
     let mut command = Command::new(python);
     command
         .current_dir(&solver)
-        .args(["-u", "-m", "moldfill", "run", CASE, "--out"])
-        .arg(&output)
+        .arg("-u")
+        .arg(root.join("tools/moldfill/driver.py"))
+        .arg(request_path)
         .stdin(Stdio::null())
         .stdout(log.try_clone().map_err(|e| e.to_string())?)
         .stderr(log);
@@ -292,63 +291,79 @@ fn perform(
     command
         .envs(CPU_SETTINGS)
         .env("PYTHONPATH", solver.join("src"));
-    let mode = if matches!(operation, Operation::Remesh) {
-        command.arg("--remesh-only");
-        "remesh_only"
-    } else {
-        command.arg("--mesh").arg(mesh.ok_or("No remeshed input")?);
-        "solve"
-    };
-    let settings = serde_json::json!({"case": CASE, "environment": CPU_SETTINGS, "mode":mode});
-    fs::write(output.join("preview-settings.json"), settings.to_string())
-        .map_err(|e| e.to_string())?;
     let mut reader = EventReader::default();
+    let mut console_offset = 0;
     let started = Instant::now();
-    let status = run_observed(&mut command, cancelled, || {
+    let mut observe = || {
         for mut event in reader.read(&output) {
             event.elapsed = started.elapsed().as_secs_f64();
             event.output_dir = output.to_string_lossy().into_owned();
             let _ = sender.send(event);
         }
-    })
-    .map_err(|e| format!("Cannot run solver: {e}\n{}", output.display()))?;
+        if let Ok(bytes) = fs::read(output.join("console.log"))
+            && bytes.len() > console_offset
+        {
+            let end = bytes
+                .iter()
+                .rposition(|b| *b == b'\n')
+                .map_or(console_offset, |p| p + 1);
+            if end > console_offset {
+                let _ = sender.send(Event::new(
+                    EventKind::Log,
+                    String::from_utf8_lossy(&bytes[console_offset..end]).into_owned(),
+                ));
+                console_offset = end;
+            }
+        }
+    };
+    let status = run_observed(&mut command, cancelled, &mut observe)
+        .map_err(|e| format!("Cannot run solver: {e}"))?;
+    observe();
     if !status.success() {
-        let log = fs::read_to_string(output.join("console.log")).unwrap_or_default();
-        let tail = log
-            .lines()
-            .rev()
-            .take(8)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join("\n");
         return Err(format!(
-            "Solver exited with {status}.\n{tail}\nRun: {}",
+            "Solver exited with {status}. See console.log in {}",
             output.display()
         ));
     }
+    let mode = request["mode"].as_str().ok_or("Missing mode")?;
     let run = result::committed_run(&output, mode)?;
-    let mut event = if matches!(operation, Operation::Remesh) {
-        let path = result::artifact(&run, "_remeshed.STL")?;
-        let mut event = Event::new(
-            EventKind::MeshReady,
-            "Mesh ready · default material and process applied",
-        );
-        event.mesh = read_stl(&path)?;
-        event.remeshed = Some(path);
-        event
-    } else {
-        let summary = fs::read_to_string(result::artifact(&run, "result.yaml")?)
+    let mut event = match mode {
+        "remesh_only" => {
+            let path = result::artifact(&run, "_remeshed.STL")?;
+            let mut e = Event::new(EventKind::MeshReady, "Mesh generated");
+            e.mesh = read_stl(&path)?;
+            e.remeshed = Some(path);
+            e
+        }
+        "gate_only" => {
+            let path = result::artifact(&run, "gate_recommend.yaml")?;
+            let mut e = Event::new(
+                EventKind::GateReady,
+                fs::read_to_string(&path).map_err(|e| e.to_string())?,
+            );
+            e.gate = Some(path);
+            let positions: Vec<f64> = serde_json::from_slice(
+                &fs::read(output.join("gate-display.json")).map_err(|e| e.to_string())?,
+            )
             .map_err(|e| e.to_string())?;
-        let (time, pressure) = result::summary(&summary)?;
-        let text = fs::read_to_string(result::artifact(&run, "fill_pattern.vtk")?)
-            .map_err(|e| e.to_string())?;
-        let mut event = Event::new(EventKind::Completed, "Filling complete · ready to replay");
-        event.mesh = result::read_vtk(&text)?;
-        event.fill_time = time;
-        event.peak_pressure = pressure;
-        event
+            if positions.len() != 3 || positions.iter().any(|p| !p.is_finite()) {
+                return Err("Invalid selected gate position".into());
+            }
+            e.mesh.gate_points = positions;
+            e
+        }
+        _ => {
+            let summary = fs::read_to_string(result::artifact(&run, "result.yaml")?)
+                .map_err(|e| e.to_string())?;
+            let (time, pressure) = result::summary(&summary)?;
+            let text = fs::read_to_string(result::artifact(&run, "fill_pattern.vtk")?)
+                .map_err(|e| e.to_string())?;
+            let mut e = Event::new(EventKind::Completed, "Filling complete");
+            e.mesh = result::read_vtk(&text)?;
+            e.fill_time = time;
+            e.peak_pressure = pressure;
+            e
+        }
     };
     event.progress = 1.0;
     event.output_dir = run.to_string_lossy().into_owned();
@@ -394,7 +409,7 @@ impl EventReader {
             };
             if matches!(
                 row["event"].as_str(),
-                Some("progress" | "stage_enter" | "warning" | "error")
+                Some("progress" | "stage_enter" | "artifact_written" | "warning" | "error")
             ) {
                 let mut event = Event::new(
                     EventKind::Progress,
@@ -457,28 +472,135 @@ mod tests {
 
     #[test]
     fn steps_require_their_inputs() {
-        let mut service = PreviewService::new(PathBuf::from("missing"));
-        assert!(service.remesh().is_err());
-        assert!(service.fill().is_err());
+        let mut service = AnalysisService::new(PathBuf::from("missing"));
+        assert!(service.start("gate", "{}").is_err());
+        assert!(service.start("fill", "{}").is_err());
+    }
+    #[test]
+    fn invalid_settings_and_multiple_injection_gates_are_rejected() {
+        let mut request = serde_json::json!({"source":"cover.STL", "output":"result",
+            "edgeLength":12.0, "moldTemperature":40.0, "meltTemperature":230.0,
+            "flowRate":94.7, "switchVolume":99.0, "numberOfGates":1});
+        assert!(validate_settings(&request).is_ok());
+        request["numberOfGates"] = 3.into();
+        assert!(validate_settings(&request).is_err());
+        request["numberOfGates"] = 1.into();
+        request["edgeLength"] = (-1).into();
+        assert!(validate_settings(&request).is_err());
+    }
+
+    /// 需要本机外部求解器和 Python 环境；不纳入普通回归的耗时门禁。
+    #[test]
+    #[ignore = "requires target/Moldfill_HITL_v1 and prepared Python environment"]
+    fn cover_mesh_gate_and_fill_are_real_solver_outputs() -> Result<(), String> {
+        cover_integration(true)
     }
 
     #[test]
-    fn missing_source_fails_without_replacing_state() -> Result<(), String> {
-        let mut service = PreviewService::new(PathBuf::from("missing"));
-        service.load()?;
-        assert!(service.load().is_err());
-        let deadline = Instant::now() + std::time::Duration::from_secs(5);
-        loop {
-            let events = service.drain();
-            if !events.is_empty() {
-                assert!(events.iter().any(|e| e.kind == EventKind::Failed));
-                assert!(!service.loaded);
-                return Ok(());
+    #[ignore = "requires the external solver; quick mesh and gate verification"]
+    fn cover_gate_marker_comes_from_solver_recommendation() -> Result<(), String> {
+        cover_integration(false)
+    }
+
+    fn cover_integration(include_fill: bool) -> Result<(), String> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .map_err(|e| e.to_string())?;
+        let output = root.join("target/moldfill-integration");
+        let request = serde_json::json!({"source":root.join("target/Moldfill_HITL_v1/examples/cover/cover.STL"),
+            "output":output, "edgeLength":12.0, "moldTemperature":40.0, "meltTemperature":230.0,
+            "flowRate":94.7, "switchVolume":99.0, "numberOfGates":1});
+        let mut service = AnalysisService::new(root);
+        for (operation, expected) in [
+            ("mesh", EventKind::MeshReady),
+            ("gate", EventKind::GateReady),
+            ("fill", EventKind::Completed),
+        ] {
+            if operation == "fill" && !include_fill {
+                break;
             }
-            if Instant::now() > deadline {
-                return Err("Timed out".into());
+            service.start(operation, &request.to_string())?;
+            let deadline = Instant::now() + std::time::Duration::from_secs(900);
+            loop {
+                let mut done = false;
+                for event in service.drain() {
+                    if matches!(event.kind, EventKind::Progress | EventKind::Log) {
+                        continue;
+                    }
+                    if event.kind != expected {
+                        return Err(event.message);
+                    }
+                    println!("{operation}: {}", event.output_dir);
+                    if expected == EventKind::GateReady {
+                        assert_eq!(event.mesh.gate_points.len(), 3);
+                        assert!(event.mesh.gate_points.iter().all(|p| p.is_finite()));
+                    }
+                    if expected == EventKind::Completed {
+                        assert!(event.fill_time > 0.0 && event.peak_pressure > 0.0);
+                        assert_eq!(
+                            event.mesh.coordinates.len(),
+                            event.mesh.fill_times.len() * 3
+                        );
+                        assert_eq!(event.mesh.pressures.len(), event.mesh.fill_times.len());
+                        assert!(
+                            event
+                                .mesh
+                                .pressures
+                                .iter()
+                                .any(|p| p.is_finite() && *p > 0.0)
+                        );
+                        println!(
+                            "fill time={} s, peak pressure={} MPa",
+                            event.fill_time, event.peak_pressure
+                        );
+                    }
+                    done = true;
+                }
+                if done {
+                    break;
+                }
+                if Instant::now() > deadline {
+                    service.cancel();
+                    return Err("Integration timed out".into());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
-            std::thread::sleep(std::time::Duration::from_millis(10));
         }
+        Ok(())
+    }
+    #[test]
+    #[ignore = "requires external solver; optionally set PANTA_SOLVER_TEST_SOURCE"]
+    fn imported_lowercase_stl_mesh_is_displayed() -> Result<(), String> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .map_err(|e| e.to_string())?;
+        let parent = root.join("target/moldfill-lowercase-regression");
+        fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
+        let source = if let Some(path) = std::env::var_os("PANTA_SOLVER_TEST_SOURCE") {
+            PathBuf::from(path)
+        } else {
+            let path = parent.join("cover.stl");
+            fs::copy(
+                root.join("target/Moldfill_HITL_v1/examples/cover/cover.STL"),
+                &path,
+            )
+            .map_err(|e| e.to_string())?;
+            path
+        };
+        let request = serde_json::json!({"source":source, "output":parent, "mode":"remesh_only",
+            "edgeLength":12.0, "moldTemperature":40.0, "meltTemperature":230.0,
+            "flowRate":94.7, "switchVolume":99.0, "numberOfGates":1});
+        let (sender, _events) = mpsc::channel();
+        let event = perform(&root, request, &AtomicBool::new(false), &sender)?;
+        assert!(event.kind == EventKind::MeshReady);
+        assert!(!event.mesh.coordinates.is_empty());
+        println!(
+            "{} triangles; {}",
+            event.mesh.coordinates.len() / 9,
+            event.output_dir
+        );
+        Ok(())
     }
 }

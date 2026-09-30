@@ -30,6 +30,11 @@ ColumnLayout {
     property bool logsOpen: false
     property int logRunCount: 0
     property var resultRun: null
+    property bool analysisAvailable: false
+    property bool analysisBusy: false
+    property string analysisOperation: ""
+    property bool meshGenerated: false
+    property bool gateGenerated: false
 
     function meshTypeText() {
         const entry = meshTypes.find(entry => entry.id === meshType);
@@ -56,7 +61,7 @@ ColumnLayout {
             id: "create-mesh",
             text: panel.meshType.length > 0 ? qsTranslate("ImportTask", "Mesh (%1)").arg(panel.meshTypeText()) : qsTranslate("ImportTask", "Create Mesh..."),
             icon: "task-mesh",
-            completed: false
+            completed: panel.meshGenerated
         },
         {
             id: "analysis-sequence",
@@ -74,7 +79,7 @@ ColumnLayout {
             id: "injection-locations",
             text: qsTranslate("ImportTask", "Set Injection Locations..."),
             icon: "task-injection",
-            completed: false
+            completed: panel.gateGenerated
         },
         {
             id: "process-settings",
@@ -91,10 +96,10 @@ ColumnLayout {
         },
         {
             id: "analyze",
-            text: qsTranslate("UiCommonAnalysis", "Analyze"),
+            text: panel.analysisBusy ? qsTr("Stop analysis") : qsTranslate("UiCommonAnalysis", "Analyze"),
             icon: "task-analysis",
-            completed: false,
-            enabled: false
+            completed: panel.analysisOperation === "fill" && !panel.analysisBusy,
+            enabled: panel.analysisAvailable
         },
         {
             id: "logs",
@@ -113,6 +118,7 @@ ColumnLayout {
     signal materialRequested
     signal newProjectRequested
     signal openImportRequested(string recordId)
+    signal analyzeRequested
 
     function openPlanTask(taskId) {
         if (taskId === "create-mesh") {
@@ -125,6 +131,8 @@ ColumnLayout {
             materialRequested();
         } else if (taskId === "logs") {
             logsRequested();
+        } else if (taskId === "analyze") {
+            analyzeRequested();
         }
     }
 

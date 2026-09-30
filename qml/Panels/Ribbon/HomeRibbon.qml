@@ -6,6 +6,13 @@ RibbonContent {
 
     signal importRequested
     signal resultsRequested
+    property bool analysisAvailable: false
+    property bool analysisBusy: false
+    signal analyzeRequested
+    signal meshRequested
+    signal sequenceRequested
+    signal materialRequested
+    signal processSettingsRequested
     signal logsRequested
 
     groups: [
@@ -96,7 +103,7 @@ RibbonContent {
                     key: "analyze",
                     label: qsTranslate("UiCommonAnalysis", "Analyze"),
                     icon: "ribbon-analyze",
-                    enabled: false
+                    enabled: homeRibbon.analysisAvailable
                 },
                 {
                     key: "logs",
@@ -144,6 +151,16 @@ RibbonContent {
             homeRibbon.importRequested();
         else if (key === "results")
             homeRibbon.resultsRequested();
+        else if (key === "analyze")
+            homeRibbon.analyzeRequested();
+        else if (key === "mesh")
+            homeRibbon.meshRequested();
+        else if (key === "sequence")
+            homeRibbon.sequenceRequested();
+        else if (key === "material")
+            homeRibbon.materialRequested();
+        else if (key === "settings")
+            homeRibbon.processSettingsRequested();
         else if (key === "logs")
             homeRibbon.logsRequested();
     }

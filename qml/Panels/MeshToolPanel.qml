@@ -1,4 +1,4 @@
-// 网格工具的纯界面；参数和动作尚未接入网格服务。
+// 网格工具发语义请求；默认边长来自 cover_fast 算例，外部服务实际重划。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -8,6 +8,12 @@ import QtQuick.Layouts
 ScrollView {
     id: meshTool
     objectName: "meshToolPanel"
+
+    property bool busy: false
+    property bool meshing: false
+    property bool meshAvailable: false
+    signal meshRequested(real edgeLength)
+    signal cancelRequested
 
     clip: true
     contentWidth: availableWidth
@@ -78,6 +84,8 @@ ScrollView {
                 Layout.fillWidth: true
                 text: qsTranslate("MeshTool", "Mesh")
                 primaryAction: true
+                enabled: meshTool.meshAvailable && !meshTool.busy
+                onClicked: meshTool.meshRequested(Number(edgeLength.text))
             }
             ThemedButton {
                 contentPadding: Theme.spacingLarge
@@ -97,8 +105,28 @@ ScrollView {
                 contentPadding: Theme.spacingLarge
                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshCancelAction"
+                enabled: meshTool.busy
+                onClicked: meshTool.cancelRequested()
                 Layout.fillWidth: true
                 text: qsTranslate("DialogAction", "Cancel")
+            }
+        }
+
+        ColumnLayout {
+            visible: meshTool.meshing
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.spacingMedium
+            Layout.rightMargin: Theme.spacingMedium
+            spacing: Theme.spacingSmall
+            ThemedLabel {
+                text: qsTr("Generating mesh… See Mesh Log for elapsed time.")
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+            ProgressBar {
+                objectName: "meshProgress"
+                Layout.fillWidth: true
+                indeterminate: true
             }
         }
 
@@ -172,7 +200,9 @@ ScrollView {
                             textSize: Theme.fontBody
                         }
                         ThemedTextField {
+                            id: edgeLength
                             objectName: "globalEdgeLengthField"
+                            enabled: !meshTool.busy
                             Layout.preferredWidth: Theme.controlHeight * 3
                             Layout.preferredHeight: Theme.controlHeight
                             text: "12.00"

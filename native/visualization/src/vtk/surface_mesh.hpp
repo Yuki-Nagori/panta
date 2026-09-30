@@ -8,6 +8,9 @@ class vtkPolyData;
 
 namespace panta::visualization {
 
+/// 所选浇口的球形显示标记；不改变求解网格或边界条件。
+vtkSmartPointer<vtkPolyData> make_gate_poly_data(const SurfaceMeshSnapshot& mesh);
+
 vtkSmartPointer<vtkPolyData> make_surface_poly_data(const SurfaceMeshSnapshot& mesh);
 
 /// 用线性插值的到达时间切分每个三角面；灰色为尚未充填，颜色为到达时间。

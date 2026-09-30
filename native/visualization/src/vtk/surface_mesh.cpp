@@ -6,17 +6,39 @@
 #include <cmath>
 #include <cstddef>
 #include <vector>
+#include <vtkAppendPolyData.h>
 #include <vtkCellArray.h>
 #include <vtkFloatArray.h>
 #include <vtkMath.h>
+#include <vtkNew.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
 #include <vtkType.h>
 #include <vtkUnsignedCharArray.h>
 
 namespace panta::visualization {
+
+vtkSmartPointer<vtkPolyData> make_gate_poly_data(const SurfaceMeshSnapshot& mesh) {
+    vtkNew<vtkAppendPolyData> append;
+    if (mesh.gate_points.empty())
+        return vtkSmartPointer<vtkPolyData>::New();
+    for (const auto& point : mesh.gate_points) {
+        vtkNew<vtkSphereSource> sphere;
+        sphere->SetCenter(point.data());
+        sphere->SetRadius(2.5);
+        sphere->SetThetaResolution(16);
+        sphere->SetPhiResolution(16);
+        sphere->Update();
+        append->AddInputData(sphere->GetOutput());
+    }
+    append->Update();
+    auto data = vtkSmartPointer<vtkPolyData>::New();
+    data->ShallowCopy(append->GetOutput());
+    return data;
+}
 
 vtkSmartPointer<vtkPolyData> make_surface_poly_data(const SurfaceMeshSnapshot& mesh) {
     const auto triangle_count = static_cast<vtkIdType>(mesh.vertices.size() / 3);
@@ -109,8 +131,27 @@ std::array<unsigned char, 3> arrival_color(double fraction) {
 } // namespace
 
 vtkSmartPointer<vtkPolyData> make_filling_poly_data(const SurfaceMeshSnapshot& mesh, double time) {
-    if (mesh.fill_times.size() != mesh.vertices.size() || mesh.fill_duration <= 0) {
+    if (mesh.fill_times.size() != mesh.vertices.size() || mesh.fill_duration <= 0 ||
+        !mesh.fields_visible) {
         return make_surface_poly_data(mesh);
+    }
+    if (mesh.pressure_visible && mesh.pressures.size() == mesh.vertices.size()) {
+        auto data = make_surface_poly_data(mesh);
+        auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+        colors->SetNumberOfComponents(3);
+        colors->SetName("pressure_colors");
+        double maximum = 0;
+        for (double p : mesh.pressures) {
+            if (std::isfinite(p))
+                maximum = std::max(maximum, p);
+        }
+        for (double p : mesh.pressures) {
+            const auto color = std::isfinite(p) ? arrival_color(maximum > 0 ? p / maximum : 0)
+                                                : std::array<unsigned char, 3>{205, 212, 220};
+            colors->InsertNextTypedTuple(color.data());
+        }
+        data->GetPointData()->SetScalars(colors);
+        return data;
     }
     SurfaceMeshSnapshot display;
     auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();

@@ -41,7 +41,12 @@ pub fn artifact(run: &Path, suffix: &str) -> Result<PathBuf, String> {
         .ok_or("Missing artifacts")?;
     let matches: Vec<_> = entries
         .iter()
-        .filter(|item| item["path"].as_str().is_some_and(|s| s.ends_with(suffix)))
+        .filter(|item| {
+            item["path"].as_str().is_some_and(|s| {
+                s.to_ascii_lowercase()
+                    .ends_with(&suffix.to_ascii_lowercase())
+            })
+        })
         .collect();
     if matches.len() != 1 {
         return Err(format!("Missing or ambiguous artifact: {suffix}"));
@@ -201,11 +206,35 @@ pub fn read_vtk(text: &str) -> Result<DisplayMesh, String> {
     if !times.iter().any(|v| v.is_finite()) {
         return Err("VTK contains no filled nodes".into());
     }
+    let mut pressures = Vec::new();
+    while let Some(next) = tokens.next() {
+        if next != "SCALARS" {
+            return Err("Unsupported VTK field layout".into());
+        }
+        let name = token(&mut tokens)?;
+        let _kind = token(&mut tokens)?;
+        expect(&mut tokens, "1")?;
+        expect(&mut tokens, "LOOKUP_TABLE")?;
+        expect(&mut tokens, "default")?;
+        let mut values = Vec::new();
+        for _ in 0..nn {
+            values.push(number(&mut tokens)?);
+        }
+        if name == "pressure_Pa" {
+            if values.iter().any(|v| v.is_infinite() || *v < 0.0) {
+                return Err("Invalid pressure field".into());
+            }
+            pressures = values.into_iter().map(|v| v / 1e6).collect();
+        }
+    }
     let mut mesh = DisplayMesh::default();
     for ids in cells {
         for id in ids {
             mesh.coordinates.extend_from_slice(&points[id]);
             mesh.fill_times.push(times[id]);
+            if !pressures.is_empty() {
+                mesh.pressures.push(pressures[id]);
+            }
         }
     }
     Ok(mesh)
@@ -273,5 +302,30 @@ mod tests {
         assert_eq!(summary(valid), Ok((1.9, 2.1)));
         assert!(summary(&valid.replace("filled: true", "filled: false")).is_err());
         assert!(summary(&valid.replace("1.9", "NaN")).is_err());
+    }
+    #[test]
+    fn pressure_field_uses_same_node_indices_and_converts_pa_to_mpa() -> Result<(), String> {
+        let vtk = format!(
+            "{VTK}SCALARS pressure_Pa double 1\nLOOKUP_TABLE default\n1000000 2000000 NaN\n"
+        );
+        let mesh = read_vtk(&vtk)?;
+        assert!(mesh.pressures[0].is_nan());
+        assert_eq!(&mesh.pressures[1..], &[1.0, 2.0]);
+        Ok(())
+    }
+    #[test]
+    fn remeshed_stl_extension_is_case_insensitive() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = crate::tests::TempDir::new();
+        let run = temp.0.join("run");
+        fs::create_dir_all(run.join("artifacts"))?;
+        let bytes = b"mesh";
+        fs::write(run.join("artifacts/Frame_remeshed.stl"), bytes)?;
+        let manifest = serde_json::json!({"artifacts":[{"path":"artifacts/Frame_remeshed.stl", "sha256":format!("{:x}",Sha256::digest(bytes))}]});
+        fs::write(run.join("manifest.json"), manifest.to_string())?;
+        assert_eq!(
+            artifact(&run, "_remeshed.STL")?,
+            run.join("artifacts/Frame_remeshed.stl")
+        );
+        Ok(())
     }
 }

@@ -14,7 +14,14 @@ struct SurfaceMeshSnapshot {
     std::uint64_t project_revision = 0;
     /// 为空或与展开顶点一一对应；单位 s，NaN 表示未充填。
     std::vector<double> fill_times;
+    /// 最终节点压力 MPa；为空表示该字段没有导出。
+    std::vector<double> pressures;
+    /// 推荐选中的浇口位置 mm；只在浇口子方案中显示。
+    std::vector<std::array<double, 3>> gate_points;
     double fill_duration = 0.0;
+    bool pressure_visible = false;
+    bool fields_visible = true;
+    bool show_gates = false;
     bool show_edges = false;
     bool z_up = false;
 };

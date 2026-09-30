@@ -1,10 +1,13 @@
-// 结果工具尚无服务与数据；保留完整布局及可访问名称，操作统一禁用。
+// 已接入的充填动画控制由 AnalysisModel 驱动；其余结果工具保留布局。
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
 
 Row {
+    id: resultsRibbon
+    property var analysisModel: null
+    readonly property bool animationAvailable: analysisModel && analysisModel.animationAvailable
     component CompactAction: ThemedToolButton {
         controlHeight: Theme.ribbonCompactHeight
         contentPadding: Theme.spacingTiny
@@ -41,6 +44,26 @@ Row {
                 width: Theme.ribbonCompactWidth
                 iconName: modelData.icon
                 accessibleName: modelData.label
+                enabled: modelData.key !== undefined && resultsRibbon.animationAvailable
+                onClicked: {
+                    switch (modelData.key) {
+                    case "play":
+                        resultsRibbon.analysisModel.play();
+                        break;
+                    case "pause":
+                        resultsRibbon.analysisModel.pause();
+                        break;
+                    case "stop":
+                        resultsRibbon.analysisModel.stop();
+                        break;
+                    case "first":
+                        resultsRibbon.analysisModel.playbackTime = 0;
+                        break;
+                    case "last":
+                        resultsRibbon.analysisModel.playbackTime = resultsRibbon.analysisModel.duration;
+                        break;
+                    }
+                }
             }
         }
     }
@@ -61,7 +84,7 @@ Row {
             color: Theme.colorPanelLine
         }
         handle: Rectangle {
-            x: slider.leftPadding
+            x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
             y: (slider.height - height) / 2
             width: Theme.iconSizeCompact
             height: width
@@ -115,22 +138,27 @@ Row {
                 actions: [
                     {
                         icon: "results-first",
+                        key: "first",
                         label: qsTr("First frame")
                     },
                     {
                         icon: "results-last",
+                        key: "last",
                         label: qsTr("Last frame")
                     },
                     {
                         icon: "results-play",
+                        key: "play",
                         label: qsTr("Play")
                     },
                     {
                         icon: "results-pause",
+                        key: "pause",
                         label: qsTr("Pause")
                     },
                     {
                         icon: "results-stop",
+                        key: "stop",
                         label: qsTr("Stop")
                     },
                     {
@@ -147,12 +175,18 @@ Row {
                 spacing: Theme.spacingXSmall
                 ResultSlider {
                     width: Theme.ribbonResultsControlWidth - timeLabel.width - parent.spacing
+                    enabled: resultsRibbon.animationAvailable
+                    opacity: enabled ? 1 : Theme.disabledOpacity
+                    from: 0
+                    to: resultsRibbon.analysisModel ? resultsRibbon.analysisModel.duration : 1
+                    value: resultsRibbon.analysisModel ? resultsRibbon.analysisModel.playbackTime : 0
+                    onMoved: resultsRibbon.analysisModel.playbackTime = value
                     Accessible.name: qsTr("Animation time")
                 }
                 ThemedLabel {
                     id: timeLabel
                     width: Theme.ribbonTimeDisplayWidth
-                    text: ""
+                    text: resultsRibbon.analysisModel && resultsRibbon.analysisModel.resultReady ? resultsRibbon.analysisModel.playbackTime.toFixed(3) + " s" : ""
                     textSize: Theme.fontRibbon
                     textColor: Theme.colorTextMuted
                     anchors.verticalCenter: parent.verticalCenter

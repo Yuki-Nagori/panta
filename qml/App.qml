@@ -22,13 +22,13 @@ ApplicationWindow {
     visibility: Window.Maximized
     color: Theme.colorPanel
     onClosing: event => {
-        if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
+        if (analysisController.busy || projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
             event.accepted = false;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property real nativeControlsLeftInset: WindowChromeMetrics.leadingSystemControlsInset
     readonly property bool layersDockShown: layersPanel.dockOpen
-    readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
+    readonly property string statusMessage: analysisController.error.length > 0 ? analysisController.error : projectModel.error.length > 0 ? projectModel.error : viewModel.error
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
     property string activeRibbonTab: "start-learn"
 
@@ -42,6 +42,16 @@ ApplicationWindow {
 
     ShellViewModel {
         id: viewModel
+    }
+
+    AnalysisModel {
+        id: analysisController
+        objectName: "analysisModel"
+        projectModel: projectModel
+        onRunStarted: {
+            viewportPane.selectLatestLog();
+            viewportPane.logsOpen = true;
+        }
     }
 
     ProjectViewModel {
@@ -156,6 +166,20 @@ ApplicationWindow {
             onImportRequested: importDialog.open()
             onResultsRequested: shellWindow.selectRibbonTab("results")
             onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
+            analysisAvailable: projectModel.planSettings.importId?.length > 0
+            analysisBusy: analysisController.busy
+            onAnalyzeRequested: {
+                analysisController.analyze();
+                viewportPane.logsOpen = true;
+            }
+            onMeshRequested: sidebarPanel.openMeshTool()
+            onSequenceRequested: analysisSequenceDialog.open()
+            onMaterialRequested: {
+                projectModel.clearError();
+                materialDialog.open();
+            }
+            onProcessSettingsRequested: sidebarPanel.processSettingsRequested()
+            analysisModel: analysisController
         }
 
         // 先确定左栏比例宽度，再把剩余区域交给原生视口。
@@ -189,12 +213,26 @@ ApplicationWindow {
                     logsOpen: viewportPane.logsOpen
                     logRunCount: viewportPane.logRunCount
                     resultRun: viewportPane.selectedLogRun
+                    analysisBusy: analysisController.busy
+                    analysisAvailable: projectModel.planSettings.importId?.length > 0
+                    analysisOperation: analysisController.operation
+                    meshGenerated: analysisController.meshReady
+                    gateGenerated: analysisController.gateReady
+                    meshAvailable: projectModel.planSettings.importId?.length > 0
+                    meshBusy: analysisController.busy && analysisController.operation === "mesh"
+                    onMeshRequested: edgeLength => analysisController.generateMesh(edgeLength)
+                    onCancelRequested: analysisController.cancel()
+                    onAnalyzeRequested: {
+                        analysisController.analyze();
+                        viewportPane.logsOpen = true;
+                    }
+                    onResultSelected: resultId => analysisController.selectResult(resultId)
                     onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
                     importedPartNames: projectModel.importedPartNames
                     importedPartIds: projectModel.importedPartIds
                     importedPartName: projectModel.importedPartName
-                    activeDocumentId: projectModel.activeDocumentId
-                    activeDocumentTitle: projectModel.activeDocumentTitle
+                    activeDocumentId: analysisController.activeDocumentId
+                    activeDocumentTitle: analysisController.activeDocumentTitle
                     analysisSequenceText: qsTranslate("AnalysisSequence", projectModel.planSettings.sequenceSourceText ?? "")
                     analysisSequenceId: projectModel.planSettings.sequenceId ?? ""
                     materialText: qsTranslate("Material", projectModel.planSettings.materialSourceText ?? "")
@@ -234,6 +272,7 @@ ApplicationWindow {
                 LayersPanel {
                     id: layersPanel
                     objectName: "layersPanel"
+                    visible: dockOpen
                     Layout.fillWidth: true
                     Layout.fillHeight: shellWindow.layersDockShown
                     Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * Theme.layersPanelRatio : 0
@@ -255,7 +294,10 @@ ApplicationWindow {
             ViewportPane {
                 id: viewportPane
 
-                meshSource: projectModel
+                documentSource: analysisController
+                meshSource: analysisController
+                analysisModel: analysisController
+                logRuns: analysisController.logRuns
                 reducedMotion: Settings.reducedMotion
                 logContextId: projectModel.currentPath + ":" + (projectModel.planSettings.importId ?? "")
                 anchors.left: workspaceSplit.right

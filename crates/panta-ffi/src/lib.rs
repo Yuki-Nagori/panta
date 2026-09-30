@@ -48,7 +48,10 @@ use path::{
     path_ref_parse, path_ref_to_logical, path_service_new, path_service_resolve,
     path_service_resolve_existing, path_service_resolve_write_target, path_service_set_root,
 };
+mod analysis;
 mod project;
+pub use analysis::AnalysisService;
+use analysis::{analysis_cancel, analysis_drain, analysis_service_new, analysis_start};
 pub use project::ProjectService;
 #[cfg(test)]
 use project::activation_outcome_to_bridge;
@@ -396,7 +399,42 @@ pub mod bridge {
         fn cpp_prefix() -> String;
     }
 
+    pub enum AnalysisEventKind {
+        Progress,
+        Log,
+        GateReady,
+        MeshReady,
+        Completed,
+        Failed,
+        Cancelled,
+    }
+
+    /// 求解器事件以轻量 DTO 跨过 CXX；网格坐标为 mm，结果字段使用物理单位。
+    pub struct AnalysisEvent {
+        pub kind: AnalysisEventKind,
+        pub message: String,
+        pub progress: f64,
+        pub elapsed: f64,
+        pub fill_time: f64,
+        pub peak_pressure: f64,
+        pub output_dir: String,
+        pub coordinates: Vec<f64>,
+        pub fill_times: Vec<f64>,
+        pub pressures: Vec<f64>,
+        pub gate_points: Vec<f64>,
+    }
+
     extern "Rust" {
+        type AnalysisService;
+        fn analysis_service_new() -> Box<AnalysisService>;
+        fn analysis_start(
+            service: &mut AnalysisService,
+            operation: &str,
+            settings: &str,
+        ) -> Result<()>;
+        fn analysis_cancel(service: &AnalysisService);
+        fn analysis_drain(service: &mut AnalysisService) -> Vec<AnalysisEvent>;
+
         /// Rust 侧拥有的 opaque 句柄：C++ 经 `rust::Box` 持有唯一所有权，
         /// 释放只能把 Box move 回 Rust；不暴露指针或复制语义。
         type Session;

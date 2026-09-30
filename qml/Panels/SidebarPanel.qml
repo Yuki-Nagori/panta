@@ -5,6 +5,16 @@ import QtQuick.Layouts
 PanelSurface {
     id: panel
     property bool meshToolOpen: false
+    property bool analysisBusy: false
+    property bool analysisAvailable: false
+    property string analysisOperation: ""
+    property bool meshGenerated: false
+    property bool gateGenerated: false
+    property bool meshAvailable: false
+    property bool meshBusy: false
+    signal meshRequested(real edgeLength)
+    signal cancelRequested
+    signal analyzeRequested
     property alias projectOpen: tasksPage.projectOpen
     property alias projectName: tasksPage.projectName
     property alias importedPartNames: tasksPage.importedPartNames
@@ -35,6 +45,10 @@ PanelSurface {
     signal newProjectRequested
     signal openImportRequested(string recordId)
     implicitWidth: Theme.leftPanelMinimumWidth
+    function openMeshTool() {
+        panelTabs.currentIndex = 1;
+        meshToolOpen = true;
+    }
     PaneCloseButton {
         onCloseRequested: panel.closeRequested()
     }
@@ -56,6 +70,12 @@ PanelSurface {
             currentIndex: panelTabs.currentIndex
             ProjectTasksPage {
                 id: tasksPage
+                analysisAvailable: panel.analysisAvailable
+                analysisBusy: panel.analysisBusy
+                analysisOperation: panel.analysisOperation
+                meshGenerated: panel.meshGenerated
+                gateGenerated: panel.gateGenerated
+                onAnalyzeRequested: panel.analyzeRequested()
                 onMeshToolRequested: {
                     panelTabs.currentIndex = 1;
                     panel.meshToolOpen = true;
@@ -71,6 +91,10 @@ PanelSurface {
             }
             ToolsPage {
                 meshToolOpen: panel.meshToolOpen
+                meshAvailable: panel.meshAvailable
+                meshBusy: panel.meshBusy
+                onMeshRequested: edgeLength => panel.meshRequested(edgeLength)
+                onCancelRequested: panel.cancelRequested()
             }
             SharedViewsPage {}
         }
