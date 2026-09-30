@@ -491,6 +491,7 @@ body.mesh-tool-workspace .output-panel { display: none; }
 button.inspector-row { width: 100%; color: inherit; text-align: left; cursor: pointer; }
 button.inspector-row:hover { background: linear-gradient(to right, transparent calc(8px + var(--icon-size-small) + 6px), var(--color-hover) calc(8px + var(--icon-size-small) + 6px)); }
 .inspector-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-material-status][data-completed="false"] { visibility: hidden; }
 .inspector-row > .status-placeholder { flex: none; width: var(--icon-size-small); }
 .inspector-indent { margin-left: 52px; }
 .inspector-muted { color: var(--color-muted); }
@@ -688,3 +689,25 @@ button.inspector-row:hover { background: linear-gradient(to right, transparent c
 .analysis-sequence-content option { padding: 5px 8px; }
 .analysis-sequence-actions { flex-direction: column; justify-content: flex-start; margin-top: 0; }
 .analysis-sequence-actions button:last-child { margin-top: auto; }
+
+/* 材料弹窗复用 Shell token，参数详情可展开。 */
+.material-dialog { width: min(680px, 100%); }
+.material-body { gap: 12px; }
+.material-body button { flex: none; min-height: 30px; padding: 0 12px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); font: inherit; }
+.material-body button:not(:disabled):hover { background: var(--color-hover); }
+.material-body select { min-width: 0; padding: 6px 8px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); color: var(--color-text); font: inherit; }
+.material-body select:disabled { opacity: var(--disabled-opacity); }
+.material-mode { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.material-mode input { margin: 0; accent-color: var(--color-focus); }
+.material-list-row { display: flex; align-items: center; gap: 12px; }
+.material-list-row > select, .material-list-row > label { flex: 1; }
+.material-list-actions { display: flex; gap: 8px; }
+.material-fields { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; }
+.material-selected { margin: 0; border: 1px solid var(--color-panel-line); border-radius: var(--radius); padding: 12px 16px 16px; }
+.material-selected legend { padding: 0 6px; font-weight: 600; }
+.material-name { margin: 4px 0 12px; font-weight: 600; }
+.material-detail-actions { display: flex; gap: 8px; }
+.material-selected dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 12px 0; padding-top: 10px; font-size: var(--font-small); border-top: 1px solid var(--color-panel-line); }
+.material-selected dd { margin: 0; font-variant-numeric: tabular-nums; }
+.material-favorite { margin-top: 16px; color: var(--color-muted); }
+.material-body .dialog-actions .dialog-primary { background: var(--color-dialog-primary); border-color: var(--color-dialog-primary-border); }

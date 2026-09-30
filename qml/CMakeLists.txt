@@ -32,12 +32,14 @@ set(PANTA_SHELL_QML_FILES
     Panels/TasksPanel.qml
     Panels/MeshToolPanel.qml
     Panels/AnalysisSequencePanel.qml
+    Panels/MaterialSelectionPanel.qml
     Panels/LayersPanel.qml
     Panels/ViewportPane.qml
     Panels/PlaceholderPanel.qml
     Dialogs/NewProjectDialog.qml
     Dialogs/ImportDialog.qml
-    Dialogs/AnalysisSequenceDialog.qml)
+    Dialogs/AnalysisSequenceDialog.qml
+    Dialogs/MaterialSelectionDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)

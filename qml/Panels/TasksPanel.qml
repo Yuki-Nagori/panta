@@ -20,6 +20,9 @@ PanelSurface {
     property string importedPartName: ""
     property bool meshToolOpen: false
     property string analysisSequenceText: ""
+    property string analysisSequenceId: ""
+    property string materialText: ""
+    property string materialId: ""
     property string meshType: ""
     property var meshTypes: []
 
@@ -44,13 +47,13 @@ PanelSurface {
             id: "analysis-sequence",
             text: panel.analysisSequenceText,
             icon: "task-analysis-sequence",
-            completed: false
+            completed: panel.analysisSequenceId.length > 0
         },
         {
             id: "material-data",
-            text: qsTranslate("ImportTask", "Material Data"),
+            text: panel.materialText.length > 0 ? panel.materialText : qsTranslate("ImportTask", "Material Data"),
             icon: "task-material",
-            completed: false
+            completed: panel.materialId.length > 0
         },
         {
             id: "injection-locations",
@@ -88,6 +91,7 @@ PanelSurface {
     signal closeRequested
     signal openProjectRequested
     signal analysisSequenceRequested
+    signal materialRequested
     signal newProjectRequested
     signal openImportRequested(string recordId)
 
@@ -97,6 +101,8 @@ PanelSurface {
             meshToolOpen = true;
         } else if (taskId === "analysis-sequence") {
             analysisSequenceRequested();
+        } else if (taskId === "material-data") {
+            materialRequested();
         }
     }
 
@@ -338,7 +344,7 @@ PanelSurface {
                                     iconName: taskRow.modelData.icon
                                     preserveIconColors: true
                                     iconSize: Theme.iconSizeSmall
-                                    accessibleName: taskRow.modelData.id === "analysis-sequence" ? qsTranslate("AnalysisSequenceDialog", "Select Analysis Sequence") : taskRow.modelData.id === "create-mesh" ? qsTranslate("ImportTask", "Create Mesh...") : text
+                                    accessibleName: taskRow.modelData.id === "material-data" ? qsTranslate("MaterialDialog", "Select Material") : taskRow.modelData.id === "analysis-sequence" ? qsTranslate("AnalysisSequenceDialog", "Select Analysis Sequence") : taskRow.modelData.id === "create-mesh" ? qsTranslate("ImportTask", "Create Mesh...") : text
                                     enabled: taskRow.modelData.enabled !== false
                                     contentAlignLeft: true
                                     contentColor: Theme.colorText

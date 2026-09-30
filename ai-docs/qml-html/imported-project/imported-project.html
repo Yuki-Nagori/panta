@@ -97,8 +97,8 @@
         <div class="inspector-list" data-inspector-list role="list">
           <div class="inspector-row" role="listitem"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-stl-file"/></svg><span class="inspector-part-name">Part (iPhone17_Pro_TPU_Case.stl)</span></div>
           <button type="button" class="inspector-row" role="listitem" aria-label="Create Mesh" data-demo-navigate="../mesh-tool/mesh-tool.html"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-mesh"/></svg><span>Mesh (Dual Domain)</span></button>
-          <button type="button" class="inspector-row" data-dialog="analysis-sequence" aria-label="Select Analysis Sequence"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis-sequence"/></svg><span data-analysis-sequence-current>Fill</span></button>
-          <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span>Material Data</span></div>
+          <button type="button" class="inspector-row" data-dialog="analysis-sequence" aria-label="Select Analysis Sequence"><svg class="status-icon icon" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-analysis-sequence"/></svg><span data-analysis-sequence-current>Fill</span></button>
+          <button type="button" class="inspector-row" data-dialog="material" aria-label="Select Material"><svg class="status-icon icon" data-material-status data-completed="false" aria-hidden="true" focusable="false"><use href="#i-status-ok"/></svg><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-material"/></svg><span data-material-current>Material Data</span></button>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-injection"/></svg><span>Set Injection Locations...</span></div>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-settings"/></svg><span>Process Settings (Default)</span></div>
           <div class="inspector-row" role="listitem"><span class="status-placeholder" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-task-optimization"/></svg><span>Optimization (None)</span></div>
@@ -150,6 +150,48 @@
           <button type="button" data-dialog-close>Cancel</button>
           <button type="button" disabled>More...</button>
         </div>
+      </div>
+    </section>
+  </div>
+  <div class="modal-backdrop" data-dialog-panel="material" hidden>
+    <section class="dialog material-dialog" role="dialog" aria-modal="true" aria-labelledby="material-title">
+      <div class="dialog-titlebar"><h2 id="material-title">Select Material</h2><button type="button" class="dialog-close" data-dialog-close aria-label="Close dialog">×</button></div>
+      <div class="dialog-body material-body">
+        <label class="material-mode"><input type="radio" name="material-mode" value="common" data-material-mode checked> Commonly used materials</label>
+        <div class="material-list-row">
+          <select size="3" data-material-common aria-label="Commonly used materials"><option selected>PP — 25% mineral filler</option></select>
+          <button type="button" disabled>Remove</button>
+        </div>
+        <div class="material-list-row">
+          <label class="material-mode"><input type="radio" name="material-mode" value="specific" data-material-mode> Specific material</label>
+          <div class="material-list-actions"><button type="button" disabled>Customize Material List...</button><button type="button" disabled>Reset Material List</button></div>
+        </div>
+        <div class="material-fields">
+          <label for="material-family">Polymer family</label>
+          <select id="material-family" data-material-specific disabled><option>Polypropylene (PP)</option></select>
+          <button type="button" disabled>Import...</button>
+          <label for="material-choice">Material</label>
+          <select id="material-choice" data-material-specific disabled><option>PP — 25% mineral filler</option></select>
+          <button type="button" disabled>Search...</button>
+        </div>
+        <fieldset class="material-selected">
+          <legend>Selected material</legend>
+          <p class="material-name">PP — 25% mineral filler</p>
+          <div class="material-detail-actions">
+            <button type="button" data-material-details aria-expanded="false" aria-controls="material-properties">Details...</button>
+            <button type="button" disabled>Report...</button>
+          </div>
+          <dl id="material-properties" hidden>
+            <dt>Mineral filler</dt><dd>25%</dd>
+            <dt>Recommended melt temperature</dt><dd>180–220 °C</dd>
+            <dt>Recommended mold temperature</dt><dd>40–80 °C</dd>
+            <dt>Ejection temperature</dt><dd>110 °C</dd>
+            <dt>Maximum shear stress</dt><dd>250 kPa</dd>
+            <dt>Maximum shear rate</dt><dd>100000 s⁻¹</dd>
+          </dl>
+          <label class="checkbox-row material-favorite"><input type="checkbox" disabled> Add material to commonly used list after selecting</label>
+        </fieldset>
+        <div class="dialog-actions"><button type="button" class="dialog-primary" data-material-accept>OK</button><button type="button" data-dialog-close>Cancel</button><button type="button" disabled>Help</button></div>
       </div>
     </section>
   </div>

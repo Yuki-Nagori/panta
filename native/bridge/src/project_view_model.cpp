@@ -68,6 +68,19 @@ QVariantList choice_catalog(const rust::Vec<panta::ffi::ChoiceDefinition>& catal
     return result;
 }
 
+QVariantMap material_definition(const panta::ffi::MaterialDefinition& material) {
+    QVariantList properties;
+    for (const auto& property : material.properties) {
+        properties.append(
+            QVariantMap{{QStringLiteral("sourceText"), QString::fromUtf8(property.source_text)},
+                        {QStringLiteral("value"), QString::fromUtf8(property.value)}});
+    }
+    return {{QStringLiteral("familySourceText"), QString::fromUtf8(material.family_source_text)},
+            {QStringLiteral("id"), QString::fromUtf8(material.id)},
+            {QStringLiteral("sourceText"), QString::fromUtf8(material.source_text)},
+            {QStringLiteral("properties"), properties}};
+}
+
 } // namespace
 
 ProjectViewModel::ProjectViewModel(QObject* parent)
@@ -76,6 +89,11 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
       m_meshTypes(choice_catalog(panta::ffi::mesh_type_catalog())),
       m_defaultMeshType(QString::fromUtf8(panta::ffi::default_mesh_type())),
       m_service(panta::ffi::project_service_new()) {
+    try {
+        m_defaultMaterial = material_definition(panta::ffi::default_material());
+    } catch (const rust::Error& failure) {
+        fail(QString::fromUtf8(failure.what()));
+    }
     connect(this, &ProjectViewModel::activeDocumentChanged, this,
             &ProjectViewModel::refreshPlanSettings);
     connect(this, &ProjectViewModel::projectChanged, this, &ProjectViewModel::refreshPlanSettings);
@@ -155,6 +173,8 @@ QVariantList ProjectViewModel::meshTypes() const { return m_meshTypes; }
 
 QString ProjectViewModel::defaultMeshType() const { return m_defaultMeshType; }
 
+QVariantMap ProjectViewModel::defaultMaterial() const { return m_defaultMaterial; }
+
 QVariantList ProjectViewModel::analysisSequences() const { return m_analysisSequences; }
 
 QVariantMap ProjectViewModel::planSettings() const { return m_planSettings; }
@@ -168,7 +188,9 @@ void ProjectViewModel::refreshPlanSettings() {
         {QStringLiteral("importId"), QString::fromUtf8(settings.import_id)},
         {QStringLiteral("meshType"), QString::fromUtf8(settings.mesh_type)},
         {QStringLiteral("sequenceId"), QString::fromUtf8(settings.sequence_id)},
-        {QStringLiteral("sequenceSourceText"), QString::fromUtf8(settings.sequence_source_text)}};
+        {QStringLiteral("sequenceSourceText"), QString::fromUtf8(settings.sequence_source_text)},
+        {QStringLiteral("materialId"), QString::fromUtf8(settings.material_id)},
+        {QStringLiteral("materialSourceText"), QString::fromUtf8(settings.material_source_text)}};
     if (next != m_planSettings) {
         m_planSettings = next;
         emit planSettingsChanged();
@@ -189,6 +211,29 @@ bool ProjectViewModel::setAnalysisSequence(const QString& projectPath, quint64 r
     try {
         applySnapshot(panta::ffi::project_service_set_analysis_sequence(*m_service, path, revision,
                                                                         id, sequence));
+        refreshPlanSettings();
+        clearError();
+        return true;
+    } catch (const rust::Error& failure) {
+        return fail(QString::fromUtf8(failure.what()));
+    }
+}
+
+bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
+                                   const QString& importId, const QString& materialId) {
+    std::string path;
+    std::string id;
+    std::string material;
+    QString conversionError;
+    if (!toBoundaryText(projectPath, &path, &conversionError) ||
+        !toBoundaryText(importId, &id, &conversionError) ||
+        !toBoundaryText(materialId, &material, &conversionError)) {
+        return fail(conversionError);
+    }
+    try {
+        applySnapshot(
+            panta::ffi::project_service_set_material(*m_service, path, revision, id, material));
+        // 工程摘要不包含方案字段；即使 projectChanged 未发出，也要刷新已提交的配置。
         refreshPlanSettings();
         clearError();
         return true;

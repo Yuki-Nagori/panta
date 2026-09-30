@@ -9,7 +9,7 @@ QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每�
 - [shell.js](shell.js)：公共壳层、SVG 图标、通用页签状态和视口文档页签交互。
 - [homepage/homepage.html](homepage/homepage.html)：启动 / 学习首页。
 - [open-project/open-project.html](open-project/open-project.html)：工程任务项与项目工具 Ribbon。
-- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入后的工程树与视口状态，Create Mesh 可进入 Mesh Tool；Fill 行打开 Analysis Sequence 选择弹窗；Mesh 行展示示例导入类型 Dual Domain，并保留进入工具的点击行为。
+- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入后的工程树与视口状态，Create Mesh 可进入 Mesh Tool；Fill 行打开 Analysis Sequence 选择弹窗；Material Data 行打开材料选择弹窗（内置 PP / 25% 矿物填充摘要）；Mesh 行展示示例导入类型 Dual Domain，并保留进入工具的点击行为。
 - [mesh-tool/mesh-tool.html](mesh-tool/mesh-tool.html)：Mesh Tool 操作与 General 网格参数布局。
 
 HTML 只保留标题、菜单、Ribbon、任务、视口和对话框状态模板，脚本将模板嵌入公共壳层。

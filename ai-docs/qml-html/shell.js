@@ -262,6 +262,7 @@ document.querySelectorAll("[data-dialog]").forEach((trigger) => {
       options.value = document.querySelector("[data-analysis-sequence-current]").textContent;
       dialog.querySelector("[data-analysis-sequence-candidate]").textContent = options.value;
     }
+    if (trigger.dataset.dialog === "material") resetMaterialDialog();
     dialog.hidden = false;
     (dialog.querySelector("input, select") || dialog.querySelector("button"))?.focus();
   });
@@ -611,9 +612,38 @@ document.querySelector("[data-analysis-sequence-accept]")?.addEventListener("cli
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") document.querySelectorAll("[data-dialog-panel]").forEach(closeDialog);
+  if (event.key === "Enter" && materialDialog && !materialDialog.hidden) {
+    event.preventDefault();
+    materialDialog.querySelector("[data-material-accept]").click();
+  }
   const sequenceDialog = document.querySelector('[data-dialog-panel="analysis-sequence"]');
   if (event.key === "Enter" && sequenceDialog && !sequenceDialog.hidden) {
     event.preventDefault();
     sequenceDialog.querySelector("[data-analysis-sequence-accept]").click();
   }
+});
+
+const materialDialog = document.querySelector('[data-dialog-panel="material"]');
+const materialDetails = materialDialog?.querySelector('[data-material-details]');
+function updateMaterialMode() {
+  const specific = materialDialog.querySelector('[data-material-mode]:checked').value === 'specific';
+  materialDialog.querySelector('[data-material-common]').disabled = specific;
+  materialDialog.querySelectorAll('[data-material-specific]').forEach((field) => { field.disabled = !specific; });
+}
+function resetMaterialDialog() {
+  materialDialog.querySelector('[data-material-mode][value="common"]').checked = true;
+  updateMaterialMode();
+  materialDialog.querySelector('#material-properties').hidden = true;
+  materialDetails.setAttribute('aria-expanded', 'false');
+}
+materialDialog?.querySelectorAll('[data-material-mode]').forEach((mode) => mode.addEventListener('change', updateMaterialMode));
+materialDetails?.addEventListener('click', () => {
+  const properties = materialDialog.querySelector('#material-properties');
+  properties.hidden = !properties.hidden;
+  materialDetails.setAttribute('aria-expanded', String(!properties.hidden));
+});
+materialDialog?.querySelector('[data-material-accept]')?.addEventListener('click', () => {
+  document.querySelector('[data-material-current]').textContent = 'PP — 25% mineral filler';
+  document.querySelector('[data-material-status]').dataset.completed = 'true';
+  closeDialog(materialDialog);
 });

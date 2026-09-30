@@ -774,3 +774,96 @@ dual-domain:
 solid-3d:
   src: Solid 3D
   tr: 实体 3D
+
+[MaterialDialog]
+entry-1:
+  src: Select Material
+  tr: 选择材料
+
+entry-2:
+  src: Commonly used materials
+  tr: 常用材料
+
+entry-3:
+  src: Remove
+  tr: 移除
+
+entry-4:
+  src: Specific material
+  tr: 指定材料
+
+entry-5:
+  src: Customize Material List...
+  tr: 自定义材料列表…
+
+entry-6:
+  src: Reset Material List
+  tr: 重置材料列表
+
+entry-7:
+  src: Polymer family
+  tr: 聚合物类别
+
+entry-8:
+  src: Material
+  tr: 材料
+
+entry-9:
+  src: Import...
+  tr: 导入…
+
+entry-10:
+  src: Search...
+  tr: 搜索…
+
+entry-11:
+  src: Selected material
+  tr: 所选材料
+
+entry-12:
+  src: Details...
+  tr: 详情…
+
+entry-13:
+  src: Report...
+  tr: 报告…
+
+entry-14:
+  src: Add material to commonly used list after selecting
+  tr: 选择后将材料添加到常用列表
+
+
+[Material]
+entry-1:
+  src: PP — 25% mineral filler
+  tr: PP — 25% 矿物填充
+
+entry-2:
+  src: Polypropylene (PP)
+  tr: 聚丙烯（PP）
+
+
+[MaterialProperty]
+entry-1:
+  src: Mineral filler
+  tr: 矿物填充比例
+
+entry-2:
+  src: Recommended melt temperature
+  tr: 建议熔体温度
+
+entry-3:
+  src: Recommended mold temperature
+  tr: 建议模具温度
+
+entry-4:
+  src: Ejection temperature
+  tr: 脱模温度
+
+entry-5:
+  src: Maximum shear stress
+  tr: 最大剪切应力
+
+entry-6:
+  src: Maximum shear rate
+  tr: 最大剪切速率

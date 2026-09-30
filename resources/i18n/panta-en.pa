@@ -774,3 +774,96 @@ dual-domain:
 solid-3d:
   src: Solid 3D
   tr: Solid 3D
+
+[MaterialDialog]
+entry-1:
+  src: Select Material
+  tr: Select Material
+
+entry-2:
+  src: Commonly used materials
+  tr: Commonly used materials
+
+entry-3:
+  src: Remove
+  tr: Remove
+
+entry-4:
+  src: Specific material
+  tr: Specific material
+
+entry-5:
+  src: Customize Material List...
+  tr: Customize Material List...
+
+entry-6:
+  src: Reset Material List
+  tr: Reset Material List
+
+entry-7:
+  src: Polymer family
+  tr: Polymer family
+
+entry-8:
+  src: Material
+  tr: Material
+
+entry-9:
+  src: Import...
+  tr: Import...
+
+entry-10:
+  src: Search...
+  tr: Search...
+
+entry-11:
+  src: Selected material
+  tr: Selected material
+
+entry-12:
+  src: Details...
+  tr: Details...
+
+entry-13:
+  src: Report...
+  tr: Report...
+
+entry-14:
+  src: Add material to commonly used list after selecting
+  tr: Add material to commonly used list after selecting
+
+
+[Material]
+entry-1:
+  src: PP — 25% mineral filler
+  tr: PP — 25% mineral filler
+
+entry-2:
+  src: Polypropylene (PP)
+  tr: Polypropylene (PP)
+
+
+[MaterialProperty]
+entry-1:
+  src: Mineral filler
+  tr: Mineral filler
+
+entry-2:
+  src: Recommended melt temperature
+  tr: Recommended melt temperature
+
+entry-3:
+  src: Recommended mold temperature
+  tr: Recommended mold temperature
+
+entry-4:
+  src: Ejection temperature
+  tr: Ejection temperature
+
+entry-5:
+  src: Maximum shear stress
+  tr: Maximum shear stress
+
+entry-6:
+  src: Maximum shear rate
+  tr: Maximum shear rate

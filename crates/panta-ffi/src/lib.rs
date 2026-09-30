@@ -108,6 +108,18 @@ pub mod bridge {
         source_text: String,
     }
 
+    struct MaterialProperty {
+        source_text: String,
+        value: String,
+    }
+
+    struct MaterialDefinition {
+        family_source_text: String,
+        id: String,
+        source_text: String,
+        properties: Vec<MaterialProperty>,
+    }
+
     struct PlanSettings {
         project_path: String,
         revision: u64,
@@ -115,6 +127,8 @@ pub mod bridge {
         mesh_type: String,
         sequence_id: String,
         sequence_source_text: String,
+        material_id: String,
+        material_source_text: String,
     }
 
     /// STL metadata shown by the import dialog before the file is copied.
@@ -299,6 +313,14 @@ pub mod bridge {
         fn analysis_sequence_catalog() -> Vec<ChoiceDefinition>;
         fn mesh_type_catalog() -> Vec<ChoiceDefinition>;
         fn default_mesh_type() -> String;
+        fn default_material() -> Result<MaterialDefinition>;
+        fn project_service_set_material(
+            service: &mut ProjectService,
+            project_path: &str,
+            revision: u64,
+            import_id: &str,
+            material_id: &str,
+        ) -> Result<ProjectSnapshot>;
         fn project_service_plan_settings(
             service: &ProjectService,
             preferred_import_id: &str,
@@ -753,6 +775,23 @@ fn analysis_sequence_catalog() -> Vec<bridge::ChoiceDefinition> {
         .collect()
 }
 
+fn default_material() -> Result<bridge::MaterialDefinition, String> {
+    let material = panta_core::project::default_material().map_err(|error| error.to_string())?;
+    Ok(bridge::MaterialDefinition {
+        family_source_text: material.family_source_text.clone(),
+        id: material.id.clone(),
+        source_text: material.source_text.clone(),
+        properties: material
+            .properties
+            .iter()
+            .map(|property| bridge::MaterialProperty {
+                source_text: property.source_text.to_owned(),
+                value: property.value.clone(),
+            })
+            .collect(),
+    })
+}
+
 fn project_service_plan_settings(
     service: &ProjectService,
     preferred_import_id: &str,
@@ -765,6 +804,8 @@ fn project_service_plan_settings(
             mesh_type: settings.mesh_type,
             sequence_id: settings.sequence_id,
             sequence_source_text: settings.sequence_source_text,
+            material_id: settings.material_id,
+            material_source_text: settings.material_source_text,
         },
         None => bridge::PlanSettings {
             project_path: String::new(),
@@ -773,8 +814,29 @@ fn project_service_plan_settings(
             mesh_type: String::new(),
             sequence_id: String::new(),
             sequence_source_text: String::new(),
+            material_id: String::new(),
+            material_source_text: String::new(),
         },
     }
+}
+
+fn project_service_set_material(
+    service: &mut ProjectService,
+    project_path: &str,
+    revision: u64,
+    import_id: &str,
+    material_id: &str,
+) -> Result<bridge::ProjectSnapshot, String> {
+    service
+        .service
+        .set_material(
+            std::path::Path::new(project_path),
+            revision,
+            import_id,
+            material_id,
+        )
+        .map(project_snapshot)
+        .map_err(|error| error.to_string())
 }
 
 fn project_service_set_analysis_sequence(

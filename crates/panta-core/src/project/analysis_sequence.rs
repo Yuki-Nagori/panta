@@ -1,4 +1,4 @@
-//! 方案分析序列的目录、显示快照和持久化命令。
+//! 方案分析序列目录与持久化命令；当前方案快照见 plan_settings。
 use super::*;
 
 /// 稳定领域 ID 与英文源文案；翻译由 Qt 展示层处理。
@@ -51,20 +51,9 @@ pub const ANALYSIS_SEQUENCES: &[AnalysisSequenceDefinition] = &[
         source_text: "Cool (FEM) + Fill + Pack + Warp",
     },
 ];
-const DEFAULT_SEQUENCE_ID: &str = "fill";
+pub(super) const DEFAULT_SEQUENCE_ID: &str = "fill";
 
-/// 当前任务面板关联零件的轻量快照；不读取或复制网格载荷。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PlanSettings {
-    pub project_path: PathBuf,
-    pub revision: u64,
-    pub import_id: String,
-    pub mesh_type: String,
-    pub sequence_id: String,
-    pub sequence_source_text: String,
-}
-
-fn definition(id: &str) -> Option<&'static AnalysisSequenceDefinition> {
+pub(super) fn definition(id: &str) -> Option<&'static AnalysisSequenceDefinition> {
     ANALYSIS_SEQUENCES.iter().find(|entry| entry.id == id)
 }
 
@@ -81,29 +70,6 @@ pub(super) fn validate_sequences(manifest: &ProjectManifest) -> Result<(), Proje
 }
 
 impl ProjectService {
-    /// 活动导入记录优先；Welcome / 空页签时展示最近导入记录。
-    pub fn plan_settings(&self, preferred_import_id: &str) -> Option<PlanSettings> {
-        let state = self.current.as_ref()?;
-        let record = state
-            .imports
-            .iter()
-            .find(|record| record.id == preferred_import_id)
-            .or_else(|| state.imports.last())?;
-        let sequence_id = state
-            .analysis_sequences
-            .get(&record.id)
-            .map_or(DEFAULT_SEQUENCE_ID, String::as_str);
-        let sequence = definition(sequence_id)?;
-        Some(PlanSettings {
-            project_path: state.path.clone(),
-            revision: state.revision,
-            import_id: record.id.clone(),
-            mesh_type: record.mesh_type.clone(),
-            sequence_id: sequence.id.to_owned(),
-            sequence_source_text: sequence.source_text.to_owned(),
-        })
-    }
-
     /// 校验弹窗打开时的工程身份和修订；先写候选清单，成功后发布内存状态。
     pub fn set_analysis_sequence(
         &mut self,
@@ -112,15 +78,7 @@ impl ProjectService {
         import_id: &str,
         sequence_id: &str,
     ) -> Result<ProjectSnapshot, ProjectError> {
-        let state = self.current.as_ref().ok_or(ProjectError::NoProject)?;
-        if state.path != expected_path || state.revision != expected_revision {
-            return Err(ProjectError::CommandInvalid(
-                "plan settings changed".to_owned(),
-            ));
-        }
-        if !state.imports.iter().any(|record| record.id == import_id) {
-            return Err(ProjectError::ImportRecordMissing(import_id.to_owned()));
-        }
+        let state = self.checked_plan_target(expected_path, expected_revision, import_id)?;
         if definition(sequence_id).is_none() {
             return Err(ProjectError::CommandInvalid(
                 "unknown analysis sequence".to_owned(),

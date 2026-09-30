@@ -107,7 +107,11 @@ QtObject {
     // 禁用控件的整体透明度
     readonly property real disabledOpacity: 0.4
 
-    // 窗口最小尺寸（逻辑像素）
+    // 窗口尺寸与最小约束（逻辑像素）
+    readonly property int materialDialogWidth: 680
+    readonly property int materialDialogHeight: 540
+    readonly property int materialDialogMinimumWidth: 640
+    readonly property int materialDialogMinimumHeight: 460
     readonly property int analysisSequenceDialogWidth: 560
     readonly property int analysisSequenceDialogHeight: 380
     readonly property int analysisSequenceDialogMinimumWidth: 420

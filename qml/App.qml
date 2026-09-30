@@ -63,6 +63,18 @@ ApplicationWindow {
         }
     }
 
+    MaterialSelectionDialog {
+        id: materialDialog
+        ownerWindow: shellWindow
+        material: projectModel.defaultMaterial
+        planSettings: projectModel.planSettings
+        errorText: projectModel.error
+        onSelectionRequested: (path, revision, importId, materialId) => {
+            if (projectModel.setMaterial(path, revision, importId, materialId))
+                materialDialog.close();
+        }
+    }
+
     FileDialog {
         id: openProjectFileDialog
         title: qsTranslate("IconActionOpenProject", "Open Project")
@@ -128,6 +140,13 @@ ApplicationWindow {
                     activeDocumentId: projectModel.activeDocumentId
                     activeDocumentTitle: projectModel.activeDocumentTitle
                     analysisSequenceText: qsTranslate("AnalysisSequence", projectModel.planSettings.sequenceSourceText ?? "")
+                    analysisSequenceId: projectModel.planSettings.sequenceId ?? ""
+                    materialText: qsTranslate("Material", projectModel.planSettings.materialSourceText ?? "")
+                    materialId: projectModel.planSettings.materialId ?? ""
+                    onMaterialRequested: {
+                        projectModel.clearError();
+                        materialDialog.open();
+                    }
                     meshType: projectModel.planSettings.meshType ?? ""
                     meshTypes: projectModel.meshTypes
                     onAnalysisSequenceRequested: {

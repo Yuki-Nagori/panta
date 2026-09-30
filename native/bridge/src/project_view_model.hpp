@@ -39,6 +39,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(quint64 importedTriangleCount READ importedTriangleCount NOTIFY importsChanged)
     Q_PROPERTY(QVariantList meshTypes READ meshTypes CONSTANT)
     Q_PROPERTY(QString defaultMeshType READ defaultMeshType CONSTANT)
+    Q_PROPERTY(QVariantMap defaultMaterial READ defaultMaterial CONSTANT)
     Q_PROPERTY(QVariantList analysisSequences READ analysisSequences CONSTANT)
     Q_PROPERTY(QVariantMap planSettings READ planSettings NOTIFY planSettingsChanged)
     Q_PROPERTY(bool importPreviewReady READ importPreviewReady NOTIFY importPreviewChanged)
@@ -86,6 +87,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
     [[nodiscard]] QVariantList meshTypes() const;
     [[nodiscard]] QString defaultMeshType() const;
+    [[nodiscard]] QVariantMap defaultMaterial() const;
     [[nodiscard]] QVariantList analysisSequences() const; // Rust 目录：ID 与英文源文案。
     [[nodiscard]] QVariantMap planSettings() const;       // Rust 当前方案快照。
 
@@ -130,6 +132,10 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 失败保留已确认值，错误由 error/errorCode 提供。
     Q_INVOKABLE bool setAnalysisSequence(const QString& projectPath, quint64 revision,
                                          const QString& importId, const QString& sequenceId);
+
+    /// 确认当前零件的材料引用；Rust 校验身份和修订后事务保存。
+    Q_INVOKABLE bool setMaterial(const QString& projectPath, quint64 revision,
+                                 const QString& importId, const QString& materialId);
 
     /// 激活一个就绪文档（Welcome 或已就绪导入页签）；Loading/Failed 文档
     /// 不可激活。同步 UI 操作，不经 Rust Flow。
@@ -193,6 +199,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     const QVariantList m_analysisSequences;
     const QVariantList m_meshTypes;
     const QString m_defaultMeshType;
+    QVariantMap m_defaultMaterial;
     QString m_error;
     QString m_errorCode;
     QString m_currentPath;
