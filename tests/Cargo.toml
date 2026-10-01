@@ -10,6 +10,7 @@ build = "build.rs"
 
 [dependencies]
 panta-build.workspace = true
+serde_json.workspace = true
 
 [[test]]
 name = "native"

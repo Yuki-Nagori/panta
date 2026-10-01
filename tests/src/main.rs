@@ -1,3 +1,4 @@
+mod coverage;
 mod performance;
 
 use std::error::Error;
@@ -28,7 +29,7 @@ fn main() -> ExitCode {
         }
         Some("audit") => audit(),
         Some("coverage") => match arguments.next().as_deref() {
-            None | Some("rust") => coverage(),
+            None | Some("rust") => coverage::run(),
             Some("native") => native_coverage(),
             Some(other) => Err(format!("未知 coverage 类型：{other}").into()),
         },
@@ -78,36 +79,6 @@ fn quality() -> Result<(), Box<dyn Error>> {
 
 fn audit() -> Result<(), Box<dyn Error>> {
     cargo("deny", ["check"])
-}
-
-fn coverage() -> Result<(), Box<dyn Error>> {
-    let tool = ensure_cargo_tool("cargo-llvm-cov", CARGO_LLVM_COV_VERSION)?;
-    let target_dir = target_root();
-    let mut command = Command::new(tool);
-    command
-        // cargo-llvm-cov 的直接调用仍要求 Cargo 子命令名作为第一个参数。
-        .arg("llvm-cov")
-        .env("CARGO_TARGET_DIR", target_dir)
-        .env("PANTA_TOOL_CACHE_ROOT", target_dir)
-        .args([
-            "--locked",
-            "--workspace",
-            "--exclude",
-            "panta-launcher",
-            // 聚合器依赖 native 构建树；由独立 native CI 验证，避免冷启动误失败。
-            "--exclude",
-            "panta-tests",
-            // 构建支持从 launcher 迁出，保持原业务覆盖率口径；另有安装/数据库回归测试。
-            "--exclude",
-            "panta-build",
-            "--summary-only",
-            "--fail-under-functions",
-            "89",
-            "--fail-under-lines",
-            "92",
-        ])
-        .current_dir(repository_root()?);
-    run("cargo llvm-cov", command)
 }
 
 /// 覆盖率构建使用独立 CMake 树，与普通构建共享已校验的依赖缓存。

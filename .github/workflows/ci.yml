@@ -194,6 +194,14 @@ jobs:
         shell: bash
         run: cargo coverage
 
+      - name: Upload Rust coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-coverage
+          path: target/rust-coverage/
+          if-no-files-found: error
+
   native-coverage:
     name: native C++ coverage and QML tests (ubuntu)
     needs: [changes]
