@@ -38,6 +38,8 @@ qt_add_qml_module(
   src/vtk/navigation/viewport_input.hpp
   src/vtk/navigation/viewport_orientation.cpp
   src/vtk/navigation/viewport_orientation.hpp
+  src/vtk/primitive_scene.cpp
+  src/vtk/primitive_scene.hpp
   src/vtk/surface_mesh.cpp
   src/vtk/surface_mesh.hpp
   src/vtk/welcome/welcome_scene.cpp
@@ -58,7 +60,7 @@ if(UNIX AND NOT APPLE)
 endif()
 # WebGPU/hardware-window 路径不依赖 Qt VTK GUI 或 OpenGL scenegraph；
 # 字形、法线和面内文本几何所需的 RenderingFreeType/FiltersCore/FiltersGeneral 与
-# FiltersSources，以及 Dawn 运行时显式列出。公共头只有
+# FiltersSources 显式列出；Dawn 由 RenderingWebGPU 的接口依赖提供。公共头只有
 # Qt 类型，VTK/Dawn 仅为模块内部消费——PRIVATE 链接避免第三方 include
 # 路径泄漏给消费方（静态库符号仍经 LINK_ONLY 传播给最终链接者）；
 # Qt6::Quick 对应公共头的 QQuickItem 基类，保持 PUBLIC。
@@ -71,7 +73,6 @@ target_link_libraries(
           VTK::FiltersCore
           VTK::FiltersGeneral
           VTK::FiltersSources
-          dawn::webgpu_dawn
   PUBLIC Qt6::Quick)
 if(UNIX AND NOT APPLE)
   target_link_libraries(panta_visualization PRIVATE PkgConfig::WAYLAND_CLIENT)
@@ -91,13 +92,25 @@ vtk_module_autoinit(
   VTK::FiltersSources)
 
 if(BUILD_TESTING)
-  foreach(_test IN ITEMS welcome_wordmark_test welcome_scene_test viewport_navigation_test)
+  foreach(_test IN ITEMS welcome_wordmark_test welcome_scene_test viewport_navigation_test
+                         primitive_scene_test)
     add_executable(panta_${_test} ../../tests/cpp/visualization/${_test}.cpp)
     panta_native_defaults(panta_${_test})
     target_include_directories(panta_${_test} PRIVATE src/vtk)
     target_link_libraries(panta_${_test} PRIVATE panta_visualization Qt6::Test VTK::CommonDataModel)
   endforeach()
+  target_link_libraries(panta_primitive_scene_test PRIVATE VTK::RenderingCore VTK::RenderingWebGPU)
+  panta_add_qml_test(Visualization.PrimitiveScene panta_primitive_scene_test)
   panta_add_qml_test(Visualization.WelcomeWordmark panta_welcome_wordmark_test)
   panta_add_qml_test(Visualization.WelcomeScene panta_welcome_scene_test)
   panta_add_qml_test(Visualization.ViewportNavigation panta_viewport_navigation_test)
+  if(APPLE)
+    add_executable(panta_native_surface_lifecycle_test
+                   ../../tests/cpp/visualization/native_surface_lifecycle_test.mm)
+    panta_native_defaults(panta_native_surface_lifecycle_test)
+    target_include_directories(panta_native_surface_lifecycle_test PRIVATE src/vtk)
+    target_link_libraries(panta_native_surface_lifecycle_test PRIVATE panta_visualization Qt6::Test
+                                                                      VTK::RenderingUI)
+    panta_add_qml_test(Visualization.NativeSurfaceLifecycle panta_native_surface_lifecycle_test)
+  endif()
 endif()

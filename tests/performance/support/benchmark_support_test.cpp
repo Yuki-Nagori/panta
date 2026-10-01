@@ -1,5 +1,10 @@
 #include "../../support/qt/frame_submission_capture.hpp"
 #include "benchmark_statistics.hpp"
+#if defined(PANTA_TEST_WITH_VTK)
+#include "vtk_error_capture.hpp"
+#include <vtkCommand.h>
+#include <vtkOutputWindow.h>
+#endif
 #include <QLoggingCategory>
 #include <QObject>
 #include <QString>
@@ -29,6 +34,21 @@ void disable_viewport(QLoggingCategory* category) {
 class BenchmarkSupportTest final : public QObject {
     Q_OBJECT
   private slots:
+#if defined(PANTA_TEST_WITH_VTK)
+    void propagates_vtk_errors_and_restores_observer() {
+        auto* output = vtkOutputWindow::GetInstance();
+        const bool previously_observed = output->HasObserver(vtkCommand::ErrorEvent) != 0;
+        {
+            panta::test::VtkErrorCapture capture;
+            capture.check();
+            output->InvokeEvent(vtkCommand::ErrorEvent);
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, capture.check());
+        }
+        QCOMPARE(output->HasObserver(vtkCommand::ErrorEvent) != 0, previously_observed);
+        panta::test::VtkErrorCapture next;
+        next.check();
+    }
+#endif
     void rejects_invalid_timings() {
         QVERIFY(!panta::test::summarize_timings({}));
         for (double value : {-1.0, std::numeric_limits<double>::infinity(),
@@ -71,6 +91,11 @@ class BenchmarkSupportTest final : public QObject {
             QVERIFY(!capture.wait_after(2, std::chrono::milliseconds{1}));
             qWarning("other diagnostic");
             QCOMPARE(forwarded, 1);
+            qCDebug(viewportLog) << "surface synchronized";
+            QCOMPARE(capture.surface_sync_count(), std::size_t{1});
+            capture.reset();
+            QCOMPARE(capture.count(), std::size_t{0});
+            QCOMPARE(capture.surface_sync_count(), std::size_t{0});
         }
         qWarning("restored diagnostic");
         QCOMPARE(forwarded, 2);

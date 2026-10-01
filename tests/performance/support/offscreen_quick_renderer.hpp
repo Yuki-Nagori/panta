@@ -4,6 +4,7 @@
 #include <QByteArray>
 #include <QElapsedTimer>
 #include <QQuickGraphicsConfiguration>
+#include <QQuickItem>
 #include <QQuickRenderControl>
 #include <QQuickRenderTarget>
 #include <QQuickWindow>
@@ -40,6 +41,8 @@ class OffscreenQuickRenderer final {
 
     [[nodiscard]] auto initialize(const QSize& logicalSize, qreal devicePixelRatio) -> QString {
         m_window.resize(logicalSize);
+        // 内容尺寸直接采用目标逻辑尺寸，避免布局依赖隐藏窗口的平台 resize 事件。
+        m_window.contentItem()->setSize(logicalSize);
         QQuickGraphicsConfiguration config;
         config.setTimestamps(true);
         m_window.setGraphicsConfiguration(config);
@@ -49,6 +52,12 @@ class OffscreenQuickRenderer final {
         QRhi* rhi = m_control.rhi();
         if (rhi == nullptr || rhi->backend() == QRhi::Null) {
             return QStringLiteral("A hardware RHI is required");
+        }
+        const auto deviceType = rhi->driverInfo().deviceType;
+        if (deviceType != QRhiDriverInfo::IntegratedDevice &&
+            deviceType != QRhiDriverInfo::DiscreteDevice &&
+            deviceType != QRhiDriverInfo::ExternalDevice) {
+            return QStringLiteral("An identifiable hardware GPU is required");
         }
         if (!rhi->isFeatureSupported(QRhi::Timestamps)) {
             return QStringLiteral("GPU timestamps are unsupported by this device");

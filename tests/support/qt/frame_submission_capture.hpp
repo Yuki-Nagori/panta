@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QByteArray>
-#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QLoggingCategory>
 #include <QObject>
@@ -9,10 +8,10 @@
 #include <QTimer>
 #include <QtCore/qlogging.h>
 #include <chrono>
+#include <cstddef>
 #include <cstdio>
 #include <mutex>
 #include <stdexcept>
-#include <vector>
 
 namespace panta::test {
 
@@ -26,7 +25,6 @@ class FrameSubmissionCapture final {
                 throw std::logic_error("Frame submission capture cannot be nested");
             }
             s_active = this;
-            m_clock.start();
         }
         // 分类注册也可能调用 filter；安装时不持有捕获锁，避免锁顺序反转。
         const auto previous = QLoggingCategory::installFilter(filter);
@@ -55,23 +53,18 @@ class FrameSubmissionCapture final {
 
     [[nodiscard]] auto count() const -> std::size_t {
         std::lock_guard lock(mutex());
-        return m_times.size();
+        return m_frames;
     }
 
     void reset() {
         std::lock_guard lock(mutex());
-        m_times.clear();
+        m_frames = 0;
         m_surfaceSyncs = 0;
     }
 
     [[nodiscard]] auto surface_sync_count() const -> std::size_t {
         std::lock_guard lock(mutex());
         return m_surfaceSyncs;
-    }
-
-    [[nodiscard]] auto times() const -> std::vector<qint64> {
-        std::lock_guard lock(mutex());
-        return m_times;
     }
 
     [[nodiscard]] auto wait_after(std::size_t previousCount, std::chrono::milliseconds timeout)
@@ -125,7 +118,7 @@ class FrameSubmissionCapture final {
                 context.category != nullptr && qstrcmp(context.category, "panta.viewport") == 0;
             if (capture != nullptr && viewport && type == QtDebugMsg) {
                 if (text.startsWith(QStringLiteral("frame submitted"))) {
-                    capture->m_times.push_back(capture->m_clock.nsecsElapsed());
+                    ++capture->m_frames;
                     if (capture->m_waitLoop != nullptr) {
                         capture->m_waitLoop->quit();
                     }
@@ -152,8 +145,7 @@ class FrameSubmissionCapture final {
     }
     inline static FrameSubmissionCapture* s_active = nullptr;
     inline static QtMessageHandler s_previousHandler = nullptr;
-    QElapsedTimer m_clock;
-    std::vector<qint64> m_times;
+    std::size_t m_frames = 0;
     std::size_t m_surfaceSyncs = 0;
     QEventLoop* m_waitLoop = nullptr;
     QtMessageHandler m_previousHandler = nullptr;

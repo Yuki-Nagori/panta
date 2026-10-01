@@ -39,6 +39,8 @@ target_link_libraries(panta_qml_gpu_benchmark PRIVATE Qt6::GuiPrivate)
 
 if(PANTA_ENABLE_BRIDGE_MODULE)
   panta_require_sdk("vtk" _performance_vtk_staging)
+  target_link_libraries(panta_benchmark_support_test PRIVATE VTK::CommonCore)
+  target_compile_definitions(panta_benchmark_support_test PRIVATE PANTA_TEST_WITH_VTK=1)
   panta_performance_target(panta_viewport_navigation_cpu_benchmark
                            cpu/viewport_navigation_benchmark.cpp)
   target_include_directories(panta_viewport_navigation_cpu_benchmark PRIVATE "${_vtk_private}")
@@ -66,4 +68,8 @@ if(PANTA_ENABLE_BRIDGE_MODULE)
     target_link_libraries(panta_bridge_project_stl_activation_cpu_benchmark PRIVATE Psapi)
     target_link_libraries(panta_project_stl_viewport_gpu_benchmark PRIVATE Psapi)
   endif()
+  foreach(_vtk_gpu_target panta_viewport_gpu_benchmark panta_project_stl_viewport_gpu_benchmark)
+    target_link_libraries(${_vtk_gpu_target} PRIVATE VTK::RenderingWebGPU VTK::RenderingCore
+                                                     VTK::FiltersCore VTK::CommonDataModel)
+  endforeach()
 endif()

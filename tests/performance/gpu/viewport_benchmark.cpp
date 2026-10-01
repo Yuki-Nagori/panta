@@ -1,7 +1,7 @@
-/// VTK WebGPU 开发基准：在真实原生窗口中测量场景更新到帧提交的间隔。
-
+/// VTK WebGPU 手动基准：默认硬件离屏，原生窗口提交间隔保留独立对照。
 #include "../../support/qt/frame_submission_capture.hpp"
 #include "../support/benchmark_statistics.hpp"
+#include "../support/offscreen_vtk_renderer.hpp"
 #include <QColor>
 #include <QGuiApplication>
 #include <QObject>
@@ -10,18 +10,20 @@
 #include <QSignalSpy>
 #include <QSizeF>
 #include <QString>
+#include <QtCore/qtenvironmentvariables.h>
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
 #include <qlogging.h>
 #include <qtestsupport_core.h>
 #include <qtestsupport_gui.h>
+#include <ratio>
 #include <vector>
 #include <vtk_viewport.hpp>
 
@@ -39,6 +41,7 @@ class ViewportGpuBenchmark final : public QObject {
 
   private:
     QQuickWindow window_;
+    std::unique_ptr<panta::test::OffscreenVtkRenderer> offscreen_;
     std::unique_ptr<panta::test::FrameSubmissionCapture> capture_;
     // 指针而非直接成员：VTK/WebGPU 资源必须在事件循环仍活跃的
     // cleanupTestCase 显式拆除（与应用侧 QML 引擎拆除同序）；作为成员会在
@@ -62,20 +65,16 @@ class ViewportGpuBenchmark final : public QObject {
     }
 
     std::vector<double> measure_submission_intervals(int frame_count, int& frame_index) {
-        const std::size_t first_frame = capture_->count();
+        std::vector<double> intervals;
+        intervals.reserve(frame_count);
         for (int frame = 0; frame < frame_count; ++frame) {
+            const auto start = std::chrono::steady_clock::now();
             if (!submit_scene_update(frame_index++)) {
                 return {};
             }
-        }
-        const auto submitted_frame_times = capture_->times();
-        std::vector<double> intervals;
-        intervals.reserve(frame_count);
-        for (std::size_t index = std::max<std::size_t>(first_frame, 1);
-             index < submitted_frame_times.size(); ++index) {
-            intervals.push_back(static_cast<double>(submitted_frame_times[index] -
-                                                    submitted_frame_times[index - 1]) /
-                                1.0e6);
+            intervals.push_back(
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+                    .count());
         }
         return intervals;
     }
@@ -84,7 +83,19 @@ class ViewportGpuBenchmark final : public QObject {
     void initTestCase() {
         const QString platform = QGuiApplication::platformName();
         if (platform == QStringLiteral("offscreen") || platform == QStringLiteral("minimal")) {
-            QSKIP("VTK WebGPU benchmark requires a visible native graphics session");
+            QFAIL("VTK WebGPU benchmark requires a native graphics session (surface hidden by "
+                  "default)");
+        }
+
+        if (qgetenv("PANTA_BENCHMARK_PRESENTATION") != "1") {
+            const double ratio = window_.devicePixelRatio();
+            try {
+                offscreen_ = std::make_unique<panta::test::OffscreenVtkRenderer>(
+                    QSize(static_cast<int>(1000 * ratio), static_cast<int>(700 * ratio)));
+            } catch (const std::exception& error) {
+                QFAIL(error.what());
+            }
+            return;
         }
 
         viewport_parent_ = new QQuickItem(window_.contentItem());
@@ -95,22 +106,55 @@ class ViewportGpuBenchmark final : public QObject {
         window_.resize(1000, 700);
         window_.show();
         if (!QTest::qWaitForWindowExposed(&window_)) {
-            QSKIP("Native benchmark window could not be exposed");
+            QFAIL("Native benchmark window could not be exposed");
         }
         if (initialized.isEmpty() && !initialized.wait(10000)) {
-            QSKIP("VTK WebGPU did not initialize a native rendering context");
+            QFAIL("VTK WebGPU did not initialize a native rendering context");
         }
 
         capture_ = std::make_unique<panta::test::FrameSubmissionCapture>();
     }
 
-    void measures_webgpu_frame_submission_interval() {
+    void measures_webgpu_frames() {
+        if (offscreen_) {
+            std::vector<double> submissions;
+            std::vector<double> completions;
+            try {
+                for (int index = 0; index < kWarmupFrameCount + kSampleCount * kFrameCountPerSample;
+                     ++index) {
+                    panta::visualization::RenderScene scene;
+                    scene.background =
+                        QColor((index * 37) % 256, (index * 71) % 256, (index * 113) % 256);
+                    const auto timing = offscreen_->render(scene);
+                    if (index >= kWarmupFrameCount) {
+                        submissions.push_back(timing.submitMs);
+                        completions.push_back(timing.completionMs);
+                    }
+                }
+            } catch (const std::exception& error) {
+                QFAIL(error.what());
+            }
+            const auto submit = panta::test::summarize_timings(submissions);
+            const auto complete = panta::test::summarize_timings(completions);
+            if (!submit || !complete) {
+                QFAIL("Invalid VTK offscreen timing samples");
+            }
+            qInfo().nospace() << "VTK offscreen (" << offscreen_->backend() << ", "
+                              << submissions.size()
+                              << " frames; CPU update to submit p50/p95 ms): " << submit->p50 << "/"
+                              << submit->p95;
+            qInfo().nospace() << "VTK offscreen (CPU update to queue completion p50/p95 ms): "
+                              << complete->p50 << "/" << complete->p95;
+            return;
+        }
+
         qInfo() << "VTK WebGPU native-window benchmark; interval is measured from scene update "
                    "to the following VTK frame-submission log, not GPU execution or display "
                    "presentation time";
         int frame_index = 0;
-        if (measure_submission_intervals(kWarmupFrameCount, frame_index).empty()) {
-            return;
+        if (measure_submission_intervals(kWarmupFrameCount, frame_index).size() !=
+            kWarmupFrameCount) {
+            QFAIL("Incomplete VTK warmup sample batch");
         }
 
         std::vector<double> intervals;
@@ -118,7 +162,7 @@ class ViewportGpuBenchmark final : public QObject {
         for (int sample = 0; sample < kSampleCount; ++sample) {
             const auto values = measure_submission_intervals(kFrameCountPerSample, frame_index);
             if (values.size() != kFrameCountPerSample) {
-                return;
+                QFAIL("Incomplete VTK submission sample batch");
             }
             intervals.insert(intervals.end(), values.begin(), values.end());
         }
@@ -134,6 +178,7 @@ class ViewportGpuBenchmark final : public QObject {
     }
 
     void cleanupTestCase() {
+        offscreen_.reset();
         capture_.reset();
         // 显式按应用侧同序拆除 VTK/WebGPU 资源：事件循环仍活跃时先行释放，
         // 避免拖到 qExec 之后的静态析构期与 Win32 interactor 遗留状态冲突。

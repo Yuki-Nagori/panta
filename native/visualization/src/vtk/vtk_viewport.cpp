@@ -8,7 +8,7 @@
 #include "navigation/viewport_camera.hpp"
 #include "navigation/viewport_input.hpp"
 #include "navigation/viewport_orientation.hpp"
-#include "surface_mesh.hpp"
+#include "primitive_scene.hpp"
 #include "vtk_native_surface.hpp"
 #include "welcome/welcome_scene.hpp"
 #include <QElapsedTimer>
@@ -27,9 +27,7 @@
 #include <QtCore/qtmetamacros.h>
 #include <QtGlobal>
 #include <QtLogging>
-#include <algorithm>
 #include <array>
-#include <cmath>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
@@ -37,10 +35,9 @@
 #include <vtkCamera.h>
 #include <vtkCommand.h>
 #include <vtkHardwareWindow.h>
+#include <vtkMapper.h>
 #include <vtkNew.h>
 #include <vtkObject.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkPolyDataNormals.h>
 #include <vtkProperty.h>
 #include <vtkWebGPUConfiguration.h>
 #if defined(Q_OS_MACOS)
@@ -68,28 +65,6 @@ constexpr double kModelCameraFitMargin = 1.25;
 constexpr double kWelcomeCameraFitMargin = 2.25;
 
 using Vector3 = std::array<double, 3>;
-
-// 字样保持透视深度；按实际宽高比留出 25% 边距，窄窗口也不裁字。
-void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect,
-                              double fit_margin) {
-    double bounds[6];
-    actor->GetBounds(bounds);
-    constexpr double view_angle = 30.0;
-    constexpr double half_angle_radians = 0.2617993877991494;
-    const double half_width = (bounds[1] - bounds[0]) / 2;
-    const double half_height = (bounds[3] - bounds[2]) / 2;
-    const double half_depth = (bounds[5] - bounds[4]) / 2;
-    const double distance =
-        fit_margin * std::max(half_height, half_width / aspect) / std::tan(half_angle_radians) +
-        half_depth;
-    vtkCamera* camera = renderer->GetActiveCamera();
-    const double* center = actor->GetCenter();
-    camera->SetPosition(center[0], center[1], center[2] + distance);
-    camera->SetFocalPoint(center);
-    camera->SetViewUp(0, 1, 0);
-    camera->SetViewAngle(view_angle);
-    renderer->ResetCameraClippingRange();
-}
 
 } // namespace
 
@@ -394,48 +369,9 @@ void VtkViewport::update_mesh_actor() {
         return;
     }
 
-    vtkSmartPointer<vtkPolyData> geometry;
-    const bool imported_mesh = impl_->pending.mesh != nullptr;
-    geometry =
-        imported_mesh ? make_surface_poly_data(*impl_->pending.mesh) : create_welcome_wordmark();
-
-    vtkNew<vtkPolyDataMapper> mapper;
-    if (imported_mesh) {
-        mapper->SetInputData(geometry);
-        mapper->SetColorModeToDefault();
-        mapper->SetScalarModeToDefault();
-    } else {
-        vtkNew<vtkPolyDataNormals> normals;
-        normals->SetInputData(geometry);
-        normals->SetFeatureAngle(45.0);
-        normals->ConsistencyOn();
-        normals->SplittingOn();
-        mapper->SetInputConnection(normals->GetOutputPort());
-        mapper->SetColorModeToDirectScalars();
-        mapper->SetScalarModeToUsePointData();
-    }
-    auto* previous_mapper = impl_->primitive_actor->GetMapper();
+    vtkMapper* previous_mapper = impl_->primitive_actor->GetMapper();
     impl_->previous_mapper = previous_mapper;
-    if (previous_mapper != nullptr && impl_->render_window != nullptr) {
-        // 页签切换会替换整条 mapper 管线；先显式释放旧窗口的图形资源，
-        // 不依赖 mapper 析构来回收 WebGPU buffers。
-        previous_mapper->ReleaseGraphicsResources(impl_->render_window.GetPointer());
-    }
-    impl_->primitive_actor->SetMapper(mapper);
-    if (imported_mesh) {
-        impl_->primitive_actor->SetOrientation(0.0, 0.0, 0.0);
-    } else {
-        impl_->primitive_actor->SetOrientation(16.0, -18.0, -4.0);
-    }
-    auto* material = impl_->primitive_actor->GetProperty();
-    material->SetInterpolationToPhong();
-    material->SetAmbient(0.22);
-    material->SetDiffuse(0.78);
-    material->SetSpecular(0.28);
-    material->SetSpecularPower(28.0);
-    if (imported_mesh) {
-        material->SetColor(0.72, 0.82, 0.94);
-    }
+    replace_primitive_geometry(impl_->primitive_actor, impl_->render_window, impl_->pending.mesh);
 }
 
 void VtkViewport::handle_interaction_event(unsigned long event_id,

@@ -7,6 +7,7 @@
 #include <QPointF>
 #include <QtGlobal>
 #include <vtkCocoaHardwareWindow.h>
+#include <vtkCocoaHardwareView.h>
 #include <vtkHardwareWindow.h>
 
 #import <Cocoa/Cocoa.h>
@@ -82,7 +83,10 @@ void set_native_surface_visible(NativeSurface& surface, bool visible) {
 }
 
 void detach_native_surface(NativeSurface& surface) {
-    if (auto* view = static_cast<NSView*>(surface.view); view != nullptr) {
+    if (auto* view = static_cast<vtkCocoaHardwareView*>(surface.view); view != nullptr) {
+        // AppKit 的已排队事件可能继续持有 view；先断开反向指针，再销毁 hardware window。
+        [view setHardwareWindow:nullptr];
+        [view setHidden:YES];
         [view removeFromSuperview];
     }
     surface = {};

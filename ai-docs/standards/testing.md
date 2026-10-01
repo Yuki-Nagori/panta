@@ -1,6 +1,6 @@
 # 测试目录与入口规范
 
-更新日期：2026-09-18。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
+更新日期：2026-10-02。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
 
 ## 目录职责
 
@@ -14,13 +14,17 @@ tests/
 ├── integration/native.rs      # cargo test 触发的 CTest + qmllint 聚合
 ├── rust/<domain>.rs            # Rust 公共 API 黑盒测试，由所属 crate 注册
 ├── cpp/<module>/*_test.cpp    # C++20、GTest/QtTest 源文件
-└── qml/*_test.cpp             # 面向 QML 组件的 QtTest 源文件
+├── qml/*_test.cpp             # 面向 QML 组件的 QtTest 源文件
+├── support/{rust,qt,qml}/     # 跨功能 / 性能测试共享辅助代码
+├── fixtures/                 # 固定回归输入，QML 夹具仍在 fixtures/qml
+└── performance/{cpu,gpu,support}/ # 手动性能基准与专用辅助代码
 ```
 
 - `tests/src/` 只放入口编排代码，不放领域测试断言。
 - `tests/integration/` 只放 `panta-tests` package 的 Cargo 集成测试；manifest 用显式 `[[test]]` 注册，不能依赖 Cargo 对 `tests/tests` 的默认猜测。
 - `tests/rust/` 放 Rust crate 公共 API 的黑盒测试；所属 crate 的 Cargo manifest 用 `[[test]]` 显式注册相对路径，故 `cargo test -p <crate>` 和 workspace 测试均会运行。
-- `tests/cpp/` 和 `tests/qml/` 是测试源代码唯一归档位置。CMake target 仍在被测模块的 `CMakeLists.txt` 注册，源文件使用明确相对路径；测试二进制不安装、不导出。
+- C++ / QML 功能测试归档于 `tests/cpp/` 和 `tests/qml/`，CMake target 在被测模块注册。手动性能源码归档于 `tests/performance/{cpu,gpu,support}`，统一由 `native/performance/CMakeLists.txt` 注册；测试二进制不安装、不导出。
+- 多种测试实际复用的辅助代码放 `tests/support/`；性能专用辅助代码放 `tests/performance/support/`。局部辅助函数保留在使用者中，不为目录分层制造单一调用的封装。
 - `native/cmake/tests/` 只保留 CMake 脚本和小型 configure fixture，不放 C++/QML 行为测试。
 - 生产 QML 仍在 `qml/`；`tests/qml/` 只存 QtTest 驱动的验证代码，不复制生产组件。
 - 小型、可追溯的输入夹具放 `tests/fixtures/<module>/`；生成物、日志和覆盖率报告放构建树或 `artifacts/`，不混入源码目录。
@@ -35,7 +39,7 @@ tests/
 ## C++、QML 与 CMake
 
 - C++ 单元/行为测试遵循 [GTest](gtest.md)，Qt 对象和 QML 资源加载使用 QtTest；每个可执行测试 target 名为 `<被测目标>_test`。
-- `BUILD_TESTING=ON` 时注册测试；GTest 使用 `gtest_discover_tests`，QtTest 使用 `add_test`，测试名按 `模块.行为` 命名。禁止只构建测试二进制而不注册 CTest。
+- 功能测试在 `BUILD_TESTING=ON` 时注册；GTest 使用 `gtest_discover_tests`，QtTest 使用 `add_test`，测试名按 `模块.行为` 命名。功能测试禁止只构建测试二进制而不注册 CTest。性能基准及性能辅助正确性测试从默认构建与常规 CTest 排除，由 `cargo performance` 显式运行；源码仍纳入质量检查。
 - 根集成测试（随 `cargo test --workspace` 执行）先构建 `all_qmllint`，再运行 `ctest --output-on-failure --no-tests=error -C <profile>`；空套件、构建失败和任一测试失败都返回非零。
 - QML lint/format 使用同一托管 Qt 工具版本；真实窗口、GPU、DPR 和平台生命周期验证另行记录，不能把无头 CTest 结果写成完整图形验收。
 - CMake 测试源不得通过宽泛 `GLOB` 自动发现；新增测试必须在对应模块 `CMakeLists.txt` 显式注册并同步 task/验证记录。
@@ -45,7 +49,8 @@ tests/
 本地日常入口：
 
 ```sh
-cargo test --workspace   # workspace Rust + 根 tests/integration/native.rs
+cargo test --locked --workspace   # workspace Rust + 根 tests/integration/native.rs
+cargo performance # 性能辅助正确性测试 → CPU → GPU，不纳入 CI 时间门禁
 cargo format     # Rust、C++/CXX、QML 格式
 cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner、Cppcheck
 cargo audit      # cargo-deny 依赖、许可证和 RustSec 审计

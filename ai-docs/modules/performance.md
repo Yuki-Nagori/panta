@@ -17,7 +17,7 @@ cargo performance all --project /path/to/model.panta --samples 31
 
 默认通过正式工程服务生成 10,000 / 20,000 个合成平面三角形的 STL 工程，保留在 `target/performance/fixture-*`；用于入口与生命周期重复验证，不代表生产模型。`--project` 可选择实际工程；Rust STL 单文件基准另可通过 `PANTA_BENCH_STL` 指定输入，未设置时使用合成 STL。`--samples` 只影响工程激活 / 页签切换基准，其他场景仍使用各自固定的预热 / 采样策略。
 
-native 基准采用当前 runner 配置（缺省 Debug），Rust 网格微基准显式使用 Release；输出和比较须区分配置。默认命令需要完整 bridge / VTK 构建；GPU 需要硬件图形会话，初始化失败不当作通过。当前 Qt Quick 默认硬件离屏；VTK 隐藏硬件目标由本任务后续批次迁移，原生窗口模式保留独立指标。
+native 基准采用当前 runner 配置（缺省 Debug），Rust 网格微基准显式使用 Release；输出和比较须区分配置。默认命令需要完整 bridge / VTK 构建；GPU 需要硬件图形会话，初始化失败不当作通过。Qt Quick 默认渲染到硬件纹理；VTK 默认使用隐藏的原生硬件 surface，仍需要平台图形会话。原生窗口模式保留独立指标。
 
 ## 定位与边界
 
@@ -47,7 +47,7 @@ cmake --build target/native/debug --config Debug --target panta_qml_cpu_benchmar
 QT_QPA_PLATFORM=offscreen target/native/debug/performance/panta_qml_cpu_benchmark measures_icon_loading
 ```
 
-QML GPU 基准默认使用 `QQuickRenderControl` 渲染到硬件纹理，不显示窗口；仍需要可用的 GPU 和平台插件。共享辅助类位于 `tests/performance/support/offscreen_quick_renderer.hpp`，管理纹理、深度/模板缓冲、帧完成计时与 GPU 时间戳；场景、预热和统计由基准负责。默认模式按 60Hz 逻辑帧推进动画，每场景预热 30 帧，再采样 3 × 60 帧。报告 CPU 更新至离屏帧完成的耗时，以及本帧 GPU 时间戳；不包含显示器刷新等待。默认离屏模式的设备初始化失败、丢失或任一正式样本无有效 GPU 时间戳均失败，不回退到软件渲染。
+QML GPU 基准默认使用 `QQuickRenderControl` 渲染到硬件纹理，不显示窗口；仍需要可用的 GPU 和平台插件。共享辅助类位于 `tests/performance/support/offscreen_quick_renderer.hpp`，管理纹理、深度/模板缓冲、帧完成计时与 GPU 时间戳；场景、预热和统计由基准负责。默认模式按 60Hz 逻辑帧推进动画，每场景预热 30 帧，再采样 3 × 60 帧。报告 CPU 更新至离屏帧完成的耗时，以及本帧 GPU 时间戳；不包含显示器刷新等待。默认离屏模式要求可识别的硬件设备；设备初始化失败、丢失或任一正式样本无有效 GPU 时间戳均失败，不回退到软件渲染。内容尺寸显式匹配目标逻辑尺寸；虚拟列表行数在预热后统计，并断言已实现可视行，避免用尚未完成布局的元数据描述正式负载。
 
 实现依据：[Qt RenderControl RHI 示例](https://doc.qt.io/qt-6/qtquick-rendercontrol-rendercontrol-rhi-example.html)。`QRhi` 通过 `Qt6::GuiPrivate` 使用，按仓库 Qt 6.11 基线编译。窗口类不放入离屏控件夹具，窗口创建和行为由已有弹窗测试覆盖。
 
@@ -58,7 +58,7 @@ PANTA_BENCHMARK_PRESENTATION=1 QT_QUICK_CONTROLS_STYLE=Basic \
   target/native/debug/performance/panta_qml_gpu_benchmark
 ```
 
-显式呈现模式保留真实窗口 `frameSwapped` 间隔，并在渲染线程采集 swapchain 已完成的 GPU 时间戳；它需要窗口可见。尚未就绪的时间戳不进入分位数，报告有效观测数；完全没有有效观测或请求帧未完整呈现均失败。比较时固定机器、后端、逻辑尺寸、DPR、场景和样本数。离屏同步完成与窗口流水线呈现具有不同调度边界，不能将两种耗时混成一个基线，也不能用离屏性能代替真实窗口的布局和输入验收。099 同机比较未证明两条路径等价，故保留呈现模式。VTK WebGPU 不使用此 Qt Quick 辅助类，其窗口和提交测量仍独立维护。
+显式呈现模式保留真实窗口 `frameSwapped` 间隔，并在渲染线程采集 swapchain 已完成的 GPU 时间戳；它需要窗口可见。尚未就绪的时间戳不进入分位数，报告有效观测数；完全没有有效观测或请求帧未完整呈现均失败。比较时固定机器、后端、逻辑尺寸、DPR、场景和样本数。离屏同步完成与窗口流水线呈现具有不同调度边界，不能将两种耗时混成一个基线，也不能用离屏性能代替真实窗口的布局和输入验收。099 同机比较未证明两条路径等价，故保留呈现模式。VTK WebGPU 使用独立的共享辅助类 `tests/performance/support/offscreen_vtk_renderer.hpp`，复用产品几何转换、欢迎字样与方向标记，管理隐藏 surface、设备检查、渲染与队列同步。提交和完成计时均从 CPU 场景更新开始；VTK 错误会使基准失败，设备销毁的 INFO 日志不属于渲染失败。
 
 任务 [056](../task/056-qml-native-review.md) 已提供按需诊断：`QT_LOGGING_RULES='panta.viewport.debug=true'` 输出原生区域同步与实际提交帧；默认关闭。`PANTA_TEST_NATIVE_VIEWPORT=1` 启用既有 `panta_qml_viewport_module_test` 中的真实窗口用例，覆盖连续更新合帧、相同外观不重绘、祖先移动、隐藏/零尺寸恢复及跨窗口重建。必须在实际桌面和正确平台插件下运行，不设 `offscreen`；默认无头测试明确跳过该用例，另行验证带窗口归属的条目析构。
 
@@ -80,14 +80,14 @@ cmake --build target/native/debug --target panta_viewport_navigation_cpu_benchma
 target/native/debug/performance/panta_viewport_navigation_cpu_benchmark
 ```
 
-VTK WebGPU GPU-backed 基准与 CPU 目标并列维护，要求真实图形会话；测量场景状态更新至下一次 WebGPU 帧提交日志的间隔：
+VTK WebGPU 基准与 CPU 目标独立维护，默认隐藏硬件 surface，预热 30 帧、正式采样 3 × 60 帧；报告 CPU 场景更新至 Render 返回和 WaitForCompletion 返回的两种耗时：
 
 ```sh
 cmake --build target/native/debug --target panta_viewport_gpu_benchmark --parallel 4
 target/native/debug/performance/panta_viewport_gpu_benchmark
 ```
 
-真实 VTK WebGPU 原生窗口的 GPU 基准与该 CPU 微基准保持独立，由任务 [048](../task/048-performance-testing.md) 维护；GPU 基准通过 `VtkViewport` 触发场景更新，测量事件调度到 VTK 帧提交的间隔。VTK 当前没有跨平台 GPU 完成或屏幕呈现时间戳，所以该指标包含 CPU 调度与 VTK 提交开销，不等同于 GPU 内核执行时间或实际显示器呈现间隔。两个目标都是开发侧手动工具，不注册为 CTest 或 CI 门禁。性能目标在所有平台统一产出到 `target/native/debug/performance/`（Windows 后缀 `.exe`），Qt/VTK 依赖 DLL 由任务 083 的部署步骤与 staging 拷贝提供，裸启即可运行。
+`PANTA_BENCHMARK_PRESENTATION=1` 通过产品 `VtkViewport` 测量场景更新至帧提交日志的间隔。离屏完成计时包含 CPU 更新、VTK 提交与队列同步；窗口提交计时包含 GUI 调度，未等待 GPU 完成。两者均不是 GPU 内核时间或显示器呈现时间，不能混成一个基线。两个目标都是开发侧手动工具，不注册为 CTest 或 CI 门禁。性能目标在所有平台统一产出到 `target/native/debug/performance/`（Windows 后缀 `.exe`），Qt/VTK 依赖 DLL 由任务 083 的部署步骤与 staging 拷贝提供，裸启即可运行。
 
 单立方体场景，32 个循环变化的姿态；每项预热 1000 次，再采样 31 批、每批 1000 次。输出批次平均耗时的 p50 / p95，分解相机插值、变化姿态下的方向标记同步、无标记消融、稳定姿态同步、六面命中和裁剪范围重置，并比较无标记与完整 CPU 过渡。结果不包括 Qt 调度、GPU 渲染和提交延迟。该 executable 不注册到 CTest，无绝对性能门槛；机器、Debug 配置及数字见任务记录。
 
@@ -97,4 +97,4 @@ target/native/debug/performance/panta_viewport_gpu_benchmark
 
 三个 GPU 基准统一使用 `tests/performance/support/benchmark_statistics.hpp` 的最近秩 p50/p95；空、负值、NaN 和无穷计时拒绝汇总。偶数样本的 p50 取下中位秩，与旧 Qt Quick / VTK 的上中位数略有差别，历史基线比较须注明统计规则。
 
-VTK 功能测试和两个 VTK 基准使用 `tests/support/qt/frame_submission_capture.hpp` 捕获 GUI 线程提交事件；作用域结束恢复原 Qt 日志处理器与过滤器，不清空调用者的日志规则。辅助代码行为测试由 `cargo performance` 单独执行，不注册到常规 Cargo/CTest 聚合测试。
+VTK 功能测试和两个 VTK 基准的真实窗口模式使用 `tests/support/qt/frame_submission_capture.hpp` 捕获 GUI 线程提交事件；作用域结束恢复原 Qt 日志处理器与过滤器，不清空调用者的日志规则。辅助代码行为测试由 `cargo performance` 单独执行，不注册到常规 Cargo/CTest 聚合测试。

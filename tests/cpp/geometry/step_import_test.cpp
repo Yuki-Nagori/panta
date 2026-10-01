@@ -1,9 +1,7 @@
 /// 任务 009 的有效/无效 STEP 样例导入冒烟。夹具来源、单位与预期记录在
 /// tests/fixtures/geometry/README.md；断言值与该文件保持同步。
 #include <filesystem>
-#include <fstream>
 #include <gtest/gtest.h>
-#include <ios>
 #include <panta/geometry/step_import.hpp>
 #include <string>
 
@@ -82,13 +80,7 @@ TEST(StepImport, TextualGarbageDoesNotCrashAndIsRejected) {
 }
 
 TEST(StepImport, EmptyFileIsRejected) {
-    fs::path empty = fs::temp_directory_path() / "panta_geometry_empty.step";
-    {
-        std::ofstream sink(empty, std::ios::binary);
-        ASSERT_TRUE(sink.is_open());
-    }
-    const auto result = import_step_summary(empty);
-    fs::remove(empty);
+    const auto result = import_step_summary(fixture_dir() / "empty.step");
     EXPECT_EQ(result.status, StepImportStatus::kParseFailed);
     EXPECT_FALSE(result.summary.has_geometry);
 }

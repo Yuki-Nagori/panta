@@ -18,6 +18,7 @@
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QSize>
+#include <QSizeF>
 #include <QString>
 #include <QTimer>
 #include <QUrl>
@@ -30,6 +31,7 @@
 #include <QtQml/qqmlextensionplugin.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -113,14 +115,17 @@ class ProjectDocksGpuBenchmark final : public QObject {
   private:
     QQmlEngine m_engine;
     QVariantList m_analysisSequences;
-    const bool m_presentation = qEnvironmentVariableIsSet("PANTA_BENCHMARK_PRESENTATION");
+    const bool m_presentation = qgetenv("PANTA_BENCHMARK_PRESENTATION") == "1";
+    // 渲染线程回调访问这些状态；窗口先析构并停线程，状态随后释放。
+    panta::test::FrameAnimationDriver m_animationDriver;
+    std::atomic<double> m_presentedGpuMs{0};
+    std::atomic_bool m_deviceChecked{false};
+    std::atomic_bool m_hardwareDevice{false};
     std::unique_ptr<panta::test::OffscreenQuickRenderer> m_offscreen{
         m_presentation ? nullptr : std::make_unique<panta::test::OffscreenQuickRenderer>()};
     std::unique_ptr<QQuickWindow> m_visibleWindow{m_presentation ? std::make_unique<QQuickWindow>()
                                                                  : nullptr};
     QQuickWindow& m_window = m_offscreen ? m_offscreen->window() : *m_visibleWindow;
-    panta::test::FrameAnimationDriver m_animationDriver;
-    std::atomic<double> m_presentedGpuMs{0};
     std::vector<double> m_gpuTimes;
     QQmlComponent m_emptyComponent{&m_engine};
     QQmlComponent m_controlsComponent{
@@ -290,6 +295,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
                          visual_items(document_bar, QStringLiteral("documentTabClose")).size()),
                      scenario.item_count);
             if (measure_frames(kWarmupFrameCount, {}, true).size() != kWarmupFrameCount) {
+                QTest::qFail("Incomplete warmup frame batch", __FILE__, __LINE__);
                 return;
             }
             m_gpuTimes.clear();
@@ -318,6 +324,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
                                               ? std::function<void()>{}
                                               : std::function<void()>{update_tabs});
                 if (sample_intervals.size() != kFrameCountPerSample) {
+                    QTest::qFail("Incomplete frame timing sample batch", __FILE__, __LINE__);
                     return;
                 }
                 intervals.insert(intervals.end(), sample_intervals.begin(), sample_intervals.end());
@@ -356,6 +363,18 @@ class ProjectDocksGpuBenchmark final : public QObject {
                  scenario.panels == Panels::Tasks || scenario.panels == Panels::Both
                      ? scenario.item_count
                      : 0);
+        QQuickItem* tab_row = layers_item == nullptr
+                                  ? nullptr
+                                  : visual_item(layers_item, QStringLiteral("layersTabRow"));
+        QCOMPARE(tab_row != nullptr && tab_row->property("visible").toBool(),
+                 (scenario.panels == Panels::Layers || scenario.panels == Panels::Both) &&
+                     scenario.item_count > 0);
+
+        if (measure_frames(kWarmupFrameCount, {}, true).size() != kWarmupFrameCount) {
+            QTest::qFail("Incomplete warmup frame batch", __FILE__, __LINE__);
+            return;
+        }
+        // 虚拟列表在 polish/预热后才补齐可视行；以正式采样时的负载报告和断言。
         const int realized_rows =
             tasks_item == nullptr
                 ? 0
@@ -366,15 +385,17 @@ class ProjectDocksGpuBenchmark final : public QObject {
             scenario.item_count > 0) {
             QVERIFY(realized_rows > 0);
         }
-        QQuickItem* tab_row = layers_item == nullptr
-                                  ? nullptr
-                                  : visual_item(layers_item, QStringLiteral("layersTabRow"));
-        QCOMPARE(tab_row != nullptr && tab_row->property("visible").toBool(),
-                 (scenario.panels == Panels::Layers || scenario.panels == Panels::Both) &&
-                     scenario.item_count > 0);
-
-        if (measure_frames(kWarmupFrameCount, {}, true).size() != kWarmupFrameCount) {
-            return;
+        if (tree != nullptr && scenario.item_count > 0) {
+            const auto rows = visual_items(tasks_item, QStringLiteral("importedPartEntry"));
+            QVERIFY(tree->width() > 0 && tree->height() > 0);
+            QVERIFY(!rows.isEmpty() && rows.front()->height() > 0);
+            auto* header = tree->property("headerItem").value<QQuickItem*>();
+            const double visible_height =
+                tree->height() - (header == nullptr ? 0 : header->height());
+            const int visible_rows = std::clamp(
+                static_cast<int>(visible_height / rows.front()->height()), 1, scenario.item_count);
+            QVERIFY2(realized_rows >= visible_rows,
+                     "Virtual list did not realize its visible workload");
         }
         m_gpuTimes.clear();
         std::vector<double> intervals;
@@ -382,6 +403,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
         for (int sample = 0; sample < kSampleCount; ++sample) {
             const auto sample_intervals = measure_frames(kFrameCountPerSample);
             if (sample_intervals.size() != kFrameCountPerSample) {
+                QTest::qFail("Incomplete frame timing sample batch", __FILE__, __LINE__);
                 return;
             }
             intervals.insert(intervals.end(), sample_intervals.begin(), sample_intervals.end());
@@ -441,12 +463,13 @@ class ProjectDocksGpuBenchmark final : public QObject {
             const QString error =
                 m_offscreen->initialize(m_window.size(), m_window.devicePixelRatio());
             QVERIFY2(error.isEmpty(), qPrintable(error));
+            QCOMPARE(m_window.contentItem()->size(), QSizeF(m_window.size()));
             qInfo() << "Offscreen GPU device:" << m_offscreen->deviceName();
             return;
         }
         if (QGuiApplication::platformName() == QStringLiteral("offscreen") ||
             QGuiApplication::platformName() == QStringLiteral("minimal")) {
-            QSKIP("GPU frame benchmark requires a visible native graphics session");
+            QFAIL("GPU frame benchmark requires a visible native graphics session");
         }
         QQuickGraphicsConfiguration config;
         config.setTimestamps(true);
@@ -455,6 +478,15 @@ class ProjectDocksGpuBenchmark final : public QObject {
         connect(
             &m_window, &QQuickWindow::afterFrameEnd, &m_window,
             [this] {
+                auto* rhi = static_cast<QRhi*>(m_window.rendererInterface()->getResource(
+                    &m_window, QSGRendererInterface::RhiResource));
+                if (rhi != nullptr) {
+                    const auto type = rhi->driverInfo().deviceType;
+                    m_hardwareDevice.store(type == QRhiDriverInfo::IntegratedDevice ||
+                                           type == QRhiDriverInfo::DiscreteDevice ||
+                                           type == QRhiDriverInfo::ExternalDevice);
+                    m_deviceChecked.store(true);
+                }
                 auto* swapchain =
                     static_cast<QRhiSwapChain*>(m_window.rendererInterface()->getResource(
                         &m_window, QSGRendererInterface::RhiSwapchainResource));
@@ -470,8 +502,10 @@ class ProjectDocksGpuBenchmark final : public QObject {
         const auto api = m_window.rendererInterface()->graphicsApi();
         if (api == QSGRendererInterface::Unknown || api == QSGRendererInterface::Software ||
             api == QSGRendererInterface::Null) {
-            QSKIP("A hardware-backed Qt Quick renderer is not available");
+            QFAIL("A hardware-backed Qt Quick renderer is not available");
         }
+        QTRY_VERIFY_WITH_TIMEOUT(m_deviceChecked.load(), 10000);
+        QVERIFY2(m_hardwareDevice.load(), "An identifiable hardware GPU is required");
     }
 
     void measures_frame_rendering_ablation() {
@@ -507,7 +541,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
 
     void measures_analysis_sequence_rendering() {
 #if !defined(PANTA_TEST_WITH_BRIDGE)
-        QSKIP("Analysis sequence catalog requires the enabled Bridge module");
+        QFAIL("Analysis sequence catalog requires the enabled Bridge module");
 #endif
         QVERIFY(!m_analysisSequences.isEmpty());
         const char* api = graphics_api_name(m_window.rendererInterface()->graphicsApi());
