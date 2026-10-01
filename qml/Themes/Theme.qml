@@ -142,8 +142,8 @@ QtObject {
     readonly property real disabledOpacity: 0.4
 
     // 主窗口最小尺寸（逻辑像素）
-    readonly property int windowMinimumWidth: 640
-    readonly property int windowMinimumHeight: 480
+    readonly property int windowMinimumWidth: 1280
+    readonly property int windowMinimumHeight: 720
 
     // 新建工程窗口尺寸与最小约束（逻辑像素）
     readonly property int newProjectDialogWidth: 620

@@ -19,6 +19,7 @@ Qt 建议分离界面与业务逻辑，并使用资源系统组织应用资源�
 - 将 `qt_add_qml_module` 放在与模块 QML 布局一致的位置，由 native 顶层纳入构建；若必须跨目录，任务 005 要验证 import 和资源别名，不能仅靠开发机 import path 可用。
 - 图标和内置 QML 通过模块资源定位；用户输入文件通过应用服务处理 URL/path 转换。避免当前工作目录相关的相对资源路径。
 - 主题、间距和色彩集中管理；文字通过翻译接口包裹；焦点、键盘操作与禁用原因可理解。布局统一使用 Qt 逻辑像素，不在 QML 里乘 `devicePixelRatio` 或缓存屏幕比例；跨屏和 framebuffer 转换集中由 C++/渲染边界处理。第一版只搭壳，不提前堆砌业务面板。
+- 主窗口采用桌面工作区下限：完整 Shell 与无 Bridge Shell 绑定 `Theme.windowMinimumWidth` / `Theme.windowMinimumHeight`，当前为 1280×720 逻辑像素。布局验收以此为最小窗口，不为低于下限的窗口增加适配分支（064，2026-10-02 用户确认）。
 - 自绘控件样式（自定义 background 等）不能运行于原生 Controls 样式；应用入口以 `QQuickStyle::setStyle("Basic")` 固定非原生样式，测试环境保持同源（029）。
 - 图标遵循 [图标设计规范](icons.md)，使用模块内 SVG 资源并经 `qt_add_resources` 登记；Mono 图标由 `panta-icons` provider 使用 QtSvg 渲染并着色，普通 SVG Image 解码使用 qsvg 插件。不在 QML 里用 Shapes/Canvas 逐个绘制静态图标。
 

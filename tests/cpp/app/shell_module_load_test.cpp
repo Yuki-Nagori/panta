@@ -151,6 +151,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY2(!engine.rootObjects().isEmpty(), "Panta.Shell entry failed to load");
 
         auto* root = engine.rootObjects().constFirst();
+        QCOMPARE(root->property("minimumWidth").toInt(), 1280);
+        QCOMPARE(root->property("minimumHeight").toInt(), 720);
         const auto assert_visible = [root](const char* object_name) {
             auto* object = root->findChild<QObject*>(QString::fromLatin1(object_name));
             if (object == nullptr) {
@@ -179,7 +181,7 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(strip != nullptr);
         QVERIFY(search != nullptr);
         shellWindow->showNormal();
-        for (const int width : {1440, 640}) {
+        for (const int width : {1440, 1280}) {
             shellWindow->resize(width, 900);
             QTest::qWait(50);
             for (const char* name : {"titleQuickActions", "titleSearchGroup"}) {
@@ -394,9 +396,9 @@ class ShellModuleLoadTest final : public QObject {
         QTest::addColumn<int>("windowWidth");
         QTest::addColumn<bool>("keyboard");
         QTest::newRow("wide-mouse") << 1440 << false;
-        QTest::newRow("narrow-mouse") << 640 << false;
+        QTest::newRow("minimum-mouse") << 1280 << false;
         QTest::newRow("wide-keyboard") << 1440 << true;
-        QTest::newRow("narrow-keyboard") << 640 << true;
+        QTest::newRow("minimum-keyboard") << 1280 << true;
     }
 
     void ribbon_navigation_preserves_workspace() {
@@ -567,7 +569,7 @@ class ShellModuleLoadTest final : public QObject {
         auto* language = root->findChild<QQuickItem*>(QStringLiteral("languageButton"));
         QVERIFY(strip && shared && menuStrip && language);
         window->showNormal();
-        for (const int width : {1440, 640}) {
+        for (const int width : {1440, 1280}) {
             window->resize(width, 900);
             QTest::qWait(50);
             QCOMPARE(ribbon->height(), 96.0);
