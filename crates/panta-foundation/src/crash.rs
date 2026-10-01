@@ -1,17 +1,13 @@
-//! 崩溃信号处理与日志落地（任务 047）：原生 SIGSEGV/SIGBUS/SIGFPE/SIGILL/
-//! SIGABRT/SIGTRAP 在控制台零输出、证据只进 macOS DiagnosticReports 的
-//! .ips（007 取证实证）。本模块在崩溃时同步向 stderr 与日志文件写入信号
-//! 信息与 best-effort 回溯，随后恢复默认处置重新 raise——.ips 崩溃报告
-//! 链路与内核退出语义保持不变。
+//! 进程级崩溃记录（047）：先向 stderr 与预打开的日志文件写出信号或
+//! Windows SEH 异常码及 PID，再尝试 POSIX 回溯。POSIX 恢复默认处置并
+//! 重发信号；Windows 继续默认异常处置，保留系统诊断与原始退出语义。
 //!
-//! 本模块是仓库内【专用手写 unsafe 边界】（rust.md）：信号句柄与回溯 FFI
-//! 的安全前提逐块注明；对外仅暴露安全 API。`panta-ffi` 只负责把安全入口
-//! 转成 CXX 可消费的 Result，不拥有本模块的底层实现。
+//! 手写 unsafe 限于本模块的系统 FFI；`panta-ffi` 仅转发安全安装入口。
 //!
 //! 安全取舍：write/fd 操作为 async-signal-safe；backtrace* 会调用分配器，
-//! 非严格安全——崩溃点位于分配器内时回溯可能缺失（.ips 兜底），以此换取
-//! 可读现场回溯。日志 fd 在安装时预创建并常驻进程生命周期，处理器内不做
-//! 路径解析或内存分配。
+//! 非严格安全——崩溃点位于分配器内时回溯可能缺失或阻塞。日志句柄与路径
+//! 字节在安装时准备并常驻进程生命周期；除 best-effort 回溯外，POSIX
+//! 处理器不解析路径、不分配内存。
 
 #[cfg(unix)]
 use std::os::fd::IntoRawFd;
@@ -29,7 +25,7 @@ static LOG_FD: AtomicI32 = AtomicI32::new(-1);
 #[cfg(windows)]
 /// 未安装时的空句柄；安装后保存常驻句柄（不关闭，进程退出由系统回收）。
 static LOG_HANDLE: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
-/// 安装期预渲染的“日志：<path>”行（以 \0 结尾）；崩溃时随信号一并输出，
+/// 安装期预渲染的“ log=<path>\n”字节（以 \0 结尾）；崩溃时随信号一并输出，
 /// 免去处理器内的路径/分配操作。指针指向进程生命周期常驻的泄露分配。
 static LOG_LINE: AtomicPtr<u8> = AtomicPtr::new(std::ptr::null_mut());
 /// 安装后的真实日志路径；仅由非信号上下文查询，处理器使用 LOG_LINE 副本。
@@ -46,8 +42,7 @@ const CRASH_SIGNALS: [libc::c_int; 6] = [
     libc::SIGTRAP,
 ];
 
-// SAFETY 使用点：backtrace/backtrace_symbols_fd 为 libc execinfo 接口，
-// 声明本身不含不变形；调用约束见 write_backtrace。
+// libc execinfo 接口；调用约束见 write_backtrace。
 #[cfg(unix)]
 unsafe extern "C" {
     fn backtrace(buffer: *mut *mut libc::c_void, size: libc::c_int) -> libc::c_int;
@@ -80,7 +75,7 @@ fn write_text(fd: i32, text: &str) {
     write_all(fd, text.as_bytes());
 }
 
-/// 仅写崩溃日志 fd（fd 与数值构成易换参数对，收敛为单参）。
+/// 在栈上格式化整数，供日志文件与 stderr 共用。
 #[cfg(unix)]
 fn write_number(fd: i32, mut value: u64) {
     let mut buffer = [0u8; 24];
@@ -119,16 +114,21 @@ extern "C" fn crash_handler(signal: libc::c_int) {
         write_text(log_fd, " pid=");
         write_number(log_fd, u64::from(std::process::id()));
         write_text(log_fd, "\n");
-        write_backtrace(log_fd);
     }
     write_text(libc::STDERR_FILENO, "panta-native crash: ");
     write_text(libc::STDERR_FILENO, signal_name(signal));
+    write_text(libc::STDERR_FILENO, " pid=");
+    write_number(libc::STDERR_FILENO, u64::from(std::process::id()));
     if !log_line.is_null() {
         // SAFETY: 指向安装期泄露的 NUL 结尾缓冲区，进程生命周期内有效。
         unsafe {
             let cstr = std::ffi::CStr::from_ptr(log_line.cast());
             write_all(libc::STDERR_FILENO, cstr.to_bytes());
         }
+    }
+    // 回溯可能触发分配器；两个目的地的基本记录必须先写出。
+    if log_fd >= 0 {
+        write_backtrace(log_fd);
     }
     write_backtrace(libc::STDERR_FILENO);
     // SAFETY: 恢复默认处置后重发同一信号，保持 .ips 崩溃报告与内核退出
@@ -142,8 +142,8 @@ extern "C" fn crash_handler(signal: libc::c_int) {
 #[cfg(unix)]
 fn write_backtrace(fd: i32) {
     // SAFETY: backtrace/backtrace_symbols_fd 会分配内存，非严格
-    // async-signal-safe——崩溃点在分配器内时可能无回溯（.ips 兜底）；
-    // buffer 为本栈帧上的定长数组，fd 由安装期预创建。
+    // async-signal-safe——崩溃点在分配器内时可能无回溯或阻塞；
+    // buffer 为本栈帧上的定长数组，fd 为预打开日志或标准错误。
     unsafe {
         let mut buffer = [std::ptr::null_mut::<libc::c_void>(); 64];
         let count = backtrace(buffer.as_mut_ptr(), 64);
@@ -208,12 +208,31 @@ pub fn install_crash_handler(log_dir: &str) -> std::io::Result<PathBuf> {
 #[cfg(windows)]
 const STD_ERROR_HANDLE: u32 = 0xffff_fff4;
 
+// Win32 ABI 布局；只读取异常码，保留完整记录以准确表达系统提供的类型。
+#[cfg(windows)]
+#[repr(C)]
+struct ExceptionRecord {
+    code: u32,
+    flags: u32,
+    record: *const ExceptionRecord,
+    address: *const std::ffi::c_void,
+    parameter_count: u32,
+    information: [usize; 15],
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct ExceptionPointers {
+    record: *const ExceptionRecord,
+    context: *const std::ffi::c_void,
+}
+
 #[cfg(windows)]
 unsafe extern "system" {
     fn GetStdHandle(which: u32) -> *mut std::ffi::c_void;
     fn SetUnhandledExceptionFilter(
-        filter: Option<unsafe extern "system" fn(*const std::ffi::c_void) -> i32>,
-    ) -> Option<unsafe extern "system" fn(*const std::ffi::c_void) -> i32>;
+        filter: Option<unsafe extern "system" fn(*const ExceptionPointers) -> i32>,
+    ) -> Option<unsafe extern "system" fn(*const ExceptionPointers) -> i32>;
     fn WriteFile(
         handle: *mut std::ffi::c_void,
         buffer: *const std::ffi::c_void,
@@ -265,19 +284,46 @@ fn write_number_windows(handle: *mut std::ffi::c_void, mut value: u64) {
 }
 
 #[cfg(windows)]
-unsafe extern "system" fn windows_exception_handler(_exception: *const std::ffi::c_void) -> i32 {
+fn write_exception_code_windows(handle: *mut std::ffi::c_void, mut code: u32) {
+    let mut buffer = *b"0x00000000";
+    for at in (2..buffer.len()).rev() {
+        buffer[at] = b"0123456789ABCDEF"[(code & 0xf) as usize];
+        code >>= 4;
+    }
+    write_all_windows(handle, &buffer);
+}
+
+#[cfg(windows)]
+fn write_windows_header(handle: *mut std::ffi::c_void, code: Option<u32>) {
+    write_all_windows(handle, b"panta-native crash: Windows SEH code=");
+    if let Some(code) = code {
+        write_exception_code_windows(handle, code);
+    } else {
+        write_all_windows(handle, b"UNKNOWN");
+    }
+    write_all_windows(handle, b" pid=");
+    write_number_windows(handle, u64::from(std::process::id()));
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn windows_exception_handler(exception: *const ExceptionPointers) -> i32 {
+    // SAFETY: Windows 回调期间提供有效的异常记录；空指针仅作为防御性路径。
+    let code = unsafe {
+        exception
+            .as_ref()
+            .and_then(|p| p.record.as_ref())
+            .map(|r| r.code)
+    };
     let log_handle = LOG_HANDLE.load(Ordering::SeqCst);
     let log_line = LOG_LINE.load(Ordering::SeqCst);
     if !log_handle.is_null() {
-        write_all_windows(log_handle, b"panta-native crash: Windows SEH pid=");
-        write_number_windows(log_handle, u64::from(std::process::id()));
+        write_windows_header(log_handle, code);
         write_all_windows(log_handle, b"\n");
     }
     // SAFETY: Windows 在未处理异常回调期间提供标准错误句柄；日志路径指针由
     // 安装期泄露并在进程生命周期内保持有效。
     let stderr = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
-    write_all_windows(stderr, b"panta-native crash: Windows SEH pid=");
-    write_number_windows(stderr, u64::from(std::process::id()));
+    write_windows_header(stderr, code);
     if !log_line.is_null() {
         // SAFETY: 指向安装期泄露的 NUL 结尾缓冲区，进程生命周期内有效。
         let cstr = unsafe { std::ffi::CStr::from_ptr(log_line.cast()) };
@@ -289,6 +335,9 @@ unsafe extern "system" fn windows_exception_handler(_exception: *const std::ffi:
 
 /// Windows 不使用 POSIX 信号；注册最小 SEH 顶层过滤器，写出信号等价的
 /// 进程级异常记录后继续交给 WER。日志文件仍在安装期预创建并常驻打开。
+///
+/// # Errors
+/// 日志目录创建失败或日志文件打开失败（权限/路径不可用）。
 #[cfg(windows)]
 pub fn install_crash_handler(log_dir: &str) -> std::io::Result<PathBuf> {
     let dir = if log_dir.is_empty() {
@@ -328,56 +377,98 @@ pub fn crash_log_path() -> Option<PathBuf> {
     LOG_PATH.lock().ok().and_then(|current| current.clone())
 }
 
-// Miri 不支持 fork/信号与 Win32 FFI 等进程边界调用；这些测试只在真实平台
+// Miri 不支持子进程/信号与 Win32 FFI 等进程边界调用；这些测试只在真实平台
 // 执行（032 Miri 边界登记），Miri 下仍编译 crash 模块本体。
 #[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
 
-    /// fork 子进程触发 SIGSEGV：处理器应向日志写入信号与 pid，且子进程
-    /// 死于原信号（默认处置重发生效）。
-    #[cfg(unix)]
+    /// 使用全新进程触发崩溃，避免污染父测试进程的处理器及退出状态。
+    #[cfg(any(unix, windows))]
     #[test]
-    fn handler_logs_segfault_and_reraises() -> std::io::Result<()> {
+    fn handler_logs_crash_and_preserves_exit() -> std::io::Result<()> {
+        use std::process::{Command, Stdio};
+
         let dir = std::env::temp_dir().join(format!(
             "panta-foundation-crash-test-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir)?;
-        let path = install_crash_handler(&dir.to_string_lossy())?;
-        assert_eq!(crash_log_path().as_deref(), Some(path.as_path()));
-
-        // SAFETY: fork/raise/waitpid 为本测试的受控进程边界；子进程仅执行
-        // raise（处理器内为 async-signal-safe 路径），父进程只 waitpid 与
-        // 读取日志文件。
-        let pid = unsafe { libc::fork() };
-        assert!(pid >= 0, "fork 失败");
-        if pid == 0 {
-            // SAFETY: raise 与 _exit 均为 async-signal-safe；子进程在此
-            // 路径上不返回。
-            unsafe {
-                libc::raise(libc::SIGSEGV);
-                libc::_exit(0);
-            }
+        let child = Command::new(std::env::current_exe()?)
+            .args([
+                "--ignored",
+                "--exact",
+                "crash::tests::crash_subprocess_entry",
+                "--nocapture",
+            ])
+            .env("PANTA_CRASH_TEST_DIR", &dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        let pid = child.id();
+        let output = child.wait_with_output()?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(output.status.signal(), Some(libc::SIGSEGV), "{stderr}");
         }
-
-        let mut status = 0;
-        // SAFETY: pid 为本测试 fork 的子进程；status 由 waitpid 初始化。
-        unsafe {
-            libc::waitpid(pid, &mut status, 0);
-        }
-        assert!(libc::WIFSIGNALED(status));
-        assert_eq!(libc::WTERMSIG(status), libc::SIGSEGV);
-
-        // SIGCHLD 的默认处置是忽略；直接调用处理器可在当前测试进程覆盖
-        // 输出与回溯逻辑，而不会破坏下面对 SIGSEGV 重发语义的断言。
-        crash_handler(libc::SIGCHLD);
-
+        #[cfg(windows)]
+        assert_eq!(
+            output.status.code().map(|code| code as u32),
+            Some(0xc000_0005),
+            "{stderr}"
+        );
+        let path = dir.join(format!("panta-native-crash-{pid}.log"));
         let content = std::fs::read_to_string(&path)?;
-        assert!(content.contains("panta-native crash: SIGSEGV"), "{content}");
-        assert!(content.contains("pid="), "{content}");
-        std::fs::remove_dir_all(&dir).ok();
+        #[cfg(unix)]
+        let header = format!("panta-native crash: SIGSEGV pid={pid}");
+        #[cfg(windows)]
+        let header = format!("panta-native crash: Windows SEH code=0xC0000005 pid={pid}");
+        assert_eq!(content.lines().next(), Some(header.as_str()), "{content}");
+        assert!(
+            stderr.starts_with(&format!("{header} log={}\n", path.display())),
+            "{stderr}"
+        );
+        std::fs::remove_dir_all(&dir)?;
         Ok(())
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    #[ignore = "Controlled crash child; handler_logs_crash_and_preserves_exit launches this explicitly"]
+    fn crash_subprocess_entry() -> std::io::Result<()> {
+        let dir = std::env::var("PANTA_CRASH_TEST_DIR")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+        let path = install_crash_handler(&dir)?;
+        assert_eq!(crash_log_path().as_deref(), Some(path.as_path()));
+        #[cfg(unix)]
+        // SAFETY: 此测试仅在独立子进程、日志已安装后触发；信号处理器应恢复
+        // 默认处置并以同一信号终止。_exit(77) 标识信号意外返回的失败路径。
+        unsafe {
+            libc::raise(libc::SIGSEGV);
+            libc::_exit(77);
+        }
+        #[cfg(windows)]
+        {
+            // 仅抑制测试子进程的 WER 界面，保留系统异常终止路径，避免 CI 弹窗等待。
+            // SAFETY: FFI 参数为文档定义的 NO_UI 标志与无附加参数的非连续异常；
+            // 此入口已通过显式环境变量确认运行在独立测试子进程。
+            unsafe {
+                const WER_FAULT_REPORTING_NO_UI: u32 = 32;
+                let result = WerSetFlags(WER_FAULT_REPORTING_NO_UI);
+                assert!(result >= 0, "WerSetFlags failed: {result:#x}");
+                RaiseException(0xc000_0005, 1, 0, std::ptr::null());
+            }
+            std::process::exit(77);
+        }
+    }
+
+    #[cfg(windows)]
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn WerSetFlags(flags: u32) -> i32;
+        fn RaiseException(code: u32, flags: u32, count: u32, arguments: *const usize);
     }
 
     #[cfg(unix)]
@@ -405,21 +496,7 @@ mod tests {
         assert_eq!(content, format!("prefix:0,42,{}", u64::MAX));
         assert_eq!(signal_name(libc::SIGSEGV), "SIGSEGV");
         assert_eq!(signal_name(-1), "UNKNOWN");
-        std::fs::remove_file(path).ok();
-        Ok(())
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn handler_installs_windows_filter() -> std::io::Result<()> {
-        let dir = std::env::temp_dir().join(format!(
-            "panta-foundation-crash-test-{}",
-            std::process::id()
-        ));
-        let path = install_crash_handler(&dir.to_string_lossy())?;
-        assert_eq!(crash_log_path().as_deref(), Some(path.as_path()));
-        assert!(path.is_file());
-        std::fs::remove_dir_all(&dir).ok();
+        std::fs::remove_file(path)?;
         Ok(())
     }
 }

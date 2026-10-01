@@ -4,8 +4,8 @@
 - 阶段：验证基础
 - 依赖：[008](008-tasks-errors-logging.md)
 - 优先级：P1
-- 负责人：待分配
-- 创建 / 更新：2026-09-19 / 2026-09-20
+- 负责人：Yuki
+- 创建 / 更新：2026-09-19 / 2026-10-02
 
 ## 目标与背景
 
@@ -24,7 +24,7 @@
 范围：Rust `panta-foundation` 崩溃处理器（POSIX 全量：信号名/pid/回溯落盘；
 Windows 最小 SEH 记录写出）、经 `panta-ffi` 暴露、app 入口安装，以及经 Cargo 运行的平台专属测试（POSIX 子进程信号测试、Windows 异常过滤器验证）。
 `panta-core` 保持领域模型职责，不承载该进程级平台设施。非目标：完整符号化（.ips 对照）、
-minidump/WER、Qt 消息处理、远程上报。
+minidump/WER 报告采集、Qt 消息处理、远程上报。
 
 ## 实施步骤
 
@@ -34,7 +34,7 @@ minidump/WER、Qt 消息处理、远程上报。
 2. 处理器仅用 async-signal-safe 操作（write/整数格式化）；回溯
    `backtrace_symbols_fd` 为 best-effort（崩溃点在分配器内时可能缺失，
    头文件注明取舍）。
-3. app main 入口首行安装；macOS/Linux 在 Rust 测试中 fork 子进程触发
+3. app main 入口首行安装；macOS/Linux 在 Rust 测试中独立启动子进程触发
    SIGSEGV，父进程断言原信号终止及日志内容；Windows 使用独立子进程验证
    异常记录写入后继续默认 WER 处置，不能在测试进程内直接触发未处理异常。
 
@@ -42,7 +42,7 @@ minidump/WER、Qt 消息处理、远程上报。
 
 - [ ] macOS/Linux 子进程触发 POSIX 崩溃信号时，stderr 与日志文件均有信号名/pid，子进程仍以原信号终止；macOS `.ips` 语义保留。
 - [ ] Windows 子进程触发 SEH 后，stderr 与日志文件记录异常码/pid，并继续 Windows 默认 WER 处理；不在父测试进程内触发异常。
-- [x] macOS/Linux POSIX 行为测试与 Windows 安装 smoke 经 Cargo 入口执行；测试注册方式、文档、task 与索引一致，无未登记兼容代码。
+- [ ] macOS/Linux POSIX 行为测试与 Windows SEH 子进程测试经 Cargo 聚合入口通过，覆盖率与质量检查通过；测试注册方式、文档、task 与索引一致，无未登记兼容代码。
 
 ## 验证计划与结果
 
@@ -65,6 +65,24 @@ minidump/WER、Qt 消息处理、远程上报。
   `panta-core` 继续保持领域模型与无手写 unsafe；手写 unsafe 集中在
   `panta-foundation::crash` 专用模块，并逐块保留 `// SAFETY:` 前提。
 
-## 完成摘要
+## 2026-10-02 实现与验收补齐
 
-POSIX 子进程崩溃记录与原信号重发已在 macOS/Linux 测试中验证，三平台 Cargo 测试通过。Windows 目前只验证异常过滤器安装和日志路径创建，尚未在子进程中触发 SEH 并检查 stderr、日志内容及默认 WER 行为；POSIX stderr 的捕获断言也仍需补齐。
+当前进展：实现和自动化验收测试已补齐，本地检查通过，仅待本批提交的三平台 CI 验收。任务保持 in-progress；CI 必须对应包含本批改动的提交，不能沿用历史安装 smoke 的结果。
+
+### 实现与评审
+
+- POSIX stderr 补齐 PID；日志与 stderr 先写基本头部，再尝试 best-effort 回溯，避免回溯阻塞时连 stderr 的信号 / PID 都缺失。
+- 用独立启动的测试子进程替换多线程 harness 中的 fork；父进程捕获 stderr，校验精确信号、PID、日志路径和原信号退出。移除为覆盖率在父进程调用处理器的做法，清理失败不再被忽略。
+- Windows 读取系统提供的异常记录，记录固定八位十六进制异常码与 PID。生产过滤器仍返回 `EXCEPTION_CONTINUE_SEARCH`；测试子进程仅设置 `WER_FAULT_REPORTING_NO_UI`，触发非连续 SEH 异常，父进程校验 stderr、日志与异常退出码。替换原本只检查安装的 smoke。
+- 崩溃子入口为 ignored 测试，由父测试显式启动；缺少专用环境变量时不会触发崩溃。Miri 不运行系统 FFI / 进程测试。整理注释，保留 ABI、句柄生命周期与回溯安全取舍。
+
+参考：[EXCEPTION_POINTERS](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-exception_pointers)、[EXCEPTION_RECORD](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-exception_record)、[WerSetFlags](https://learn.microsoft.com/en-us/windows/win32/api/werapi/nf-werapi-wersetflags)。测试不使用会禁用 WER 的 `SEM_NOGPFAULTERRORBOX`。
+
+### 本地验证
+
+- macOS arm64：`cargo test --locked -p panta-foundation --all-targets` 通过，2 passed / 1 ignored。ignored 子入口已由父测试运行并验证。
+- `cargo check --locked -p panta-foundation --tests --target x86_64-pc-windows-msvc` 通过；包含新增 Windows 测试的类型检查，尚未运行或链接 Windows 可执行文件。
+- `cargo test --locked --workspace` 通过，包含 qmllint 与 CTest 69/69。
+- `cargo coverage` 通过现行门禁：全局函数 624/687（90.83%）、行 6849/7359（93.07%）。foundation 为函数 6/13、行 83/171；信号退出前不能刷新部分子进程 profile，剩余缺口如实保留，不新增排除或在父进程触发处理器凑数。
+- macOS DiagnosticReports 新增 `panta_foundation-9bfc76d2827a102c-2026-10-02-054925.ips`，记录 SIGSEGV / EXC_CRASH，系统诊断报告仍能生成；该系统文件不纳入仓库。
+- 评审调整后再次运行 `cargo test --locked --workspace`、`cargo coverage`、`cargo format --check`、`cargo lint --check` 及上述 Windows 目标交叉检查，全部通过。三平台 CI 尚未取得本批提交的运行证据，待确认后同步验收项与任务 / 索引状态。
