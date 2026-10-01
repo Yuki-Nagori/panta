@@ -113,6 +113,7 @@ ApplicationWindow {
 
     FileDialog {
         id: openProjectFileDialog
+        objectName: "openProjectFileDialog"
         title: qsTranslate("IconActionOpenProject", "Open Project")
         currentFolder: projectModel.defaultLocationUrl
         fileMode: FileDialog.OpenFile

@@ -24,6 +24,8 @@
 #include <QFileInfo>
 #include <QIODevice>
 #include <QImage>
+#include <QMetaEnum>
+#include <QMetaProperty>
 #include <QPoint>
 #include <QPointF>
 #include <QPointer>
@@ -508,6 +510,101 @@ class ShellModuleLoadTest final : public QObject {
         activate_menu(window, "start-learn", keyboard);
         QVERIFY(project->createProject(QStringLiteral("Second"), fixture.path()));
         verify_ribbon_tab(window, "home", 18);
+    }
+
+    void project_file_dialog_routes_final_selection_data() {
+        QTest::addColumn<QString>("storedName");
+        QTest::newRow("plain") << QStringLiteral("Stored");
+        QTest::newRow("encoded") << QStringLiteral("已保存 项目 #%");
+    }
+
+    void project_file_dialog_routes_final_selection() {
+        QFETCH(QString, storedName);
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        panta::bridge::ProjectViewModel stored;
+        QVERIFY(stored.createProject(storedName, fixture.path()));
+        const QUrl selectedUrl = QUrl::fromLocalFile(stored.currentPath());
+
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* root = engine.rootObjects().constFirst();
+        auto* project =
+            root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        auto* dialog = root->findChild<QObject*>(QStringLiteral("openProjectFileDialog"));
+        auto* ribbon = root->findChild<QQuickItem*>(QStringLiteral("ribbonPanel"));
+        QVERIFY(project && dialog && ribbon);
+
+        const auto* meta = dialog->metaObject();
+        const int modeIndex = meta->indexOfProperty("fileMode");
+        QVERIFY(modeIndex >= 0);
+        const int openFile = meta->property(modeIndex).enumerator().keyToValue("OpenFile");
+        QVERIFY(openFile >= 0);
+        QCOMPARE(dialog->property("fileMode").toInt(), openFile);
+        QCOMPARE(dialog->property("options").toInt(), 0);
+        QCOMPARE(dialog->property("currentFolder").toUrl(), project->defaultLocationUrl());
+        const QStringList filters = dialog->property("nameFilters").toStringList();
+        QCOMPARE(filters.size(), 1);
+        QVERIFY(filters.constFirst().endsWith(QStringLiteral("(*.panta)")));
+
+        QVERIFY(project->createProject(QStringLiteral("Current"), fixture.path()));
+        QVERIFY(project->renameProject(QStringLiteral("Unsaved current")));
+        const QString previousPath = project->currentPath();
+        const QVariantMap previousSettings = project->planSettings();
+        const QVariantList previousDocuments = project->openDocuments();
+        QVERIFY(root->setProperty("activeRibbonTab", QStringLiteral("start-learn")));
+        QTRY_COMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("start-learn"));
+        QSignalSpy opened(project, &panta::bridge::ProjectViewModel::projectOpened);
+        QVERIFY(opened.isValid());
+
+        // 只驱动公开 QML 属性及信号，验证接线；不冒充 Cocoa 原生选择器验收。
+        QVERIFY(dialog->setProperty("selectedFile", selectedUrl));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "rejected"));
+        QCOMPARE(opened.count(), 0);
+        QCOMPARE(project->currentPath(), previousPath);
+        QCOMPARE(project->currentName(), QStringLiteral("Unsaved current"));
+        QVERIFY(project->dirty());
+        QCOMPARE(project->planSettings(), previousSettings);
+        QCOMPARE(project->openDocuments(), previousDocuments);
+        QCOMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("start-learn"));
+
+        for (const bool disappears : {true, false}) {
+            const QString path = fixture.filePath(disappears ? QStringLiteral("disappearing.panta")
+                                                             : QStringLiteral("malformed.panta"));
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            QCOMPARE(file.write("{}"), 2);
+            file.close();
+            const QUrl invalid = QUrl::fromLocalFile(path);
+            // FileDialog 拒绝预选不存在的文件；先选真实文件，再模拟选择后的删除。
+            QVERIFY(dialog->setProperty("selectedFile", invalid));
+            QCOMPARE(dialog->property("selectedFile").toUrl(), invalid);
+            if (disappears)
+                QVERIFY(QFile::remove(path));
+            QVERIFY(QMetaObject::invokeMethod(dialog, "accepted"));
+            QCOMPARE(opened.count(), 0);
+            QVERIFY(!project->errorCode().isEmpty());
+            QCOMPARE(project->currentPath(), previousPath);
+            QCOMPARE(project->currentName(), QStringLiteral("Unsaved current"));
+            QVERIFY(project->dirty());
+            QCOMPARE(project->planSettings(), previousSettings);
+            QCOMPARE(project->openDocuments(), previousDocuments);
+            QCOMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("start-learn"));
+        }
+
+        QVERIFY(dialog->setProperty("selectedFile", selectedUrl));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "accepted"));
+        QCOMPARE(opened.count(), 1);
+        QCOMPARE(opened.constFirst().constFirst().toString(), stored.currentPath());
+        QCOMPARE(project->currentPath(), stored.currentPath());
+        QCOMPARE(project->currentName(), storedName);
+        QVERIFY(!project->dirty());
+        QVERIFY(project->errorCode().isEmpty());
+        QCOMPARE(project->activeDocumentId(), QStringLiteral("welcome"));
+        QCOMPARE(project->openDocuments().size(), 1);
+        QTRY_COMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("home"));
     }
 
     void project_workspace_tracks_service_data() {

@@ -165,7 +165,7 @@ ai-docs/
 | 084 | [进行中任务状态复查（2026-09-28）](task/084-active-task-status-followup.md) | 文档维护 | — | done |
 | 101 | [进行中任务 CI 验收复查（2026-10-02）](task/101-active-task-ci-acceptance.md) | 文档维护 | — | done |
 | 102 | [弹窗 GUI 与文档页签读屏验收](task/102-gui-and-screen-reader-acceptance.md) | 验证基础 | 091, 092, 094, 095, 096, 080 | done |
-| 103 | [macOS 工程文件选择器打开状态复查](task/103-macos-project-open-dialog.md) | 验证基础 | 063, 102 | ready |
+| 103 | [macOS 工程文件选择器打开状态复查](task/103-macos-project-open-dialog.md) | 验证基础 | 063, 102 | in-progress |
 
 ## 执行顺序与交付边界
 
