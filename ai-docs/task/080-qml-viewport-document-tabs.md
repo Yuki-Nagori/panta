@@ -1,11 +1,11 @@
 # 080 — 视口文档页签与 STL 按需激活
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[086](086-qt-platform-adapter.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-29
+- 创建 / 更新：2026-09-24 / 2026-10-02
 
 ## 目标与背景
 
@@ -94,7 +94,7 @@
 - [x] 页签栏暴露 PageTabList / PageTab，标签和关闭按钮有可访问名称；Tab 获得键盘焦点后可用左右键导航并滚入可视区，Enter / Space 激活标签，关闭按钮可用 Space 或辅助技术 press action 执行。
 - [x] 真实 VTK 窗口中，辅助技术激活 PageTab 会转移键盘焦点并更新无障碍焦点/选中态；页签焦点边框透明，不绘制黑色外框；Close 按钮的辅助技术动作会关闭对应标签。
 - [x] 从全局搜索框沿 Shell 的 Tab 焦点顺序可到达文档 PageTab；页面真实辅助树暴露 Open documents / Welcome / Close Welcome。
-- [ ] 在 VoiceOver 真读屏环境确认标签名称、选中态和关闭操作的朗读。
+- [x] 在 VoiceOver 真读屏环境确认标签名称、选中态和关闭操作的朗读。
 - [x] 适用 `qmllint`、格式、Cargo 聚合测试和 native 真窗口测试通过。
 - [x] 每个新增 QML 组件及影响更新/布局/绘制成本的 QML 均进入 069 harness 的 CPU / GPU 手动性能场景；记录输入规模、采样、p50/p95、环境与测量边界。
 - [x] 不保留旧视口分类切换路径；task、索引、HTML、C++/Rust 边界和性能记录相互一致。
@@ -208,4 +208,8 @@
 
 ## 完成摘要
 
-文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、Shell Tab 焦点链、四标签鼠标拖拽边界和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API；真窗口检查覆盖 12 轮网格替换、隐藏关闭、换宿主后的 VTK 对象与 WebGPU configuration 回收；页签仍提供无障碍焦点状态，焦点边框引用 `Theme.colorTransparent`。代表性 STL 的 CPU 重载和 GPU 帧提交测量已完成；反复切换时的 RSS 高水位已归因于 STL 法线管线的重复大额分配，并通过直接面法线消融确认下降。128 MiB Rust Mesh 缓存预算经 7 页签压力场景与 256 MiB 对照后冻结；唯一未完成验收是 VoiceOver 真读屏朗读检查。
+文档页签核心行为及此前 CI 回归已通过本机聚合、ASan/UBSan、TSan 与远端 run 36430454561（commit `ca8ad8a`）。动画测试改为容差等待；重复来源名已有可见与辅助技术消歧；ViewModel 活动快照切换/重排/关闭、Shell Tab 焦点链、四标签鼠标拖拽边界和 `DocumentTabBar` 中英文 QM 条目已有回归覆盖。086 已提供 Qt adapter API；真窗口检查覆盖 12 轮网格替换、隐藏关闭、换宿主后的 VTK 对象与 WebGPU configuration 回收；页签仍提供无障碍焦点状态，焦点边框引用 `Theme.colorTransparent`。代表性 STL 的 CPU 重载和 GPU 帧提交测量已完成；反复切换时的 RSS 高水位已归因于 STL 法线管线的重复大额分配，并通过直接面法线消融确认下降。128 MiB Rust Mesh 缓存预算经 7 页签压力场景与 256 MiB 对照后冻结；2026-10-02 经用户补充确认，普通 Tab 可到达关闭按钮，使用 Control + Option + Shift + 下方向键进入页签组后旁白可访问并朗读关闭按钮，完成真实读屏验收。
+
+## 2026-10-02 补充验收
+
+Yuki 开启 macOS 旁白，最初报告点击页签有声音但关闭按钮无声。随后确认普通 Tab 可以切到关闭按钮，使用 Control + Option + Shift + 下方向键进入页签组后旁白可以访问并朗读关闭按钮。按最终人工确认完成验收，无需修改产品实现；AX 树与自动化 VoiceOver 应用绑定超时不作为朗读通过依据。详见 [102 GUI 与读屏验收](102-gui-and-screen-reader-acceptance.md)。

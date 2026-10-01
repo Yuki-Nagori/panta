@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest；007 仍待真实窗口/硬件渲染生命周期验收，010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当前 15 个进行中项，未发现具备全部关闭证据的任务。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest；007 仍待真实窗口/硬件渲染生命周期验收，010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -105,21 +105,21 @@ ai-docs/
 | 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
 | 073 | [FSM DSL 与首个异步 STL 视口资源激活](task/073-fsm-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | in-progress |
 | 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
-| 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073, 086 | in-progress |
+| 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073, 086 | done |
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | in-progress |
 | 085 | [Qt reduced-motion 原生属性迁移](task/085-qt-reduced-motion-preference-migration.md) | 应用平台扩展 | 080, 086, 002 | planned |
 | 086 | [Qt 平台服务适配层](task/086-qt-platform-adapter.md) | 应用平台扩展 | 002, 005, 023, 034 | done |
 | 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 048, 086 | planned |
 | 088 | [Mesh 资产旁置存储与按需加载](task/088-mesh-asset-sidecar-storage.md) | CAE 领域模块迁移 | 063, 067, 073, 080 | planned |
 | 090 | [Mesh Tool QML 界面](task/090-mesh-tool-qml-ui.md) | 应用平台扩展 | 050, 068, 081 | done |
-| 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | in-progress |
+| 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | done |
 | 092 | [方案分析序列与网格类型接线](task/092-plan-analysis-sequence-and-mesh-settings.md) | 应用平台扩展 | 057, 067, 080, 091 | in-progress |
 | 093 | [材料选择弹窗与默认材料](task/093-material-selection-dialog.md) | 应用平台扩展 | 068, 081, 092 | in-progress |
-| 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | in-progress |
+| 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | done |
 | 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | in-progress |
-| 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | in-progress |
+| 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | done |
 | 097 | [分析日志面板与结果目录](task/097-analysis-logs-dock.md) | 应用平台扩展 | 080, 091, 096 | done |
-| 098 | [工艺确认跨平台 CI 修复](task/098-ci-metadata-confirmation.md) | 质量与构建 | 094, 095, 097 | in-progress |
+| 098 | [工艺确认跨平台 CI 修复](task/098-ci-metadata-confirmation.md) | 质量与构建 | 094, 095, 097 | done |
 | 099 | [QML 组件与弹窗整理](task/099-qml-components-and-dialog-consolidation.md) | 应用平台扩展 | 029, 094, 095, 097 | in-progress |
 | 100 | [tests 整体整理与性能入口统一](task/100-tests-consolidation.md) | 验证基础 | 048, 099 | done |
 
@@ -147,7 +147,7 @@ ai-docs/
 | 076 | [Cargo 测试与质量 runner 维护](task/076-panta-tests-runner-maintenance.md) | 验证基础 | 011, 043 | done |
 | 082 | [CI 修复：VTK benchmark moc 前置与标题条焦点滚动](task/082-ci-vtk-benchmark-moc-and-focus-scroll.md) | 验证基础 | 048, 076, 029 | done |
 | 083 | [Windows 开发裸启应用的 Qt 运行库部署](task/083-windows-app-runtime-deployment.md) | 应用平台扩展 | 005, 042 | done |
-| 089 | [CI 修复：STL benchmark RSS 头文件识别](task/089-ci-stl-benchmark-rusage-include.md) | 验证基础 | 048, 080 | in-progress |
+| 089 | [CI 修复：STL benchmark RSS 头文件识别](task/089-ci-stl-benchmark-rusage-include.md) | 验证基础 | 048, 080 | done |
 
 ## 仓库与文档维护
 
@@ -163,6 +163,9 @@ ai-docs/
 | 077 | [进行中任务状态盘点](task/077-active-task-status-audit.md) | 文档维护 | — | done |
 | 078 | [QML 性能基准登记规范](task/078-qml-performance-benchmark-policy.md) | 文档维护 | 069, 048 | done |
 | 084 | [进行中任务状态复查（2026-09-28）](task/084-active-task-status-followup.md) | 文档维护 | — | done |
+| 101 | [进行中任务 CI 验收复查（2026-10-02）](task/101-active-task-ci-acceptance.md) | 文档维护 | — | done |
+| 102 | [弹窗 GUI 与文档页签读屏验收](task/102-gui-and-screen-reader-acceptance.md) | 验证基础 | 091, 092, 094, 095, 096, 080 | done |
+| 103 | [macOS 工程文件选择器打开状态复查](task/103-macos-project-open-dialog.md) | 验证基础 | 063, 102 | ready |
 
 ## 执行顺序与交付边界
 
@@ -180,4 +183,4 @@ FSM 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [0
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 
-后续新任务使用当前最大编号加一，不复用已有编号。主线仍有 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 的真实窗口验收，以及 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) / [038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 的运行时分发、Linux 基线与 SBOM/provenance 收尾。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；当前状态见 [084 复查](task/084-active-task-status-followup.md)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。主线仍有 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 的真实窗口验收，以及 [031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) / [038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 的运行时分发、Linux 基线与 SBOM/provenance 收尾。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；最近一次复查见 [101 CI 验收复查](task/101-active-task-ci-acceptance.md)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。

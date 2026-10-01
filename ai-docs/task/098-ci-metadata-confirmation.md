@@ -1,11 +1,11 @@
 # 098 — 工艺确认跨平台 CI 修复
 
-- 状态：in-progress
+- 状态：done
 - 阶段：质量与构建
 - 依赖：094, 095, 097
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-10-01 / 2026-10-01
+- 创建 / 更新：2026-10-01 / 2026-10-02
 
 ## 目标与范围
 
@@ -22,7 +22,7 @@
 - [x] 工艺配置重开回归按字段语义比较，保留持久化与失败保留状态断言。
 - [x] 按任务 042 的既有插桩边界，仅在 TSan 排除新增的 Rust 异步 Fill 桥接用例；普通测试、ASan/UBSan 与 Rust Miri 保留，复查条件为双侧 TSan 插桩。
 - [x] Cargo 聚合测试、格式与相关质量检查通过，远端平台证据如实记录。
-- [ ] 修复提交后的 Windows / Linux CI 通过。
+- [x] 修复提交后的 Windows / Linux CI 通过。
 
 ## 验证与工作记录
 
@@ -37,6 +37,8 @@
 
 无兼容例外。TSan 覆盖例外按任务 042 登记；不增加按堆栈通配的竞态抑制。
 
+- 2026-10-02：通过 `gh run view 36890328640` 核验最新 [CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)，提交 `a0f0872061627a969d60e422a2c945e8fc22f7b7` 与当前 HEAD 一致，19 个 job 全部成功。Windows / Linux build/test 与 sanitizer、Rust coverage 及 Miri 均通过，修复后平台验收完成。
+
 ## 完成摘要
 
-本地修复已实施并验证；提交后仍需 Windows / Linux CI 确认。
+Windows 工艺配置重开比较、既有插桩边界下的 Linux TSan 排除及 Rust 覆盖率回归补充已完成；最新 CI 的三平台构建与测试、sanitizer、Rust coverage 和 Miri 均通过。既有双侧 TSan 插桩复查条件继续由任务 042 跟踪。证据：[CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`）。

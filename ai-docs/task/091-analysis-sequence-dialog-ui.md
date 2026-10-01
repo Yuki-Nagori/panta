@@ -1,11 +1,11 @@
 # 091 — Analysis Sequence 选择弹窗
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：050, 068, 081, 090
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-30 / 2026-09-30
+- 创建 / 更新：2026-09-30 / 2026-10-02
 
 ## 目标与背景
 
@@ -36,7 +36,7 @@
 | 2026-09-30 | GPU `measures_analysis_sequence_frame_presentation` | 场景登记并构建，启动报 `Cannot create window: no screens available`，未取得帧呈现数据 |
 | 2026-09-30 | 构建后使用临时 PantaPreview.app 连接真实应用 | 两次连接均报 `timeoutReached`；临时 wrapper 已删除，真实窗口验收待补 |
 
-CPU 场景实例化 `AnalysisSequencePanel` 与 `AnalysisSequenceDialog`，GPU 场景呈现选择面板。因真实窗口验收尚未完成，任务保持 in-progress。
+CPU 场景实例化 `AnalysisSequencePanel` 与 `AnalysisSequenceDialog`，GPU 场景呈现选择面板。此前未取得真实窗口证据；2026-10-02 已在实际应用窗口完成补验，任务关闭。
 
 ## 决策与工作记录
 
@@ -46,3 +46,11 @@ CPU 场景实例化 `AnalysisSequencePanel` 与 `AnalysisSequenceDialog`，GPU �
 ## 清理与兼容例外
 
 删除 task-fill SVG 和正式 symbol，替换为 task-analysis-sequence；无兼容例外。
+
+## 完成摘要
+
+分析序列 UI、既有行为回归与本轮真实窗口验收均完成；工程序列接线及多零件验收仍归任务 092。
+
+## 2026-10-02 补充验收
+
+macOS 26.3.1 / Apple M4 / Qt 6.11.2，`cargo build --locked` 通过后连接同一构建二进制的临时 bundle；真实窗口显示十个序列及禁用 More。默认 Fill，Down 选择 Fill + Pack 后 Cancel 保持 Fill；鼠标选择 Gate Location 并确认更新任务行，再切回 Fill。窗口无截断，截图为 `artifacts/task-102/analysis-sequence.png`。任务 100 已完成对应 CPU / 硬件 GPU 基准；最新 CI run 36890328640 全部成功。键盘 Enter / Esc 仍引用既有 QML 回归，本轮不宣称逐键人工重验。详见 [102 GUI 与读屏验收](102-gui-and-screen-reader-acceptance.md)。
