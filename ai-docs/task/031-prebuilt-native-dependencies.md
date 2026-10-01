@@ -1,6 +1,6 @@
 # 031 — 预编译 native 依赖供给与 CMake package
 
-- 状态：in-progress
+- 状态：deferred
 - 阶段：交付基础
 - 依赖：[002](002-dependency-baseline.md)、[004](004-cargo-native-orchestration.md)
 - 优先级：P0
@@ -83,7 +83,7 @@
 
 ## 完成摘要
 
-未完成（保持 in-progress）。VTK WebGPU、OCCT 和 Netgen 的固定资产、SHA256、ABI、模块、许可证与 CMake package 入口均已登记；旧 VTK Qt/OpenGL 条目已被新 WebGPU manifest 替换。当前剩余项是 007/009/010 的真实链接/运行冒烟、Linux glibc 有效基线回写，以及消费侧 SBOM/provenance 自动化。
+未完成；按 2026-10-02 用户决定延后（deferred）。VTK WebGPU、OCCT 和 Netgen 的固定资产、SHA256、ABI、模块、许可证与 CMake package 入口均已登记；旧 VTK Qt/OpenGL 条目已被新 WebGPU manifest 替换。当前剩余项是 007/009/010 的真实链接/运行冒烟、Linux glibc 有效基线回写，以及消费侧 SBOM/provenance 自动化。
 
 ## 2026-10-02 优先级跟进
 
@@ -94,3 +94,7 @@
 使用 `target/native/debug/CMakeCache.txt` 中固定 CMake 4.4.3 运行 `cmake --install target/native/debug --prefix /private/tmp/panta-install-031`，退出 0。安装树仅有 `bin/panta-native`、foundation 静态库/头和 CMake config；没有 Qt/VTK 动态库或许可证目录。`otool -L` 显示 executable 依赖 `@rpath/QtQuickControls2.framework/...` 等；`otool -l` 未发现 LC_RPATH。直接运行安装产物在进入应用前由 dyld 终止（退出 134）：`Library not loaded: @rpath/QtQuickControls2.framework/Versions/A/QtQuickControls2`，`Reason: no LC_RPATH's found`。日志 `/tmp/panta-031-install.log` 与 `/tmp/panta-031-installed-launch.log`。这是安装分发缺陷的复现，区别于构建目录原生窗口已通过；不以设置指向开发缓存的绝对 RPATH 作为可搬迁分发修复。
 
 后续实现需同时处理平台运行库/Qt 插件部署、相对加载路径与 SDK 许可证安装，并验证安装树搬迁后启动；先完成 macOS 当前环境，Windows 与 Wayland 证据分别记录，不改动开发裸启路径。
+
+### 延后决定
+
+2026-10-02：Yuki 确认安装分发属于后续打包工作，要求延后，031 改为 deferred。停止本轮安装部署测试并撤回未提交的 bundle / CMake 部署代码；保留已提交的安装失败复现，恢复时继续定位与验证。当前开发构建与裸启路径保持原实现，未产生可发布安装包。
