@@ -512,6 +512,58 @@ class ShellModuleLoadTest final : public QObject {
         verify_ribbon_tab(window, "home", 18);
     }
 
+    void material_submission_keeps_windows_until_completion() {
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
+        QVERIFY(window);
+        auto* project =
+            window->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        auto* dialog = window->findChild<QQuickWindow*>(QStringLiteral("materialSelectionDialog"));
+        QVERIFY(project && dialog);
+        QVERIFY(project->createProject(QStringLiteral("Material"), fixture.path()));
+        const QString sourcePath = fixture.filePath(QStringLiteral("part.stl"));
+        QFile source(sourcePath);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        const QByteArray stl("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n");
+        QCOMPARE(source.write(stl), stl.size());
+        source.close();
+        QVERIFY(project->importStl(sourcePath, QStringLiteral("dual-domain"),
+                                   QStringLiteral("millimeters"), false));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QVERIFY(dialog->isVisible());
+        const auto initial = project->planSettings();
+        QSignalSpy finished(project,
+                            &panta::bridge::ProjectViewModel::materialConfirmationFinished);
+        QVERIFY(finished.isValid());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        // 不处理事件循环，确保尚未被 Qt 定时器消费真实后台结果。
+        QVERIFY(project->materialConfirmationPending());
+        QVERIFY(dialog->property("saving").toBool());
+        QVERIFY(!dialog->property("canConfirm").toBool());
+        auto* cancel = dialog->findChild<QObject*>(QStringLiteral("materialCancel"));
+        auto* close = dialog->findChild<QObject*>(QStringLiteral("dialogCloseButton"));
+        QVERIFY(cancel && close);
+        QVERIFY(!cancel->property("enabled").toBool());
+        QVERIFY(!close->property("enabled").toBool());
+        QVERIFY(!dialog->close());
+        QVERIFY(!window->close());
+        QVERIFY(dialog->isVisible() && window->isVisible());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        QCOMPARE(project->planSettings(), initial);
+        QTRY_COMPARE(finished.count(), 1);
+        QVERIFY(finished.constFirst().constFirst().toBool());
+        QVERIFY(!project->materialConfirmationPending());
+        QTRY_VERIFY(!dialog->isVisible());
+        QCOMPARE(project->planSettings().value(QStringLiteral("materialId")).toString(),
+                 project->defaultMaterial().value(QStringLiteral("id")).toString());
+        QVERIFY(window->close());
+    }
+
     void project_file_dialog_routes_final_selection_data() {
         QTest::addColumn<QString>("storedName");
         QTest::newRow("plain") << QStringLiteral("Stored");

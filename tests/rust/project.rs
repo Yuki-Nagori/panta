@@ -633,6 +633,152 @@ fn wait_metadata_confirmation(
 }
 
 #[test]
+fn material_confirmation_blocks_competing_writes_and_recovers_from_failure()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("material.stl");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Material")?;
+    let first = service.import_stl(&source, "dual-domain", "millimeters", false)?;
+    let second = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let initial = service.plan_settings(&first.id).ok_or("missing plan")?;
+    let material = &panta_core::project::default_material()?.id;
+    let original = fs::read(&project.path)?;
+    assert!(initial.material_id.is_empty());
+    assert!(service.finish_material_confirmation().is_err());
+    for (path, revision, id, value) in [
+        (
+            &fixture.root,
+            initial.revision,
+            first.id.as_str(),
+            material.as_str(),
+        ),
+        (
+            &project.path,
+            initial.revision - 1,
+            first.id.as_str(),
+            material.as_str(),
+        ),
+        (
+            &project.path,
+            initial.revision,
+            "missing",
+            material.as_str(),
+        ),
+        (
+            &project.path,
+            initial.revision,
+            first.id.as_str(),
+            "unknown",
+        ),
+    ] {
+        assert!(
+            service
+                .begin_material_confirmation(path, revision, id, value)
+                .is_err()
+        );
+        assert_eq!(service.plan_settings(&first.id), Some(initial.clone()));
+    }
+
+    let obstacle = project.path.with_extension("panta.tmp");
+    fs::create_dir(&obstacle)?;
+    assert!(service.begin_material_confirmation(
+        &project.path,
+        initial.revision,
+        &first.id,
+        material
+    )?);
+    // 结果未消费前锁仍有效；不依赖后台线程的耗时来命中提交窗口。
+    assert_eq!(service.plan_settings(&first.id), Some(initial.clone()));
+    assert!(service.create(&fixture.root, "Competing").is_err());
+    assert!(service.open(&project.path).is_err());
+    assert!(service.save().is_err());
+    assert!(
+        service
+            .execute(ProjectCommand::Rename {
+                name: "Competing".into()
+            })
+            .is_err()
+    );
+    assert!(
+        service
+            .import_stl(&source, "solid-3d", "millimeters", false)
+            .is_err()
+    );
+    assert!(
+        service
+            .set_analysis_sequence(&project.path, initial.revision, &first.id, "cool")
+            .is_err()
+    );
+    assert!(
+        service
+            .begin_material_confirmation(&project.path, initial.revision, &first.id, material)
+            .is_err()
+    );
+    assert!(
+        service
+            .begin_fill_settings_confirmation(
+                &project.path,
+                initial.revision,
+                &first.id,
+                initial.fill_settings.clone()
+            )
+            .is_err()
+    );
+    assert!(service.finish_fill_settings_confirmation().is_err());
+    assert!(
+        wait_metadata_confirmation(&mut service, ProjectService::finish_material_confirmation)
+            .is_err()
+    );
+    assert_eq!(service.plan_settings(&first.id), Some(initial.clone()));
+    assert_eq!(fs::read(&project.path)?, original);
+    fs::remove_dir(&obstacle)?;
+    service.save()?;
+
+    assert!(service.begin_material_confirmation(
+        &project.path,
+        initial.revision,
+        &first.id,
+        material
+    )?);
+    wait_metadata_confirmation(&mut service, ProjectService::finish_material_confirmation)?;
+    let saved = service
+        .plan_settings(&first.id)
+        .ok_or("missing saved plan")?;
+    assert_eq!(saved.material_id, *material);
+    assert_eq!(saved.revision, initial.revision + 1);
+    assert!(
+        service
+            .plan_settings(&second.id)
+            .ok_or("missing second plan")?
+            .material_id
+            .is_empty()
+    );
+    let manifest = fs::read(&project.path)?;
+    assert!(!service.begin_material_confirmation(
+        &project.path,
+        saved.revision,
+        &first.id,
+        material
+    )?);
+    assert_eq!(service.plan_settings(&first.id), Some(saved.clone()));
+    assert_eq!(fs::read(&project.path)?, manifest);
+    assert!(service.finish_material_confirmation().is_err());
+    let mut reopened = ProjectService::new();
+    reopened.open(&project.path)?;
+    assert_eq!(reopened.plan_settings(&first.id), Some(saved));
+    assert!(
+        reopened
+            .plan_settings(&second.id)
+            .ok_or("missing second plan")?
+            .material_id
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
 fn fill_settings_round_trip_is_per_record_and_blocks_competing_writes()
 -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;

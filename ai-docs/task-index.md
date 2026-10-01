@@ -114,7 +114,7 @@ ai-docs/
 | 090 | [Mesh Tool QML 界面](task/090-mesh-tool-qml-ui.md) | 应用平台扩展 | 050, 068, 081 | done |
 | 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | done |
 | 092 | [方案分析序列与网格类型接线](task/092-plan-analysis-sequence-and-mesh-settings.md) | 应用平台扩展 | 057, 067, 080, 091 | done |
-| 093 | [材料选择弹窗与默认材料](task/093-material-selection-dialog.md) | 应用平台扩展 | 068, 081, 092 | in-progress |
+| 093 | [材料选择弹窗与默认材料](task/093-material-selection-dialog.md) | 应用平台扩展 | 068, 081, 092 | done |
 | 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | done |
 | 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | done |
 | 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | done |
