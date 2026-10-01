@@ -1,6 +1,6 @@
 # 047 — 崩溃信号处理与日志落地
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[008](008-tasks-errors-logging.md)
 - 优先级：P1
@@ -40,9 +40,9 @@ minidump/WER 报告采集、Qt 消息处理、远程上报。
 
 ## 验收标准
 
-- [ ] macOS/Linux 子进程触发 POSIX 崩溃信号时，stderr 与日志文件均有信号名/pid，子进程仍以原信号终止；macOS `.ips` 语义保留。
-- [ ] Windows 子进程触发 SEH 后，stderr 与日志文件记录异常码/pid，并继续 Windows 默认 WER 处理；不在父测试进程内触发异常。
-- [ ] macOS/Linux POSIX 行为测试与 Windows SEH 子进程测试经 Cargo 聚合入口通过，覆盖率与质量检查通过；测试注册方式、文档、task 与索引一致，无未登记兼容代码。
+- [x] macOS/Linux 子进程触发 POSIX 崩溃信号时，stderr 与日志文件均有信号名/pid，子进程仍以原信号终止；macOS `.ips` 语义保留。
+- [x] Windows 子进程触发 SEH 后，stderr 与日志文件记录异常码/pid，并继续 Windows 默认 WER 处理；不在父测试进程内触发异常。
+- [x] macOS/Linux POSIX 行为测试与 Windows SEH 子进程测试经 Cargo 聚合入口通过，覆盖率与质量检查通过；测试注册方式、文档、task 与索引一致，无未登记兼容代码。
 
 ## 验证计划与结果
 
@@ -67,7 +67,7 @@ minidump/WER 报告采集、Qt 消息处理、远程上报。
 
 ## 2026-10-02 实现与验收补齐
 
-当前进展：实现和自动化验收测试已补齐，本地检查通过，仅待本批提交的三平台 CI 验收。任务保持 in-progress；CI 必须对应包含本批改动的提交，不能沿用历史安装 smoke 的结果。
+实现、自动化验收与本地检查已完成；本批提交 `bf0ecfb` 的三平台 CI 已通过，任务结案。
 
 ### 实现与评审
 
@@ -85,4 +85,10 @@ minidump/WER 报告采集、Qt 消息处理、远程上报。
 - `cargo test --locked --workspace` 通过，包含 qmllint 与 CTest 69/69。
 - `cargo coverage` 通过现行门禁：全局函数 624/687（90.83%）、行 6849/7359（93.07%）。foundation 为函数 6/13、行 83/171；信号退出前不能刷新部分子进程 profile，剩余缺口如实保留，不新增排除或在父进程触发处理器凑数。
 - macOS DiagnosticReports 新增 `panta_foundation-9bfc76d2827a102c-2026-10-02-054925.ips`，记录 SIGSEGV / EXC_CRASH，系统诊断报告仍能生成；该系统文件不纳入仓库。
-- 评审调整后再次运行 `cargo test --locked --workspace`、`cargo coverage`、`cargo format --check`、`cargo lint --check` 及上述 Windows 目标交叉检查，全部通过。三平台 CI 尚未取得本批提交的运行证据，待确认后同步验收项与任务 / 索引状态。
+- 评审调整后再次运行 `cargo test --locked --workspace`、`cargo coverage`、`cargo format --check`、`cargo lint --check` 及上述 Windows 目标交叉检查，全部通过。三平台 CI 结果见下方记录。
+
+## 完成摘要
+
+2026-10-02 通过 gh 核对 [CI run 36932703454](https://github.com/Yuki-Nagori/panta/actions/runs/36932703454)，对应 `bf0ecfb4546ad262bed90c013c957c56ddc2e378`，19 个 job 全部 success。macOS / Linux / Windows 的 `handler_logs_crash_and_preserves_exit` 均通过：POSIX 保留 SIGSEGV 退出；Windows 校验 SEH 异常码、PID、日志路径和原异常退出码。处理器保留默认系统处置；macOS `.ips` 已有本地证据，WER 报告采集不在范围内。
+
+Cargo 聚合测试的 CTest 为 macOS 69/69、Linux 68/68、Windows 66/66；格式、lint、审计与 sanitizer job 通过。Rust coverage 门禁通过（函数 90.83%、行 93.07%），[报告制品](https://github.com/Yuki-Nagori/panta/actions/runs/36932703454/artifacts/11196183017)上传成功。实现、测试、文档及索引一致，无兼容例外。
