@@ -116,7 +116,7 @@ ai-docs/
 | 092 | [方案分析序列与网格类型接线](task/092-plan-analysis-sequence-and-mesh-settings.md) | 应用平台扩展 | 057, 067, 080, 091 | in-progress |
 | 093 | [材料选择弹窗与默认材料](task/093-material-selection-dialog.md) | 应用平台扩展 | 068, 081, 092 | in-progress |
 | 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | done |
-| 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | in-progress |
+| 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | done |
 | 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | done |
 | 097 | [分析日志面板与结果目录](task/097-analysis-logs-dock.md) | 应用平台扩展 | 080, 091, 096 | done |
 | 098 | [工艺确认跨平台 CI 修复](task/098-ci-metadata-confirmation.md) | 质量与构建 | 094, 095, 097 | done |
