@@ -4,8 +4,8 @@
 - 阶段：M0
 - 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（WebGPU 硬件窗口制品已登记）
 - 优先级：P0
-- 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-28
+- 负责人：Yuki
+- 创建 / 更新：2026-09-16 / 2026-10-02
 
 ## 前置条件已解除与历史阻塞
 
@@ -61,10 +61,10 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 
 - [ ] 通过 `cargo run` 显示默认 Welcome 场景，并能呈现无模型的空视口状态；VTK WebGPU 渲染错误不会静默表现为“已成功”。
 - [ ] resize、高 DPI、隐藏/恢复和关闭/重开可用，记录平台与图形后端。
-- [ ] VTK 对象没有从 GUI/worker 任意修改，所用平台 WebGPU/hardware-window API 已对照 release 核实。
+- [x] VTK 对象没有从 GUI/worker 任意修改，所用平台 WebGPU/hardware-window API 已对照 release 核实。
 - [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
-- [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
 ## 验证计划与结果
 
@@ -100,3 +100,19 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 ## 完成摘要
 
 WebGPU 原生视口与三平台 surface bridge 已实现，三平台 SDK 消费和 CTest 在 run 36001859191 通过。仍需真实图形窗口验收 VTK 内容可见性、resize、高 DPI、隐藏/恢复、关闭重开及输入/资源生命周期；CI 与 offscreen 创建测试不替代该验收。
+
+## 2026-10-02 优先级跟进
+
+按用户要求从 P0 开始逐项推进：先补本机原生视口的 Welcome / 空场景、resize、隐藏恢复、关闭重开真实窗口证据，并审计 GUI 串行渲染与锁定 SDK 的生命周期接口。沿用 080、100、102 已有证据，避免重复宣称；跨显示器 DPR 和未具备的目标平台验收明确保留。实施前先构建，真实窗口与自动化回归分别记录。
+
+### 本轮已取得证据与剩余项
+
+- 仓库根目录 `cargo build --locked` 通过（`/tmp/panta-007-build.log`）；macOS 26.3.1 / Apple M4 / Qt 6.11.2 / VTK 9.7.0，Cocoa hardware view + Metal layer。按 102 已验证的方式将同一构建二进制复制进忽略目录临时 bundle 后通过 CUA 操作，不把该方式写为 `cargo run` 人工验收。
+- 默认 Welcome 在 2940×1682 与 1280×1024 像素窗口截图中完整显示；对应 Retina DPR 2 的逻辑窗口尺寸为 1470×841 与 640×512。通过 macOS 窗口 zoom 缩小；Command + H 隐藏后 Raise 恢复，Welcome 正常。最小化按钮操作后 AX 状态未反映变化，不独立宣称最小化验收通过。
+- 关闭 Welcome 后字样与 Welcome 文案消失，视口保持空场景；关闭应用后 CUA 确认不再运行，重开显示新的 Welcome，再次退出。截图保存在忽略目录 `artifacts/task-007/{welcome,welcome-small,empty,reopened}.png`；临时 bundle 已删除。
+- 原生生命周期测试首次在沙箱运行因无可用屏幕失败；获得桌面访问后，以 `QT_QPA_PLATFORM=cocoa PANTA_TEST_NATIVE_VIEWPORT=1` 分别运行 `target/native/debug/app/panta_qml_viewport_module_test` 和 `target/native/debug/visualization/panta_native_surface_lifecycle_test`，结果 5/5 与 3/3，通过且无跳过。日志 `/tmp/panta-007-lifecycle-native.log`、`/tmp/panta-007-surface-native.log`。覆盖 12 轮网格替换、隐藏时释放、跨窗口重建后的旧资源释放、排队刷新析构及 Cocoa 晚到鼠标事件；帧提交计数不表示已呈现，真实画面证据另见上项。
+- 源码复核：`VtkViewport::schedule_refresh()` 的 QObject 上下文定时器将刷新串行投递回条目线程；跨线程窗口信号使用自动连接。场景更新经适配器排队，不在 worker 修改 VTK。按本机固定 SDK 的 `vtkWebGPURenderWindow.h`、`vtkCocoaHardwareWindow.h` 核对 Initialize / Finalize、Create / Destroy、GetViewId / GetMetalLayer；硬件 view 解绑先清空反向指针，避免 AppKit 晚到事件访问已释放窗口。初始化缺平台 surface / device 的路径输出告警，不把源码审计视作故障注入通过。
+- 搜索产品 `native/`、`qml/`、`crates/` 未发现旧 QQuickVTKItem / GUISupportQtQuick / RenderingQt 实现或依赖；历史任务与规范中的路线说明保留。
+- 仍未完成：实际跨显示器 DPR 切换、本轮 `cargo run` 路径的窗口操作与初始化失败注入，以及缺少环境的目标平台补验。640×512 逻辑窗口中坐标轴右侧标签裁切、定位器文字偏小已交任务 064 跟进；因此不将整个 resize / 高 DPI 验收勾选或关闭本任务。
+
+- Cargo 聚合验证：`cargo test --locked --workspace` 通过，native CTest 69/69，Rust 测试与 qmllint 通过；日志 `/tmp/panta-007-workspace-tests.log`。本轮未修改产品代码，也未新增测试或重复执行性能基准。
