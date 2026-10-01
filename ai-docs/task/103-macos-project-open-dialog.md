@@ -1,6 +1,6 @@
 # 103 — macOS 工程文件选择器打开状态复查
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：063 已实现的工程读写、102 已取得的文件选择器复现场景
 - 优先级：P1
@@ -20,7 +20,7 @@
 
 ## 验收标准
 
-- [ ] 正常启动与临时 bundle 对照，确认 `.panta` 过滤及原生选择行为。
+- [x] 正常启动与临时 bundle 对照，确认 `.panta` 过滤及原生选择行为。
 - [x] 工程能够从文件选择器打开，已保存 Fill / Gate Location 设置回显正确；取消不修改工程。
 - [x] 必要修复、回归验证与文档同步；GUI 验收单独记录。
 
@@ -46,11 +46,21 @@
 
 ### 2026-10-02 原验收范围补齐
 
+用户要求再次尝试正常启动验收；复查窗口清单与进程，并尝试仓库约定的启动脚本 wrapper，脚本直接 exec 原构建路径，以检查是否能绑定正常运行的二进制。
+
 `cargo build --locked` 通过后直接启动 `target/native/debug/app/panta-native`。沙箱内启动无法创建 Qt 平台窗口；获准在沙箱外启动后正常运行，但 CUA 绑定仍返回 Invalid app，已请求用户人工检查该窗口的原生文件选择行为，等待实际结果。
 
 使用相同构建的临时 bundle（复制二进制，SHA-256 与原文件一致）完成工具可操作的真实窗口验收：原生选择器定位临时工程目录，在列表按 Down 建立 selected 状态、Open 启用并成功打开；Gate Location 回显模温 50°C、熔温 230°C、Advanced gate locator、浇口数 4，与清单一致。临时改模温为 55 后 Cancel，再打开仍为 50，未保存修改。再次打开工程选择器、选择文件后 Cancel，当前工程名称、计划与文档保持不变；自动化同时检查未保存状态及设置保护。
 
 新增证据为忽略目录 `artifacts/task-103/gate-reopened.png`、`gate-cancel-reopened.ax.txt`、`open-cancel.ax.txt`。CUA 的文件名称点击未建立 selected，键盘选择可以建立；工具点击结果不能据此认定用户鼠标选择失败。验收 bundle 已退出并删除，原生对照等待用户结果，不改验收范围。
+
+### 2026-10-02 再次尝试与对照结果
+
+原裸二进制进程已退出，按进程名绑定仍返回 Invalid app。重新使用仓库约定的脚本 wrapper 后 CUA 成功绑定；脚本仅切换仓库目录并 exec 原构建路径，进程查询确认运行 `/Users/yuki/eit/panta/target/native/debug/app/panta-native`，未复制或修改二进制。这是正常构建路径的窗口验收启动适配，仍经过 LaunchServices wrapper，不声明工具已经能够直接绑定裸进程。
+
+该窗口的原生 Open Project → Go to Folder 能显示临时 `.panta` 工程；列表按 Down 后文件 selected、Open 启用，点击 Open 成功打开并显示 `gui-acceptance-102`、`part-a.stl`、Gate Location 与 Process Settings (Custom)。与前一轮复制二进制 bundle 的选择及打开结果一致，未复现“已有 selected 状态而 Open 仍 disabled”的故障。工具 row 点击仍未建立 selected；以实际 AX 状态区分点击动作与选择成功，不把该工具行为归因于产品。
+
+证据为忽略目录 `artifacts/task-103/original-open-enabled.png`、`original-open-enabled.ax.txt`、`original-opened.png`、`original-opened.ax.txt`。窗口已退出，进程查询无匹配，脚本 wrapper 已删除。无需用户补充正常启动结果；本轮只更新验收文档，`git diff HEAD --check` 通过，沿用上一批已通过的 Cargo 聚合测试与质量检查。
 
 ## 清理与兼容例外
 
@@ -58,4 +68,4 @@
 
 ## 完成摘要
 
-应用配置与 QML 打开接线的自动化回归、临时 bundle 的工程打开与 Fill / Gate Location 回显及取消验收已通过，未发现可据此修复的产品缺陷。任务保持 in-progress：正常启动的原生选择对照等待用户人工结果；不将自动化接线测试当作原生文件选择器通过证据。
+应用配置与 QML 打开接线的自动化回归、原构建路径与复制二进制 bundle 的原生选择 / 打开对照、Fill / Gate Location 回显及取消验收均通过。此前工具点击未建立选择状态，未复现已选中文件无法打开的产品故障；无需修改产品行为。任务完成，自动化与真实窗口证据分别记录。
