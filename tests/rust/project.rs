@@ -4,30 +4,11 @@ use panta_core::project::{
     STL_IMPORT_PARSER_VERSION,
 };
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::Path;
 
-struct Fixture {
-    root: PathBuf,
-}
-
-impl Fixture {
-    fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        let root =
-            std::env::temp_dir().join(format!("panta-project-{}-{}", std::process::id(), id));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root)?;
-        Ok(Self { root })
-    }
-}
-
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
+#[path = "../support/rust/temp_directory.rs"]
+mod temp_directory;
+use temp_directory::Fixture;
 
 #[test]
 fn create_command_save_open_and_model_command_round_trip() -> Result<(), Box<dyn std::error::Error>>

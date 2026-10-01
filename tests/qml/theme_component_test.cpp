@@ -1,6 +1,6 @@
 // QML 组件的主题参数、资源解析及 Ribbon 页签组合边界回归。
-#include "analysis_sequence_helpers.hpp"
-#include "quick_item_helpers.hpp"
+#include "../support/qml/analysis_sequence_helpers.hpp"
+#include "../support/qml/quick_item_helpers.hpp"
 #include <QColor>
 #include <QDir>
 #include <QDirIterator>

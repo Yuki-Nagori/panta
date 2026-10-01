@@ -91,7 +91,13 @@ pub fn write(path: &Path, commands: &[CompileCommand]) -> Result<(), String> {
 
 /// 排除构建目录、第三方与头文件；头文件随包含它的真实翻译单元检查。
 pub fn owned(commands: Vec<CompileCommand>, root: &Path) -> Vec<CompileCommand> {
-    let directories = ["native", "tests/cpp", "tests/qml", "crates/panta-ffi"];
+    let directories = [
+        "native",
+        "tests/cpp",
+        "tests/qml",
+        "tests/performance",
+        "crates/panta-ffi",
+    ];
     let mut commands: Vec<_> = commands
         .into_iter()
         .filter(|entry| {
@@ -152,6 +158,7 @@ mod tests {
             "native/app/main.cpp",
             "tests/cpp/ffi/test.cc",
             "tests/qml/main.cpp",
+            "tests/performance/gpu/viewport_benchmark.cpp",
             "crates/panta-ffi/src/ffi_support.cc",
             "target/cxxbridge/lib.rs.cc",
             "native/app/main.h",
@@ -160,7 +167,7 @@ mod tests {
         .map(entry)
         .to_vec();
         let selected = owned(entries, Path::new("/repo"));
-        assert_eq!(selected.len(), 4);
+        assert_eq!(selected.len(), 5);
         assert!(
             selected
                 .iter()

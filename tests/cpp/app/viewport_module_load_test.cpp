@@ -1,3 +1,4 @@
+#include "../../support/qt/frame_submission_capture.hpp"
 /// Panta.Visualization 运行时加载测试（任务 007）：验证静态模块注册与
 /// CaeViewport 类型可创建。
 ///
@@ -23,7 +24,6 @@
 #include <cstring>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
-#include <qlogging.h>
 #include <qtenvironmentvariables.h>
 #include <qtestsupport_core.h>
 #include <utility>
@@ -51,40 +51,6 @@ class ViewportTestAccess final {
 };
 } // namespace panta::visualization
 
-namespace {
-int rendered_frames = 0;
-int surface_syncs = 0;
-QtMessageHandler previous_handler = nullptr;
-
-void count_frames(QtMsgType type, const QMessageLogContext& context, const QString& message) {
-    if (std::strcmp(context.category, "panta.viewport") == 0 &&
-        message.startsWith(QStringLiteral("frame submitted"))) {
-        ++rendered_frames;
-    }
-    if (std::strcmp(context.category, "panta.viewport") == 0 &&
-        message == QStringLiteral("surface synchronized")) {
-        ++surface_syncs;
-    }
-    if (previous_handler != nullptr) {
-        previous_handler(type, context, message);
-    } else {
-        std::fprintf(stderr, "%s\n", qPrintable(message));
-    }
-}
-
-struct FrameCapture {
-    FrameCapture() {
-        rendered_frames = 0;
-        QLoggingCategory::setFilterRules(QStringLiteral("panta.viewport.debug=true"));
-        previous_handler = qInstallMessageHandler(count_frames);
-    }
-    ~FrameCapture() {
-        qInstallMessageHandler(previous_handler);
-        QLoggingCategory::setFilterRules(QString());
-    }
-};
-} // namespace
-
 class ViewportModuleLoadTest final : public QObject {
     Q_OBJECT
 
@@ -103,7 +69,7 @@ class ViewportModuleLoadTest final : public QObject {
         if (!qEnvironmentVariableIsSet("PANTA_TEST_NATIVE_VIEWPORT")) {
             QSKIP("Native GPU lifecycle requires PANTA_TEST_NATIVE_VIEWPORT=1 and a real desktop");
         }
-        const FrameCapture capture;
+        panta::test::FrameSubmissionCapture capture;
         QQuickWindow first;
         QQuickWindow second;
         first.resize(480, 360);
@@ -117,7 +83,7 @@ class ViewportModuleLoadTest final : public QObject {
         first.show();
         QTRY_COMPARE_WITH_TIMEOUT(initialized.count(), 1, 10000);
         QTest::qWait(100);
-        rendered_frames = 0;
+        capture.reset();
         panta::visualization::RenderScene scene;
         for (int i = 0; i < 100; ++i) {
             scene.revision = i + 1;
@@ -126,7 +92,7 @@ class ViewportModuleLoadTest final : public QObject {
             viewport.setWidth(400 + i);
         }
         QTest::qWait(100);
-        QCOMPARE(rendered_frames, 1);
+        QCOMPARE(capture.count(), 1);
 
         auto snapshot = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
         snapshot->vertices = {{{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}}};
@@ -135,9 +101,9 @@ class ViewportModuleLoadTest final : public QObject {
         scene.mesh = snapshot;
         snapshot.reset();
         ++scene.revision;
-        rendered_frames = 0;
+        capture.reset();
         viewport.apply_state(scene);
-        QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(capture.count() > 0, 10000);
         QVERIFY(!snapshot_lifetime.expired());
         const void* actor_identity =
             panta::visualization::ViewportTestAccess::actor_identity(viewport);
@@ -155,9 +121,9 @@ class ViewportModuleLoadTest final : public QObject {
             old_snapshots.emplace_back(next);
             scene.mesh = std::move(next);
             ++scene.revision;
-            rendered_frames = 0;
+            capture.reset();
             viewport.apply_state(scene);
-            QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
+            QTRY_VERIFY_WITH_TIMEOUT(capture.count() > 0, 10000);
             QCOMPARE(panta::visualization::ViewportTestAccess::actor_identity(viewport),
                      actor_identity);
             QVERIFY(panta::visualization::ViewportTestAccess::previous_mapper_released(viewport));
@@ -175,38 +141,37 @@ class ViewportModuleLoadTest final : public QObject {
         viewport.apply_state(scene);
         QTRY_VERIFY_WITH_TIMEOUT(snapshot_lifetime.expired(), 5000);
         QVERIFY(panta::visualization::ViewportTestAccess::previous_mapper_released(viewport));
-        rendered_frames = 0;
+        capture.reset();
         viewport.setVisible(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rendered_frames > 0, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(capture.count() > 0, 10000);
 
-        rendered_frames = 0;
-        surface_syncs = 0;
+        capture.reset();
         viewport.apply_state(scene);
         ++scene.revision;
         viewport.apply_state(scene);
         parent.setPosition(QPointF(20, 10));
         QTest::qWait(100);
-        QCOMPARE(rendered_frames, 0);
-        QCOMPARE(surface_syncs, 1);
+        QCOMPARE(capture.count(), 0);
+        QCOMPARE(capture.surface_sync_count(), 1);
 
         viewport.setVisible(false);
         scene.primitive_visible = false;
         ++scene.revision;
         viewport.apply_state(scene);
         QTest::qWait(100);
-        QCOMPARE(rendered_frames, 0);
+        QCOMPARE(capture.count(), 0);
         viewport.setVisible(true);
         QTest::qWait(100);
-        QCOMPARE(rendered_frames, 1);
+        QCOMPARE(capture.count(), 1);
 
-        rendered_frames = 0;
+        capture.reset();
         const qreal width = viewport.width();
         viewport.setWidth(0);
         QTest::qWait(100);
-        QCOMPARE(rendered_frames, 0);
+        QCOMPARE(capture.count(), 0);
         viewport.setWidth(width);
         QTest::qWait(100);
-        QCOMPARE(rendered_frames, 1);
+        QCOMPARE(capture.count(), 1);
 
         second.show();
         parent.setParentItem(second.contentItem());

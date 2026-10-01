@@ -60,7 +60,12 @@ panta/
 ├── python/                    # 后续 Python API，包名待定
 ├── schemas/                   # 本地工程 schema、外部契约版本引用
 ├── resources/                 # 图标、.pa 源文件与样例；TS/QM 只进构建树
-└── tests/                     # Rust 公共 API、native/QML 测试与回归数据
+└── tests/                     # Cargo 编排及测试；详见 tests/README.md
+    ├── rust/、cpp/、qml/       # 按语言 / 模块组织功能回归
+    ├── integration/           # Cargo native/QML 聚合入口
+    ├── support/               # 跨功能 / 性能测试共享的 Rust、Qt、QML 辅助代码
+    ├── fixtures/              # 固定输入与来源 / 单位 / 预期
+    └── performance/           # cpu/、gpu/、support/；cargo performance 手动运行
 ```
 
 ## 模块归属

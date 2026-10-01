@@ -97,26 +97,7 @@ if(BUILD_TESTING)
     target_include_directories(panta_${_test} PRIVATE src/vtk)
     target_link_libraries(panta_${_test} PRIVATE panta_visualization Qt6::Test VTK::CommonDataModel)
   endforeach()
-  add_executable(panta_viewport_navigation_cpu_benchmark EXCLUDE_FROM_ALL
-                 ../../tests/cpp/visualization/viewport_navigation_cpu_benchmark.cpp)
-  panta_native_defaults(panta_viewport_navigation_cpu_benchmark)
-  target_include_directories(panta_viewport_navigation_cpu_benchmark PRIVATE src src/vtk)
-  target_link_libraries(
-    panta_viewport_navigation_cpu_benchmark
-    PRIVATE panta_visualization Qt6::Test VTK::CommonDataModel VTK::FiltersSources
-            VTK::RenderingCore)
-  # CPU/GPU 基准并列维护；GPU 目标复用真实 VtkViewport，但需可见原生窗口，手动运行。
-  add_executable(panta_viewport_gpu_benchmark EXCLUDE_FROM_ALL
-                 ../../tests/cpp/visualization/viewport_gpu_benchmark.cpp)
-  panta_native_defaults(panta_viewport_gpu_benchmark)
-  target_include_directories(panta_viewport_gpu_benchmark PRIVATE src/vtk)
-  target_link_libraries(panta_viewport_gpu_benchmark PRIVATE panta_visualization Qt6::Gui
-                                                             Qt6::Quick Qt6::Test)
-  # 手动基准的 moc 登记给 lint 前置聚合（native 顶层 panta_benchmark_moc）。
-  add_dependencies(panta_benchmark_moc panta_viewport_navigation_cpu_benchmark_autogen
-                   panta_viewport_gpu_benchmark_autogen)
   panta_add_qml_test(Visualization.WelcomeWordmark panta_welcome_wordmark_test)
   panta_add_qml_test(Visualization.WelcomeScene panta_welcome_scene_test)
   panta_add_qml_test(Visualization.ViewportNavigation panta_viewport_navigation_test)
-  # CPU 基准显式手动构建；真实窗口 GPU 帧基准由性能任务单独跟进。
 endif()

@@ -1,6 +1,6 @@
 // 开发侧 QML 构造消融基准：比较工程树、Layers 面板及组合的 CPU 构造成本。
-#include "analysis_sequence_helpers.hpp"
-#include "quick_item_helpers.hpp"
+#include "../../support/qml/analysis_sequence_helpers.hpp"
+#include "../../support/qml/quick_item_helpers.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -578,4 +578,4 @@ class QmlPerformanceBenchmark final : public QObject {
 };
 
 QTEST_MAIN(QmlPerformanceBenchmark)
-#include "project_docks_cpu_benchmark.moc"
+#include "project_docks_benchmark.moc"

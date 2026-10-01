@@ -12,4 +12,4 @@ workspace = true
 
 [[test]]
 name = "mesh_performance"
-path = "../../tests/rust/mesh_performance.rs"
+path = "../../tests/performance/cpu/mesh_performance.rs"

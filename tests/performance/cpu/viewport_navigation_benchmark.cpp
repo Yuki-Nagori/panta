@@ -175,4 +175,4 @@ class ViewportNavigationCpuBenchmark final : public QObject {
 };
 
 QTEST_APPLESS_MAIN(ViewportNavigationCpuBenchmark)
-#include "viewport_navigation_cpu_benchmark.moc"
+#include "viewport_navigation_benchmark.moc"

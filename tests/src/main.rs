@@ -1,3 +1,5 @@
+mod performance;
+
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,6 +19,7 @@ fn main() -> ExitCode {
     let mut arguments = std::env::args().skip(1);
     let result = match arguments.next().as_deref() {
         Some("quality") => quality(),
+        Some("performance") => performance::run(arguments.collect()),
         Some("test") => test_all(),
         Some("format") => {
             let mut rest: Vec<String> = arguments.collect();
@@ -40,12 +43,12 @@ fn main() -> ExitCode {
         }
         Some(command) => Err(format!(
             "未知命令 '{command}'；可用：quality、test、audit、lint、format、coverage、sanitize、\
-             ub-check、toolchain"
+             ub-check、toolchain、performance"
         )
         .into()),
         None => Err(
             "缺少命令；可用：quality、test、audit、lint、format、coverage、sanitize、ub-check、\
-                 toolchain"
+                 toolchain、performance"
                 .into(),
         ),
     };
@@ -615,6 +618,7 @@ fn cargo_command(
     args: impl IntoIterator<Item = &'static str>,
 ) -> Result<(String, Command), Box<dyn Error>> {
     let target_dir = target_root();
+    let args: Vec<_> = args.into_iter().collect();
     // deny/machete 走托管的独立二进制；其余是 cargo 子命令。
     let managed_scanner = matches!(subcommand, "deny" | "machete");
     let mut command = if managed_scanner {
@@ -632,21 +636,30 @@ fn cargo_command(
     };
     if env!("PANTA_TEST_BUILD_TYPE") == "Release"
         && matches!(subcommand, "build" | "test" | "clippy")
+        && !args.contains(&"--release")
     {
         command.arg("--release");
     }
     let mut inserted_target_dir = false;
+    let mut passthrough = false;
+    let needs_target = matches!(subcommand, "build" | "test" | "clippy");
     for arg in args {
-        if arg == "--target-dir" {
+        if arg == "--" && !passthrough {
+            // Cargo 参数必须位于测试 / 子命令透传参数之前。
+            if needs_target && !inserted_target_dir {
+                command.arg("--target-dir").arg(target_dir);
+                inserted_target_dir = true;
+            }
+            passthrough = true;
+        }
+        if arg == "--target-dir" && !passthrough {
             command.arg(arg).arg(target_dir);
             inserted_target_dir = true;
         } else {
             command.arg(arg);
         }
     }
-    if (subcommand == "build" || subcommand == "test" || subcommand == "clippy")
-        && !inserted_target_dir
-    {
+    if needs_target && !inserted_target_dir {
         command.arg("--target-dir").arg(target_dir);
     }
     command.current_dir(repository_root()?);
@@ -751,6 +764,8 @@ fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {
         // 修复模式：直接就地格式化；文件清单与检查脚本（check-qml-format.cmake
         // 按 QML_DIR 递归）保持同一来源。
         let mut files = qml_sources(&root.join("qml"))?;
+        files.extend(qml_sources(&root.join("tests/qml"))?);
+        files.extend(qml_sources(&root.join("tests/fixtures/qml"))?);
         files.sort();
         for file in files {
             let mut command = Command::new(&qmlformat);
@@ -989,6 +1004,8 @@ fn check_cpp_format(check: bool) -> Result<(), Box<dyn Error>> {
     let mut files = cpp_sources(&root.join("native"))?;
     files.extend(cpp_sources(&root.join("tests/cpp"))?);
     files.extend(cpp_sources(&root.join("tests/qml"))?);
+    files.extend(cpp_sources(&root.join("tests/performance"))?);
+    files.extend(cpp_sources(&root.join("tests/support"))?);
     files.extend(cpp_sources(&root.join("crates/panta-ffi/src"))?);
     files.extend(cpp_sources(&root.join("crates/panta-ffi/include"))?);
     if files.is_empty() {

@@ -1,7 +1,8 @@
 // 开发侧硬件渲染基准；默认离屏完成与 GPU 时间戳，可选真实窗口呈现。
-#include "analysis_sequence_helpers.hpp"
-#include "offscreen_quick_renderer.hpp"
-#include "quick_item_helpers.hpp"
+#include "../../support/qml/analysis_sequence_helpers.hpp"
+#include "../../support/qml/quick_item_helpers.hpp"
+#include "../support/benchmark_statistics.hpp"
+#include "../support/offscreen_quick_renderer.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -29,7 +30,6 @@
 #include <QtQml/qqmlextensionplugin.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
-#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -40,7 +40,6 @@
 #include <memory>
 #include <qtenvironmentvariables.h>
 #include <rhi/qrhi.h>
-#include <utility>
 #include <vector>
 
 Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
@@ -80,13 +79,6 @@ QStringList make_names(int count) {
         names.append(QStringLiteral("part_%1.stl").arg(index));
     }
     return names;
-}
-
-std::vector<double> percentiles(std::vector<double> values) {
-    std::sort(values.begin(), values.end());
-    const auto p95_index =
-        static_cast<std::size_t>(std::ceil(static_cast<double>(values.size()) * 0.95)) - 1;
-    return {values[values.size() / 2], values[p95_index]};
 }
 
 const char* graphics_api_name(QSGRendererInterface::GraphicsApi api) {
@@ -338,7 +330,11 @@ class ProjectDocksGpuBenchmark final : public QObject {
                 QCOMPARE(document_bar->property("activeDocumentId").toString(),
                          QStringLiteral("doc-0"));
             }
-            const auto summary = percentiles(std::move(intervals));
+            const auto summary = panta::test::summarize_timings(intervals);
+            if (!summary) {
+                QTest::qFail("Invalid frame timing samples", __FILE__, __LINE__);
+                return;
+            }
             if (!report_gpu_times(scenario, api_name)) {
                 return;
             }
@@ -347,8 +343,8 @@ class ProjectDocksGpuBenchmark final : public QObject {
                               << " (" << api_name << ", " << scenario.name << ", "
                               << scenario.item_count << " document tabs, " << kSampleCount << " x "
                               << kFrameCountPerSample
-                              << " frames; p50/p95 ms per frame): " << summary[0] << "/"
-                              << summary[1];
+                              << " frames; p50/p95 ms per frame): " << summary->p50 << "/"
+                              << summary->p95;
             return;
         }
         QCOMPARE(static_cast<int>(owner.children().size()),
@@ -390,7 +386,11 @@ class ProjectDocksGpuBenchmark final : public QObject {
             }
             intervals.insert(intervals.end(), sample_intervals.begin(), sample_intervals.end());
         }
-        const auto summary = percentiles(std::move(intervals));
+        const auto summary = panta::test::summarize_timings(intervals);
+        if (!summary) {
+            QTest::qFail("Invalid frame timing samples", __FILE__, __LINE__);
+            return;
+        }
         if (!report_gpu_times(scenario, api_name)) {
             return;
         }
@@ -399,7 +399,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
                           << " (" << api_name << ", " << scenario.name << ", "
                           << scenario.item_count << " imported items, " << kSampleCount << " x "
                           << kFrameCountPerSample << " frames; realized task rows " << realized_rows
-                          << "; p50/p95 ms per frame): " << summary[0] << "/" << summary[1];
+                          << "; p50/p95 ms per frame): " << summary->p50 << "/" << summary->p95;
     }
 
     bool report_gpu_times(const Scenario& scenario, const char* api_name) {
@@ -408,11 +408,15 @@ class ProjectDocksGpuBenchmark final : public QObject {
                          __LINE__);
             return false;
         }
-        const auto summary = percentiles(m_gpuTimes);
+        const auto summary = panta::test::summarize_timings(m_gpuTimes);
+        if (!summary) {
+            QTest::qFail("Invalid frame timing samples", __FILE__, __LINE__);
+            return false;
+        }
         qInfo().nospace() << "QML GPU timestamp (" << api_name << ", " << scenario.name << ", "
                           << scenario.item_count << " items; completed observations "
                           << m_gpuTimes.size() << "/" << kSampleCount * kFrameCountPerSample
-                          << "; p50/p95 ms): " << summary[0] << "/" << summary[1];
+                          << "; p50/p95 ms): " << summary->p50 << "/" << summary->p95;
         return true;
     }
 
@@ -522,4 +526,4 @@ class ProjectDocksGpuBenchmark final : public QObject {
 };
 
 QTEST_MAIN(ProjectDocksGpuBenchmark)
-#include "project_docks_gpu_benchmark.moc"
+#include "project_docks_benchmark.moc"

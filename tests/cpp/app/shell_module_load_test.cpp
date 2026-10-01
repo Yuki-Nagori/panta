@@ -18,7 +18,7 @@
 #include <qtenvironmentvariables.h>
 #include <qtestsupport_core.h>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
-#include "../../qml/quick_item_helpers.hpp"
+#include "../../support/qml/quick_item_helpers.hpp"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>

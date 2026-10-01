@@ -1,31 +1,27 @@
 /// VTK WebGPU 开发基准：在真实原生窗口中测量场景更新到帧提交的间隔。
 
+#include "../../support/qt/frame_submission_capture.hpp"
+#include "../support/benchmark_statistics.hpp"
 #include <QColor>
-#include <QElapsedTimer>
-#include <QEventLoop>
 #include <QGuiApplication>
-#include <QLoggingCategory>
 #include <QObject>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QSizeF>
 #include <QString>
-#include <QTimer>
-#include <QtCore/qlogging.h>
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <algorithm>
-#include <cmath>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
-#include <cstring>
+#include <memory>
 #include <panta/visualization/render_scene.hpp>
+#include <qlogging.h>
 #include <qtestsupport_core.h>
 #include <qtestsupport_gui.h>
-#include <utility>
 #include <vector>
 #include <vtk_viewport.hpp>
 
@@ -36,41 +32,6 @@ constexpr int kFrameCountPerSample = 60;
 constexpr int kSampleCount = 3;
 constexpr int kFrameWaitTimeoutMs = 10000;
 
-QElapsedTimer frame_clock;
-std::vector<qint64> submitted_frame_times;
-QtMessageHandler previous_handler = nullptr;
-QEventLoop* frame_wait_loop = nullptr;
-
-void capture_frame_submissions(QtMsgType type, const QMessageLogContext& context,
-                               const QString& message) {
-    const bool viewport_debug =
-        context.category != nullptr && std::strcmp(context.category, "panta.viewport") == 0;
-    if (viewport_debug && message.startsWith(QStringLiteral("frame submitted"))) {
-        if (frame_clock.isValid()) {
-            submitted_frame_times.push_back(frame_clock.nsecsElapsed());
-        }
-        if (frame_wait_loop != nullptr) {
-            frame_wait_loop->quit();
-        }
-        return;
-    }
-    if (viewport_debug && message == QStringLiteral("surface synchronized")) {
-        return;
-    }
-    if (previous_handler != nullptr) {
-        previous_handler(type, context, message);
-    } else {
-        std::fprintf(stderr, "%s\n", qPrintable(message));
-    }
-}
-
-std::vector<double> summarize_percentiles(std::vector<double> values) {
-    std::sort(values.begin(), values.end());
-    const auto p95_index =
-        static_cast<std::size_t>(std::ceil(static_cast<double>(values.size()) * 0.95)) - 1;
-    return {values[values.size() / 2], values[p95_index]};
-}
-
 } // namespace
 
 class ViewportGpuBenchmark final : public QObject {
@@ -78,6 +39,7 @@ class ViewportGpuBenchmark final : public QObject {
 
   private:
     QQuickWindow window_;
+    std::unique_ptr<panta::test::FrameSubmissionCapture> capture_;
     // 指针而非直接成员：VTK/WebGPU 资源必须在事件循环仍活跃的
     // cleanupTestCase 显式拆除（与应用侧 QML 引擎拆除同序）；作为成员会在
     // qExec 之后的静态析构期释放，与 Win32 interactor 遗留状态冲突触发
@@ -86,18 +48,13 @@ class ViewportGpuBenchmark final : public QObject {
     panta::visualization::VtkViewport* viewport_ = nullptr;
 
     bool submit_scene_update(int frame_index) {
-        const int previous_count = static_cast<int>(submitted_frame_times.size());
+        const auto previous_count = capture_->count();
         panta::visualization::RenderScene scene;
         scene.revision = static_cast<std::uint64_t>(frame_index) + std::uint64_t{1};
         scene.background =
             QColor((frame_index * 37) % 256, (frame_index * 71) % 256, (frame_index * 113) % 256);
-        QEventLoop wait_loop;
-        frame_wait_loop = &wait_loop;
-        QTimer::singleShot(kFrameWaitTimeoutMs, &wait_loop, &QEventLoop::quit);
         viewport_->apply_state(scene);
-        wait_loop.exec();
-        frame_wait_loop = nullptr;
-        if (static_cast<int>(submitted_frame_times.size()) == previous_count) {
+        if (!capture_->wait_after(previous_count, std::chrono::milliseconds{kFrameWaitTimeoutMs})) {
             QTest::qFail("Timed out waiting for a VTK WebGPU frame submission", __FILE__, __LINE__);
             return false;
         }
@@ -105,12 +62,13 @@ class ViewportGpuBenchmark final : public QObject {
     }
 
     std::vector<double> measure_submission_intervals(int frame_count, int& frame_index) {
-        const std::size_t first_frame = submitted_frame_times.size();
+        const std::size_t first_frame = capture_->count();
         for (int frame = 0; frame < frame_count; ++frame) {
             if (!submit_scene_update(frame_index++)) {
                 return {};
             }
         }
+        const auto submitted_frame_times = capture_->times();
         std::vector<double> intervals;
         intervals.reserve(frame_count);
         for (std::size_t index = std::max<std::size_t>(first_frame, 1);
@@ -143,10 +101,7 @@ class ViewportGpuBenchmark final : public QObject {
             QSKIP("VTK WebGPU did not initialize a native rendering context");
         }
 
-        QLoggingCategory::setFilterRules(QStringLiteral("panta.viewport.debug=true"));
-        previous_handler = qInstallMessageHandler(capture_frame_submissions);
-        submitted_frame_times.clear();
-        frame_clock.start();
+        capture_ = std::make_unique<panta::test::FrameSubmissionCapture>();
     }
 
     void measures_webgpu_frame_submission_interval() {
@@ -168,18 +123,18 @@ class ViewportGpuBenchmark final : public QObject {
             intervals.insert(intervals.end(), values.begin(), values.end());
         }
 
-        const auto summary = summarize_percentiles(std::move(intervals));
+        const auto summary = panta::test::summarize_timings(intervals);
+        if (!summary) {
+            QTest::qFail("Invalid frame timing samples", __FILE__, __LINE__);
+            return;
+        }
         qInfo().nospace() << "VTK WebGPU frame submission (" << QGuiApplication::platformName()
                           << ", " << kSampleCount << " x " << kFrameCountPerSample
-                          << " frames; p50/p95 ms): " << summary[0] << "/" << summary[1];
+                          << " frames; p50/p95 ms): " << summary->p50 << "/" << summary->p95;
     }
 
     void cleanupTestCase() {
-        if (previous_handler != nullptr) {
-            qInstallMessageHandler(previous_handler);
-            previous_handler = nullptr;
-        }
-        QLoggingCategory::setFilterRules(QString());
+        capture_.reset();
         // 显式按应用侧同序拆除 VTK/WebGPU 资源：事件循环仍活跃时先行释放，
         // 避免拖到 qExec 之后的静态析构期与 Win32 interactor 遗留状态冲突。
         delete viewport_;
@@ -191,4 +146,4 @@ class ViewportGpuBenchmark final : public QObject {
 };
 
 QTEST_MAIN(ViewportGpuBenchmark)
-#include "viewport_gpu_benchmark.moc"
+#include "viewport_benchmark.moc"

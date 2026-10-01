@@ -5,30 +5,11 @@ use panta_core::project::{Outcome, OutcomeKind, ProjectError, ProjectService};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-struct Fixture {
-    root: PathBuf,
-}
-
-impl Fixture {
-    fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        let root =
-            std::env::temp_dir().join(format!("panta-activation-{}-{}", std::process::id(), id));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root)?;
-        Ok(Self { root })
-    }
-}
-
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
+#[path = "../support/rust/temp_directory.rs"]
+mod temp_directory;
+use temp_directory::Fixture;
 
 const SAMPLE_STL: &[u8] = b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n";
 // Miri 逐条解释执行写入和解析；并发语义只要求 worker 在提交后的检查点仍在飞。

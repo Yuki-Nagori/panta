@@ -1,10 +1,11 @@
-// 080 的手动真窗口基准：用保存的 STL 快照驱动单个 VTK WebGPU viewport。
+// 保存的 STL 快照驱动单个 VTK WebGPU viewport；计时边界由输出明确标注。
+#include "../../support/qt/frame_submission_capture.hpp"
+#include "../support/benchmark_statistics.hpp"
 #include "panta/visualization/mesh_source.hpp"
 #include "panta/visualization/render_scene.hpp"
 #include "project_view_model.hpp"
 #include <QEventLoop>
 #include <QGuiApplication>
-#include <QLoggingCategory>
 #include <QObject>
 #include <QQuickWindow>
 #include <QString>
@@ -18,9 +19,7 @@
 #include <QtCore/qtversion.h>
 #include <QtLogging>
 #include <algorithm>
-#include <atomic>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
@@ -60,37 +59,6 @@ struct LoadedDocument {
     QString id;
     QString name;
     std::uint64_t mesh_payload_estimate_bytes = 0;
-};
-
-QtMessageHandler previous_message_handler = nullptr;
-std::atomic<int> submitted_frames{0};
-
-void capture_frame_submissions(QtMsgType type, const QMessageLogContext& context,
-                               const QString& message) {
-    if (context.category != nullptr && qstrcmp(context.category, "panta.viewport") == 0 &&
-        message.startsWith(QStringLiteral("frame submitted"))) {
-        submitted_frames.fetch_add(1, std::memory_order_relaxed);
-        return;
-    }
-    if (context.category != nullptr && qstrcmp(context.category, "panta.viewport") == 0 &&
-        message.startsWith(QStringLiteral("surface synchronized"))) {
-        return;
-    }
-    if (previous_message_handler != nullptr) {
-        previous_message_handler(type, context, message);
-    }
-}
-
-class FrameCapture final {
-  public:
-    FrameCapture() {
-        QLoggingCategory::setFilterRules(QStringLiteral("panta.viewport.debug=true"));
-        previous_message_handler = qInstallMessageHandler(capture_frame_submissions);
-    }
-    ~FrameCapture() {
-        qInstallMessageHandler(previous_message_handler);
-        QLoggingCategory::setFilterRules(QString{});
-    }
 };
 
 class DiagnosticPause final {
@@ -224,17 +192,6 @@ void print_memory(const char* phase, const MemorySample& sample,
               << mib(project_mesh_payload_estimate_bytes) << '\n';
 }
 
-double percentile_ms(std::vector<double> samples, double percentile) {
-    if (samples.empty()) {
-        return 0.0;
-    }
-    std::sort(samples.begin(), samples.end());
-    const auto rank =
-        static_cast<std::size_t>(std::ceil(percentile * static_cast<double>(samples.size())));
-    const auto index = std::clamp<std::size_t>(rank, 1, samples.size()) - 1;
-    return samples[index];
-}
-
 // DTO capacity estimates the raw mesh payload; this sum does not imply per-tab DTO retention.
 std::uint64_t project_mesh_payload_estimate(const std::vector<LoadedDocument>& documents) {
     std::uint64_t bytes = 0;
@@ -306,7 +263,7 @@ int main(int argc, char* argv[]) try {
     if (!diagnostic_pause.valid()) {
         return fail("PANTA_BENCH_PAUSE_PHASE requires a positive PANTA_BENCH_PAUSE_MS");
     }
-    const FrameCapture frame_capture;
+    const panta::test::FrameSubmissionCapture frame_capture;
 
     std::cout << "benchmark=project_stl_viewport_gpu build="
 #if defined(NDEBUG)
@@ -341,7 +298,7 @@ int main(int argc, char* argv[]) try {
     bool scene_initialized = false;
     QObject::connect(&viewport, &VtkViewport::sceneInitialized, &app,
                      [&scene_initialized]() { scene_initialized = true; });
-    const int before_window_show = submitted_frames.load(std::memory_order_relaxed);
+    const auto before_window_show = frame_capture.count();
     window.show();
     if (!wait_until([&window]() { return window.isExposed(); }, 10000)) {
         return fail("native benchmark window was not exposed");
@@ -349,11 +306,9 @@ int main(int argc, char* argv[]) try {
     if (!wait_until([&scene_initialized]() { return scene_initialized; }, 30000)) {
         return fail("VTK WebGPU scene was not initialized");
     }
-    if (!wait_until(
-            [before_window_show]() {
-                return submitted_frames.load(std::memory_order_relaxed) > before_window_show;
-            },
-            30000)) {
+    if (!wait_until([&frame_capture,
+                     before_window_show]() { return frame_capture.count() > before_window_show; },
+                    30000)) {
         return fail("VTK WebGPU scene did not submit a frame");
     }
     print_memory("native_viewport_baseline", {resident_bytes(), peak_rss_bytes()}, 0);
@@ -371,12 +326,11 @@ int main(int argc, char* argv[]) try {
     loaded.reserve(static_cast<std::size_t>(ids.size()));
     for (qsizetype index = 0; index < ids.size(); ++index) {
         const QString& id = ids[index];
-        const int before_frame = submitted_frames.load(std::memory_order_relaxed);
+        const auto before_frame = frame_capture.count();
         const auto start = Clock::now();
         view_model.openImportRecord(id);
         const auto ready = [&]() {
-            return document_ready(view_model, id) &&
-                   submitted_frames.load(std::memory_order_relaxed) > before_frame;
+            return document_ready(view_model, id) && frame_capture.count() > before_frame;
         };
         if (!wait_until(ready, 60000)) {
             return fail("activation or VTK frame timed out for " + names[index].toStdString());
@@ -403,12 +357,10 @@ int main(int argc, char* argv[]) try {
             return lhs.mesh_payload_estimate_bytes < rhs.mesh_payload_estimate_bytes;
         });
     if (largest != loaded.end() && view_model.activeDocumentId() != largest->id) {
-        const int before_frame = submitted_frames.load(std::memory_order_relaxed);
+        const auto before_frame = frame_capture.count();
         view_model.activateDocument(largest->id);
         if (!wait_until(
-                [before_frame]() {
-                    return submitted_frames.load(std::memory_order_relaxed) > before_frame;
-                },
+                [&frame_capture, before_frame]() { return frame_capture.count() > before_frame; },
                 30000)) {
             return fail("largest STL did not reach a VTK frame");
         }
@@ -430,35 +382,35 @@ int main(int argc, char* argv[]) try {
             // ViewModel 对已活动页签不会重复发射 meshChanged；先切到另一页，
             // 让每个样本都实际经历一次目标模型的 VTK 场景更新。
             if (view_model.activeDocumentId() == document.id) {
-                const int before_alternate = submitted_frames.load(std::memory_order_relaxed);
+                const auto before_alternate = frame_capture.count();
                 view_model.activateDocument(alternate->id);
                 if (!wait_until(
-                        [before_alternate]() {
-                            return submitted_frames.load(std::memory_order_relaxed) >
-                                   before_alternate;
+                        [&frame_capture, before_alternate]() {
+                            return frame_capture.count() > before_alternate;
                         },
                         30000)) {
                     return fail("VTK alternate frame submit timed out for " +
                                 alternate->name.toStdString());
                 }
             }
-            const int before_frame = submitted_frames.load(std::memory_order_relaxed);
+            const auto before_frame = frame_capture.count();
             const auto start = Clock::now();
             view_model.activateDocument(document.id);
-            if (!wait_until(
-                    [before_frame]() {
-                        return submitted_frames.load(std::memory_order_relaxed) > before_frame;
-                    },
-                    30000)) {
+            if (!wait_until([&frame_capture,
+                             before_frame]() { return frame_capture.count() > before_frame; },
+                            30000)) {
                 return fail("VTK frame submit timed out for " + document.name.toStdString());
             }
             frame_samples_ms.push_back(
                 std::chrono::duration<double, std::milli>(Clock::now() - start).count());
         }
+        const auto summary = panta::test::summarize_timings(frame_samples_ms);
+        if (!summary) {
+            return fail("invalid VTK frame submission samples");
+        }
         std::cout << "vtk_frame_submit file=" << document.name.toStdString()
                   << " samples=" << frame_samples_ms.size() << " p50_ms=" << std::fixed
-                  << std::setprecision(3) << percentile_ms(frame_samples_ms, 0.50)
-                  << " p95_ms=" << percentile_ms(frame_samples_ms, 0.95)
+                  << std::setprecision(3) << summary->p50 << " p95_ms=" << summary->p95
                   << " boundary=scene_change_to_VTK_submit_not_GPU_completion\n";
         std::cout << "memory_after_frame_cycles file=" << document.name.toStdString() << ' ';
         print_memory("document_complete", {resident_bytes(), peak_rss_bytes()},
@@ -477,12 +429,10 @@ int main(int argc, char* argv[]) try {
         return fail("PANTA_BENCH_KEEP_WINDOW_MS must be a non-negative integer");
     }
     if (pause_ms > 0 && largest != loaded.end()) {
-        const int before_frame = submitted_frames.load(std::memory_order_relaxed);
+        const auto before_frame = frame_capture.count();
         view_model.activateDocument(largest->id);
         if (!wait_until(
-                [before_frame]() {
-                    return submitted_frames.load(std::memory_order_relaxed) > before_frame;
-                },
+                [&frame_capture, before_frame]() { return frame_capture.count() > before_frame; },
                 30000)) {
             return fail("largest STL did not render before the window pause");
         }
@@ -493,16 +443,14 @@ int main(int argc, char* argv[]) try {
         pause_loop.exec();
     }
 
+    const auto before_empty_frame = frame_capture.count();
     for (const auto& document : loaded) {
         view_model.closeDocument(document.id);
     }
     view_model.closeDocument(QStringLiteral("welcome"));
-    const int before_empty_frame = submitted_frames.load(std::memory_order_relaxed);
-    if (!wait_until(
-            [before_empty_frame]() {
-                return submitted_frames.load(std::memory_order_relaxed) > before_empty_frame;
-            },
-            30000)) {
+    if (!wait_until([&frame_capture,
+                     before_empty_frame]() { return frame_capture.count() > before_empty_frame; },
+                    30000)) {
         return fail("empty viewport frame did not submit after closing all documents");
     }
     print_memory("all_documents_closed", {resident_bytes(), peak_rss_bytes()}, 0);

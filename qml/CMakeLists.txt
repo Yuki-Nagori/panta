@@ -113,7 +113,6 @@ qt_add_resources(panta_shell "panta_shell_icons" PREFIX "/qt/qml/Panta/Shell" FI
                  ${PANTA_SHELL_ICON_FILES})
 
 if(BUILD_TESTING)
-  find_package(Qt6 6.11 REQUIRED COMPONENTS GuiPrivate)
   add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)
   panta_native_defaults(panta_qml_theme_component_test)
   target_link_libraries(
@@ -130,46 +129,10 @@ if(BUILD_TESTING)
     FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/../ai-docs/qml-html/shell.js")
   panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
-  # 开发侧 QML 性能工作台：按场景扩展，手动运行，不注册为 CTest 或 CI 时间门禁。
-  add_executable(panta_qml_cpu_benchmark EXCLUDE_FROM_ALL
-                 ../tests/qml/project_docks_cpu_benchmark.cpp)
-  panta_native_defaults(panta_qml_cpu_benchmark)
-  target_link_libraries(panta_qml_cpu_benchmark PRIVATE panta_shell panta_shellplugin Qt6::Gui
-                                                        Qt6::Qml Qt6::Test Qt6::Quick)
-  add_executable(panta_qml_gpu_benchmark EXCLUDE_FROM_ALL
-                 ../tests/qml/project_docks_gpu_benchmark.cpp)
-  panta_native_defaults(panta_qml_gpu_benchmark)
-  target_link_libraries(
-    panta_qml_gpu_benchmark
-    PRIVATE panta_shell
-            panta_shellplugin
-            Qt6::Gui
-            Qt6::GuiPrivate
-            Qt6::Qml
-            Qt6::Test
-            Qt6::Quick)
   if(PANTA_ENABLE_BRIDGE_MODULE)
-    # 目录场景直接经正式 ViewModel 读取 Rust；不依赖测试进程的 QML 插件注册。
-    foreach(PANTA_SEQUENCE_TEST_TARGET panta_qml_theme_component_test panta_qml_cpu_benchmark
-                                       panta_qml_gpu_benchmark)
-      target_link_libraries(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE panta::bridge)
-      target_compile_definitions(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE PANTA_TEST_WITH_BRIDGE=1)
-    endforeach()
+    target_link_libraries(panta_qml_theme_component_test PRIVATE panta::bridge)
+    target_compile_definitions(panta_qml_theme_component_test PRIVATE PANTA_TEST_WITH_BRIDGE=1)
   endif()
-  foreach(PANTA_CONTROLS_BENCHMARK panta_qml_cpu_benchmark panta_qml_gpu_benchmark)
-    qt_add_resources(
-      ${PANTA_CONTROLS_BENCHMARK}
-      panta_control_gallery
-      PREFIX
-      "/panta-benchmark"
-      BASE
-      "${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/qml"
-      FILES
-      "${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/qml/ControlGallery.qml")
-  endforeach()
-  # 手动基准的 moc 登记给 lint 前置聚合（native 顶层 panta_benchmark_moc）。
-  add_dependencies(panta_benchmark_moc panta_qml_cpu_benchmark_autogen
-                   panta_qml_gpu_benchmark_autogen)
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。
   find_program(
