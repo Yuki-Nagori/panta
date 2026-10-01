@@ -2,10 +2,9 @@
 import QtQuick
 import QtQuick.Layouts
 
-Window {
+DialogWindow {
     id: dialog
     objectName: "materialSelectionDialog"
-    property Window ownerWindow
     property var material: ({})
     property var planSettings: ({})
     property var openedSettings: ({})
@@ -17,11 +16,7 @@ Window {
     height: Theme.materialDialogHeight
     minimumWidth: Theme.materialDialogMinimumWidth
     minimumHeight: Theme.materialDialogMinimumHeight
-    color: Theme.colorTransparent
-    modality: Qt.ApplicationModal
-    flags: Qt.Dialog | Qt.FramelessWindowHint
     title: qsTranslate("MaterialDialog", "Select Material")
-    transientParent: ownerWindow
     onClosing: event => {
         if (saving)
             event.accepted = false;
@@ -32,10 +27,7 @@ Window {
             return;
         openedSettings = planSettings;
         materialPanel.reset();
-        if (ownerWindow) {
-            x = ownerWindow.x + Math.round((ownerWindow.width - width) / 2);
-            y = ownerWindow.y + Math.round((ownerWindow.height - height) / 2);
-        }
+        centerOnOwner();
         show();
         requestActivate();
     }
@@ -45,68 +37,54 @@ Window {
             selectionRequested(openedSettings.projectPath, openedSettings.revision, openedSettings.importId, material.id);
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.colorPanel
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-            DialogTitleBar {
-                Layout.fillWidth: true
-                window: dialog
-                caption: dialog.title
-                closeEnabled: !dialog.saving
-                onCloseRequested: dialog.close()
+    DialogFrame {
+        window: dialog
+        closeEnabled: !dialog.saving
+
+        ThemedLabel {
+            Layout.fillWidth: true
+            Layout.margins: Theme.spacingLarge
+            text: dialog.saving ? qsTranslate("MaterialDialog", "Saving material...") : dialog.errorText
+            textColor: dialog.saving ? Theme.colorTextMuted : Theme.colorError
+            visible: text.length > 0
+            wrapMode: Text.Wrap
+        }
+        MaterialSelectionPanel {
+            id: materialPanel
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.margins: Theme.spacingLarge
+            material: dialog.material
+            enabled: !dialog.saving
+        }
+        DialogButtonRow {
+            Layout.fillWidth: true
+            Layout.margins: Theme.spacingLarge
+            spacing: Theme.spacingSmall
+
+            ThemedButton {
+                objectName: "materialAccept"
+
+                text: qsTranslate("DialogAction", "OK")
+                enabled: dialog.canConfirm
+                primaryAction: true
+                contentColor: Theme.colorText
+                onClicked: dialog.acceptSelection()
             }
-            ThemedLabel {
-                Layout.fillWidth: true
-                Layout.margins: Theme.spacingLarge
-                text: dialog.saving ? qsTranslate("MaterialDialog", "Saving material...") : dialog.errorText
-                textColor: dialog.saving ? Theme.colorTextMuted : Theme.colorError
-                visible: text.length > 0
-                wrapMode: Text.Wrap
-            }
-            MaterialSelectionPanel {
-                id: materialPanel
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.margins: Theme.spacingLarge
-                material: dialog.material
+            ThemedButton {
+                objectName: "materialCancel"
                 enabled: !dialog.saving
+
+                text: qsTranslate("DialogAction", "Cancel")
+                contentColor: Theme.colorText
+                borderColor: Theme.colorPanelLine
+                onClicked: dialog.close()
             }
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.margins: Theme.spacingLarge
-                spacing: Theme.spacingSmall
-                Item {
-                    Layout.fillWidth: true
-                }
-                ThemedToolButton {
-                    objectName: "materialAccept"
-                    Layout.preferredWidth: Theme.tabSegmentWidth
-                    text: qsTranslate("DialogAction", "OK")
-                    enabled: dialog.canConfirm
-                    primaryAction: true
-                    contentColor: Theme.colorText
-                    borderColor: Theme.colorDialogPrimaryBorder
-                    onClicked: dialog.acceptSelection()
-                }
-                ThemedToolButton {
-                    objectName: "materialCancel"
-                    enabled: !dialog.saving
-                    Layout.preferredWidth: Theme.tabSegmentWidth
-                    text: qsTranslate("DialogAction", "Cancel")
-                    contentColor: Theme.colorText
-                    borderColor: Theme.colorPanelLine
-                    onClicked: dialog.close()
-                }
-                ThemedToolButton {
-                    Layout.preferredWidth: Theme.tabSegmentWidth
-                    text: qsTranslate("UiCommonHelp", "Help")
-                    contentColor: Theme.colorText
-                    borderColor: Theme.colorPanelLine
-                    enabled: false
-                }
+            ThemedButton {
+                text: qsTranslate("UiCommonHelp", "Help")
+                contentColor: Theme.colorText
+                borderColor: Theme.colorPanelLine
+                enabled: false
             }
         }
     }

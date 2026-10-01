@@ -109,21 +109,10 @@ ColumnLayout {
                         tree.selections[tree.selectionKey()] = modelData.id;
                         tree.resultSelected(modelData.id);
                     }
-                    indicator: Rectangle {
-                        implicitWidth: Theme.iconSizeSmall
-                        implicitHeight: Theme.iconSizeSmall
+                    indicator: CheckIndicator {
                         y: (choice.height - height) / 2
-                        radius: Theme.radiusSmall
-                        color: choice.checked ? Theme.colorFocus : Theme.colorPanel
-                        border.color: choice.checked || choice.visualFocus ? Theme.colorFocus : Theme.colorPanelLine
-                        border.width: choice.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-                        ThemedIcon {
-                            anchors.centerIn: parent
-                            name: "check"
-                            iconSize: Theme.iconSizeCompact
-                            color: Theme.colorPanel
-                            visible: choice.checked
-                        }
+                        checked: choice.checked
+                        focused: choice.visualFocus
                     }
                     contentItem: ThemedLabel {
                         leftPadding: choice.indicator.width + choice.spacing

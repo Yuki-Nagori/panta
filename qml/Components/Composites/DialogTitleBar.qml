@@ -33,6 +33,8 @@ Rectangle {
             id: closeButton
             objectName: "dialogCloseButton"
             enabled: titleBar.closeEnabled
+            Layout.alignment: Qt.AlignTop
+            Layout.topMargin: Theme.spacingXSmall
             Layout.preferredWidth: Theme.paneCloseSize
             Layout.preferredHeight: Theme.paneCloseSize
             controlHeight: Theme.paneCloseSize

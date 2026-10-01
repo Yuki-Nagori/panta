@@ -41,6 +41,7 @@
 // 必须同时导入并链接其 plugin，否则运行时报 "module not installed"。
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
+Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
 
 namespace {
 
@@ -229,7 +230,12 @@ class ShellModuleLoadTest final : public QObject {
                         button, QPointF(content->width() / 2, content->height() / 2));
                     QVERIFY(qAbs(center.y() - button->height() / 2) <= 0.5);
                     if (!button->property("contentAlignLeft").toBool()) {
-                        QVERIFY(qAbs(center.x() - button->width() / 2) <= 0.5);
+                        QVERIFY2(qAbs(center.x() - button->width() / 2) <= 0.5,
+                                 qPrintable(QStringLiteral("Button %1 (%2), width %3, center %4")
+                                                .arg(button->objectName(),
+                                                     button->property("text").toString())
+                                                .arg(button->width())
+                                                .arg(center.x())));
                     }
                 }
                 verify_ribbon_alignment(
@@ -620,16 +626,16 @@ class ShellModuleLoadTest final : public QObject {
         auto* window = qobject_cast<QQuickWindow*>(root);
         auto* project =
             root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
-        auto* tasksPanel = root->findChild<QQuickItem*>(QStringLiteral("tasksPanel"));
+        auto* sidebarPanel = root->findChild<QQuickItem*>(QStringLiteral("sidebarPanel"));
         auto* layersPanel = root->findChild<QQuickItem*>(QStringLiteral("layersPanel"));
         auto* tabRow = root->findChild<QQuickItem*>(QStringLiteral("layersTabRow"));
         auto* toolbar = root->findChild<QQuickItem*>(QStringLiteral("layersToolbar"));
         auto* content = root->findChild<QQuickItem*>(QStringLiteral("layersContent"));
-        QVERIFY(window && project && tasksPanel && layersPanel && tabRow && toolbar && content);
+        QVERIFY(window && project && sidebarPanel && layersPanel && tabRow && toolbar && content);
 
         window->showNormal();
         window->resize(1440, 900);
-        QTRY_VERIFY(tasksPanel->isVisible());
+        QTRY_VERIFY(sidebarPanel->isVisible());
         QTRY_VERIFY(layersPanel->isVisible());
         QTRY_VERIFY(toolbar->isVisible());
         QTRY_VERIFY(content->isVisible());
@@ -654,17 +660,17 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(project->importStl(firstStlPath, QStringLiteral("dual-domain"),
                                    QStringLiteral("millimeters"), false));
         QTRY_VERIFY(tabRow->isVisible());
-        QTRY_VERIFY(tasksPanel->isVisible());
-        QTRY_COMPARE(visual_items(tasksPanel, QStringLiteral("importedPartEntry")).size(), 1);
+        QTRY_VERIFY(sidebarPanel->isVisible());
+        QTRY_COMPARE(visual_items(sidebarPanel, QStringLiteral("importedPartEntry")).size(), 1);
 
         const QString secondStlPath = fixture.filePath(QStringLiteral("second.stl"));
         QVERIFY(QFile::copy(firstStlPath, secondStlPath));
         QVERIFY(project->inspectStl(secondStlPath));
         QVERIFY(project->importStl(secondStlPath, QStringLiteral("dual-domain"),
                                    QStringLiteral("millimeters"), false));
-        QTRY_COMPARE(visual_items(tasksPanel, QStringLiteral("importedPartEntry")).size(), 2);
+        QTRY_COMPARE(visual_items(sidebarPanel, QStringLiteral("importedPartEntry")).size(), 2);
         QVERIFY(tabRow->isVisible());
-        QVERIFY(tasksPanel->isVisible());
+        QVERIFY(sidebarPanel->isVisible());
         QVERIFY(project->saveProject());
 
         QVERIFY(project->createProject(QStringLiteral("Empty"), fixture.path()));
@@ -672,12 +678,12 @@ class ShellModuleLoadTest final : public QObject {
         QTRY_VERIFY(layersPanel->isVisible());
         QTRY_VERIFY(toolbar->isVisible());
         QTRY_VERIFY(content->isVisible());
-        QTRY_VERIFY(tasksPanel->isVisible());
+        QTRY_VERIFY(sidebarPanel->isVisible());
 
         QVERIFY(project->openProject(importedProjectPath));
         QTRY_VERIFY(tabRow->isVisible());
-        QTRY_COMPARE(visual_items(tasksPanel, QStringLiteral("importedPartEntry")).size(), 2);
-        QVERIFY(tasksPanel->isVisible());
+        QTRY_COMPARE(visual_items(sidebarPanel, QStringLiteral("importedPartEntry")).size(), 2);
+        QVERIFY(sidebarPanel->isVisible());
     }
 #endif
 };

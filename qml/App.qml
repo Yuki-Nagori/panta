@@ -163,9 +163,9 @@ ApplicationWindow {
                 width: Math.max(workspace.width * Theme.leftPanelRatio, Theme.leftPanelMinimumWidth)
                 spacing: 0
 
-                TasksPanel {
-                    id: tasksPanel
-                    objectName: "tasksPanel"
+                SidebarPanel {
+                    id: sidebarPanel
+                    objectName: "sidebarPanel"
 
                     Layout.fillWidth: true
                     Layout.fillHeight: !shellWindow.layersDockShown
@@ -205,7 +205,7 @@ ApplicationWindow {
                         analysisSequenceDialog.open();
                     }
                     onOpenImportRequested: recordId => projectModel.openImportRecord(recordId)
-                    onCloseRequested: tasksPanel.visible = false
+                    onCloseRequested: sidebarPanel.visible = false
                     onOpenProjectRequested: openProjectFileDialog.open()
                     onNewProjectRequested: newProjectDialog.open()
                 }

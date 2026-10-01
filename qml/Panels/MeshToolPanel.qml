@@ -11,67 +11,8 @@ ScrollView {
 
     clip: true
     contentWidth: availableWidth
-    ScrollBar.vertical.policy: ScrollBar.AsNeeded
-
-    component MeshActionButton: Button {
-        id: action
-
-        property bool primaryAction: false
-
-        hoverEnabled: true
-        implicitHeight: Theme.controlHeight + Theme.spacingSmall
-        font.pixelSize: Theme.fontBody
-
-        background: Rectangle {
-            color: action.primaryAction ? Theme.colorDialogPrimary : action.hovered ? Theme.colorHover : Theme.colorPanel
-            border.width: action.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-            border.color: action.visualFocus ? Theme.colorFocus : action.primaryAction ? Theme.colorDialogPrimaryBorder : Theme.colorPanelLine
-            radius: Theme.radiusSmall
-        }
-
-        contentItem: ThemedLabel {
-            text: action.text
-            textSize: Theme.fontBody
-            font.weight: action.primaryAction ? Font.DemiBold : Font.Normal
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-        }
-    }
-
-    component MeshOption: CheckBox {
-        id: option
-
-        hoverEnabled: true
-        font.pixelSize: Theme.fontBody
-        spacing: Theme.spacingSmall
-
-        indicator: Rectangle {
-            implicitWidth: Theme.iconSizeSmall
-            implicitHeight: Theme.iconSizeSmall
-            x: option.leftPadding
-            y: (option.height - height) / 2
-            color: option.checked ? Theme.colorFocus : Theme.colorPanel
-            border.width: Theme.borderWidth
-            border.color: option.checked ? Theme.colorFocus : Theme.colorPanelLine
-            radius: Theme.radiusSmall
-
-            ThemedLabel {
-                anchors.centerIn: parent
-                visible: option.checked
-                text: "✓"
-                textSize: Theme.fontSmall
-                textColor: Theme.colorPanel
-            }
-        }
-
-        contentItem: ThemedLabel {
-            leftPadding: option.indicator.width + option.spacing
-            text: option.text
-            textSize: Theme.fontBody
-            wrapMode: Text.Wrap
-            verticalAlignment: Text.AlignVCenter
-        }
-    }
+    ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
     ColumnLayout {
         width: meshTool.availableWidth
@@ -84,53 +25,37 @@ ScrollView {
             Layout.topMargin: Theme.spacingMedium
             spacing: Theme.spacingSmall
 
-            ComboBox {
+            ThemedComboBox {
                 id: operationSelect
+
+                font.pixelSize: Theme.fontBody
                 objectName: "meshOperationSelect"
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.controlHeight + Theme.spacingSmall
+
                 model: [qsTranslate("MeshTool", "Generate Mesh")]
                 Accessible.name: qsTranslate("MeshTool", "Mesh operation")
-                leftPadding: Theme.spacingLarge
-                rightPadding: Theme.spacingMedium
-                topPadding: 0
-                bottomPadding: 0
+                rightPadding: Theme.iconSizeSmall + shortcutHint.implicitWidth + 3 * Theme.spacingSmall
 
-                background: Rectangle {
-                    color: Theme.colorPanel
-                    border.width: operationSelect.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-                    border.color: operationSelect.visualFocus ? Theme.colorFocus : Theme.colorPanelLine
-                    radius: Theme.radiusSmall
-                }
-                indicator: Item {}
-                contentItem: RowLayout {
-                    spacing: Theme.spacingSmall
-
-                    ThemedLabel {
-                        Layout.fillWidth: true
-                        text: operationSelect.displayText
-                        textSize: Theme.fontBody
-                        elide: Text.ElideRight
-                    }
-                    ThemedLabel {
-                        text: "F2"
-                        textSize: Theme.fontSmall
-                        textColor: Theme.colorTextMuted
-                        leftPadding: Theme.spacingXSmall
-                        rightPadding: Theme.spacingXSmall
-                        background: Rectangle {
-                            color: Theme.colorChrome
-                            radius: Theme.radiusSmall
-                        }
-                    }
-                    ThemedIcon {
-                        name: "caret"
-                        iconSize: Theme.iconSizeCompact
+                ThemedLabel {
+                    id: shortcutHint
+                    anchors.right: operationSelect.indicator.left
+                    anchors.rightMargin: Theme.spacingSmall
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "F2"
+                    textSize: Theme.fontSmall
+                    textColor: Theme.colorTextMuted
+                    leftPadding: Theme.spacingXSmall
+                    rightPadding: Theme.spacingXSmall
+                    background: Rectangle {
+                        color: Theme.colorChrome
+                        radius: Theme.radiusSmall
                     }
                 }
             }
 
-            MeshActionButton {
+            ThemedButton {
+                contentPadding: Theme.spacingLarge
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshMoreOptions"
                 Layout.preferredWidth: Theme.controlHeight + Theme.spacingSmall
                 text: "…"
@@ -146,36 +71,48 @@ ScrollView {
             columnSpacing: Theme.spacingMedium
             rowSpacing: Theme.spacingSmall
 
-            MeshActionButton {
+            ThemedButton {
+                contentPadding: Theme.spacingLarge
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshAction"
                 Layout.fillWidth: true
                 text: qsTranslate("MeshTool", "Mesh")
                 primaryAction: true
             }
-            MeshActionButton {
+            ThemedButton {
+                contentPadding: Theme.spacingLarge
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshHelpAction"
                 Layout.fillWidth: true
                 text: qsTranslate("MeshTool", "Help")
             }
-            MeshActionButton {
+            ThemedButton {
+                contentPadding: Theme.spacingLarge
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshPreviewAction"
                 Layout.fillWidth: true
                 text: qsTranslate("MeshTool", "Preview")
             }
-            MeshActionButton {
+            ThemedButton {
+                contentPadding: Theme.spacingLarge
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshCancelAction"
                 Layout.fillWidth: true
                 text: qsTranslate("DialogAction", "Cancel")
             }
         }
 
-        MeshOption {
+        ThemedCheckBox {
+
+            wrapText: true
             Layout.fillWidth: true
             Layout.leftMargin: Theme.spacingMedium
             Layout.rightMargin: Theme.spacingMedium
             text: qsTranslate("MeshTool", "Remesh already meshed parts of the model")
         }
-        MeshOption {
+        ThemedCheckBox {
+
+            wrapText: true
             Layout.fillWidth: true
             Layout.leftMargin: Theme.spacingMedium
             Layout.rightMargin: Theme.spacingMedium
@@ -192,7 +129,6 @@ ScrollView {
             ThemedLabel {
                 text: qsTranslate("MeshTool", "General")
                 textSize: Theme.fontSmall
-                font.weight: Font.DemiBold
                 leftPadding: Theme.spacingSmall
                 rightPadding: Theme.spacingSmall
                 topPadding: Theme.spacingXSmall
@@ -249,12 +185,16 @@ ScrollView {
                         }
                     }
 
-                    MeshOption {
+                    ThemedCheckBox {
+
+                        wrapText: true
                         Layout.fillWidth: true
                         text: qsTranslate("MeshTool", "Match mesh")
                         checked: true
                     }
-                    MeshOption {
+                    ThemedCheckBox {
+
+                        wrapText: true
                         Layout.fillWidth: true
                         text: qsTranslate("MeshTool", "Calculate thickness for Dual Domain meshes")
                         checked: true

@@ -4,9 +4,9 @@
 
 ## 当前状态与目标
 
-`GateLocationSettingsDialog` 在 Gate Location 分析序列下打开，配置投影及确认状态来自 Rust；机器编辑、选择和高级选项保持禁用。`ProcessSettingsControls` 为工艺弹窗提供共用的 Action、Section、ValueField 与 Choice 内联组件，消费者通过限定类型名引用，统一样式且不共享候选值。实现见 [095](../task/095-gate-location-process-settings.md)。
+`GateLocationSettingsDialog` 在 Gate Location 分析序列下打开，配置投影及确认状态来自 Rust；机器编辑、选择和高级选项保持禁用。工艺弹窗通过 `FormSection`、`ThemedNumberField` 与 `ThemedButton` 复用表单结构，按钮和选择外观由 Atoms 提供，不共享候选值。实现见 [095](../task/095-gate-location-process-settings.md)。
 
-`FillProcessSettingsDialog` 与 `HoldingProfileDialog` 复用主题输入、按钮和标题栏；父弹窗持有候选参数，子弹窗确认才替换候选曲线。曲线表格默认至少三行，空白行不提交；绘图使用 Qt Quick Canvas，仅在编辑、显露和尺寸变化时重绘。Rust 提供已保存的 `PlanSettings.fillSettings`，确认命令经 ViewModel 后台写盘，成功后刷新任务行；QML 不保存第二份已确认配置。窗口尺寸在 Theme 的窗口约束分类中，确认与取消按钮共用材料弹窗的宽度和高度。实现与验收见 [094](../task/094-fill-process-settings.md)。
+`FillProcessSettingsDialog` 与 `HoldingProfileDialog` 复用主题输入、按钮和标题栏；父弹窗持有候选参数，子弹窗确认才替换候选曲线。曲线表格默认至少三行，空白行不提交；绘图使用 Qt Quick Canvas，仅在编辑、显露和尺寸变化时重绘。Rust 提供已保存的 `PlanSettings.fillSettings`，确认命令经 ViewModel 后台写盘，成功后刷新任务行；QML 不保存第二份已确认配置。窗口尺寸在 Theme 的窗口约束分类中，确认与取消按钮统一使用 ThemedButton 的 92 × 24 默认尺寸。实现与验收见 [094](../task/094-fill-process-settings.md)。
 
 `qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认布局/配色源于 050 复刻件 homepage.html 的 `:root`（029 迁入），图标与交互尺寸由 052 按用户反馈细化；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，运行期默认值迁 `.pa` 与切换由 030 的 C++ ThemeViewModel 发布，Theme 属性名即稳定契约。
 
@@ -28,32 +28,37 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 ## 组件分层与输入输出
 
+项目沿用原子组件 → 组合组件 → 业务界面 → 页面拼装四层规则，职责约束以 [QML 规范](../standards/qml.md#原子组件与主题参数项目约定) 为准。Theme 向四层提供视觉参数。
+
+
 | 层次 | 位置 | 组件 |
 |---|---|---|
 | 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
-| 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface` |
-| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`DocumentTabBar`（130px 视口文档页签：关闭、凹弧过渡、拖拽重排，080）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭） |
-| 业务面板 | `qml/Panels/` | `TopChromePanel`、`RibbonPanel`、`TasksPanel`、`LayersPanel`、`PlaceholderPanel`（无 Bridge 变体用） |
-| Ribbon 页签 | `qml/Panels/Ribbon/` | `HomeRibbon`、`StartLearnRibbon`：各自的工具定义、启用条件与命令映射 |
+| 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface`、`ThemedButton`、`ThemedNumberField`、`MenuTabButton`、`ThemedCheckBox`、`ThemedRadioButton`、`ThemedComboBox`、`CheckIndicator` |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`DocumentTabBar`（130px 视口文档页签：关闭、凹弧过渡、拖拽重排，080）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭）、`DialogWindow`、`DialogFrame`、`DialogButtonRow`、`FormSection` |
+| 业务界面 | `qml/Panels/`、`qml/Dialogs/` | `TopChromePanel`、`RibbonPanel`、`SidebarPanel`、`LayersPanel`、`PlaceholderPanel`（无 Bridge 变体用）；Dialogs 持有编辑草稿、上下文快照、校验反馈及保存交互 |
+| Ribbon 页签 | `qml/Panels/Ribbon/` | `HomeRibbon`、`ResultsRibbon`、`StartLearnRibbon`：各自的工具定义、启用条件与命令映射 |
 | 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |
 
 组件可以封装 Qt Quick Controls，保留其焦点、键盘、禁用与可访问性行为；不为了“原子化”重新实现所有底层控件。避免为单次无独立职责的布局建立空壳组件。只提取当前界面实际使用的组件，不预建无用途库。
 
-原子/组合组件公开语义清楚的属性与信号，例如 label、iconName、controlHeight、contentPadding、closeRequested。尺寸属性默认绑定 Theme token，调用方可通过属性覆盖；组合组件向内部原子组件显式传入参数，不依赖父级 id、parent 链或隐式全局业务状态。不用 imperative 赋值覆盖 token 绑定，保证换主题后未覆盖值能继续更新。
+原子/组合组件公开语义清楚的属性与信号，例如 label、iconName、controlHeight、contentPadding、closeRequested。固定控件默认尺寸在原子层绑定 Theme token，调用方仅在已确认的差异处覆盖；组合组件向内部原子组件显式传入参数，不依赖父级 id、parent 链或隐式全局业务状态。不用 imperative 赋值覆盖 token 绑定，保证换主题后未覆盖值能继续更新。
 
-组件默认宽高通过内容及输入参数计算 implicit size，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。工作区先按比例和最小值确定左栏宽度，再以 anchors 把余下空间分配给 VTK 列。点击仅发语义信号，面板再调用 ViewModel。
+固定控件通过 implicit size 提供已确认的 Theme 默认尺寸；内容驱动的控件才按文本及输入参数计算，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。工作区先按比例和最小值确定左栏宽度，再以 anchors 把余下空间分配给 VTK 列。点击仅发语义信号，面板再调用 ViewModel。
 
 `ThemedToolButton` 的正文与弱化后缀跟随按钮 `font.pixelSize`，默认使用 `Theme.fontBody`。Layers Dock 的按钮由 `LayersPanel` 按统一尺寸横向排列，目前只发出语义动作信号，不声明图层行为。标题工具分组保留内容所需宽度，中央标题可省略；分组变宽时同步扩展滚动范围，并在布局后重新显露当前焦点。
 
-业务对话框使用 `DialogTitleBar` 组合组件时，窗口自身设置 `Qt.FramelessWindowHint`，标题栏通过 `QWindow::startSystemMove()` 发起平台移动，受限平台再使用逻辑坐标回退；关闭按钮只发组合组件信号。窗口的模态、居中和业务命令仍由对话框页面负责。
+业务对话框使用 `DialogTitleBar` 组合组件时，窗口自身设置 `Qt.FramelessWindowHint`，标题栏通过 `QWindow::startSystemMove()` 发起平台移动，受限平台再使用逻辑坐标回退；关闭按钮只发组合组件信号。窗口的模态与居中由 `DialogWindow` 提供，标题和内容布局由 `DialogFrame` 装配；打开条件、关闭守卫与业务命令留在具体对话框。
 
 显示文案使用英文源 + `qsTr()` / `qsTranslate()`，中文译文登记在 `../../resources/i18n/panta-{en,cn}.pa`。`qsTr()` 使用组件同名上下文；需要独立语义时通过 `qsTranslate()` 分配 context。Ribbon 的显式换行属于源文本，译文按目标语言排版分行；运行期加载与语言切换由 022 接入。Shell 自绘控件（自定义 background 等）不能运行于原生 Controls 样式：主入口以 `QQuickStyle::setStyle("Basic")` 固定 Basic，ctest 环境同源（029）。
 
 图标遵循 [SVG 图标设计规范](../standards/icons.md)：`qml/icons/<symbol-id>.svg` 与 `shell.js` 的正式 symbol 一一对应，保留源 viewBox、比例和颜色，并通过 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。`ThemedIcon` 的 `preserveSourceColors` 显式选择加载方式：彩色资源直接从 qrc 加载；单色 utility glyph 由 `panta-icons` provider 使用 qtsvg 渲染，再按 `ThemedIcon.color` 着色。
 
-新增 Theme token 时按 `Theme.qml` 内的颜色、字号、间距、图标尺寸、圆角与线宽、布局尺寸、交互阈值与时长、禁用状态和窗口约束分组归位，不在文件末尾另起重复分类。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
+新增 Theme token 时按 `Theme.qml` 内的色彩、字体、通用间距与图标、形状与边框、通用控件、Shell、Ribbon、侧栏、文档页签、表单、日志、交互、禁用状态和各窗口约束分组归位，不在文件末尾另起重复分类。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
 
-App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入 TasksPanel 和 TopChromePanel。新建或打开成功后，TasksPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单；失败保留上一有效快照。Start & Learn Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；Home 的 Import 也只发语义信号，由 App 打开 `ImportDialog`，选项预检和持久化经 `ProjectViewModel` 进入 Rust 工程服务。成功导入后 TasksPanel 展开首期任务树，ViewportPane 只接收工程内复制资产路径；其他 Ribbon 工具仍是设计入口，不表示求解或网格生成业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
+等宽字体由 Shell 模块的 C++ `PlatformFonts` 单例查询系统 FixedFont 的实际字体族，Theme 保留唯一视觉访问入口；不使用可能缺失的 Monospace 名称，也不内置字体资产。Shell 是模块名而非字体名；静态消费者导入 Shell 插件以保留 C++ 类型注册，Theme 显式导入 `Panta.Shell` 后读取单例。当前 macOS 环境查询结果为 Menlo，其他平台按系统配置解析。
+
+App 从 `ProjectViewModel.currentPath` 派生工程打开状态，显式注入 SidebarPanel 和 TopChromePanel。新建或打开成功后，SidebarPanel 显示实际工程名及文件图标，TopChromePanel 切换扩展菜单；失败保留上一有效快照。Start & Learn Ribbon 的新建 / 打开按钮发语义信号，App 调用既有对话框；Home 的 Import 也只发语义信号，由 App 打开 `ImportDialog`，选项预检和持久化经 `ProjectViewModel` 进入 Rust 工程服务。成功导入后 SidebarPanel 展开首期任务树，ViewportPane 只接收工程内复制资产路径；其他 Ribbon 工具仍是设计入口，不表示求解或网格生成业务已实现。长工程名在任务栏省略，完整名称保留在按钮可访问文本中。
 
 061 将活动工具栏与工程状态分离：App 的 `activeRibbonTab` 默认 `start-learn`，菜单 key 和 `projectCreated` / `projectOpened` 成功信号均经 `selectRibbonTab()` 统一校验；只有开始页和已打开工程的 Home 可达。创建 / 打开成功时选择 `home`，改名、保存及失败不改变选中态。TopChromePanel 和 RibbonPanel 显式接收同一页签值，实现 `Home` 的 18 个工具与 `Start & Learn` 的 7 个工具切换，鼠标和空格键激活共用按钮点击逻辑。切换不清空工程、不写文件、不重建 Tasks 或 VTK 视口；未接入的其他菜单不改变活动页签。未打开工程时不显示 Home，沿用开始页布局。
 
@@ -86,9 +91,19 @@ QT_SCALE_FACTOR=1.5 \
 
 Theme 集中管理 spacing、padding、radius、borderWidth、iconSize、fontSize、controlHeight、条带高度（titlebar/menubar/ribbon/statusbar）、leftPanelRatio/MinimumWidth、layersPanelRatio、windowMinimumSize 等可配置视觉值。采用语义 token，例如 `controlHeight`，而不是在各组件重复相同数值。
 
-所有视觉尺寸默认值只在 Theme 的权威默认配置中定义；组件声明输入属性绑定 token，面板若覆盖也应传 Theme token 或根据可用空间计算的值，不另写视觉魔法数字。`0`（无间距）、比例/计数等纯算法常量可以保留，但有视觉设计含义的非零偏移也必须使用 token。width/height 的父布局绑定和内容测量不应改成固定主题尺寸。
+所有视觉尺寸默认值只在 Theme 的权威默认配置中定义；组件声明输入属性绑定 token，面板若覆盖也应传 Theme token 或根据可用空间计算的值，不另写视觉魔法数字。`0`（无间距）、计数、索引及纯算法常量可以保留；具有视觉设计含义的比例、偏移仍使用 token。width/height 的父布局绑定和内容测量不应改成固定主题尺寸。
 
 UI 尺寸统一采用 Qt Quick 逻辑像素语义，不自行乘设备像素比；图标栅格资源分辨率与控件布局尺寸区分。高 DPI、字体变化、英文/中文长文本和小窗口下仍需验证布局。业务数值、网格单位及几何尺寸不属于 Theme。
+
+## 组件与弹窗整理（099 实施中）
+
+[099](../task/099-qml-components-and-dialog-consolidation.md) 已将公共选择与按钮样式迁入 Atoms，弹窗复用公共窗口和内容外壳；构建、质量检查及视觉验收的真实状态见任务记录。SidebarPanel 装配 Panels/Sidebar 下的 ProjectTasksPage、ToolsPage 和 SharedViewsPage；工程任务页隐藏滚动条，保留滚动。
+
+- 下拉框完整沿用 Import 的 Basic 外观，右侧使用实心三角，高度统一为 30 并由原子层绑定 Theme；模型、当前选择和业务响应由调用方提供；尺寸参数按用途命名，不因数值相同而绑定到无关组件的 token。
+- 普通按钮默认 92 × 24；较长表单动作可按内容覆盖宽度。普通 CheckBox 行高 24、无内边距、指示框 16 × 16。圆角保持固定 token，胶囊和圆形指示器按尺寸计算。
+- 面板与弹窗关闭按钮的上、右间距使用同一 token，沿用现有右间距。
+- 公共弹窗结构及控件样式统一实现，按钮顺序、Help 位置与关闭限制显式配置；草稿初始化、校验反馈、异步保存和上下文检查留在业务界面。
+- 原子控件不内置 `Layout.fillWidth` 等父布局分配策略；表单行、单位与分组布局归组合层。当前仅服务于单个业务界面的结构无需拆文件。
 
 ## Theme 与 DSL 的单向数据流
 

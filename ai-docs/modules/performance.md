@@ -30,6 +30,19 @@ cmake --build target/native/debug --config Debug --target panta_qml_cpu_benchmar
 QT_QPA_PLATFORM=offscreen target/native/debug/qml/panta_qml_cpu_benchmark measures_icon_loading
 ```
 
+QML GPU 基准默认使用 `QQuickRenderControl` 渲染到硬件纹理，不显示窗口；仍需要可用的 GPU 和平台插件。共享辅助类位于 `tests/qml/offscreen_quick_renderer.hpp`，管理纹理、深度/模板缓冲、帧完成计时与 GPU 时间戳；场景、预热和统计由基准负责。默认模式按 60Hz 逻辑帧推进动画，每场景预热 30 帧，再采样 3 × 60 帧。报告 CPU 更新至离屏帧完成的耗时，以及本帧 GPU 时间戳；不包含显示器刷新等待。默认离屏模式的设备初始化失败、丢失或任一正式样本无有效 GPU 时间戳均失败，不回退到软件渲染。
+
+实现依据：[Qt RenderControl RHI 示例](https://doc.qt.io/qt-6/qtquick-rendercontrol-rendercontrol-rhi-example.html)。`QRhi` 通过 `Qt6::GuiPrivate` 使用，按仓库 Qt 6.11 基线编译。窗口类不放入离屏控件夹具，窗口创建和行为由已有弹窗测试覆盖。
+
+```sh
+cmake --build target/native/debug --target panta_qml_gpu_benchmark --parallel 4
+QT_QUICK_CONTROLS_STYLE=Basic target/native/debug/qml/panta_qml_gpu_benchmark
+PANTA_BENCHMARK_PRESENTATION=1 QT_QUICK_CONTROLS_STYLE=Basic \
+  target/native/debug/qml/panta_qml_gpu_benchmark
+```
+
+显式呈现模式保留真实窗口 `frameSwapped` 间隔，并在渲染线程采集 swapchain 已完成的 GPU 时间戳；它需要窗口可见。尚未就绪的时间戳不进入分位数，报告有效观测数；完全没有有效观测或请求帧未完整呈现均失败。比较时固定机器、后端、逻辑尺寸、DPR、场景和样本数。离屏同步完成与窗口流水线呈现具有不同调度边界，不能将两种耗时混成一个基线，也不能用离屏性能代替真实窗口的布局和输入验收。099 同机比较未证明两条路径等价，故保留呈现模式。VTK WebGPU 不使用此 Qt Quick 辅助类，其窗口和提交测量仍独立维护。
+
 任务 [056](../task/056-qml-native-review.md) 已提供按需诊断：`QT_LOGGING_RULES='panta.viewport.debug=true'` 输出原生区域同步与实际提交帧；默认关闭。`PANTA_TEST_NATIVE_VIEWPORT=1` 启用既有 `panta_qml_viewport_module_test` 中的真实窗口用例，覆盖连续更新合帧、相同外观不重绘、祖先移动、隐藏/零尺寸恢复及跨窗口重建。必须在实际桌面和正确平台插件下运行，不设 `offscreen`；默认无头测试明确跳过该用例，另行验证带窗口归属的条目析构。
 
 macOS 示例（仓库根目录，先 `cargo build --locked`）：

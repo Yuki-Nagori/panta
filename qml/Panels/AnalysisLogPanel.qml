@@ -64,39 +64,19 @@ PanelSurface {
                     currentIndex: panel.categoryIndex
                     onTabActivated: index => panel.selectedCategoryId = panel.categories[index].id
                 }
-                ComboBox {
+                ThemedComboBox {
                     id: runChoice
+
+                    font.pixelSize: Theme.fontSmall
                     objectName: "analysisLogRunChoice"
                     Layout.preferredWidth: Theme.analysisLogRunWidth
-                    implicitHeight: Theme.controlHeight
+
                     Accessible.name: qsTr("Analysis run")
                     enabled: panel.contextRuns.length > 0
                     model: panel.contextRuns.map((run, index) => qsTr("Run %1").arg(index + 1))
                     currentIndex: panel.selectedRunIndex
                     displayText: panel.currentRun ? currentText : qsTr("No runs")
-                    opacity: enabled ? 1 : Theme.disabledOpacity
                     onActivated: index => panel.selectedRunId = panel.contextRuns[index].id
-                    leftPadding: Theme.spacingSmall
-                    rightPadding: Theme.iconSizeCompact + 2 * Theme.spacingSmall
-                    contentItem: ThemedLabel {
-                        text: runChoice.displayText
-                        textSize: Theme.fontSmall
-                        elide: Text.ElideRight
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                    indicator: ThemedIcon {
-                        anchors.right: parent.right
-                        anchors.rightMargin: Theme.spacingSmall
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: "caret"
-                        iconSize: Theme.iconSizeCompact
-                    }
-                    background: Rectangle {
-                        color: Theme.colorPanel
-                        radius: Theme.radiusSmall
-                        border.color: runChoice.visualFocus ? Theme.colorFocus : Theme.colorPanelLine
-                        border.width: runChoice.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-                    }
                 }
             }
             PaneCloseButton {

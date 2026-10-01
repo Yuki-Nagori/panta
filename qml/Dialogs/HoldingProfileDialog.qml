@@ -4,10 +4,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-Window {
+DialogWindow {
     id: dialog
     objectName: "holdingProfileDialog"
-    property Window ownerWindow
     property bool plotVisible: false
     property int editRevision: 0
     readonly property var points: {
@@ -34,11 +33,7 @@ Window {
     height: Theme.holdingProfileDialogHeight
     minimumWidth: Theme.holdingProfileDialogMinimumWidth
     minimumHeight: Theme.holdingProfileDialogMinimumHeight
-    color: Theme.colorTransparent
-    modality: Qt.ApplicationModal
-    flags: Qt.Dialog | Qt.FramelessWindowHint
     title: qsTranslate("HoldingProfile", "Pack/Holding Control Profile")
-    transientParent: ownerWindow
 
     function open(profile) {
         rows.clear();
@@ -54,10 +49,7 @@ Window {
             });
         editRevision++;
         plotVisible = false;
-        if (ownerWindow) {
-            x = ownerWindow.x + Math.round((ownerWindow.width - width) / 2);
-            y = ownerWindow.y + Math.round((ownerWindow.height - height) / 2);
-        }
+        centerOnOwner();
         show();
         requestActivate();
         table.forceActiveFocus();
@@ -72,139 +64,132 @@ Window {
     ListModel {
         id: rows
     }
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.colorPanel
+    DialogFrame {
+        window: dialog
+        closeEnabled: true
+
         ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-            DialogTitleBar {
-                Layout.fillWidth: true
-                window: dialog
-                caption: dialog.title
-                onCloseRequested: dialog.close()
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.margins: Theme.spacingLarge
+            spacing: Theme.spacingLarge
+            ThemedLabel {
+                text: qsTranslate("FillSettings", "Filling pressure vs time (%)")
+                textColor: Theme.colorTextMuted
             }
-            ColumnLayout {
+            Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.margins: Theme.spacingLarge
-                spacing: Theme.spacingLarge
-                ThemedLabel {
-                    text: qsTranslate("FillSettings", "Filling pressure vs time (%)")
-                    textColor: Theme.colorTextMuted
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    color: Theme.colorPanel
-                    border.color: Theme.colorPanelLine
-                    border.width: Theme.borderWidth
-                    radius: Theme.radiusSmall
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: Theme.borderWidth
-                        spacing: 0
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: header.implicitHeight + 2 * Theme.spacingMedium
-                            color: Theme.colorChrome
-                            RowLayout {
-                                id: header
-                                anchors.fill: parent
-                                anchors.margins: Theme.spacingMedium
-                                spacing: Theme.spacingMedium
-                                ThemedLabel {
-                                    Layout.preferredWidth: Theme.profileStepColumnWidth
-                                    text: qsTranslate("HoldingProfile", "Step")
-                                }
-                                ThemedLabel {
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: 0
-                                    text: qsTranslate("HoldingProfile", "Duration") + "\n" + qsTranslate("HoldingProfile", "s · ≥ 0")
-                                }
-                                ThemedLabel {
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: 0
-                                    text: qsTranslate("HoldingProfile", "Filling pressure") + "\n% · 0–200"
-                                }
-                                Item {
-                                    Layout.preferredWidth: Theme.controlHeight
-                                }
+                color: Theme.colorPanel
+                border.color: Theme.colorPanelLine
+                border.width: Theme.borderWidth
+                radius: Theme.radiusSmall
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: Theme.borderWidth
+                    spacing: 0
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: header.implicitHeight + 2 * Theme.spacingMedium
+                        color: Theme.colorChrome
+                        RowLayout {
+                            id: header
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingMedium
+                            spacing: Theme.spacingMedium
+                            ThemedLabel {
+                                Layout.preferredWidth: Theme.profileStepColumnWidth
+                                text: qsTranslate("HoldingProfile", "Step")
+                            }
+                            ThemedLabel {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                text: qsTranslate("HoldingProfile", "Duration") + "\n" + qsTranslate("HoldingProfile", "s · ≥ 0")
+                            }
+                            ThemedLabel {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                text: qsTranslate("HoldingProfile", "Filling pressure") + "\n% · 0–200"
+                            }
+                            Item {
+                                Layout.preferredWidth: Theme.controlHeight
                             }
                         }
-                        ScrollView {
-                            id: table
-                            objectName: "holdingProfileTable"
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            contentWidth: availableWidth
-                            clip: true
-                            ColumnLayout {
-                                width: table.availableWidth
-                                spacing: Theme.spacingSmall
-                                Repeater {
-                                    model: rows
-                                    delegate: RowLayout {
-                                        id: row
-                                        required property int index
-                                        required property string durationText
-                                        required property string pressureText
+                    }
+                    ScrollView {
+                        id: table
+                        objectName: "holdingProfileTable"
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        contentWidth: availableWidth
+                        clip: true
+                        ColumnLayout {
+                            width: table.availableWidth
+                            spacing: Theme.spacingSmall
+                            Repeater {
+                                model: rows
+                                delegate: RowLayout {
+                                    id: row
+                                    required property int index
+                                    required property string durationText
+                                    required property string pressureText
+                                    Layout.fillWidth: true
+                                    Layout.margins: Theme.spacingMedium
+                                    spacing: Theme.spacingMedium
+                                    ThemedLabel {
+                                        Layout.preferredWidth: Theme.profileStepColumnWidth
+                                        text: row.index + 1
+                                        textColor: Theme.colorTextMuted
+                                    }
+                                    ThemedTextField {
+                                        objectName: "profileDuration" + row.index
                                         Layout.fillWidth: true
-                                        Layout.margins: Theme.spacingMedium
-                                        spacing: Theme.spacingMedium
-                                        ThemedLabel {
-                                            Layout.preferredWidth: Theme.profileStepColumnWidth
-                                            text: row.index + 1
-                                            textColor: Theme.colorTextMuted
+                                        Layout.preferredWidth: 0
+                                        Layout.preferredHeight: Theme.controlHeight + Theme.spacingSmall
+                                        text: row.durationText
+                                        selectByMouse: true
+                                        Accessible.name: qsTranslate("HoldingProfile", "Step %1 duration in seconds").arg(row.index + 1)
+                                        validator: DoubleValidator {
+                                            bottom: 0
+                                            locale: "C"
+                                            notation: DoubleValidator.StandardNotation
                                         }
-                                        ThemedTextField {
-                                            objectName: "profileDuration" + row.index
-                                            Layout.fillWidth: true
-                                            Layout.preferredWidth: 0
-                                            Layout.preferredHeight: Theme.controlHeight + Theme.spacingSmall
-                                            text: row.durationText
-                                            selectByMouse: true
-                                            Accessible.name: qsTranslate("HoldingProfile", "Step %1 duration in seconds").arg(row.index + 1)
-                                            validator: DoubleValidator {
-                                                bottom: 0
-                                                locale: "C"
-                                                notation: DoubleValidator.StandardNotation
-                                            }
-                                            invalid: (text.length > 0 && !acceptableInput) || (text.length === 0 && row.pressureText.length > 0)
-                                            onTextEdited: {
-                                                rows.setProperty(row.index, "durationText", text);
-                                                dialog.editRevision++;
-                                            }
+                                        invalid: (text.length > 0 && !acceptableInput) || (text.length === 0 && row.pressureText.length > 0)
+                                        onTextEdited: {
+                                            rows.setProperty(row.index, "durationText", text);
+                                            dialog.editRevision++;
                                         }
-                                        ThemedTextField {
-                                            objectName: "profilePressure" + row.index
-                                            Layout.fillWidth: true
-                                            Layout.preferredWidth: 0
-                                            Layout.preferredHeight: Theme.controlHeight + Theme.spacingSmall
-                                            text: row.pressureText
-                                            selectByMouse: true
-                                            Accessible.name: qsTranslate("HoldingProfile", "Step %1 filling pressure in percent").arg(row.index + 1)
-                                            validator: DoubleValidator {
-                                                bottom: 0
-                                                top: 200
-                                                locale: "C"
-                                                notation: DoubleValidator.StandardNotation
-                                            }
-                                            invalid: (text.length > 0 && !acceptableInput) || (text.length === 0 && row.durationText.length > 0)
-                                            onTextEdited: {
-                                                rows.setProperty(row.index, "pressureText", text);
-                                                dialog.editRevision++;
-                                            }
+                                    }
+                                    ThemedTextField {
+                                        objectName: "profilePressure" + row.index
+                                        Layout.fillWidth: true
+                                        Layout.preferredWidth: 0
+                                        Layout.preferredHeight: Theme.controlHeight + Theme.spacingSmall
+                                        text: row.pressureText
+                                        selectByMouse: true
+                                        Accessible.name: qsTranslate("HoldingProfile", "Step %1 filling pressure in percent").arg(row.index + 1)
+                                        validator: DoubleValidator {
+                                            bottom: 0
+                                            top: 200
+                                            locale: "C"
+                                            notation: DoubleValidator.StandardNotation
                                         }
-                                        ProcessSettingsControls.Action {
-                                            Layout.preferredWidth: Theme.controlHeight
-                                            text: "×"
-                                            accessibleName: qsTranslate("HoldingProfile", "Remove step")
-                                            enabled: rows.count > 3
-                                            onClicked: {
-                                                rows.remove(row.index);
-                                                dialog.editRevision++;
-                                            }
+                                        invalid: (text.length > 0 && !acceptableInput) || (text.length === 0 && row.durationText.length > 0)
+                                        onTextEdited: {
+                                            rows.setProperty(row.index, "pressureText", text);
+                                            dialog.editRevision++;
+                                        }
+                                    }
+                                    ThemedButton {
+                                        contentPadding: Theme.spacingLarge
+                                        implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
+                                        Layout.preferredWidth: Theme.controlHeight
+                                        text: "×"
+                                        accessibleName: qsTranslate("HoldingProfile", "Remove step")
+                                        enabled: rows.count > 3
+                                        onClicked: {
+                                            rows.remove(row.index);
+                                            dialog.editRevision++;
                                         }
                                     }
                                 }
@@ -212,99 +197,103 @@ Window {
                         }
                     }
                 }
-                RowLayout {
-                    Layout.fillWidth: true
-                    ProcessSettingsControls.Action {
-                        text: qsTranslate("HoldingProfile", "Add Step")
-                        onClicked: {
-                            rows.append({
-                                durationText: "",
-                                pressureText: ""
-                            });
-                            dialog.editRevision++;
-                        }
-                    }
-                    ProcessSettingsControls.Action {
-                        text: qsTranslate("HoldingProfile", "Import Profile…")
-                        enabled: false
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                    ProcessSettingsControls.Action {
-                        text: qsTranslate("HoldingProfile", "Plot Profile")
-                        enabled: dialog.points.length > 0
-                        onClicked: dialog.plotVisible = !dialog.plotVisible
-                    }
-                }
-                Canvas {
-                    id: plot
-                    objectName: "holdingProfilePlot"
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.profilePlotHeight
-                    visible: dialog.plotVisible
-                    onVisibleChanged: if (visible)
-                        requestPaint()
-                    onWidthChanged: requestPaint()
-                    onHeightChanged: requestPaint()
-                    onPaint: {
-                        const ctx = getContext("2d");
-                        ctx.clearRect(0, 0, width, height);
-                        const inset = Theme.spacingLarge;
-                        const total = dialog.points.reduce((sum, point) => sum + point.duration, 0);
-                        ctx.strokeStyle = Theme.colorPanelLine;
-                        ctx.lineWidth = Theme.borderWidth;
-                        ctx.beginPath();
-                        ctx.moveTo(inset, inset);
-                        ctx.lineTo(inset, height - inset);
-                        ctx.lineTo(width - inset, height - inset);
-                        ctx.stroke();
-                        ctx.strokeStyle = Theme.colorFocus;
-                        ctx.lineWidth = Theme.focusBorderWidth;
-                        ctx.beginPath();
-                        let time = 0;
-                        dialog.points.forEach((point, index) => {
-                            time += point.duration;
-                            const x = inset + time / (total || 1) * (width - 2 * inset);
-                            const y = height - inset - point.pressure / 200 * (height - 2 * inset);
-                            if (index === 0)
-                                ctx.moveTo(x, y);
-                            else
-                                ctx.lineTo(x, y);
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                ThemedButton {
+                    contentPadding: Theme.spacingLarge
+                    implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
+                    text: qsTranslate("HoldingProfile", "Add Step")
+                    onClicked: {
+                        rows.append({
+                            durationText: "",
+                            pressureText: ""
                         });
-                        ctx.stroke();
+                        dialog.editRevision++;
                     }
-                    Accessible.role: Accessible.Chart
-                    Accessible.name: qsTranslate("HoldingProfile", "Pressure vs cumulative time")
                 }
-                RowLayout {
+                ThemedButton {
+                    contentPadding: Theme.spacingLarge
+                    implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
+                    text: qsTranslate("HoldingProfile", "Import Profile…")
+                    enabled: false
+                }
+                Item {
                     Layout.fillWidth: true
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                    ProcessSettingsControls.Action {
-                        objectName: "holdingProfileAccept"
-                        Layout.preferredWidth: Theme.tabSegmentWidth
-                        controlHeight: Theme.controlHeight
-                        text: qsTranslate("DialogAction", "OK")
-                        enabled: dialog.points.length > 0
-                        primaryAction: true
-                        borderColor: Theme.colorDialogPrimaryBorder
-                        onClicked: dialog.acceptProfile()
-                    }
-                    ProcessSettingsControls.Action {
-                        Layout.preferredWidth: Theme.tabSegmentWidth
-                        controlHeight: Theme.controlHeight
-                        objectName: "holdingProfileCancel"
-                        text: qsTranslate("DialogAction", "Cancel")
-                        onClicked: dialog.close()
-                    }
-                    ProcessSettingsControls.Action {
-                        Layout.preferredWidth: Theme.tabSegmentWidth
-                        controlHeight: Theme.controlHeight
-                        text: qsTranslate("UiCommonHelp", "Help")
-                        enabled: false
-                    }
+                }
+                ThemedButton {
+                    contentPadding: Theme.spacingLarge
+                    implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
+                    text: qsTranslate("HoldingProfile", "Plot Profile")
+                    enabled: dialog.points.length > 0
+                    onClicked: dialog.plotVisible = !dialog.plotVisible
+                }
+            }
+            Canvas {
+                id: plot
+                objectName: "holdingProfilePlot"
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.profilePlotHeight
+                visible: dialog.plotVisible
+                onVisibleChanged: if (visible)
+                    requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.clearRect(0, 0, width, height);
+                    const inset = Theme.spacingLarge;
+                    const total = dialog.points.reduce((sum, point) => sum + point.duration, 0);
+                    ctx.strokeStyle = Theme.colorPanelLine;
+                    ctx.lineWidth = Theme.borderWidth;
+                    ctx.beginPath();
+                    ctx.moveTo(inset, inset);
+                    ctx.lineTo(inset, height - inset);
+                    ctx.lineTo(width - inset, height - inset);
+                    ctx.stroke();
+                    ctx.strokeStyle = Theme.colorFocus;
+                    ctx.lineWidth = Theme.focusBorderWidth;
+                    ctx.beginPath();
+                    let time = 0;
+                    dialog.points.forEach((point, index) => {
+                        time += point.duration;
+                        const x = inset + time / (total || 1) * (width - 2 * inset);
+                        const y = height - inset - point.pressure / 200 * (height - 2 * inset);
+                        if (index === 0)
+                            ctx.moveTo(x, y);
+                        else
+                            ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                }
+                Accessible.role: Accessible.Chart
+                Accessible.name: qsTranslate("HoldingProfile", "Pressure vs cumulative time")
+            }
+            DialogButtonRow {
+                Layout.fillWidth: true
+
+                ThemedButton {
+                    contentPadding: Theme.spacingLarge
+                    objectName: "holdingProfileAccept"
+
+                    text: qsTranslate("DialogAction", "OK")
+                    enabled: dialog.points.length > 0
+                    primaryAction: true
+                    onClicked: dialog.acceptProfile()
+                }
+                ThemedButton {
+                    contentPadding: Theme.spacingLarge
+
+                    objectName: "holdingProfileCancel"
+                    text: qsTranslate("DialogAction", "Cancel")
+                    onClicked: dialog.close()
+                }
+                ThemedButton {
+                    contentPadding: Theme.spacingLarge
+                    implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
+
+                    text: qsTranslate("UiCommonHelp", "Help")
+                    enabled: false
                 }
             }
         }

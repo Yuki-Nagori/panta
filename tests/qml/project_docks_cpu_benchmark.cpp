@@ -21,6 +21,7 @@
 #include <QtCore/qlogging.h>
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <algorithm>
@@ -32,6 +33,8 @@
 #include <iterator>
 #include <utility>
 #include <vector>
+
+Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
 
 namespace {
 
@@ -47,6 +50,7 @@ enum class Panels : std::uint8_t {
     Tasks,
     Layers,
     Both,
+    Controls,
     MeshTool,
     AnalysisSequence,
     AnalysisSequenceDialog
@@ -106,8 +110,10 @@ class QmlPerformanceBenchmark final : public QObject {
     QVariantList m_analysisSequences;
     QQuickWindow m_window;
     QQmlComponent m_emptyComponent{&m_engine};
+    QQmlComponent m_controlsComponent{
+        &m_engine, QUrl(QStringLiteral("qrc:/panta-benchmark/ControlGallery.qml"))};
     QQmlComponent m_tasksComponent{
-        &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"))};
+        &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"))};
     QQmlComponent m_layersComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/LayersPanel.qml"))};
     QQmlComponent m_analysisSequenceDialogComponent{
@@ -158,6 +164,10 @@ class QmlPerformanceBenchmark final : public QObject {
             if (panels == Panels::AnalysisSequence) {
                 create(m_analysisSequenceComponent,
                        QVariantMap{{QStringLiteral("sequences"), m_analysisSequences}}, owner);
+            }
+            if (panels == Panels::Controls) {
+                create(m_controlsComponent,
+                       QVariantMap{{QStringLiteral("itemCount"), names.size()}}, owner);
             }
             if (panels == Panels::MeshTool) {
                 create(m_meshToolComponent, {}, owner);
@@ -485,6 +495,7 @@ class QmlPerformanceBenchmark final : public QObject {
         m_emptyComponent.setData(QByteArrayLiteral("import QtQuick\nItem {}"),
                                  QUrl(QStringLiteral("qrc:/benchmark/Empty.qml")));
         QVERIFY(m_emptyComponent.isReady());
+        QVERIFY2(m_controlsComponent.isReady(), qPrintable(m_controlsComponent.errorString()));
         QVERIFY2(m_tasksComponent.isReady(), qPrintable(m_tasksComponent.errorString()));
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
         QVERIFY2(m_meshToolComponent.isReady(), qPrintable(m_meshToolComponent.errorString()));
@@ -543,6 +554,15 @@ class QmlPerformanceBenchmark final : public QObject {
                 {QStringLiteral("analysis sequence"), QString::fromLatin1(name), 1,
                  [this, panels] { return measure_once(panels, {}); },
                  [this, panels](const Sample& sample) { verify_sample(panels, 0, sample); }});
+        }
+    }
+
+    void measures_controls_construct() {
+        for (const int count : {1, 8, 24}) {
+            run_scenario(
+                {QStringLiteral("controls"), QStringLiteral("gallery"), count,
+                 [this, count] { return measure_once(Panels::Controls, make_names(count)); },
+                 [this](const Sample& sample) { verify_sample(Panels::Controls, 0, sample); }});
         }
     }
 

@@ -19,105 +19,11 @@ ScrollView {
         specificMode = false;
     }
 
-    component MaterialAction: ThemedToolButton {
-        contentColor: Theme.colorText
-        borderColor: Theme.colorPanelLine
-        hoverColor: Theme.colorHover
-        contentPadding: Theme.spacingMedium
-    }
-
-    component MaterialMode: RadioButton {
-        id: mode
-        // 模式由 specificMode 统一控制，避免同级控件的自动互斥再次修改 checked。
-        autoExclusive: false
-        implicitHeight: Theme.controlHeight
-        padding: 0
-        spacing: Theme.spacingSmall
-        indicator: Rectangle {
-            implicitWidth: Theme.iconSizeSmall
-            implicitHeight: Theme.iconSizeSmall
-            y: (mode.height - height) / 2
-            radius: width / 2
-            color: Theme.colorPanel
-            border.width: mode.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-            border.color: mode.checked || mode.visualFocus ? Theme.colorFocus : Theme.colorPanelLine
-            Rectangle {
-                anchors.centerIn: parent
-                width: Theme.iconSizeSmall / 2
-                height: width
-                radius: width / 2
-                color: Theme.colorFocus
-                visible: mode.checked
-            }
-        }
-        contentItem: ThemedLabel {
-            text: mode.text
-            leftPadding: mode.indicator.width + mode.spacing
-            verticalAlignment: Text.AlignVCenter
-        }
-    }
-
-    component MaterialChoice: ComboBox {
-        id: choice
-        implicitHeight: Theme.controlHeight
-        leftPadding: Theme.spacingMedium
-        rightPadding: Theme.iconSizeSmall + 2 * Theme.spacingSmall
-        opacity: enabled ? 1 : Theme.disabledOpacity
-        contentItem: ThemedLabel {
-            text: choice.displayText
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-        }
-        indicator: ThemedIcon {
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacingSmall
-            anchors.verticalCenter: parent.verticalCenter
-            name: "caret"
-            iconSize: Theme.iconSizeSmall
-            color: Theme.colorIcon
-        }
-        background: Rectangle {
-            color: Theme.colorPanel
-            border.color: choice.visualFocus ? Theme.colorFocus : Theme.colorPanelLine
-            border.width: choice.visualFocus ? Theme.focusBorderWidth : Theme.borderWidth
-            radius: Theme.radiusSmall
-        }
-    }
-
-    component MaterialFavorite: CheckBox {
-        id: favorite
-        implicitHeight: Theme.controlHeight
-        padding: 0
-        spacing: Theme.spacingSmall
-        opacity: enabled ? 1 : Theme.disabledOpacity
-        indicator: Rectangle {
-            implicitWidth: Theme.iconSizeSmall
-            implicitHeight: Theme.iconSizeSmall
-            y: (favorite.height - height) / 2
-            color: favorite.checked ? Theme.colorFocus : Theme.colorPanel
-            border.color: favorite.checked ? Theme.colorFocus : Theme.colorPanelLine
-            border.width: Theme.borderWidth
-            radius: Theme.radiusSmall
-            ThemedLabel {
-                anchors.centerIn: parent
-                text: "✓"
-                visible: favorite.checked
-                textColor: Theme.colorPanel
-                textSize: Theme.fontSmall
-            }
-        }
-        contentItem: ThemedLabel {
-            text: favorite.text
-            leftPadding: favorite.indicator.width + favorite.spacing
-            textSize: Theme.fontSmall
-            verticalAlignment: Text.AlignVCenter
-        }
-    }
-
     ColumnLayout {
         width: panel.availableWidth
         spacing: Theme.spacingMedium
-        MaterialMode {
+        ThemedRadioButton {
+            autoExclusive: false
             text: qsTranslate("MaterialDialog", "Commonly used materials")
             checked: !panel.specificMode
             onClicked: panel.specificMode = false
@@ -131,8 +37,9 @@ ScrollView {
                 border.color: Theme.colorPanelLine
                 border.width: Theme.borderWidth
                 radius: Theme.radiusSmall
-                MaterialAction {
+                ThemedButton {
                     id: commonMaterial
+                    contentPadding: Theme.spacingMedium
                     objectName: "defaultMaterialChoice"
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -149,14 +56,16 @@ ScrollView {
                     }
                 }
             }
-            MaterialAction {
+            ThemedButton {
+                contentPadding: Theme.spacingMedium
                 text: qsTranslate("MaterialDialog", "Remove")
                 enabled: false
             }
         }
         RowLayout {
             Layout.fillWidth: true
-            MaterialMode {
+            ThemedRadioButton {
+                autoExclusive: false
                 text: qsTranslate("MaterialDialog", "Specific material")
                 checked: panel.specificMode
                 onClicked: panel.specificMode = true
@@ -164,11 +73,15 @@ ScrollView {
             Item {
                 Layout.fillWidth: true
             }
-            MaterialAction {
+            ThemedButton {
+                contentPadding: Theme.spacingMedium
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 text: qsTranslate("MaterialDialog", "Customize Material List...")
                 enabled: false
             }
-            MaterialAction {
+            ThemedButton {
+                contentPadding: Theme.spacingMedium
+                implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 text: qsTranslate("MaterialDialog", "Reset Material List")
                 enabled: false
             }
@@ -181,26 +94,30 @@ ScrollView {
             ThemedLabel {
                 text: qsTranslate("MaterialDialog", "Polymer family")
             }
-            MaterialChoice {
+            ThemedComboBox {
+                font.pixelSize: Theme.fontBody
                 Layout.fillWidth: true
                 model: [qsTranslate("Material", panel.material.familySourceText ?? "")]
                 enabled: panel.specificMode
                 Accessible.name: qsTranslate("MaterialDialog", "Polymer family")
             }
-            MaterialAction {
+            ThemedButton {
+                contentPadding: Theme.spacingMedium
                 text: qsTranslate("MaterialDialog", "Import...")
                 enabled: false
             }
             ThemedLabel {
                 text: qsTranslate("MaterialDialog", "Material")
             }
-            MaterialChoice {
+            ThemedComboBox {
+                font.pixelSize: Theme.fontBody
                 Layout.fillWidth: true
                 model: [panel.materialText]
                 enabled: panel.specificMode
                 Accessible.name: qsTranslate("MaterialDialog", "Material")
             }
-            MaterialAction {
+            ThemedButton {
+                contentPadding: Theme.spacingMedium
                 text: qsTranslate("MaterialDialog", "Search...")
                 enabled: false
             }
@@ -227,12 +144,14 @@ ScrollView {
                     wrapMode: Text.Wrap
                 }
                 RowLayout {
-                    MaterialAction {
+                    ThemedButton {
+                        contentPadding: Theme.spacingMedium
                         objectName: "materialDetailsAction"
                         text: qsTranslate("MaterialDialog", "Details...")
                         onClicked: panel.detailsVisible = !panel.detailsVisible
                     }
-                    MaterialAction {
+                    ThemedButton {
+                        contentPadding: Theme.spacingMedium
                         text: qsTranslate("MaterialDialog", "Report...")
                         enabled: false
                     }
@@ -255,7 +174,9 @@ ScrollView {
                         }
                     }
                 }
-                MaterialFavorite {
+                ThemedCheckBox {
+
+                    font.pixelSize: Theme.fontSmall
                     text: qsTranslate("MaterialDialog", "Add material to commonly used list after selecting")
                     enabled: false
                 }

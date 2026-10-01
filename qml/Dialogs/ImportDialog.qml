@@ -1,27 +1,21 @@
 // STL 预检与导入窗口；文件解析和工程持久化由 ProjectViewModel 完成。
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import Panta.Bridge
 
-Window {
+DialogWindow {
     id: dialog
     objectName: "importDialog"
 
     required property ProjectViewModel projectModel
-    property Window ownerWindow
     property string sourcePath: ""
 
-    width: 680
-    height: 430
-    minimumWidth: 580
-    minimumHeight: 360
-    color: Theme.colorTransparent
-    modality: Qt.ApplicationModal
-    flags: Qt.Dialog | Qt.FramelessWindowHint
+    width: Theme.importDialogWidth
+    height: Theme.importDialogHeight
+    minimumWidth: Theme.importDialogMinimumWidth
+    minimumHeight: Theme.importDialogMinimumHeight
     title: qsTranslate("UiCommon", "Import")
-    transientParent: ownerWindow
 
     readonly property var meshTypes: projectModel.meshTypes
     readonly property var unitValues: ["millimeters", "centimeters", "inches"]
@@ -37,10 +31,7 @@ Window {
 
     function open() {
         resetFields();
-        if (ownerWindow) {
-            x = ownerWindow.x + Math.round((ownerWindow.width - width) / 2);
-            y = ownerWindow.y + Math.round((ownerWindow.height - height) / 2);
-        }
+        centerOnOwner();
         visible = true;
         requestActivate();
     }
@@ -69,176 +60,156 @@ Window {
         return qsTranslate("ImportDialogErrors", "The import operation could not be completed.");
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.colorPanel
+    DialogFrame {
+        window: dialog
+        closeEnabled: true
 
         ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: Theme.spacingLarge
+            Layout.rightMargin: Theme.spacingLarge
+            Layout.topMargin: Theme.spacingMedium
+            Layout.bottomMargin: Theme.spacingMedium
+            spacing: Theme.spacingMedium
 
-            DialogTitleBar {
+            ThemedLabel {
                 Layout.fillWidth: true
-                window: dialog
-                caption: dialog.title
-                onCloseRequested: dialog.close()
+                text: qsTranslate("ImportDialogForm", "Select a mesh type and units before importing the STL file.")
+                textSize: Theme.fontSmall
+                textColor: Theme.colorTextMuted
+                wrapMode: Text.Wrap
             }
 
-            ColumnLayout {
+            GridLayout {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.leftMargin: Theme.spacingLarge
-                Layout.rightMargin: Theme.spacingLarge
-                Layout.topMargin: Theme.spacingMedium
-                Layout.bottomMargin: Theme.spacingMedium
-                spacing: Theme.spacingMedium
+                columns: 2
+                columnSpacing: Theme.spacingMedium
+                rowSpacing: Theme.spacingMedium
 
                 ThemedLabel {
-                    Layout.fillWidth: true
-                    text: qsTranslate("ImportDialogForm", "Select a mesh type and units before importing the STL file.")
-                    textSize: Theme.fontSmall
-                    textColor: Theme.colorTextMuted
-                    wrapMode: Text.Wrap
+                    text: qsTranslate("UiCommon", "File")
+                    textSize: Theme.fontBody
                 }
-
-                GridLayout {
-                    Layout.fillWidth: true
-                    columns: 2
-                    columnSpacing: Theme.spacingMedium
-                    rowSpacing: Theme.spacingMedium
-
-                    ThemedLabel {
-                        text: qsTranslate("UiCommon", "File")
-                        textSize: Theme.fontBody
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.spacingSmall
-
-                        ThemedTextField {
-                            id: sourceField
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: Theme.controlHeight
-                            text: dialog.sourcePath
-                            readOnly: true
-                            placeholderText: qsTranslate("ImportDialogForm", "Choose an STL file")
-                            Accessible.name: qsTranslate("ImportDialogForm", "STL file")
-                        }
-                        ThemedToolButton {
-                            Layout.preferredWidth: 92
-                            Layout.preferredHeight: Theme.controlHeight
-                            text: qsTranslate("UiCommonNavigation", "Browse")
-                            iconName: "open"
-                            preserveIconColors: true
-                            contentPadding: Theme.spacingSmall
-                            hoverColor: Theme.colorHover
-                            borderColor: Theme.colorPanelLine
-                            onClicked: dialog.chooseFile()
-                        }
-                    }
-
-                    ThemedLabel {
-                        text: qsTranslate("ImportDialogForm", "Mesh type")
-                        textSize: Theme.fontBody
-                    }
-                    ComboBox {
-                        id: meshTypeCombo
-                        Layout.fillWidth: true
-                        model: dialog.meshTypes.map(entry => qsTranslate("MeshType", entry.sourceText))
-                        Accessible.name: qsTranslate("ImportDialogForm", "Mesh type")
-                    }
-
-                    ThemedLabel {
-                        text: qsTranslate("ImportDialogForm", "Units")
-                        textSize: Theme.fontBody
-                    }
-                    ComboBox {
-                        id: unitsCombo
-                        Layout.fillWidth: true
-                        model: [qsTranslate("UiCommonUnitMillimeters", "Millimeters"), qsTranslate("UiCommonUnitCentimeters", "Centimeters"), qsTranslate("UiCommonUnitInches", "Inches")]
-                        Accessible.name: qsTranslate("ImportDialogForm", "Units")
-                    }
-
-                    ThemedLabel {
-                        text: qsTranslate("ImportDialogForm", "Approximate dimensions")
-                        textSize: Theme.fontBody
-                    }
-                    ThemedLabel {
-                        Layout.fillWidth: true
-                        text: dialog.projectModel.importPreviewReady && dialog.sourcePath.length > 0 ? dialog.projectModel.importPreviewDimensions + " " + unitsCombo.currentText.toLowerCase() : qsTranslate("ImportDialogStatus", "Select an STL file")
-                        textSize: Theme.fontBody
-                        textColor: Theme.colorTextMuted
-                    }
-                }
-
-                CheckBox {
-                    id: showImportLogCheckBox
-                    text: qsTranslate("ImportDialogForm", "Show import log")
-                    Layout.fillWidth: true
-                }
-
-                ThemedLabel {
-                    id: helpText
-                    Layout.fillWidth: true
-                    visible: false
-                    text: qsTranslate("ImportDialogHelp", "The source file is copied into the project assets so the import can be reopened later.")
-                    textSize: Theme.fontSmall
-                    textColor: Theme.colorTextMuted
-                    wrapMode: Text.Wrap
-                }
-
-                ThemedLabel {
-                    Layout.fillWidth: true
-                    visible: dialog.projectModel.error.length > 0
-                    text: dialog.errorMessage()
-                    textSize: Theme.fontSmall
-                    textColor: Theme.colorError
-                    wrapMode: Text.Wrap
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                }
-
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacingSmall
 
-                    ThemedToolButton {
-                        Layout.preferredWidth: 92
-                        Layout.preferredHeight: Theme.controlHeight
-                        text: qsTranslate("UiCommonHelp", "Help")
-                        contentColor: Theme.colorText
-                        hoverColor: Theme.colorHover
-                        borderColor: Theme.colorPanelLine
-                        onClicked: helpText.visible = !helpText.visible
-                    }
-
-                    Item {
+                    ThemedTextField {
+                        id: sourceField
                         Layout.fillWidth: true
-                    }
-
-                    ThemedToolButton {
-                        Layout.preferredWidth: 92
                         Layout.preferredHeight: Theme.controlHeight
-                        text: qsTranslate("DialogAction", "OK")
-                        primaryAction: true
-                        enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady
-                        contentColor: Theme.colorText
-                        hoverColor: Theme.colorHover
-                        borderColor: Theme.colorDialogPrimaryBorder
-                        onClicked: dialog.submit()
+                        text: dialog.sourcePath
+                        readOnly: true
+                        placeholderText: qsTranslate("ImportDialogForm", "Choose an STL file")
+                        Accessible.name: qsTranslate("ImportDialogForm", "STL file")
                     }
-                    ThemedToolButton {
-                        Layout.preferredWidth: 92
-                        Layout.preferredHeight: Theme.controlHeight
-                        text: qsTranslate("DialogAction", "Cancel")
-                        contentColor: Theme.colorText
+                    ThemedButton {
+                        text: qsTranslate("UiCommonNavigation", "Browse")
+                        iconName: "open"
+                        preserveIconColors: true
+                        contentPadding: Theme.spacingSmall
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
-                        onClicked: dialog.close()
+                        onClicked: dialog.chooseFile()
                     }
+                }
+
+                ThemedLabel {
+                    text: qsTranslate("ImportDialogForm", "Mesh type")
+                    textSize: Theme.fontBody
+                }
+                ThemedComboBox {
+                    id: meshTypeCombo
+                    Layout.fillWidth: true
+                    model: dialog.meshTypes.map(entry => qsTranslate("MeshType", entry.sourceText))
+                    Accessible.name: qsTranslate("ImportDialogForm", "Mesh type")
+                }
+
+                ThemedLabel {
+                    text: qsTranslate("ImportDialogForm", "Units")
+                    textSize: Theme.fontBody
+                }
+                ThemedComboBox {
+                    id: unitsCombo
+                    Layout.fillWidth: true
+                    model: [qsTranslate("UiCommonUnitMillimeters", "Millimeters"), qsTranslate("UiCommonUnitCentimeters", "Centimeters"), qsTranslate("UiCommonUnitInches", "Inches")]
+                    Accessible.name: qsTranslate("ImportDialogForm", "Units")
+                }
+
+                ThemedLabel {
+                    text: qsTranslate("ImportDialogForm", "Approximate dimensions")
+                    textSize: Theme.fontBody
+                }
+                ThemedLabel {
+                    Layout.fillWidth: true
+                    text: dialog.projectModel.importPreviewReady && dialog.sourcePath.length > 0 ? dialog.projectModel.importPreviewDimensions + " " + unitsCombo.currentText.toLowerCase() : qsTranslate("ImportDialogStatus", "Select an STL file")
+                    textSize: Theme.fontBody
+                    textColor: Theme.colorTextMuted
+                }
+            }
+
+            ThemedCheckBox {
+                id: showImportLogCheckBox
+
+                text: qsTranslate("ImportDialogForm", "Show import log")
+                Layout.fillWidth: true
+            }
+
+            ThemedLabel {
+                id: helpText
+                Layout.fillWidth: true
+                visible: false
+                text: qsTranslate("ImportDialogHelp", "The source file is copied into the project assets so the import can be reopened later.")
+                textSize: Theme.fontSmall
+                textColor: Theme.colorTextMuted
+                wrapMode: Text.Wrap
+            }
+
+            ThemedLabel {
+                Layout.fillWidth: true
+                visible: dialog.projectModel.error.length > 0
+                text: dialog.errorMessage()
+                textSize: Theme.fontSmall
+                textColor: Theme.colorError
+                wrapMode: Text.Wrap
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                ThemedButton {
+                    text: qsTranslate("UiCommonHelp", "Help")
+                    contentColor: Theme.colorText
+                    hoverColor: Theme.colorHover
+                    borderColor: Theme.colorPanelLine
+                    onClicked: helpText.visible = !helpText.visible
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                ThemedButton {
+                    text: qsTranslate("DialogAction", "OK")
+                    primaryAction: true
+                    enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady
+                    contentColor: Theme.colorText
+                    hoverColor: Theme.colorHover
+                    onClicked: dialog.submit()
+                }
+                ThemedButton {
+                    text: qsTranslate("DialogAction", "Cancel")
+                    contentColor: Theme.colorText
+                    hoverColor: Theme.colorHover
+                    borderColor: Theme.colorPanelLine
+                    onClicked: dialog.close()
                 }
             }
         }

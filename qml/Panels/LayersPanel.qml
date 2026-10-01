@@ -118,7 +118,7 @@ PanelSurface {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                width: 92
+                width: Theme.layersTabWidth
                 text: qsTranslate("LayerPanelTitle", "Layers")
                 iconName: "layers"
                 highlighted: true

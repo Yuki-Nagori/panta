@@ -16,7 +16,7 @@ Rectangle {
     // 面板仅报告稳定菜单 key，由宿主决定哪些入口可导航。
     signal menuRequested(string key)
 
-    implicitWidth: 800
+    implicitWidth: Theme.chromeImplicitWidth
     implicitHeight: Theme.titlebarHeight + Theme.menubarHeight + Theme.borderWidth
     color: Theme.colorPanel
 
@@ -261,17 +261,11 @@ Rectangle {
                                     label: qsTranslate("ShellMenuView", "View")
                                 }
                             ]
-                            delegate: ThemedToolButton {
+                            delegate: MenuTabButton {
                                 required property var modelData
                                 objectName: "menu-" + modelData.key
                                 text: modelData.label
-                                controlHeight: Theme.menubarHeight
-                                cornerRadius: 0
                                 highlighted: modelData.key === chrome.activeRibbonTab
-                                contentColor: highlighted ? Theme.colorText : Theme.colorMenubarText
-                                hoverColor: Theme.colorMenubarHover
-                                contentPadding: Theme.spacingLarge
-                                font.weight: highlighted ? Font.DemiBold : Font.Normal
                                 onClicked: chrome.menuRequested(modelData.key)
                             }
                         }

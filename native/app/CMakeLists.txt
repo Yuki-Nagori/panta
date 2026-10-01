@@ -6,6 +6,7 @@ target_link_libraries(
   panta_native_app
   PRIVATE panta::foundation
           panta::shell
+          panta_shellplugin
           panta::i18n
           "${PANTA_FFI_STATIC_LIB}"
           Qt6::Gui
@@ -44,6 +45,7 @@ if(BUILD_TESTING)
   target_link_libraries(
     panta_qml_shell_module_test
     PRIVATE panta::shell
+            panta_shellplugin
             Qt6::Gui
             Qt6::Qml
             Qt6::Quick

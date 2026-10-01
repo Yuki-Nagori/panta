@@ -2,10 +2,9 @@
 import QtQuick
 import QtQuick.Layouts
 
-Window {
+DialogWindow {
     id: dialog
     objectName: "analysisSequenceDialog"
-    property Window ownerWindow
     property var sequences: []
     property var planSettings: ({})
     property string errorText: ""
@@ -17,21 +16,14 @@ Window {
     height: Theme.analysisSequenceDialogHeight
     minimumWidth: Theme.analysisSequenceDialogMinimumWidth
     minimumHeight: Theme.analysisSequenceDialogMinimumHeight
-    color: Theme.colorTransparent
-    modality: Qt.ApplicationModal
-    flags: Qt.Dialog | Qt.FramelessWindowHint
     title: qsTranslate("AnalysisSequenceDialog", "Select Analysis Sequence")
-    transientParent: ownerWindow
 
     function open() {
         openedSettings = planSettings;
         sequencePanel.selectedIndex = sequences.findIndex(entry => entry.id === openedSettings.sequenceId);
         if (sequencePanel.selectedIndex < 0 || !openedSettings.importId)
             return;
-        if (ownerWindow) {
-            x = ownerWindow.x + Math.round((ownerWindow.width - width) / 2);
-            y = ownerWindow.y + Math.round((ownerWindow.height - height) / 2);
-        }
+        centerOnOwner();
         show();
         requestActivate();
         sequencePanel.focusSelection();
@@ -42,71 +34,60 @@ Window {
             selectionRequested(openedSettings.projectPath, openedSettings.revision, openedSettings.importId, sequencePanel.selectedId);
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.colorPanel
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-            DialogTitleBar {
-                Layout.fillWidth: true
-                window: dialog
-                caption: dialog.title
-                onCloseRequested: dialog.close()
-            }
-            ThemedLabel {
-                Layout.fillWidth: true
-                Layout.margins: Theme.spacingLarge
-                visible: dialog.errorText.length > 0
-                text: dialog.errorText
-                textColor: Theme.colorError
-                wrapMode: Text.Wrap
-            }
-            RowLayout {
+    DialogFrame {
+        window: dialog
+        closeEnabled: true
+
+        ThemedLabel {
+            Layout.fillWidth: true
+            Layout.margins: Theme.spacingLarge
+            visible: dialog.errorText.length > 0
+            text: dialog.errorText
+            textColor: Theme.colorError
+            wrapMode: Text.Wrap
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.margins: Theme.spacingLarge
+            spacing: Theme.spacingLarge
+            AnalysisSequencePanel {
+                id: sequencePanel
+                objectName: "analysisSequencePanel"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.margins: Theme.spacingLarge
-                spacing: Theme.spacingLarge
-                AnalysisSequencePanel {
-                    id: sequencePanel
-                    objectName: "analysisSequencePanel"
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    sequences: dialog.sequences
+                sequences: dialog.sequences
+            }
+            ColumnLayout {
+                Layout.fillHeight: true
+                spacing: Theme.spacingSmall
+                ThemedButton {
+                    objectName: "analysisSequenceAccept"
+
+                    text: qsTranslate("DialogAction", "OK")
+                    enabled: sequencePanel.selectedId.length > 0
+                    primaryAction: true
+                    contentColor: Theme.colorText
+                    hoverColor: Theme.colorHover
+                    onClicked: dialog.acceptSelection()
                 }
-                ColumnLayout {
+                ThemedButton {
+                    objectName: "analysisSequenceCancel"
+
+                    text: qsTranslate("DialogAction", "Cancel")
+                    contentColor: Theme.colorText
+                    borderColor: Theme.colorPanelLine
+                    hoverColor: Theme.colorHover
+                    onClicked: dialog.close()
+                }
+                Item {
                     Layout.fillHeight: true
-                    spacing: Theme.spacingSmall
-                    ThemedToolButton {
-                        objectName: "analysisSequenceAccept"
-                        Layout.preferredWidth: Theme.tabSegmentWidth
-                        text: qsTranslate("DialogAction", "OK")
-                        enabled: sequencePanel.selectedId.length > 0
-                        primaryAction: true
-                        contentColor: Theme.colorText
-                        borderColor: Theme.colorDialogPrimaryBorder
-                        hoverColor: Theme.colorHover
-                        onClicked: dialog.acceptSelection()
-                    }
-                    ThemedToolButton {
-                        objectName: "analysisSequenceCancel"
-                        Layout.preferredWidth: Theme.tabSegmentWidth
-                        text: qsTranslate("DialogAction", "Cancel")
-                        contentColor: Theme.colorText
-                        borderColor: Theme.colorPanelLine
-                        hoverColor: Theme.colorHover
-                        onClicked: dialog.close()
-                    }
-                    Item {
-                        Layout.fillHeight: true
-                    }
-                    ThemedToolButton {
-                        Layout.preferredWidth: Theme.tabSegmentWidth
-                        text: qsTranslate("AnalysisSequenceDialog", "More...")
-                        enabled: false
-                        contentColor: Theme.colorText
-                        borderColor: Theme.colorPanelLine
-                    }
+                }
+                ThemedButton {
+                    text: qsTranslate("AnalysisSequenceDialog", "More...")
+                    enabled: false
+                    contentColor: Theme.colorText
+                    borderColor: Theme.colorPanelLine
                 }
             }
         }

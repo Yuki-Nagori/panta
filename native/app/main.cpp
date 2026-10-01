@@ -11,20 +11,20 @@
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QtCore/qnamespace.h>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QtQuickControls2/qquickstyle.h>
+#include <cstdio>
 #include <icon_provider.hpp>
 #include <panta/foundation/version.hpp>
 #include <rust/cxx.h>
-#ifdef PANTA_ENABLE_BRIDGE_MODULE
-#include <QtQml/qqmlextensionplugin.h>
-#endif
-#include <cstdio>
 #include <string_view>
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
 #endif
+
+Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
 
 namespace {
 

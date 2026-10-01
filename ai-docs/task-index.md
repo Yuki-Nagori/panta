@@ -120,6 +120,8 @@ ai-docs/
 | 096 | [Results 工具栏内容](task/096-results-ribbon.md) | 应用平台扩展 | 060, 081, 095 | in-progress |
 | 097 | [分析日志面板与结果目录](task/097-analysis-logs-dock.md) | 应用平台扩展 | 080, 091, 096 | done |
 | 098 | [工艺确认跨平台 CI 修复](task/098-ci-metadata-confirmation.md) | 质量与构建 | 094, 095, 097 | in-progress |
+| 099 | [QML 组件与弹窗整理](task/099-qml-components-and-dialog-consolidation.md) | 应用平台扩展 | 029, 094, 095, 097 | in-progress |
+| 100 | [GPU 基准共享与离屏验证](task/100-gpu-benchmark-consolidation.md) | 验证基础 | 048, 099 | in-progress |
 
 ## 验证与质量扩展队列
 

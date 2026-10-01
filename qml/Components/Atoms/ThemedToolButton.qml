@@ -8,7 +8,7 @@ ToolButton {
 
     property int controlHeight: Theme.controlHeight
     property int contentPadding: Theme.spacingXSmall
-    property int cornerRadius: Theme.radiusSmall
+    property real cornerRadius: Theme.radiusSmall
     property color contentColor: Theme.colorIcon
     property color hoverColor: Theme.colorHover
     property color borderColor: Theme.colorTransparent
@@ -74,6 +74,8 @@ ToolButton {
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: button.contentAlignLeft ? parent.left : undefined
             anchors.horizontalCenter: button.contentAlignLeft ? undefined : parent.horizontalCenter
+            // 避免连续居中取整让普通字重的分数像素宽度偏离按钮中心。
+            anchors.alignWhenCentered: false
             spacing: button.spacing
 
             ThemedIcon {
@@ -89,6 +91,7 @@ ToolButton {
                 visible: button.text !== ""
                 text: button.text
                 textSize: button.font.pixelSize
+                font.weight: button.font.weight
                 textColor: button.contentColor
             }
             ThemedLabel {
@@ -96,6 +99,7 @@ ToolButton {
                 visible: button.dimText !== ""
                 text: button.dimText
                 textSize: button.font.pixelSize
+                font.weight: button.font.weight
                 textColor: Theme.colorTextMuted
             }
             ThemedIcon {

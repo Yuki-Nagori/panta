@@ -32,6 +32,7 @@
 #include <QtCore/qnamespace.h>
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <icon_provider.hpp>
@@ -42,6 +43,8 @@
 #include <qtestmouse.h>
 #include <qtestsupport_core.h>
 #include <qtestsupport_gui.h>
+
+Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
 
 namespace {
 
@@ -150,6 +153,40 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(surface != nullptr);
         QCOMPARE(surface->property("surfaceColor").value<QColor>(),
                  QColor(QStringLiteral("#ffffff")));
+    }
+
+    void consolidated_controls_keep_fixed_sizes_and_stable_tabs() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        const QString atomPath = QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/");
+        auto* button =
+            create_component(engine, atomPath + QStringLiteral("ThemedButton.qml"), owner);
+        QVERIFY(button != nullptr);
+        QCOMPARE(button->property("implicitWidth").toDouble(), 92.0);
+        QCOMPARE(button->property("implicitHeight").toDouble(), 24.0);
+        auto* combo =
+            create_component(engine, atomPath + QStringLiteral("ThemedComboBox.qml"), owner);
+        QVERIFY(combo != nullptr);
+        QCOMPARE(combo->property("implicitHeight").toDouble(), 30.0);
+        auto* check =
+            create_component(engine, atomPath + QStringLiteral("ThemedCheckBox.qml"), owner);
+        QVERIFY(check != nullptr);
+        QCOMPARE(check->property("implicitHeight").toDouble(), 24.0);
+        QCOMPARE(check->property("padding").toDouble(), 0.0);
+        auto* indicator = check->property("indicator").value<QObject*>();
+        QVERIFY(indicator != nullptr);
+        QCOMPARE(indicator->property("implicitWidth").toDouble(), 16.0);
+        QCOMPARE(indicator->property("implicitHeight").toDouble(), 16.0);
+        auto* tab = create_component(engine, atomPath + QStringLiteral("MenuTabButton.qml"), owner);
+        QVERIFY(tab != nullptr);
+        tab->setProperty("text", QStringLiteral("Boundary Conditions"));
+        const double width = tab->property("implicitWidth").toDouble();
+        QVERIFY(width > 0.0);
+        tab->setProperty("highlighted", true);
+        QCOMPARE(tab->property("implicitWidth").toDouble(), width);
+        tab->setProperty("highlighted", false);
+        QCOMPARE(tab->property("implicitWidth").toDouble(), width);
     }
 
     void explicit_values_override_theme() {
@@ -346,7 +383,7 @@ class ThemeComponentTest final : public QObject {
         panta::install_icon_provider(engine);
         QObject owner;
         QObject* panel = create_component(
-            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"), owner);
         QVERIFY(panel != nullptr);
         panel->setProperty("importedPartIds", QStringList{QStringLiteral("import-1")});
         panel->setProperty("importedPartName", QStringLiteral("latest.stl"));
@@ -393,7 +430,7 @@ class ThemeComponentTest final : public QObject {
         QCOMPARE(dialog->property("height").toInt(), 600);
         auto* accept = dialog->findChild<QObject*>(QStringLiteral("fillSettingsAccept"));
         QVERIFY(accept != nullptr);
-        QTRY_COMPARE(accept->property("width").toInt(), 96);
+        QTRY_COMPARE(accept->property("width").toInt(), 92);
         QCOMPARE(accept->property("height").toInt(), 24);
         auto* profileDialog = dialog->findChild<QObject*>(QStringLiteral("holdingProfileDialog"));
         QVERIFY(profileDialog != nullptr);
@@ -489,11 +526,12 @@ class ThemeComponentTest final : public QObject {
         dialog->setProperty("visible", false);
 
         auto* tasks = create_component(
-            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"), owner);
         QVERIFY(tasks != nullptr);
         QSignalSpy requested(tasks, SIGNAL(analysisSequenceRequested()));
-        QVERIFY(
-            QMetaObject::invokeMethod(tasks, "openPlanTask", Q_ARG(QVariant, "analysis-sequence")));
+        QVERIFY(QMetaObject::invokeMethod(
+            tasks->findChild<QObject*>(QStringLiteral("projectTasksPage")), "openPlanTask",
+            Q_ARG(QVariant, "analysis-sequence")));
         QCOMPARE(requested.count(), 1);
     }
 
@@ -645,7 +683,7 @@ class ThemeComponentTest final : public QObject {
         panta::install_icon_provider(engine);
         QObject owner;
         auto* panel = create_component(
-            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"), owner);
         QVERIFY(panel != nullptr);
         auto* root = qobject_cast<QQuickItem*>(panel);
         panel->setProperty("projectOpen", true);
@@ -670,10 +708,10 @@ class ThemeComponentTest final : public QObject {
         panta::install_icon_provider(engine);
         QObject owner;
         QObject* panel = create_component(
-            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/TasksPanel.qml"), owner);
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"), owner);
         QVERIFY(panel != nullptr);
         auto* tabs = panel->findChild<QObject*>(QStringLiteral("panelTabs"));
-        auto* information = panel->findChild<QObject*>(QStringLiteral("tasksToolsInformation"));
+        auto* information = panel->findChild<QObject*>(QStringLiteral("toolsInformation"));
         auto* mesh_tool = panel->findChild<QObject*>(QStringLiteral("meshToolPanel"));
         QVERIFY(tabs != nullptr);
         QVERIFY(information != nullptr);
@@ -685,7 +723,8 @@ class ThemeComponentTest final : public QObject {
 
         tabs->setProperty("currentIndex", 0);
         QVERIFY(QMetaObject::invokeMethod(
-            panel, "openPlanTask", Q_ARG(QVariant, QVariant(QStringLiteral("create-mesh")))));
+            panel->findChild<QObject*>(QStringLiteral("projectTasksPage")), "openPlanTask",
+            Q_ARG(QVariant, QVariant(QStringLiteral("create-mesh")))));
         QCOMPARE(tabs->property("currentIndex").toInt(), 1);
         QVERIFY(!information->property("visible").toBool());
         QVERIFY(mesh_tool->property("visible").toBool());
@@ -842,7 +881,7 @@ class ThemeComponentTest final : public QObject {
 
                 const QString mode = qml_binding(item, "preserveIconColors");
                 const bool is_ribbon_data = path.contains(QStringLiteral("/Panels/Ribbon/"));
-                const bool is_task_data = path.endsWith(QStringLiteral("/TasksPanel.qml"));
+                const bool is_task_data = path.endsWith(QStringLiteral("/ProjectTasksPage.qml"));
                 ribbon_data_icons += is_ribbon_data ? 1 : 0;
                 task_data_icons += is_task_data ? 1 : 0;
                 bool preserves_source = false;
@@ -909,7 +948,7 @@ class ThemeComponentTest final : public QObject {
                 if (icon_id.isEmpty()) {
                     if ((expression == QStringLiteral("modelData.icon") ||
                          expression == QStringLiteral("taskRow.modelData.icon")) &&
-                        path.endsWith(QStringLiteral("/TasksPanel.qml"))) {
+                        path.endsWith(QStringLiteral("/ProjectTasksPage.qml"))) {
                         QCOMPARE(mode, QStringLiteral("true"));
                         task_model_uses_source_colors = mode == QStringLiteral("true");
                     } else if (expression == QStringLiteral("modelData.icon") &&

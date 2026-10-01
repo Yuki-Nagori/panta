@@ -8,7 +8,7 @@ ThemedToolButton {
 
     anchors.top: parent.top
     anchors.right: parent.right
-    anchors.topMargin: (Theme.panelToolbarHeight - controlHeight) / 2
+    anchors.topMargin: Theme.spacingXSmall
     anchors.rightMargin: Theme.spacingXSmall
     z: 2
 

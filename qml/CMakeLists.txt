@@ -10,6 +10,13 @@ set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
 set(PANTA_SHELL_QML_FILES
     App.qml
     Themes/Theme.qml
+    Components/Atoms/MenuTabButton.qml
+    Components/Atoms/ThemedNumberField.qml
+    Components/Atoms/ThemedButton.qml
+    Components/Atoms/ThemedCheckBox.qml
+    Components/Atoms/ThemedRadioButton.qml
+    Components/Atoms/ThemedComboBox.qml
+    Components/Atoms/CheckIndicator.qml
     Components/Atoms/ThemedLabel.qml
     Components/Atoms/ThemedToolButton.qml
     Components/Atoms/ThemedTextField.qml
@@ -25,13 +32,19 @@ set(PANTA_SHELL_QML_FILES
     Components/Composites/InformationPanel.qml
     Components/Composites/PaneCloseButton.qml
     Components/Composites/DialogTitleBar.qml
-    Components/Composites/ProcessSettingsControls.qml
+    Components/Composites/DialogWindow.qml
+    Components/Composites/DialogFrame.qml
+    Components/Composites/DialogButtonRow.qml
+    Components/Composites/FormSection.qml
     Panels/TopChromePanel.qml
     Panels/RibbonPanel.qml
     Panels/Ribbon/HomeRibbon.qml
     Panels/Ribbon/ResultsRibbon.qml
     Panels/Ribbon/StartLearnRibbon.qml
-    Panels/TasksPanel.qml
+    Panels/SidebarPanel.qml
+    Panels/Sidebar/ProjectTasksPage.qml
+    Panels/Sidebar/ToolsPage.qml
+    Panels/Sidebar/SharedViewsPage.qml
     Panels/MeshToolPanel.qml
     Panels/AnalysisSequencePanel.qml
     Panels/MaterialSelectionPanel.qml
@@ -65,7 +78,7 @@ if(UNIX AND NOT APPLE)
   set(PANTA_QML_MODULE_OPTIONS __QT_INTERNAL_NO_GENERATE_QMLLS_BUILD_INI)
 endif()
 
-# 纯资源模块静态链接，避免 Windows 丢弃无导出符号引用的 DLL 及其资源初始化。
+# Shell 静态模块含平台字体单例；消费者显式导入静态插件，保留类型注册。
 qt_add_qml_module(
   panta_shell
   STATIC
@@ -75,11 +88,13 @@ qt_add_qml_module(
   1.0
   RESOURCE_PREFIX
   /qt/qml
-  NO_PLUGIN
   ${PANTA_SHELL_QML_DEPENDENCIES}
   ${PANTA_QML_MODULE_OPTIONS}
   QML_FILES
-  ${PANTA_SHELL_QML_FILES})
+  ${PANTA_SHELL_QML_FILES}
+  SOURCES
+  ../native/app/platform_fonts.hpp
+  ../native/app/platform_fonts.cpp)
 
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
 panta_native_defaults(panta_shell)
@@ -98,10 +113,12 @@ qt_add_resources(panta_shell "panta_shell_icons" PREFIX "/qt/qml/Panta/Shell" FI
                  ${PANTA_SHELL_ICON_FILES})
 
 if(BUILD_TESTING)
+  find_package(Qt6 6.11 REQUIRED COMPONENTS GuiPrivate)
   add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)
   panta_native_defaults(panta_qml_theme_component_test)
-  target_link_libraries(panta_qml_theme_component_test PRIVATE panta_shell Qt6::Gui Qt6::Qml
-                                                               Qt6::Test Qt6::Quick)
+  target_link_libraries(
+    panta_qml_theme_component_test PRIVATE panta_shell panta_shellplugin Qt6::Gui Qt6::Qml
+                                           Qt6::Test Qt6::Quick)
   # 测试对照正式 HTML symbol 清单与打包的 QML SVG 资源集合。
   qt_add_resources(
     panta_qml_theme_component_test
@@ -117,13 +134,20 @@ if(BUILD_TESTING)
   add_executable(panta_qml_cpu_benchmark EXCLUDE_FROM_ALL
                  ../tests/qml/project_docks_cpu_benchmark.cpp)
   panta_native_defaults(panta_qml_cpu_benchmark)
-  target_link_libraries(panta_qml_cpu_benchmark PRIVATE panta_shell Qt6::Gui Qt6::Qml Qt6::Test
-                                                        Qt6::Quick)
+  target_link_libraries(panta_qml_cpu_benchmark PRIVATE panta_shell panta_shellplugin Qt6::Gui
+                                                        Qt6::Qml Qt6::Test Qt6::Quick)
   add_executable(panta_qml_gpu_benchmark EXCLUDE_FROM_ALL
                  ../tests/qml/project_docks_gpu_benchmark.cpp)
   panta_native_defaults(panta_qml_gpu_benchmark)
-  target_link_libraries(panta_qml_gpu_benchmark PRIVATE panta_shell Qt6::Gui Qt6::Qml Qt6::Test
-                                                        Qt6::Quick)
+  target_link_libraries(
+    panta_qml_gpu_benchmark
+    PRIVATE panta_shell
+            panta_shellplugin
+            Qt6::Gui
+            Qt6::GuiPrivate
+            Qt6::Qml
+            Qt6::Test
+            Qt6::Quick)
   if(PANTA_ENABLE_BRIDGE_MODULE)
     # 目录场景直接经正式 ViewModel 读取 Rust；不依赖测试进程的 QML 插件注册。
     foreach(PANTA_SEQUENCE_TEST_TARGET panta_qml_theme_component_test panta_qml_cpu_benchmark
@@ -132,6 +156,17 @@ if(BUILD_TESTING)
       target_compile_definitions(${PANTA_SEQUENCE_TEST_TARGET} PRIVATE PANTA_TEST_WITH_BRIDGE=1)
     endforeach()
   endif()
+  foreach(PANTA_CONTROLS_BENCHMARK panta_qml_cpu_benchmark panta_qml_gpu_benchmark)
+    qt_add_resources(
+      ${PANTA_CONTROLS_BENCHMARK}
+      panta_control_gallery
+      PREFIX
+      "/panta-benchmark"
+      BASE
+      "${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/qml"
+      FILES
+      "${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/qml/ControlGallery.qml")
+  endforeach()
   # 手动基准的 moc 登记给 lint 前置聚合（native 顶层 panta_benchmark_moc）。
   add_dependencies(panta_benchmark_moc panta_qml_cpu_benchmark_autogen
                    panta_qml_gpu_benchmark_autogen)
