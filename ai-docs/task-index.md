@@ -113,7 +113,7 @@ ai-docs/
 | 088 | [Mesh 资产旁置存储与按需加载](task/088-mesh-asset-sidecar-storage.md) | CAE 领域模块迁移 | 063, 067, 073, 080 | planned |
 | 090 | [Mesh Tool QML 界面](task/090-mesh-tool-qml-ui.md) | 应用平台扩展 | 050, 068, 081 | done |
 | 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | done |
-| 092 | [方案分析序列与网格类型接线](task/092-plan-analysis-sequence-and-mesh-settings.md) | 应用平台扩展 | 057, 067, 080, 091 | in-progress |
+| 092 | [方案分析序列与网格类型接线](task/092-plan-analysis-sequence-and-mesh-settings.md) | 应用平台扩展 | 057, 067, 080, 091 | done |
 | 093 | [材料选择弹窗与默认材料](task/093-material-selection-dialog.md) | 应用平台扩展 | 068, 081, 092 | in-progress |
 | 094 | [Fill 工艺设置与保压曲线弹窗](task/094-fill-process-settings.md) | 应用平台扩展 | 081, 092, 093 | done |
 | 095 | [Gate Location 工艺设置弹窗](task/095-gate-location-process-settings.md) | 应用平台扩展 | 081, 092, 094 | done |
