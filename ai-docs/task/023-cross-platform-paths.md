@@ -5,7 +5,7 @@
 - 依赖：[005](005-qt-qml-shell.md)（已完成）、[006](006-rust-cpp-boundary.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-29
+- 创建 / 更新：2026-09-16 / 2026-10-02
 
 ## 目标与背景
 
@@ -49,8 +49,8 @@
 ## 验收标准
 
 - [x] 切换 cwd 与搬迁工程根后，相对资产仍正确解析；内置 qrc 资源只读且不当作本机路径。
-- [ ] 覆盖空格、中文、file URL 编码、Windows 盘符/UNC、大小写与非 Unicode 策略，三平台记录实际结果。（空格/中文/file URL/非 Unicode/大小写不折叠已实测——大小写断言随 CI 三平台执行；盘符拒绝为跨平台规则本地已测，UNC 与 C++ 侧三平台记录待补）
-- [ ] 拒绝绝对路径冒充相对引用、`..` 越界及符号链接/junction 越界，覆盖尚不存在的写入目标。（绝对路径/`..`/未创建写目标/Unix 符号链接已测；Windows junction 待 Windows 平台证据）
+- [ ] 覆盖空格、中文、file URL 编码、Windows 盘符/UNC、大小写与非 Unicode 策略，三平台记录实际结果。（既有 Rust / C++ 场景已有三平台 CI；新增盘符 / UNC URL 和反斜杠拒绝矩阵本地通过，新增场景三平台记录待补）
+- [ ] 拒绝绝对路径冒充相对引用、`..` 越界及符号链接/junction 越界，覆盖尚不存在的写入目标。（绝对路径/`..`/未创建写目标/Unix 符号链接已测；新增 Windows junction 测试待 Windows CI 平台证据）
 - [x] 标准目录为空、不可写、资产缺失返回明确错误，不静默退到 cwd；FFI 往返无有损编码。（空/相对路径注入、不可写目录（Unix 只读 + 写探针）、缺失目录自动创建且无探针残留、资产缺失 `path.not_found`、非 Unicode 往返均有夹具；注入语义：标准目录缺失即创建、写探针验证真实可写）
 - [x] 代码、测试、配置和文档一致，删除废弃实现；记录真实验证并同步索引。（无被替代的旧路径实现，记录为无废弃项）
 
@@ -76,6 +76,10 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 
 ## 决策与工作记录
 
+- 2026-10-02：盘点发现逻辑引用约定仅使用 `/`，但 Rust 校验尚未拒绝反斜杠；Windows `PathBuf::join` 可将其解释成盘符 / UNC / 父级分隔。范围补充为在 Rust 引用校验处统一拒绝反斜杠，增加稳定错误码及 Rust / CXX 端到端拒绝矩阵；本机路径与 file URL 转换不受此逻辑引用规则影响。
+
+- 2026-10-02：继续 P1 路径验收。最新 CI 36982743570 已覆盖三平台 C++ PathHost；补充盘符 / UNC file URL 单次解码与 UNC 相对引用拒绝矩阵，增加 Windows 真实目录 junction 夹具，验证现存读目标和未创建写目标根外访问均被拒绝。UNC 网络共享访问不在本轮创建；区分 URL 语义验证与网络可用性，不将 macOS 结果冒充 Windows junction 通过。
+
 - 2026-09-16：由任务 021 编排；长期设计见模块说明，不将文档完成等同功能完成。
 - 2026-09-17：依赖 005、006 均已完成且范围/验收明确，状态调整为 ready。
 - 2026-09-19：确认 macOS 上 `QStandardPaths::setTestModeEnabled(true)` 仍会落到用户 home 下的 `.qttest`，不适合作为受控环境的写入夹具；PathHost 测试统一通过 `createWithStandardRoots` 注入 `QTemporaryDir` 根，不改变生产路径发现和不可写目录拒绝语义。
@@ -83,4 +87,18 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 - 2026-09-29：任务 086 将 `PathHost` 和 `ProjectViewModel` 的标准目录查询迁至 `panta::qt_adapter::standard_location`；类别映射、UTF-8 边界、根注入及错误语义保持不变。原有 QStandardPaths 行为验证仍适用于该 adapter 转发，平台覆盖缺口按本任务验收清单保留。
 
 ## 完成摘要
-未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵/大小写不折叠，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（标准目录注入映射——同时作为 013 的安装布局接口、注入时缺失目录自动创建 + 写探针验证可写、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 18+9、C++ 10 项，ctest 27/27），Rust 侧随 CI 三平台通过。待补：Windows junction 实测、UNC/C++ 侧三平台记录（PathHost 测试进 CI 归 011）。
+未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵/大小写不折叠，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（标准目录注入映射——同时作为 013 的安装布局接口、注入时缺失目录自动创建 + 写探针验证可写、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 18+9、C++ 10 项，ctest 27/27），Rust 侧随 CI 三平台通过。既有 PathHost 测试已纳入 Cargo 聚合并通过三平台 CI；待补新增 Windows junction 与 UNC URL / 拒绝矩阵的三平台记录。
+
+
+## 2026-10-02 平台回归补充
+
+- 最新 CI [36982743570](https://github.com/Yuki-Nagori/panta/actions/runs/36982743570) 的三平台 Cargo 聚合及 sanitizer 均成功，已执行 PathHost C++ 测试；旧记录中“C++ 尚未进 CI”仅是当时状态，当前缺口为新增 UNC / junction 场景的平台证据。
+- 新增反斜杠逻辑引用矩阵在修复前于 macOS 失败（UNC 片段被错误接受），日志 `/tmp/panta-023-repro.log`。Rust 校验新增 `path.backslash_rejected`，错误码 / 详情遍历与 CXX 端到端测试同步；不把 Windows 本机路径字符串作为逻辑引用。
+- file URL 测试覆盖盘符与 UNC 中的中文、空格、#、%20，要求单次解码且原值保留；不连接或创建网络共享，不能据此宣称网络共享 I/O 通过。
+- Windows 测试通过真实 `mklink /J` 创建临时目录 junction，先核对 canonical 目标，再验证根外现存读目标及未创建写目标均拒绝；移除 junction 后检查目标文件仍在。创建失败直接失败，不跳过。[Microsoft mklink 文档](https://learn.microsoft.com/windows-server/administration/windows-commands/mklink) 定义 `/J` 创建目录 junction；[Qt QProcess 文档](https://doc.qt.io/qt-6/qprocess.html#setNativeArguments) 要求 cmd.exe 使用原生命令行（2026-10-02 查阅）。测试使用固定相对参数及 QProcess working directory，不将临时路径插入 shell 文本。
+- Unix 符号链接跨 CXX 测试补充未创建写目标拒绝，与原 Rust 行为回归一致。生产 UI、工程数据和原生 file URL 转换保持不变；无兼容例外。
+
+- 初次新增 URL 测试识别出 Unix 解码盘符 URL 得到 `/C:/...`、Windows 得到 `C:/...` 的差异，已按平台分别断言；不通过宽松规范化吞掉差异。修复后 `cargo test --locked --workspace` 通过，69/69 CTest（macOS arm64，仓库根目录）；日志 `/tmp/panta-023-tests-reviewed.log`。
+- 本轮未取得新 Windows / Linux 场景结果；UNC 网络共享 I/O 未测试。Windows junction 与新增 URL / 拒绝矩阵仍需下一次 CI 验证，任务保持 in-progress。
+
+- 提交前评审：`cargo format --check`、`cargo lint --check` 与 `git diff HEAD --check` 通过，lint 日志 `/tmp/panta-023-lint.log`。Rust 负责逻辑引用规则，C++ 仅做 Qt URL 适配及跨语言测试；无重复规则、旧路径实现或兼容分支。

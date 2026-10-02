@@ -17,6 +17,10 @@
 #include <initializer_list>
 #include <memory>
 #include <utility>
+#ifdef Q_OS_WIN
+#include <QProcess>
+#include <QScopeGuard>
+#endif
 
 namespace {
 
@@ -149,6 +153,13 @@ TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes) {
     for (const auto& [reference, code] : std::initializer_list<std::pair<QString, QString>>{
              {QStringLiteral("project:/../escape"), QStringLiteral("path.parent_escape")},
              {QStringLiteral("project:/C:/win"), QStringLiteral("path.absolute_rejected")},
+             {QStringLiteral("project:////server/share/asset.pa"),
+              QStringLiteral("path.absolute_rejected")},
+             {QStringLiteral("project:/\\\\server\\share\\asset.pa"),
+              QStringLiteral("path.backslash_rejected")},
+             {QStringLiteral("project:/C:\\win"), QStringLiteral("path.backslash_rejected")},
+             {QStringLiteral("project:/assets\\..\\..\\outside"),
+              QStringLiteral("path.backslash_rejected")},
              {QStringLiteral("project:/CON"), QStringLiteral("path.reserved_name")},
              {QStringLiteral("project:/tail."), QStringLiteral("path.trailing_dot_or_space")},
              {QStringLiteral("workspace:/x"), QStringLiteral("path.unknown_scheme")},
@@ -172,12 +183,23 @@ TEST(PathHostTest, InvalidReferencesAreRejectedWithStableCodes) {
 
 TEST(PathHostTest, FileUrlsDecodeExactlyOnce) {
     QString error;
-    const QString path = QStringLiteral("/tmp/panta 空格%20名字.pa");
-    const QUrl url = QUrl::fromLocalFile(path);
-    const QString decoded = PathHost::fileUrlToPath(url, &error);
-    EXPECT_TRUE(error.isEmpty()) << error.toStdString();
-    // 编码后的 %20 不再二次解码：结果与原始路径一致。
-    EXPECT_EQ(decoded, path);
+    // 只验证 URL 转换，不连接 UNC 网络共享；%20 不得二次解码。
+    for (const QString& path :
+         {QStringLiteral("/tmp/panta 空格%20名字.pa"), QStringLiteral("C:/工程 路径/齿轮 #%20.pa"),
+          QStringLiteral("//server/share/工程 路径/齿轮 #%20.pa")}) {
+        error.clear();
+        const QUrl url = QUrl::fromLocalFile(path);
+        const QString decoded = PathHost::fileUrlToPath(url, &error);
+        EXPECT_TRUE(error.isEmpty()) << error.toStdString();
+        QString expected = path;
+#ifndef Q_OS_WIN
+        // Unix 不将盘符当本机前缀，保留 file URL 的绝对路径起始斜杠。
+        if (path.startsWith(QStringLiteral("C:/"))) {
+            expected.prepend(QChar('/'));
+        }
+#endif
+        EXPECT_EQ(decoded, expected);
+    }
 
     error.clear();
     const QString rejected =
@@ -293,6 +315,61 @@ TEST(PathHostTest, SymlinkEscapeOutsideRootIsRejected) {
     const QString leaked = host->resolveExisting(QStringLiteral("project:/leak/secret.pa"), &error);
     EXPECT_TRUE(leaked.isEmpty());
     EXPECT_TRUE(error.startsWith(QStringLiteral("path.not_contained"))) << error.toStdString();
+
+    error.clear();
+    EXPECT_TRUE(
+        host->resolveWriteTarget(QStringLiteral("project:/leak/new/nested.pa"), &error).isEmpty());
+    EXPECT_TRUE(error.startsWith(QStringLiteral("path.not_contained"))) << error.toStdString();
+}
+#endif
+
+#ifdef Q_OS_WIN
+TEST(PathHostTest, JunctionEscapeOutsideRootIsRejected) {
+    IsolatedStandardRoots standardRoots;
+    ASSERT_TRUE(standardRoots.isValid());
+    QTemporaryDir scratch;
+    ASSERT_TRUE(scratch.isValid());
+    const QString project = scratch.filePath(QStringLiteral("project root"));
+    const QString outside = scratch.filePath(QStringLiteral("outside"));
+    ASSERT_TRUE(QDir().mkpath(project));
+    ASSERT_TRUE(QDir().mkpath(outside));
+    QFile secret(outside + QStringLiteral("/secret.pa"));
+    ASSERT_TRUE(secret.open(QIODevice::WriteOnly));
+    ASSERT_EQ(secret.write("x"), qint64(1));
+    secret.close();
+
+    const QString link = project + QStringLiteral("/leak");
+    // 先移除 junction 本身，避免临时目录递归清理依赖重解析点行为。
+    auto cleanup = qScopeGuard([&link] {
+        if (QFileInfo::exists(link)) {
+            EXPECT_TRUE(QDir().rmdir(link));
+        }
+    });
+    QProcess command;
+    command.setProgram(QStringLiteral("cmd.exe"));
+    command.setWorkingDirectory(project);
+    // cmd.exe 使用原生命令行；固定相对参数不插入临时目录文本。
+    command.setNativeArguments(QStringLiteral("/d /c mklink /J leak \"..\\outside\""));
+    command.start();
+    ASSERT_TRUE(command.waitForFinished(10000)) << command.errorString().toStdString();
+    ASSERT_EQ(command.exitStatus(), QProcess::NormalExit);
+    ASSERT_EQ(command.exitCode(), 0) << command.readAllStandardError().toStdString();
+    ASSERT_EQ(QFileInfo(link).canonicalFilePath(), QFileInfo(outside).canonicalFilePath());
+
+    QString error;
+    auto host = standardRoots.create(&error);
+    ASSERT_NE(host, nullptr) << error.toStdString();
+    ASSERT_TRUE(host->setProjectRoot(project, &error)) << error.toStdString();
+    EXPECT_TRUE(host->resolveExisting(QStringLiteral("project:/leak/secret.pa"), &error).isEmpty());
+    EXPECT_TRUE(error.startsWith(QStringLiteral("path.not_contained"))) << error.toStdString();
+    error.clear();
+    EXPECT_TRUE(
+        host->resolveWriteTarget(QStringLiteral("project:/leak/new/nested.pa"), &error).isEmpty());
+    EXPECT_TRUE(error.startsWith(QStringLiteral("path.not_contained"))) << error.toStdString();
+    EXPECT_FALSE(QFileInfo::exists(outside + QStringLiteral("/new")));
+    ASSERT_TRUE(QDir().rmdir(link));
+    cleanup.dismiss();
+    EXPECT_TRUE(QFileInfo::exists(outside + QStringLiteral("/secret.pa")));
 }
 #endif
 

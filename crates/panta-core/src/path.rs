@@ -75,6 +75,8 @@ pub enum PathError {
     TrailingDotOrSpace(String),
     /// 引用内含 NUL 字节。
     NulByte,
+    /// 逻辑引用仅使用 `/`，拒绝可能被 Windows 当作分隔符的反斜杠。
+    BackslashRejected(String),
     /// 未知 scheme。
     UnknownScheme(String),
     /// 引用缺少 `scheme:/` 前缀。
@@ -103,6 +105,7 @@ impl PathError {
             Self::ReservedName(_) => "path.reserved_name",
             Self::TrailingDotOrSpace(_) => "path.trailing_dot_or_space",
             Self::NulByte => "path.nul_byte",
+            Self::BackslashRejected(_) => "path.backslash_rejected",
             Self::UnknownScheme(_) => "path.unknown_scheme",
             Self::MissingScheme => "path.missing_scheme",
             Self::RootMissing(_) => "path.root_missing",
@@ -122,6 +125,7 @@ impl PathError {
             | Self::QrcRootForbidden
             | Self::QrcNotNative => String::new(),
             Self::AbsoluteRejected(fragment)
+            | Self::BackslashRejected(fragment)
             | Self::ParentEscape(fragment)
             | Self::NotContained(fragment)
             | Self::NotFound(fragment) => fragment.clone(),
@@ -155,8 +159,7 @@ pub struct ResourceRef {
 }
 
 impl ResourceRef {
-    /// 解析逻辑地址；scheme 后必须跟 `:/`（`://` 形式按 scheme 切分后
-    /// 以未知 scheme 拒绝）。相对片段合法性由 `PathService` 的解析入口
+    /// 解析逻辑地址；scheme 后必须跟 `:/`。相对片段合法性由 `PathService` 的解析入口
     /// 统一校验，此处只做结构切分。
     pub fn parse(reference: &str) -> Result<Self, PathError> {
         let Some((scheme, relative)) = reference.split_once(":/") else {
@@ -205,6 +208,10 @@ fn validate_relative(relative: &str) -> Result<Vec<String>, PathError> {
     }
     if relative.contains('\0') {
         return Err(PathError::NulByte);
+    }
+    // 不让 PathBuf::join 在 Windows 将单个逻辑组件重新解释为 UNC 或父级路径。
+    if relative.contains('\\') {
+        return Err(PathError::BackslashRejected(relative.to_owned()));
     }
     let mut folded: Vec<String> = Vec::new();
     // 逻辑引用以 `/` 为唯一分隔符，手工切分而非经平台 Path 解析：Windows
@@ -448,6 +455,10 @@ mod tests {
             (".", "path.empty_reference"),
             ("/abs", "path.absolute_rejected"),
             ("C:/win", "path.absolute_rejected"),
+            ("//server/share/asset.pa", "path.absolute_rejected"),
+            (r"\\server\share\asset.pa", "path.backslash_rejected"),
+            (r"C:\win", "path.backslash_rejected"),
+            (r"assets\..\..\outside", "path.backslash_rejected"),
             ("..", "path.parent_escape"),
             ("a/../../b", "path.parent_escape"),
             ("CON", "path.reserved_name"),
@@ -629,6 +640,11 @@ mod tests {
                 "x ",
             ),
             (PathError::NulByte, "path.nul_byte", ""),
+            (
+                PathError::BackslashRejected(r"assets\part.pa".into()),
+                "path.backslash_rejected",
+                r"assets\part.pa",
+            ),
             (
                 PathError::UnknownScheme("ws".into()),
                 "path.unknown_scheme",
