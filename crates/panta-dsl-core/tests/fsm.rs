@@ -96,6 +96,28 @@ fn rejects_terminal_initial_duplicate_states_and_terminal_outgoing() -> Result<(
 }
 
 #[test]
+fn rejects_missing_headers_duplicate_sections_and_syntax() -> Result<(), Box<dyn Error>> {
+    assert_rejected(
+        "kind: fsm\nname: bad\ninitial: A\n\nstates:\n  A: active\n  B: terminal\n\ntransitions:\n  go:\n    from: A\n    on: advance\n    to: B\n",
+        "pa.missing_version",
+    )?;
+    assert_rejected(
+        "version: 1\nname: bad\ninitial: A\n\nstates:\n  A: active\n  B: terminal\n\ntransitions:\n  go:\n    from: A\n    on: advance\n    to: B\n",
+        "pa.missing_kind",
+    )?;
+    assert_rejected(
+        "version: 1\nkind: fsm\nname: bad\ninitial: A\ninitial: B\n\nstates:\n  A: active\n  B: terminal\n\ntransitions:\n  go:\n    from: A\n    on: advance\n    to: B\n",
+        "pa.duplicate_header",
+    )?;
+    assert_rejected(
+        "version: 1\nkind: fsm\nname: bad\ninitial: A\n\nstates:\n  A: active\n  B: terminal\n\ntransitions:\n  go:\n    from: A\n    on: advance\n    to: B\ntransitions:\n  again:\n    from: A\n    on: other\n    to: B\n",
+        "pa.fsm_duplicate_section",
+    )?;
+    assert_rejected("version: nope\nkind: fsm\n", "pa.syntax")?;
+    Ok(())
+}
+
+#[test]
 fn rejects_ambiguous_edges_and_duplicate_transition_ids() -> Result<(), Box<dyn Error>> {
     assert_rejected(
         "version: 1\nkind: fsm\nname: bad\ninitial: A\n\nstates:\n  A: active\n  B: terminal\n  C: terminal\n\ntransitions:\n  go:\n    from: A\n    on: advance\n    to: B\n  again:\n    from: A\n    on: advance\n    to: C\n",

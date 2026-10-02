@@ -108,3 +108,14 @@ pub(super) fn map_import_error(error: ImportError) -> ProjectError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_failures_become_parse_failures() {
+        let error = map_import_error(ImportError::Read("disk full".into()));
+        assert!(matches!(error, ProjectError::ImportParseFailed(detail) if detail == "disk full"));
+    }
+}

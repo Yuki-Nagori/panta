@@ -634,6 +634,10 @@ mod tests {
             read_source_checked(&unknown, || false),
             Err(CheckedReadError::Failed(ImportError::UnsupportedFormat(_)))
         ));
+        let cancelled = CheckedReadError::Cancelled(source.display().to_string());
+        assert!(cancelled.to_string().contains("Cancelled"));
+        let failed = CheckedReadError::Failed(ImportError::Missing(source.display().to_string()));
+        assert!(failed.to_string().contains("Missing"));
         Ok(())
     }
 }

@@ -136,3 +136,11 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 `cargo coverage` 通过：全局函数 677/736（91.98%）、行 7818/8237（94.91%）。`panta-ffi` 为函数 152/160（95.00%）、行 1886/2002（94.21%），行覆盖越过 92%。上一轮全局是 664/732（90.71%），ffi 行覆盖是 1713/1920（89.22%）。门槛仍是 89% / 92%。函数 100%、C++ line/branch 和逐模块防下降仍未完成。
 
 `cargo test -p panta-ffi --locked --lib` 25 passed。`cargo clippy -p panta-ffi --locked --all-targets -- -D warnings` 通过。未跑完整 workspace 测试。
+
+## 2026-10-02 FSM 头部与导入错误显示
+
+FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pest 语法错误都会进入既有诊断。可取消读取的 `CheckedReadError` 能格式化成文本。STL 读失败映射为 `ImportParseFailed`。
+
+`cargo coverage` 通过：全局函数 681/737（92.40%）、行 7855/8245（95.27%）。上一轮是 677/736（91.98%）和 7818/8237（94.91%）。`panta-dsl-core` 为函数 125/145（86.21%），`panta-import` 为函数 36/40（90.00%）。门槛仍是 89% / 92%。函数 100%、C++ line/branch 和逐模块防下降仍未完成。
+
+定向测试：`cargo test -p panta-dsl-core --locked --test fsm -- rejects_missing_headers`、`cargo test -p panta-import --locked --lib -- checked_read_supports_cancellation`、`cargo test -p panta-core --locked --lib -- read_failures_become_parse_failures` 均通过。三个 crate 的 `cargo clippy --locked --all-targets -- -D warnings` 通过。未跑完整 workspace 测试。
