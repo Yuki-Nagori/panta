@@ -1,11 +1,11 @@
 # 038 — Native SDK 制品生产与发布
 
-- 状态：in-progress
+- 状态：deferred
 - 阶段：交付基础
 - 依赖：[031](031-prebuilt-native-dependencies.md)、[020](020-toolchain-provisioning.md)
 - 优先级：P0
 - 负责人：待分配
-- 创建 / 更新：2026-09-17 / 2026-09-20
+- 创建 / 更新：2026-09-17 / 2026-10-02
 
 ## 目标与背景
 
@@ -90,4 +90,6 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 
 ## 完成摘要
 
-未完成（保持 in-progress）。VTK WebGPU hardware-window 三平台 production/selfcheck/package/release 已完成，031 manifest 已切换并记录真实 SHA256、ABI、targets 与窗口系统；OCCT/Netgen 合并 workflow 已有三平台 Release。剩余：OCCT/Netgen manifest 最终复核、SBOM/provenance 自动化、007/009/010 的真实链接/运行冒烟，以及 Linux glibc 有效基线回写。
+未完成。VTK WebGPU hardware-window 三平台 production/selfcheck/package/release 已完成，031 manifest 已切换并记录真实 SHA256、ABI、targets 与窗口系统；OCCT/Netgen 合并 workflow 已有三平台 Release。
+
+2026-10-02：维护者要求本任务暂时延后。状态改为 deferred，不排入当前交付。恢复时继续 OCCT/Netgen manifest 复核、SBOM/provenance、007/009/010 的真实链接与运行冒烟，以及 Linux glibc 有效基线。已发布制品和 manifest 保持有效，不把延后写成这些收尾已完成。

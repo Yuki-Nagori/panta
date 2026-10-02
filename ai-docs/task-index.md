@@ -65,7 +65,7 @@ ai-docs/
 | 020 | [托管引导：CMake/Ninja 二进制供给](task/020-toolchain-provisioning.md) | M0 | 004 | done |
 | 031 | [预编译 native 依赖供给与 CMake package](task/031-prebuilt-native-dependencies.md) | 交付基础 | 002, 004 | deferred |
 | 036 | [三平台 CI native 构建修复](task/036-ci-native-build-fix.md) | 验证基础 | 004, 005, 018 | done |
-| 038 | [Native SDK 制品生产与发布](task/038-native-sdk-artifact-production.md) | 交付基础 | 031, 020 | in-progress |
+| 038 | [Native SDK 制品生产与发布](task/038-native-sdk-artifact-production.md) | 交付基础 | 031, 020 | deferred |
 | 039 | [CI FFI 构建链修复](task/039-ci-ffi-build-fix.md) | 验证基础 | 006, 018, 036 | done |
 | 040 | [统一 Cargo 构建编排入口](task/040-cargo-build-orchestration.md) | 验证基础 | 004, 039 | done |
 | 041 | [构建产物归一与第三方缓存共享](task/041-build-artifact-consolidation.md) | 验证基础 | 004, 020 | done |
@@ -184,4 +184,4 @@ FSM 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [0
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 
-后续新任务使用当前最大编号加一，不复用已有编号。主线里 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已暂时延后，恢复时再补跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口。[031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) / [038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 仍有运行时分发、Linux 基线与 SBOM/provenance 收尾。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；最近一次复查见 [101 CI 验收复查](task/101-active-task-ci-acceptance.md)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。主线里 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已暂时延后，恢复时再补跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口。[031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) 仍为 deferred。[038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 于 2026-10-02 暂时延后，恢复时再补运行时分发、Linux glibc 基线与 SBOM/provenance。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；最近一次复查见 [101 CI 验收复查](task/101-active-task-ci-acceptance.md)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
