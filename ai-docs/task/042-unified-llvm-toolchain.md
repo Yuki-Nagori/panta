@@ -26,6 +26,10 @@
 - **Windows ASan × 未插桩 Qt DLL**：clang ASan 在 Windows 用自有分配器，未插桩 Qt DLL 走 ucrt/RTL 堆，QML 引擎跨模块对象生命周期释放到错误堆触发 bad-free（abort，非报告，不可抑制）。Windows asan 组合经 runner 排除 `Qml.*`；纯自有 C++ 与 FFI 测试不受影响。
 - **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。tsan 组合经 runner 排除 `TaskHost.*`/`Ffi.*`（FFI 驱动 Rust 线程）、`Qml.*`（第三方栈噪声），以及 `ProjectViewModelTest` 中经 FFI 拉取 Rust 异步激活结果的两个用例和 Fill 后台确认用例（补登记见任务 098）。这些用例在普通 CTest 和 ASan/UBSan 中运行，Rust 协调器另由 Miri 检查；其余不涉及 Rust 后台结果交付的 `ProjectViewModelTest` 仍由 TSan 执行。`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。升级为 Rust/C++ 双侧 TSan 插桩后复查排除项。
 
+### STL 预检排除补登记（2026-10-02，任务 063）
+
+CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/37005793824) 的 Linux TSan 报告均位于未插桩 Rust std mpsc 的结果读写、快照复制或释放栈。063 后台预检使以下四个用例进入同一工具边界，runner 按精确名称补入 TSan 排除：`StructuredImportFailuresPreserveTheCommittedProjectAndViewport`、`PreviewsImportsAndPersistsLatestRecord`、`PreviewCancellationReplacementAndProjectSwitchIgnoreOldResults`、`PreviewNotificationsCanReplaceOrCancelTheCompletedRequest`。普通 Cargo 聚合及 ASan/UBSan 仍执行这些用例；本次 CI 的 Miri 与三平台普通测试、ASan/UBSan 已通过。未扩大为整个 ViewModel 排除，也未添加运行时抑制；Rust/C++ 双侧插桩后复查这些排除。
+
 ## 本轮修复范围（2026-09-19）
 
 按维护者要求修复复审列出的全部基础设施缺口：提取公共构建支持 crate，供给采用文件锁、摘要隔离和原子发布；统一 Ninja 与 Windows SDK 环境；runner 按命令准备工具；固定并托管 uv/Python/Cppcheck；覆盖自有 CXX 编译命令；native coverage 使用 C++ LLVM 配套工具；工具核验读取实际编译数据库与 CMakeCache。工具选择收敛和验证证据随实施回填，不用本机旁路冒充三平台通过。

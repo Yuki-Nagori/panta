@@ -212,17 +212,24 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     if !native.is_dir() {
         return Err(format!("sanitizer 构建树不存在：{}", native.display()).into());
     }
-    // 组合级排除（边界登记 042）：tsan 下 Rust std 的 futex 锁不可见
-    // （rust-lang/rust#110485），经 FFI 驱动 Rust 线程的测试只会确定性误报；
-    // ProjectViewModel 异步激活及 Fill 确认测试也经 Rust 同步取结果，
+    // 组合级排除（边界登记 042）：当前仅插桩 C++，TSan 无法识别 Rust std
+    // 同步关系（rust-lang/rust#110485），CI 在跨线程结果交付中产生误报；
+    // ProjectViewModel 异步激活、Fill 确认与 STL 预检也经 Rust 同步取结果，
     // 普通 CTest 与 ASan/UBSan 仍执行，Rust 侧由 Miri 验证。
     // QML 测试栈（Qt/glib/系统库）连续三轮仅产出第三方噪声，无自有信号。
     // Windows asan 下未插桩 Qt DLL 走 ucrt/RTL 堆而 ASan 用自有分配器，
     // QML 引擎跨模块对象生命周期触发 bad-free。
     let exclude = match (name, cfg!(windows)) {
-        ("tsan", _) => Some(
-            "^(TaskHost|Ffi|Qml)\\.|^ProjectViewModelTest\\.(ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand|FailedLoadRetainsTabAndCloseReleasesActivationState|FillSettingsConfirmAsynchronouslyAndReopenFromRust)$",
-        ),
+        ("tsan", _) => Some(concat!(
+            "^(TaskHost|Ffi|Qml)\\.|^ProjectViewModelTest\\.(",
+            "ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand|",
+            "FailedLoadRetainsTabAndCloseReleasesActivationState|",
+            "FillSettingsConfirmAsynchronouslyAndReopenFromRust|",
+            "StructuredImportFailuresPreserveTheCommittedProjectAndViewport|",
+            "PreviewsImportsAndPersistsLatestRecord|",
+            "PreviewCancellationReplacementAndProjectSwitchIgnoreOldResults|",
+            "PreviewNotificationsCanReplaceOrCancelTheCompletedRequest)$",
+        )),
         ("asan", true) => Some("^Qml\\."),
         _ => None,
     };
