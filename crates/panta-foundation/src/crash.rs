@@ -104,8 +104,10 @@ fn signal_name(signal: libc::c_int) -> &'static str {
     }
 }
 
+/// 写出崩溃标识和回溯。不恢复默认处置、不重发信号，便于测试覆盖
+/// 记录路径；真正的信号处理器在记录后仍按原语义终止进程。
 #[cfg(unix)]
-extern "C" fn crash_handler(signal: libc::c_int) {
+fn record_crash(signal: libc::c_int) {
     let log_fd = LOG_FD.load(Ordering::SeqCst);
     let log_line = LOG_LINE.load(Ordering::SeqCst);
     if log_fd >= 0 {
@@ -131,6 +133,11 @@ extern "C" fn crash_handler(signal: libc::c_int) {
         write_backtrace(log_fd);
     }
     write_backtrace(libc::STDERR_FILENO);
+}
+
+#[cfg(unix)]
+extern "C" fn crash_handler(signal: libc::c_int) {
+    record_crash(signal);
     // SAFETY: 恢复默认处置后重发同一信号，保持 .ips 崩溃报告与内核退出
     // 语义；signal/raise 均为 async-signal-safe。
     unsafe {
@@ -383,6 +390,13 @@ pub fn crash_log_path() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// 记录与安装都改进程级 fd；并行测试会互相覆盖。
+    fn lock_crash_state() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: Mutex<()> = Mutex::new(());
+        LOCK.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     /// 使用全新进程触发崩溃，避免污染父测试进程的处理器及退出状态。
     #[cfg(any(unix, windows))]
     #[test]
@@ -495,8 +509,81 @@ mod tests {
         let content = std::fs::read_to_string(&path)?;
         assert_eq!(content, format!("prefix:0,42,{}", u64::MAX));
         assert_eq!(signal_name(libc::SIGSEGV), "SIGSEGV");
+        assert_eq!(signal_name(libc::SIGBUS), "SIGBUS");
+        assert_eq!(signal_name(libc::SIGFPE), "SIGFPE");
+        assert_eq!(signal_name(libc::SIGILL), "SIGILL");
+        assert_eq!(signal_name(libc::SIGABRT), "SIGABRT");
+        assert_eq!(signal_name(libc::SIGTRAP), "SIGTRAP");
         assert_eq!(signal_name(-1), "UNKNOWN");
+        write_all(-1, b"ignored");
         std::fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn record_crash_writes_log_without_terminating() -> std::io::Result<()> {
+        let _guard = lock_crash_state();
+        let path = std::env::temp_dir().join(format!(
+            "panta-foundation-crash-record-{}",
+            std::process::id()
+        ));
+        let file = std::fs::File::create(&path)?;
+        // SAFETY: fd 由本测试独占，记录完成后恢复哨兵并关闭一次。
+        let fd = file.into_raw_fd();
+        let previous_fd = LOG_FD.swap(fd, Ordering::SeqCst);
+        let previous_line = LOG_LINE.swap(std::ptr::null_mut(), Ordering::SeqCst);
+        let log_line = std::ffi::CString::new(" log=/tmp/panta-record\n")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?
+            .into_raw();
+        LOG_LINE.store(log_line.cast(), Ordering::SeqCst);
+        record_crash(libc::SIGBUS);
+        LOG_FD.store(previous_fd, Ordering::SeqCst);
+        LOG_LINE.store(previous_line, Ordering::SeqCst);
+        // SAFETY: 指针来自本测试刚泄露的 CString，且处理器不再读取它。
+        unsafe {
+            drop(std::ffi::CString::from_raw(log_line));
+            libc::close(fd);
+        }
+        let content = std::fs::read_to_string(&path)?;
+        let header = format!("panta-native crash: SIGBUS pid={}\n", std::process::id());
+        assert!(content.starts_with(&header), "{content}");
+        assert!(
+            content.contains("backtrace(unsymbolized; 符号对照见 .ips):\n"),
+            "{content}"
+        );
+        std::fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn install_rejects_unusable_directory_and_accepts_empty_dir() -> std::io::Result<()> {
+        let _guard = lock_crash_state();
+        let root = std::env::temp_dir().join(format!(
+            "panta-foundation-crash-install-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root)?;
+        let blocking = root.join("not-a-directory");
+        std::fs::File::create(&blocking)?;
+        let blocking_text = blocking.to_str().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "临时路径不是 UTF-8")
+        })?;
+        let failed = install_crash_handler(blocking_text);
+        assert!(failed.is_err(), "{failed:?}");
+
+        let installed = install_crash_handler("")?;
+        assert!(installed.is_file(), "{}", installed.display());
+        assert_eq!(crash_log_path().as_deref(), Some(installed.as_path()));
+        for signal in CRASH_SIGNALS {
+            // SAFETY: 测试结束恢复默认处置，避免后续用例继承本进程处理器。
+            unsafe {
+                libc::signal(signal, libc::SIG_DFL);
+            }
+        }
+        std::fs::remove_file(&installed)?;
+        std::fs::remove_dir_all(root)?;
         Ok(())
     }
 }

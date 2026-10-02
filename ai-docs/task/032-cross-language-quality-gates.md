@@ -104,4 +104,19 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 - `cargo coverage`：通过，函数 629/685（91.82%）、行 6907/7343（94.06%）；三个报告文件均已生成。初次运行发现工具版本命令需要 `llvm-cov` 子命令、当前 LLVM JSON 为 3.1.0，修正后重新实跑通过。
 - `cargo test --locked --workspace`：通过，包含 qmllint 与 CTest 69/69；报告校验三项单测通过。追加精度边界测试后，定向 runner 单测再次通过（性能 CLI 三项按既有约定忽略）。
 - `cargo format --check`、`cargo lint --check` 与 `git diff HEAD --check`：通过；Clippy、machete、CMake、qmllint、clang-tidy、include-cleaner、Cppcheck 均完成。依赖键保持 serde_json / pest_derive 原名，无版本变更。
-- 新配置的 CI artifact 上传尚未取得当前提交证据；逐 crate 数字仅用于审阅，任务仍为 `in-progress`。
+- 新配置的 CI artifact 上传当时尚未取得当前提交证据；逐 crate 数字仅用于审阅，任务仍为 `in-progress`。随后 [run 37010051058](https://github.com/Yuki-Nagori/panta/actions/runs/37010051058)（`966b358`）成功上传 `rust-coverage` 与 `native-coverage`。那次上传只证明报告路径，不提高 89% / 92% 门槛，也不等于 100% 或分模块门禁。
+
+## 2026-10-02 崩溃记录覆盖
+
+`panta-foundation` 的崩溃记录此前大量落在信号处理器里。子进程以 SIGSEGV 退出时 LLVM profile 来不及刷盘，所以处理器里的写日志和回溯在覆盖率里一直显示未执行。本批把记录从“重发信号”里拆出：`record_crash` 只写标识和回溯，`crash_handler` 仍在记录后恢复默认处置并重发信号。生产终止语义不变。
+
+新增直接测试：无效 fd 的 `write_all` 提前返回、六个崩溃信号名、`record_crash(SIGBUS)` 的日志与回溯文本、不可用目录安装失败，以及空目录安装后恢复默认信号处置。重发信号的那几行仍只在会杀死进程的子进程里执行，不把未刷盘的 profile 算作覆盖。Windows 路径不在这次 macOS 统计里。
+
+`cargo coverage`（macOS arm64，rustc 1.98.1 / cargo-llvm-cov 0.9.1）通过，未改 89% / 92% 下限：
+
+- 全局：函数 657/726（90.50%）、行 7567/8101（93.41%）
+- `panta-foundation`：函数 14/19（73.68%）、行 215/241（89.21%）
+
+同一份旧报告（`d0870c2`，树已脏）里 foundation 是函数 6/13（46.15%）、行 83/171（48.54%）。两次分母不同，只说明记录路径已经进入覆盖，不拿全局百分比和那份旧报告比高低。`panta-ffi` 行覆盖 1713/1920（89.22%）仍低于全局行下限，目前由其他 crate 补上。C++ line/branch、逐模块防下降和函数 100% 仍未完成，任务保持 in-progress。
+
+本批还跑了 `cargo test -p panta-foundation --locked`（4 passed，1 ignored）和 `cargo clippy -p panta-foundation --locked --all-targets -- -D warnings`。未跑完整 `cargo test --locked --workspace`。
