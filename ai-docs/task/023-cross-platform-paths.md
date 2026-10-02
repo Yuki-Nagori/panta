@@ -92,13 +92,17 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 
 ## 2026-10-02 平台回归补充
 
+- CI [36985311142](https://github.com/Yuki-Nagori/panta/actions/runs/36985311142) 的 Windows Cargo / ASan 均在 junction 夹具目标断言失败，尚未执行该用例的 Rust 越界拒绝断言；其余失败日志未发现独立故障。本轮修复范围为使用 Qt 专用 `isJunction()` / `junctionTarget()` 核对真实 junction 与目标，替换错误的 `canonicalFilePath()` 直接比较；保留创建失败即失败、读 / 写越界拒绝及清理检查。任务仍待修复后的 Windows CI 验证。
+
 - 最新 CI [36982743570](https://github.com/Yuki-Nagori/panta/actions/runs/36982743570) 的三平台 Cargo 聚合及 sanitizer 均成功，已执行 PathHost C++ 测试；旧记录中“C++ 尚未进 CI”仅是当时状态，当前缺口为新增 UNC / junction 场景的平台证据。
 - 新增反斜杠逻辑引用矩阵在修复前于 macOS 失败（UNC 片段被错误接受），日志 `/tmp/panta-023-repro.log`。Rust 校验新增 `path.backslash_rejected`，错误码 / 详情遍历与 CXX 端到端测试同步；不把 Windows 本机路径字符串作为逻辑引用。
 - file URL 测试覆盖盘符与 UNC 中的中文、空格、#、%20，要求单次解码且原值保留；不连接或创建网络共享，不能据此宣称网络共享 I/O 通过。
-- Windows 测试通过真实 `mklink /J` 创建临时目录 junction，先核对 canonical 目标，再验证根外现存读目标及未创建写目标均拒绝；移除 junction 后检查目标文件仍在。创建失败直接失败，不跳过。[Microsoft mklink 文档](https://learn.microsoft.com/windows-server/administration/windows-commands/mklink) 定义 `/J` 创建目录 junction；[Qt QProcess 文档](https://doc.qt.io/qt-6/qprocess.html#setNativeArguments) 要求 cmd.exe 使用原生命令行（2026-10-02 查阅）。测试使用固定相对参数及 QProcess working directory，不将临时路径插入 shell 文本。
+- Windows 测试通过真实 `mklink /J` 创建临时目录 junction，先用 `isJunction()` / `junctionTarget()` 核对类型与目标，再验证根外现存读目标及未创建写目标均拒绝；移除 junction 后检查目标文件仍在。创建失败直接失败，不跳过。[Microsoft mklink 文档](https://learn.microsoft.com/windows-server/administration/windows-commands/mklink) 定义 `/J` 创建目录 junction；[Qt QProcess 文档](https://doc.qt.io/qt-6/qprocess.html#setNativeArguments) 要求 cmd.exe 使用原生命令行；[Qt QFileInfo 文档](https://doc.qt.io/qt-6/qfileinfo.html#junctionTarget) 定义 junction 专用目标查询（2026-10-02 查阅）。测试使用固定相对参数及 QProcess working directory，不将临时路径插入 shell 文本。
 - Unix 符号链接跨 CXX 测试补充未创建写目标拒绝，与原 Rust 行为回归一致。生产 UI、工程数据和原生 file URL 转换保持不变；无兼容例外。
 
 - 初次新增 URL 测试识别出 Unix 解码盘符 URL 得到 `/C:/...`、Windows 得到 `C:/...` 的差异，已按平台分别断言；不通过宽松规范化吞掉差异。修复后 `cargo test --locked --workspace` 通过，69/69 CTest（macOS arm64，仓库根目录）；日志 `/tmp/panta-023-tests-reviewed.log`。
 - 本轮未取得新 Windows / Linux 场景结果；UNC 网络共享 I/O 未测试。Windows junction 与新增 URL / 拒绝矩阵仍需下一次 CI 验证，任务保持 in-progress。
 
 - 提交前评审：`cargo format --check`、`cargo lint --check` 与 `git diff HEAD --check` 通过，lint 日志 `/tmp/panta-023-lint.log`。Rust 负责逻辑引用规则，C++ 仅做 Qt URL 适配及跨语言测试；无重复规则、旧路径实现或兼容分支。
+
+- CI 夹具修复后的 macOS arm64 回归：`cargo test --locked --workspace` 通过，69/69 CTest，日志 `/tmp/panta-023-ci-fix-tests.log`；`cargo format --check`、`cargo lint --check` 与 `git diff HEAD --check` 通过，质量检查日志 `/tmp/panta-023-ci-fix-lint.log`。评审核对保留原有 Rust 根包含规则及读 / 写越界、目标未被写入、清理后目标文件仍在的断言，无生产代码或 UI 改动。Windows 专用修复尚未本地执行，不以 macOS 聚合结果代替 Windows junction / ASan 验收；任务与索引继续 in-progress。

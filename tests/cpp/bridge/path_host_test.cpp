@@ -354,7 +354,14 @@ TEST(PathHostTest, JunctionEscapeOutsideRootIsRejected) {
     ASSERT_TRUE(command.waitForFinished(10000)) << command.errorString().toStdString();
     ASSERT_EQ(command.exitStatus(), QProcess::NormalExit);
     ASSERT_EQ(command.exitCode(), 0) << command.readAllStandardError().toStdString();
-    ASSERT_EQ(QFileInfo(link).canonicalFilePath(), QFileInfo(outside).canonicalFilePath());
+    // Qt 对 NTFS junction 提供独立查询；canonicalFilePath 不用于识别其目标。
+    const QFileInfo junction(link);
+    ASSERT_TRUE(junction.isJunction()) << link.toStdString();
+    const QString target = junction.junctionTarget();
+    ASSERT_FALSE(target.isEmpty()) << link.toStdString();
+    const QString canonicalTarget = QFileInfo(target).canonicalFilePath();
+    ASSERT_FALSE(canonicalTarget.isEmpty()) << target.toStdString();
+    ASSERT_EQ(canonicalTarget.toStdString(), QFileInfo(outside).canonicalFilePath().toStdString());
 
     QString error;
     auto host = standardRoots.create(&error);
