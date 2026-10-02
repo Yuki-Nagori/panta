@@ -43,23 +43,28 @@ QString format_dimensions(double sizeX, double sizeY, double sizeZ, const QStrin
     return unit.isEmpty() ? values : values + QLatin1Char(' ') + unit;
 }
 
-// Rust 错误可能带冒号后的细节；用户消息只按稳定错误码选择。
+// 激活结果已分别携带稳定码与上下文，用户摘要只按稳定码选择。
 QString activation_message_for(const QString& code) {
-    const QString errorCode = code.section(QLatin1Char(':'), 0, 0);
-    if (errorCode == QStringLiteral("project.asset_missing")) {
+    if (code == QStringLiteral("project.asset_missing")) {
         return QStringLiteral("The saved STL asset is missing from the project package.");
     }
-    if (errorCode == QStringLiteral("project.asset_unsupported_format")) {
+    if (code == QStringLiteral("project.asset_unsupported_format")) {
         return QStringLiteral("The saved STL asset format is not supported.");
     }
-    if (errorCode == QStringLiteral("project.import_unsupported_units")) {
+    if (code == QStringLiteral("project.import_unsupported_units")) {
         return QStringLiteral("The saved STL asset uses unsupported units.");
     }
-    if (errorCode == QStringLiteral("project.asset_read_failed") ||
-        errorCode == QStringLiteral("project.asset_parse_failed")) {
+    if (code == QStringLiteral("project.asset_read_failed") ||
+        code == QStringLiteral("project.asset_parse_failed")) {
         return QStringLiteral("The saved STL asset could not be read.");
     }
     return QStringLiteral("The saved STL asset could not be opened.");
+}
+
+QVariantMap project_diagnostic(const panta::ffi::ProjectDiagnostic& error) {
+    return {{QStringLiteral("code"), QString::fromUtf8(error.code)},
+            {QStringLiteral("category"), QString::fromUtf8(error.category)},
+            {QStringLiteral("detail"), QString::fromUtf8(error.detail)}};
 }
 
 QVariantList choice_catalog(const rust::Vec<panta::ffi::ChoiceDefinition>& catalog) {
@@ -93,10 +98,11 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
       m_meshTypes(choice_catalog(panta::ffi::mesh_type_catalog())),
       m_defaultMeshType(QString::fromUtf8(panta::ffi::default_mesh_type())),
       m_service(panta::ffi::project_service_new()) {
-    try {
-        m_defaultMaterial = material_definition(panta::ffi::default_material());
-    } catch (const rust::Error& failure) {
-        fail(QString::fromUtf8(failure.what()));
+    const auto material = panta::ffi::default_material();
+    if (material.error.code.empty()) {
+        m_defaultMaterial = material_definition(material.value);
+    } else {
+        fail(material.error);
     }
     connect(this, &ProjectViewModel::activeDocumentChanged, this,
             &ProjectViewModel::refreshPlanSettings);
@@ -131,25 +137,26 @@ bool ProjectViewModel::placeholder_visible() const {
 
 std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
 ProjectViewModel::pull_service_mesh(const QString& importId) const {
-    try {
-        const auto snapshot = panta::ffi::project_service_mesh_snapshot_for_import(
-            *m_service, importId.toStdString());
-        if (snapshot.coordinates.empty() || snapshot.coordinates.size() % 9 != 0) {
-            return nullptr;
-        }
-        auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
-        mesh->project_revision = snapshot.revision;
-        mesh->vertices.reserve(snapshot.coordinates.size() / 3);
-        for (std::size_t offset = 0; offset < snapshot.coordinates.size(); offset += 3) {
-            mesh->vertices.push_back({snapshot.coordinates[offset],
-                                      snapshot.coordinates[offset + 1],
-                                      snapshot.coordinates[offset + 2]});
-        }
-        return mesh;
-    } catch (const rust::Error& error) {
-        qWarning("ProjectViewModel mesh snapshot failed: %s", error.what());
+    const auto result =
+        panta::ffi::project_service_mesh_snapshot_for_import(*m_service, importId.toStdString());
+    if (!result.error.code.empty()) {
+        qWarning("ProjectViewModel mesh snapshot failed: %s: %s",
+                 QString::fromUtf8(result.error.code).toStdString().c_str(),
+                 QString::fromUtf8(result.error.detail).toStdString().c_str());
         return nullptr;
     }
+    const auto& snapshot = result.value;
+    if (snapshot.coordinates.empty() || snapshot.coordinates.size() % 9 != 0) {
+        return nullptr;
+    }
+    auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+    mesh->project_revision = snapshot.revision;
+    mesh->vertices.reserve(snapshot.coordinates.size() / 3);
+    for (std::size_t offset = 0; offset < snapshot.coordinates.size(); offset += 3) {
+        mesh->vertices.push_back({snapshot.coordinates[offset], snapshot.coordinates[offset + 1],
+                                  snapshot.coordinates[offset + 2]});
+    }
+    return mesh;
 }
 
 const QString& ProjectViewModel::defaultLocation() const { return m_defaultLocation; }
@@ -163,6 +170,10 @@ const QString& ProjectViewModel::lastCreatedPath() const { return m_lastCreatedP
 const QString& ProjectViewModel::error() const { return m_error; }
 
 const QString& ProjectViewModel::errorCode() const { return m_errorCode; }
+
+const QString& ProjectViewModel::errorCategory() const { return m_errorCategory; }
+
+const QString& ProjectViewModel::errorDetail() const { return m_errorDetail; }
 
 const QString& ProjectViewModel::currentPath() const { return m_currentPath; }
 
@@ -255,15 +266,13 @@ bool ProjectViewModel::setAnalysisSequence(const QString& projectPath, quint64 r
         !toBoundaryText(sequenceId, &sequence, &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        applySnapshot(panta::ffi::project_service_set_analysis_sequence(*m_service, path, revision,
-                                                                        id, sequence));
-        refreshPlanSettings();
-        clearError();
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    if (!applySnapshot(panta::ffi::project_service_set_analysis_sequence(*m_service, path, revision,
+                                                                         id, sequence))) {
+        return false;
     }
+    refreshPlanSettings();
+    clearError();
+    return true;
 }
 
 bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
@@ -281,21 +290,21 @@ bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
         !toBoundaryText(materialId, &material, &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        const bool pending = panta::ffi::project_service_begin_material_confirmation(
-            *m_service, path, revision, id, material);
-        clearError();
-        if (pending) {
-            set_pending_confirmation(ConfirmationKind::Material);
-        } else {
-            // 相同材料无需写盘，仍按完成事件结束弹窗。
-            refreshPlanSettings();
-            emit materialConfirmationFinished(true);
-        }
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto result = panta::ffi::project_service_begin_material_confirmation(
+        *m_service, path, revision, id, material);
+    if (!result.error.code.empty()) {
+        return fail(result.error);
     }
+    const bool pending = result.value;
+    clearError();
+    if (pending) {
+        set_pending_confirmation(ConfirmationKind::Material);
+    } else {
+        // 相同材料无需写盘，仍按完成事件结束弹窗。
+        refreshPlanSettings();
+        emit materialConfirmationFinished(true);
+    }
+    return true;
 }
 
 bool ProjectViewModel::setFillSettings(const QString& projectPath, quint64 revision,
@@ -337,22 +346,23 @@ bool ProjectViewModel::setFillSettings(const QString& projectPath, quint64 revis
         candidate.holding_profile.push_back({duration, pressure});
     }
     if (!converted) {
-        return fail(QStringLiteral("project.command_invalid: invalid process settings value"));
+        return fail(QStringLiteral("project.command_invalid"), QStringLiteral("validation"),
+                    QStringLiteral("invalid process settings value"));
     }
-    try {
-        const bool pending = panta::ffi::project_service_begin_fill_settings_confirmation(
-            *m_service, path, revision, id, std::move(candidate));
-        clearError();
-        if (pending) {
-            set_pending_confirmation(ConfirmationKind::FillSettings);
-        } else {
-            refreshPlanSettings();
-            emit fillSettingsConfirmationFinished(true);
-        }
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto result = panta::ffi::project_service_begin_fill_settings_confirmation(
+        *m_service, path, revision, id, std::move(candidate));
+    if (!result.error.code.empty()) {
+        return fail(result.error);
     }
+    const bool pending = result.value;
+    clearError();
+    if (pending) {
+        set_pending_confirmation(ConfirmationKind::FillSettings);
+    } else {
+        refreshPlanSettings();
+        emit fillSettingsConfirmationFinished(true);
+    }
+    return true;
 }
 
 bool ProjectViewModel::setGateLocationSettings(const QString& projectPath, quint64 revision,
@@ -381,28 +391,28 @@ bool ProjectViewModel::setGateLocationSettings(const QString& projectPath, quint
     // 拒绝 DTO 整数转换中的截断；业务范围由 Rust 校验。
     if (!moldOk || !meltOk || !gatesOk || !std::isfinite(gates) || gates < 0 ||
         gates > std::numeric_limits<std::uint32_t>::max() || std::floor(gates) != gates)
-        return fail(
-            QStringLiteral("project.command_invalid: invalid gate location settings value"));
+        return fail(QStringLiteral("project.command_invalid"), QStringLiteral("validation"),
+                    QStringLiteral("invalid gate location settings value"));
     panta::ffi::GateLocationSettings candidate;
     candidate.machine_id = machine;
     candidate.algorithm_id = algorithm;
     candidate.mold_temperature_celsius = mold;
     candidate.melt_temperature_celsius = melt;
     candidate.number_of_gates = static_cast<std::uint32_t>(gates);
-    try {
-        const bool pending = panta::ffi::project_service_begin_gate_location_settings_confirmation(
-            *m_service, path, revision, id, std::move(candidate));
-        clearError();
-        if (pending)
-            set_pending_confirmation(ConfirmationKind::GateLocationSettings);
-        else {
-            refreshPlanSettings();
-            emit gateLocationSettingsConfirmationFinished(true);
-        }
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto result = panta::ffi::project_service_begin_gate_location_settings_confirmation(
+        *m_service, path, revision, id, std::move(candidate));
+    if (!result.error.code.empty()) {
+        return fail(result.error);
     }
+    const bool pending = result.value;
+    clearError();
+    if (pending)
+        set_pending_confirmation(ConfirmationKind::GateLocationSettings);
+    else {
+        refreshPlanSettings();
+        emit gateLocationSettingsConfirmationFinished(true);
+    }
+    return true;
 }
 
 void ProjectViewModel::set_pending_confirmation(ConfirmationKind kind) {
@@ -433,33 +443,31 @@ void ProjectViewModel::finish_metadata_confirmation() {
     if (kind == ConfirmationKind::None) {
         return;
     }
+    panta::ffi::ProjectConfirmationResult result;
+    switch (kind) {
+    case ConfirmationKind::Material:
+        result = panta::ffi::project_service_finish_material_confirmation(*m_service);
+        break;
+    case ConfirmationKind::FillSettings:
+        result = panta::ffi::project_service_finish_fill_settings_confirmation(*m_service);
+        break;
+    case ConfirmationKind::GateLocationSettings:
+        result = panta::ffi::project_service_finish_gate_location_settings_confirmation(*m_service);
+        break;
+    case ConfirmationKind::None:
+        return;
+    }
+    if (result.error.code.empty() && !result.value) {
+        return;
+    }
     bool succeeded = false;
-    try {
-        bool finished = false;
-        switch (kind) {
-        case ConfirmationKind::Material:
-            finished = panta::ffi::project_service_finish_material_confirmation(*m_service);
-            break;
-        case ConfirmationKind::FillSettings:
-            finished = panta::ffi::project_service_finish_fill_settings_confirmation(*m_service);
-            break;
-        case ConfirmationKind::GateLocationSettings:
-            finished =
-                panta::ffi::project_service_finish_gate_location_settings_confirmation(*m_service);
-            break;
-        case ConfirmationKind::None:
-            return;
-        }
-        if (!finished) {
-            return;
-        }
-        applySnapshot(panta::ffi::project_service_current(*m_service));
+    if (!result.error.code.empty()) {
+        fail(result.error);
+    } else if (applySnapshot(panta::ffi::project_service_current(*m_service))) {
         // 当前待完成类型保持到快照通知结束，防止同步回调重入下一次写入。
         refreshPlanSettings();
         clearError();
         succeeded = true;
-    } catch (const rust::Error& failure) {
-        fail(QString::fromUtf8(failure.what()));
     }
     set_pending_confirmation(ConfirmationKind::None);
     if (kind == ConfirmationKind::Material) {
@@ -501,29 +509,28 @@ bool ProjectViewModel::createProject(const QString& rawName, const QString& rawL
                         &location, &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        const auto snapshot = panta::ffi::project_service_create(*m_service, location, name);
-        if (!applySnapshot(snapshot)) {
-            return false;
-        }
-        if (!refreshImports()) {
-            return false;
-        }
-        reset_documents();
-        m_lastCreatedPath = m_currentPath;
-        emit projectCreated(m_lastCreatedPath);
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto snapshot = panta::ffi::project_service_create(*m_service, location, name);
+    if (!applySnapshot(snapshot)) {
+        return false;
     }
+    if (!refreshImports()) {
+        return false;
+    }
+    reset_documents();
+    m_lastCreatedPath = m_currentPath;
+    emit projectCreated(m_lastCreatedPath);
+    return true;
 }
 
 void ProjectViewModel::clearError() {
-    if (m_error.isEmpty() && m_errorCode.isEmpty()) {
+    if (m_error.isEmpty() && m_errorCode.isEmpty() && m_errorCategory.isEmpty() &&
+        m_errorDetail.isEmpty()) {
         return;
     }
     m_error.clear();
     m_errorCode.clear();
+    m_errorCategory.clear();
+    m_errorDetail.clear();
     emit errorChanged();
 }
 
@@ -535,20 +542,16 @@ bool ProjectViewModel::openProject(const QString& path) {
                         &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        const auto snapshot = panta::ffi::project_service_open(*m_service, boundaryPath);
-        if (!applySnapshot(snapshot)) {
-            return false;
-        }
-        if (!refreshImports()) {
-            return false;
-        }
-        reset_documents();
-        emit projectOpened(m_currentPath);
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto snapshot = panta::ffi::project_service_open(*m_service, boundaryPath);
+    if (!applySnapshot(snapshot)) {
+        return false;
     }
+    if (!refreshImports()) {
+        return false;
+    }
+    reset_documents();
+    emit projectOpened(m_currentPath);
+    return true;
 }
 
 bool ProjectViewModel::openProjectUrl(const QUrl& url) {
@@ -562,16 +565,12 @@ QString ProjectViewModel::localPath(const QUrl& url) const {
 
 bool ProjectViewModel::saveProject() {
     clearError();
-    try {
-        const auto snapshot = panta::ffi::project_service_save(*m_service);
-        if (!applySnapshot(snapshot)) {
-            return false;
-        }
-        emit projectSaved(m_currentPath);
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto snapshot = panta::ffi::project_service_save(*m_service);
+    if (!applySnapshot(snapshot)) {
+        return false;
     }
+    emit projectSaved(m_currentPath);
+    return true;
 }
 
 bool ProjectViewModel::renameProject(const QString& name) {
@@ -581,14 +580,10 @@ bool ProjectViewModel::renameProject(const QString& name) {
     if (!toBoundaryText(name.trimmed(), &boundaryName, &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        const auto snapshot = panta::ffi::project_service_execute(
-            *m_service,
-            panta::ffi::ProjectCommand{panta::ffi::ProjectCommandKind::Rename, boundaryName});
-        return applySnapshot(snapshot);
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
-    }
+    const auto snapshot = panta::ffi::project_service_execute(
+        *m_service,
+        panta::ffi::ProjectCommand{panta::ffi::ProjectCommandKind::Rename, boundaryName});
+    return applySnapshot(snapshot);
 }
 
 bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshType,
@@ -604,32 +599,32 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
         !toBoundaryText(rawUnits.trimmed(), &units, &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        const auto imported = panta::ffi::project_service_import_stl(*m_service, path, meshType,
-                                                                     units, showImportLog);
-        const auto snapshot = panta::ffi::project_service_current(*m_service);
-        if (!applySnapshot(snapshot) || !refreshImports()) {
-            return false;
-        }
-        const QString recordId = QString::fromUtf8(imported.id);
-        int index = document_index(recordId);
-        bool documentsChangedEmitted = false;
-        if (index < 0) {
-            index = static_cast<int>(m_documents.size());
-            m_documents.append({recordId, QStringLiteral("import"), QStringLiteral("ready"),
-                                QString::fromUtf8(imported.source_name), QString{}});
-            documentsChangedEmitted = true;
-        }
-        documentsChangedEmitted = activate_ready_document(index) || documentsChangedEmitted;
-        documentsChangedEmitted = sync_mesh_residency() || documentsChangedEmitted;
-        if (documentsChangedEmitted) {
-            emit documentsChanged();
-        }
-        emit projectImported(m_importedAssetPath);
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto result =
+        panta::ffi::project_service_import_stl(*m_service, path, meshType, units, showImportLog);
+    if (!result.error.code.empty()) {
+        return fail(result.error);
     }
+    const auto& imported = result.value;
+    const auto snapshot = panta::ffi::project_service_current(*m_service);
+    if (!applySnapshot(snapshot) || !refreshImports()) {
+        return false;
+    }
+    const QString recordId = QString::fromUtf8(imported.id);
+    int index = document_index(recordId);
+    bool documentsChangedEmitted = false;
+    if (index < 0) {
+        index = static_cast<int>(m_documents.size());
+        m_documents.append({recordId, QStringLiteral("import"), QStringLiteral("ready"),
+                            QString::fromUtf8(imported.source_name), QString{}});
+        documentsChangedEmitted = true;
+    }
+    documentsChangedEmitted = activate_ready_document(index) || documentsChangedEmitted;
+    documentsChangedEmitted = sync_mesh_residency() || documentsChangedEmitted;
+    if (documentsChangedEmitted) {
+        emit documentsChanged();
+    }
+    emit projectImported(m_importedAssetPath);
+    return true;
 }
 
 bool ProjectViewModel::inspectStl(const QString& rawPath) {
@@ -647,34 +642,43 @@ bool ProjectViewModel::inspectStl(const QString& rawPath) {
                         &conversionError)) {
         return fail(conversionError);
     }
-    try {
-        const auto preview = panta::ffi::project_service_inspect_stl(*m_service, path);
-        const QString name = QString::fromUtf8(preview.source_name);
-        const QString dimensions =
-            format_dimensions(preview.size_x, preview.size_y, preview.size_z);
-        const bool changed = !m_importPreviewReady || m_importPreviewName != name ||
-                             m_importPreviewDimensions != dimensions ||
-                             m_importPreviewTriangleCount != preview.triangle_count;
-        m_importPreviewReady = true;
-        m_importPreviewName = name;
-        m_importPreviewDimensions = dimensions;
-        m_importPreviewTriangleCount = preview.triangle_count;
-        if (changed) {
-            emit importPreviewChanged();
-        }
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto result = panta::ffi::project_service_inspect_stl(*m_service, path);
+    if (!result.error.code.empty()) {
+        return fail(result.error);
     }
+    const auto& preview = result.value;
+    const QString name = QString::fromUtf8(preview.source_name);
+    const QString dimensions = format_dimensions(preview.size_x, preview.size_y, preview.size_z);
+    const bool changed = !m_importPreviewReady || m_importPreviewName != name ||
+                         m_importPreviewDimensions != dimensions ||
+                         m_importPreviewTriangleCount != preview.triangle_count;
+    m_importPreviewReady = true;
+    m_importPreviewName = name;
+    m_importPreviewDimensions = dimensions;
+    m_importPreviewTriangleCount = preview.triangle_count;
+    if (changed) {
+        emit importPreviewChanged();
+    }
+    return true;
 }
 
-bool ProjectViewModel::fail(const QString& boundaryError) {
-    const auto separator = boundaryError.indexOf(QLatin1Char(':'));
-    const QString code = separator < 0 ? boundaryError : boundaryError.left(separator);
+bool ProjectViewModel::fail(const panta::ffi::ProjectDiagnostic& diagnostic) {
+    return fail(QString::fromUtf8(diagnostic.code), QString::fromUtf8(diagnostic.category),
+                QString::fromUtf8(diagnostic.detail));
+}
+
+bool ProjectViewModel::applySnapshot(const panta::ffi::ProjectSnapshotResult& result) {
+    return result.error.code.empty() ? applySnapshot(result.value) : fail(result.error);
+}
+
+bool ProjectViewModel::fail(const QString& code, const QString& category, const QString& detail) {
     const QString message = userMessageFor(code);
-    if (m_errorCode != code || m_error != message) {
+    if (m_errorCode != code || m_error != message || m_errorCategory != category ||
+        m_errorDetail != detail) {
         m_errorCode = code;
         m_error = message;
+        m_errorCategory = category;
+        m_errorDetail = detail;
         emit errorChanged();
     }
     return false;
@@ -745,15 +749,15 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
 }
 
 bool ProjectViewModel::refreshImports() {
-    try {
-        applyImports(panta::ffi::project_service_imports(*m_service));
-        refreshPlanSettings();
-        // 网格内容只随文档（激活 / 快照变化）改变：由文档路径负责发射
-        // meshChanged，避免与导入激活的发射重复。
-        return true;
-    } catch (const rust::Error& failure) {
-        return fail(QString::fromUtf8(failure.what()));
+    const auto result = panta::ffi::project_service_imports(*m_service);
+    if (!result.error.code.empty()) {
+        return fail(result.error);
     }
+    applyImports(result.value);
+    refreshPlanSettings();
+    // 网格内容只随文档（激活 / 快照变化）改变：由文档路径负责发射
+    // meshChanged，避免与导入激活的发射重复。
+    return true;
 }
 
 QString ProjectViewModel::userMessageFor(const QString& errorCode) {
@@ -824,7 +828,8 @@ QVariantList ProjectViewModel::openDocuments() const {
                                      {QStringLiteral("kind"), document.kind},
                                      {QStringLiteral("state"), document.state},
                                      {QStringLiteral("title"), document.title},
-                                     {QStringLiteral("message"), document.message}});
+                                     {QStringLiteral("message"), document.message},
+                                     {QStringLiteral("diagnostic"), document.diagnostic}});
     }
     return documents;
 }
@@ -866,6 +871,7 @@ bool ProjectViewModel::activate_ready_document(
         !panta::ffi::project_service_activate_mesh_document(*m_service, documentId.toStdString())) {
         m_documents[index].state = QStringLiteral("unloaded");
         m_documents[index].message.clear();
+        m_documents[index].diagnostic.clear();
         return true;
     }
 
@@ -921,6 +927,7 @@ bool ProjectViewModel::sync_mesh_residency() {
         if (document.state != state) {
             document.state = state;
             document.message.clear();
+            document.diagnostic.clear();
             changed = true;
         }
     }
@@ -1000,6 +1007,7 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
             if (m_documents[fallback].state == QStringLiteral("unloaded")) {
                 m_documents[fallback].state = QStringLiteral("loading");
                 m_documents[fallback].message.clear();
+                m_documents[fallback].diagnostic.clear();
                 begin_import_activation(m_documents[fallback].id);
             }
         } else {
@@ -1021,6 +1029,7 @@ void ProjectViewModel::closeDocument(const QString& documentId) {
             if (reload >= 0) {
                 m_documents[reload].state = QStringLiteral("loading");
                 m_documents[reload].message.clear();
+                m_documents[reload].diagnostic.clear();
                 begin_import_activation(m_documents[reload].id);
             }
         }
@@ -1038,6 +1047,7 @@ void ProjectViewModel::openImportRecord(const QString& recordId) {
             if (m_documents[index].state == QStringLiteral("unloaded")) {
                 m_documents[index].state = QStringLiteral("loading");
                 m_documents[index].message.clear();
+                m_documents[index].diagnostic.clear();
                 emit documentsChanged();
                 begin_import_activation(recordId);
             } else if (changed) {
@@ -1047,6 +1057,7 @@ void ProjectViewModel::openImportRecord(const QString& recordId) {
                    m_documents[index].state == QStringLiteral("unloaded")) {
             m_documents[index].state = QStringLiteral("loading");
             m_documents[index].message.clear();
+            m_documents[index].diagnostic.clear();
             emit documentsChanged();
             begin_import_activation(recordId);
         }
@@ -1063,20 +1074,23 @@ void ProjectViewModel::openImportRecord(const QString& recordId) {
 }
 
 void ProjectViewModel::begin_import_activation(const QString& recordId) {
-    try {
-        const auto attempt =
-            panta::ffi::project_service_begin_asset_activation(*m_service, recordId.toStdString());
-        m_activationAttempts.insert(recordId, attempt.attempt);
+    const auto result =
+        panta::ffi::project_service_begin_asset_activation(*m_service, recordId.toStdString());
+    if (result.error.code.empty()) {
+        m_activationAttempts.insert(recordId, result.value.attempt);
         sync_activation_poll();
-    } catch (const rust::Error& failure) {
-        qWarning("ProjectViewModel activation begin failed: %s", failure.what());
-        const int index = document_index(recordId);
-        if (index >= 0) {
-            auto& document = m_documents[index];
-            document.state = QStringLiteral("failed");
-            document.message = activation_message_for(QString::fromUtf8(failure.what()));
-            emit documentsChanged();
-        }
+        return;
+    }
+    qWarning("ProjectViewModel activation begin failed: %s: %s",
+             QString::fromUtf8(result.error.code).toStdString().c_str(),
+             QString::fromUtf8(result.error.detail).toStdString().c_str());
+    const int index = document_index(recordId);
+    if (index >= 0) {
+        auto& document = m_documents[index];
+        document.state = QStringLiteral("failed");
+        document.message = activation_message_for(QString::fromUtf8(result.error.code));
+        document.diagnostic = project_diagnostic(result.error);
+        emit documentsChanged();
     }
 }
 
@@ -1090,72 +1104,69 @@ void ProjectViewModel::moveDocument(int fromIndex, int toIndex) {
 }
 
 void ProjectViewModel::drain_activations() {
-    try {
-        const auto outcomes = panta::ffi::project_service_drain_asset_activations(*m_service);
-        bool documentsChangedEmitted = false;
-        const bool residencyMayHaveChanged = !outcomes.empty();
-        for (const auto& outcome : outcomes) {
-            const QString recordId = QString::fromUtf8(outcome.import_id);
-            // 同一记录可在关闭后重新打开；旧 attempt 的迟到结果不能
-            // 覆盖新页签，即使它们的 ImportRecord.id 相同。
-            const auto attempt = m_activationAttempts.constFind(recordId);
-            if (attempt == m_activationAttempts.cend() || attempt.value() != outcome.attempt) {
-                const int index = document_index(recordId);
-                if (index < 0) {
-                    // 只有页签确已关闭才按 ID 释放；同 ID 的重开页签可能已有新 attempt 缓存。
-                    panta::ffi::project_service_release_mesh_document(*m_service,
-                                                                      recordId.toStdString());
-                }
-                continue;
-            }
+    const auto outcomes = panta::ffi::project_service_drain_asset_activations(*m_service);
+    bool documentsChangedEmitted = false;
+    const bool residencyMayHaveChanged = !outcomes.empty();
+    for (const auto& outcome : outcomes) {
+        const QString recordId = QString::fromUtf8(outcome.import_id);
+        // 同一记录可在关闭后重新打开；旧 attempt 的迟到结果不能
+        // 覆盖新页签，即使它们的 ImportRecord.id 相同。
+        const auto attempt = m_activationAttempts.constFind(recordId);
+        if (attempt == m_activationAttempts.cend() || attempt.value() != outcome.attempt) {
             const int index = document_index(recordId);
             if (index < 0) {
+                // 只有页签确已关闭才按 ID 释放；同 ID 的重开页签可能已有新 attempt 缓存。
                 panta::ffi::project_service_release_mesh_document(*m_service,
                                                                   recordId.toStdString());
-                continue; // 页签已关闭：结果（含快照）就地丢弃。
             }
-            if (outcome.kind == panta::ffi::ActivationOutcomeKind::Cancelled) {
-                // 关闭页签引发的取消：页签已不在；此处兜底移除残留。
-                m_activationAttempts.remove(recordId);
-                m_documents.remove(index);
-                documentsChangedEmitted = true;
-                continue;
-            }
-            if (outcome.kind == panta::ffi::ActivationOutcomeKind::Expired) {
-                continue; // 过期结果不驱动任何 UI 状态。
-            }
-            auto& document = m_documents[index];
-            if (outcome.kind == panta::ffi::ActivationOutcomeKind::Succeeded) {
-                auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
-                mesh->vertices.reserve(outcome.coordinates.size() / 3);
-                for (std::size_t offset = 0; offset + 2 < outcome.coordinates.size(); offset += 3) {
-                    mesh->vertices.push_back({outcome.coordinates[offset],
-                                              outcome.coordinates[offset + 1],
-                                              outcome.coordinates[offset + 2]});
-                }
-                document.state = QStringLiteral("ready");
-                document.message.clear();
-                m_activationAttempts.remove(recordId);
-                documentsChangedEmitted = true;
-                // 激活仍由活动文档语义决定：成功后自动切到该文档。
-                activate_ready_document(index, std::move(mesh));
-            } else if (outcome.kind == panta::ffi::ActivationOutcomeKind::Failed) {
-                document.state = QStringLiteral("failed");
-                document.message = activation_message_for(QString::fromUtf8(outcome.code));
-                m_activationAttempts.remove(recordId);
-                documentsChangedEmitted = true;
-            }
+            continue;
         }
-        if (residencyMayHaveChanged) {
-            documentsChangedEmitted = sync_mesh_residency() || documentsChangedEmitted;
+        const int index = document_index(recordId);
+        if (index < 0) {
+            panta::ffi::project_service_release_mesh_document(*m_service, recordId.toStdString());
+            continue; // 页签已关闭：结果（含快照）就地丢弃。
         }
-        if (documentsChangedEmitted) {
-            emit documentsChanged();
+        if (outcome.kind == panta::ffi::ActivationOutcomeKind::Cancelled) {
+            // 关闭页签引发的取消：页签已不在；此处兜底移除残留。
+            m_activationAttempts.remove(recordId);
+            m_documents.remove(index);
+            documentsChangedEmitted = true;
+            continue;
         }
-        sync_activation_poll();
-    } catch (const rust::Error& failure) {
-        qWarning("ProjectViewModel activation drain failed: %s", failure.what());
+        if (outcome.kind == panta::ffi::ActivationOutcomeKind::Expired) {
+            continue; // 过期结果不驱动任何 UI 状态。
+        }
+        auto& document = m_documents[index];
+        if (outcome.kind == panta::ffi::ActivationOutcomeKind::Succeeded) {
+            auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+            mesh->vertices.reserve(outcome.coordinates.size() / 3);
+            for (std::size_t offset = 0; offset + 2 < outcome.coordinates.size(); offset += 3) {
+                mesh->vertices.push_back({outcome.coordinates[offset],
+                                          outcome.coordinates[offset + 1],
+                                          outcome.coordinates[offset + 2]});
+            }
+            document.state = QStringLiteral("ready");
+            document.message.clear();
+            document.diagnostic.clear();
+            m_activationAttempts.remove(recordId);
+            documentsChangedEmitted = true;
+            // 激活仍由活动文档语义决定：成功后自动切到该文档。
+            activate_ready_document(index, std::move(mesh));
+        } else if (outcome.kind == panta::ffi::ActivationOutcomeKind::Failed) {
+            document.state = QStringLiteral("failed");
+            document.message = activation_message_for(QString::fromUtf8(outcome.error.code));
+            document.diagnostic = project_diagnostic(outcome.error);
+            m_activationAttempts.remove(recordId);
+            documentsChangedEmitted = true;
+        }
     }
+    if (residencyMayHaveChanged) {
+        documentsChangedEmitted = sync_mesh_residency() || documentsChangedEmitted;
+    }
+    if (documentsChangedEmitted) {
+        emit documentsChanged();
+    }
+    sync_activation_poll();
 }
 
 void ProjectViewModel::sync_activation_poll() {

@@ -78,16 +78,138 @@ TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
 
     EXPECT_FALSE(view_model.createProject(QStringLiteral("../escape"), location));
     EXPECT_EQ(view_model.errorCode(), QStringLiteral("project.invalid_name"));
+    EXPECT_EQ(view_model.errorCategory(), QStringLiteral("validation"));
+    EXPECT_EQ(view_model.errorDetail(), QStringLiteral("../escape"));
     EXPECT_FALSE(view_model.error().isEmpty());
     EXPECT_FALSE(QDir(fixture.path()).exists(QStringLiteral("escape")));
 
     ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), location));
+    EXPECT_TRUE(view_model.errorCategory().isEmpty());
+    EXPECT_TRUE(view_model.errorDetail().isEmpty());
     EXPECT_FALSE(view_model.createProject(QStringLiteral("Demo"), location));
     EXPECT_EQ(view_model.errorCode(), QStringLiteral("project.already_exists"));
+    EXPECT_EQ(view_model.errorCategory(), QStringLiteral("conflict"));
+    EXPECT_FALSE(view_model.errorDetail().isEmpty());
 
     ProjectViewModel empty;
     EXPECT_FALSE(empty.saveProject());
     EXPECT_EQ(empty.errorCode(), QStringLiteral("project.no_project"));
+    EXPECT_EQ(empty.errorCategory(), QStringLiteral("state"));
+    EXPECT_TRUE(empty.errorDetail().isEmpty());
+}
+
+TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAndViewport) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const QString sourcePath = fixture.filePath(QStringLiteral("零件 sample.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                QStringLiteral("millimeters"), false));
+    const auto mesh = model.mesh_snapshot();
+    ASSERT_NE(mesh, nullptr);
+    const auto settings = model.planSettings();
+    const auto documents = model.openDocuments();
+    const auto parts = model.importedPartNames();
+    const auto active = model.activeDocumentId();
+    QFile manifest(model.currentPath());
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    const auto before = manifest.readAll();
+    manifest.close();
+    QSignalSpy imported(&model, &ProjectViewModel::projectImported);
+
+    // 参数本身包含冒号及中文，不能通过拼接文案还原诊断字段。
+    EXPECT_FALSE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                 QStringLiteral("unknown:单位"), false));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.import_unsupported_units"));
+    EXPECT_EQ(model.errorCategory(), QStringLiteral("format"));
+    EXPECT_EQ(model.errorDetail(), QStringLiteral("unknown:单位"));
+    EXPECT_EQ(model.error(), QStringLiteral("Choose valid STL import options."));
+    EXPECT_EQ(imported.count(), 0);
+    EXPECT_EQ(model.mesh_snapshot(), mesh);
+    EXPECT_EQ(model.planSettings(), settings);
+    EXPECT_EQ(model.openDocuments(), documents);
+    EXPECT_EQ(model.importedPartNames(), parts);
+    EXPECT_EQ(model.activeDocumentId(), active);
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    EXPECT_EQ(manifest.readAll(), before);
+    manifest.close();
+
+    const QString missing = fixture.filePath(QStringLiteral("不存在 sample.stl"));
+    EXPECT_FALSE(model.inspectStl(missing));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.import_file_missing"));
+    EXPECT_EQ(model.errorCategory(), QStringLiteral("missing"));
+    EXPECT_EQ(model.errorDetail(), missing);
+    EXPECT_FALSE(model.importPreviewReady());
+    EXPECT_EQ(model.mesh_snapshot(), mesh);
+    EXPECT_EQ(model.planSettings(), settings);
+
+    const auto revision = settings.value(QStringLiteral("revision")).toULongLong();
+    const auto importId = settings.value(QStringLiteral("importId")).toString();
+    QSignalSpy materialFinished(&model, &ProjectViewModel::materialConfirmationFinished);
+    QSignalSpy fillFinished(&model, &ProjectViewModel::fillSettingsConfirmationFinished);
+    QSignalSpy gateFinished(&model, &ProjectViewModel::gateLocationSettingsConfirmationFinished);
+    const auto expectStaleRequest = [&model](bool accepted) {
+        EXPECT_FALSE(accepted);
+        EXPECT_EQ(model.errorCode(), QStringLiteral("project.command_invalid"));
+        EXPECT_EQ(model.errorCategory(), QStringLiteral("validation"));
+        EXPECT_EQ(model.errorDetail(), QStringLiteral("plan settings changed"));
+    };
+    expectStaleRequest(model.setAnalysisSequence(model.currentPath(), revision + 1, importId,
+                                                 QStringLiteral("fill")));
+    expectStaleRequest(
+        model.setMaterial(model.currentPath(), revision + 1, importId,
+                          model.defaultMaterial().value(QStringLiteral("id")).toString()));
+    expectStaleRequest(
+        model.setFillSettings(model.currentPath(), revision + 1, importId,
+                              settings.value(QStringLiteral("fillSettings")).toMap()));
+    expectStaleRequest(model.setGateLocationSettings(
+        model.currentPath(), revision + 1, importId,
+        settings.value(QStringLiteral("gateLocationSettings")).toMap()));
+    EXPECT_FALSE(model.materialConfirmationPending());
+    EXPECT_FALSE(model.fillSettingsConfirmationPending());
+    EXPECT_FALSE(model.gateLocationSettingsConfirmationPending());
+    EXPECT_EQ(materialFinished.count(), 0);
+    EXPECT_EQ(fillFinished.count(), 0);
+    EXPECT_EQ(gateFinished.count(), 0);
+    EXPECT_EQ(model.planSettings(), settings);
+    EXPECT_EQ(model.mesh_snapshot(), mesh);
+
+    EXPECT_FALSE(model.openProject(fixture.filePath(QStringLiteral("missing.panta"))));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.file_missing"));
+    EXPECT_EQ(model.errorCategory(), QStringLiteral("missing"));
+    EXPECT_EQ(model.planSettings(), settings);
+    EXPECT_EQ(model.mesh_snapshot(), mesh);
+    EXPECT_EQ(model.openDocuments(), documents);
+
+    // 已存在的目标资产使 create_new 确定失败，无需依赖用户权限或时序。
+    const QString collision = QFileInfo(model.currentPath()).absolutePath() +
+                              QStringLiteral("/assets/imports/0002-零件 sample.stl");
+    ASSERT_TRUE(QFile::copy(sourcePath, collision));
+    EXPECT_FALSE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                 QStringLiteral("millimeters"), false));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.import_asset_copy_failed"));
+    EXPECT_EQ(model.errorCategory(), QStringLiteral("io"));
+    EXPECT_TRUE(model.errorDetail().contains(QStringLiteral("0002-零件 sample.stl")));
+    EXPECT_EQ(imported.count(), 0);
+    EXPECT_EQ(model.planSettings(), settings);
+    EXPECT_EQ(model.mesh_snapshot(), mesh);
+    EXPECT_EQ(model.importedPartNames(), parts);
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    EXPECT_EQ(manifest.readAll(), before);
+    manifest.close();
+
+    ASSERT_TRUE(model.inspectStl(sourcePath));
+    EXPECT_TRUE(model.error().isEmpty());
+    EXPECT_TRUE(model.errorCode().isEmpty());
+    EXPECT_TRUE(model.errorCategory().isEmpty());
+    EXPECT_TRUE(model.errorDetail().isEmpty());
+    EXPECT_TRUE(model.importPreviewReady());
 }
 
 TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
@@ -494,6 +616,12 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
                  QStringLiteral("failed"));
     EXPECT_EQ(reopened.openDocuments()[1].toMap()[QStringLiteral("message")].toString(),
               QStringLiteral("The saved STL asset is missing from the project package."));
+    const auto diagnostic =
+        reopened.openDocuments()[1].toMap().value(QStringLiteral("diagnostic")).toMap();
+    EXPECT_EQ(diagnostic.value(QStringLiteral("code")).toString(),
+              QStringLiteral("project.asset_missing"));
+    EXPECT_EQ(diagnostic.value(QStringLiteral("category")).toString(), QStringLiteral("missing"));
+    EXPECT_FALSE(diagnostic.value(QStringLiteral("detail")).toString().isEmpty());
     EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
     EXPECT_EQ(reopened.mesh_snapshot(), nullptr);
 
@@ -508,6 +636,8 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
     QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
     EXPECT_EQ(reopened.mesh_snapshot()->vertices.size(), 3U);
+    EXPECT_TRUE(
+        reopened.openDocuments()[1].toMap().value(QStringLiteral("diagnostic")).toMap().isEmpty());
 }
 
 TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
@@ -552,5 +682,21 @@ TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
     ASSERT_TRUE(finished.wait(5000));
     EXPECT_FALSE(finished.at(1).at(0).toBool());
     EXPECT_FALSE(model.fillSettingsConfirmationPending());
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.manifest_invalid"));
+    EXPECT_EQ(model.errorCategory(), QStringLiteral("format"));
+    EXPECT_FALSE(model.errorDetail().isEmpty());
     expect_same_plan_settings(reopened.planSettings(), model.planSettings());
+
+    candidate = model.planSettings().value(QStringLiteral("fillSettings")).toMap();
+    candidate.insert(QStringLiteral("meltTemperature"), 240.0);
+    ASSERT_TRUE(model.setFillSettings(
+        model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
+        initial.value(QStringLiteral("importId")).toString(), candidate));
+    ASSERT_TRUE(finished.wait(5000));
+    ASSERT_EQ(finished.count(), 3);
+    EXPECT_TRUE(finished.at(2).at(0).toBool());
+    EXPECT_FALSE(model.fillSettingsConfirmationPending());
+    EXPECT_TRUE(model.errorCode().isEmpty());
+    EXPECT_TRUE(model.errorCategory().isEmpty());
+    EXPECT_TRUE(model.errorDetail().isEmpty());
 }

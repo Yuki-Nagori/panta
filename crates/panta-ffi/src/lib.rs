@@ -2,6 +2,21 @@
 //! 调用，以及 Rust 拥有的任务生命周期（任务 008）、路径服务（任务 023）
 //! 与工程 application service（任务 057）。
 
+mod project_response;
+
+use project_response::{
+    default_material_response, project_service_begin_asset_activation_response,
+    project_service_begin_fill_settings_confirmation_response,
+    project_service_begin_gate_location_settings_confirmation_response,
+    project_service_begin_material_confirmation_response, project_service_create_response,
+    project_service_current_response, project_service_execute_response,
+    project_service_finish_fill_settings_confirmation_response,
+    project_service_finish_gate_location_settings_confirmation_response,
+    project_service_finish_material_confirmation_response, project_service_import_stl_response,
+    project_service_imports_response, project_service_inspect_stl_response,
+    project_service_mesh_snapshot_for_import_response, project_service_open_response,
+    project_service_save_response, project_service_set_analysis_sequence_response,
+};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const MAX_REPEAT: u32 = 8;
@@ -76,7 +91,7 @@ pub mod bridge {
     }
 
     /// Rust 工程服务返回的稳定状态快照；path/name 均为可往返 UTF-8。
-    #[derive(Clone, PartialEq, Eq)]
+    #[derive(Default, Clone, PartialEq, Eq)]
     pub struct ProjectSnapshot {
         pub path: String,
         pub name: String,
@@ -86,7 +101,7 @@ pub mod bridge {
 
     /// 已导入网格的持久化元数据。尺寸拆成标量，避免 CXX shared struct
     /// 直接暴露 Rust 数组，便于 Qt 侧消费。
-    #[derive(Clone, PartialEq)]
+    #[derive(Default, Clone, PartialEq)]
     pub struct ProjectImport {
         pub record_version: u32,
         pub parser_version: u32,
@@ -113,6 +128,7 @@ pub mod bridge {
         value: String,
     }
 
+    #[derive(Default)]
     struct MaterialDefinition {
         family_source_text: String,
         id: String,
@@ -160,8 +176,8 @@ pub mod bridge {
         gate_location_settings_confirmed: bool,
     }
 
-    /// STL metadata shown by the import dialog before the file is copied.
-    #[derive(Clone, PartialEq)]
+    /// 源文件尚未复制时供导入弹窗展示的 STL 元数据。
+    #[derive(Default, Clone, PartialEq)]
     pub struct StlImportPreview {
         pub source_name: String,
         pub triangle_count: u64,
@@ -172,6 +188,7 @@ pub mod bridge {
 
     /// 连续三角面坐标：每三个 f64 为一个点，每三个点为一片面；
     /// CXX Vec 独占缓冲区，调用返回后 C++ 复制到自身场景快照。
+    #[derive(Default)]
     pub struct SurfaceMeshSnapshot {
         pub coordinates: Vec<f64>,
         pub revision: u64,
@@ -217,6 +234,7 @@ pub mod bridge {
 
     /// begin 返回的运行期相关性句柄；generation 是会话级计数（create/open
     /// 递增），不是工程 revision，也不持久化。
+    #[derive(Default)]
     pub struct ActivationAttempt {
         pub attempt: u64,
         pub generation: u64,
@@ -229,9 +247,74 @@ pub mod bridge {
         pub generation: u64,
         pub import_id: String,
         pub kind: ActivationOutcomeKind,
-        pub code: String,
-        pub detail: String,
+        pub error: ProjectDiagnostic,
         pub coordinates: Vec<f64>,
+    }
+
+    /// 所有工程结果遵循同一契约：code 为空表示成功，其余诊断字段为空；
+    /// 失败时 value 为缺省占位，不可消费，调用方保留上一次有效状态。
+    /// detail 保留原始上下文供诊断，界面仅按稳定 code 选择本地化摘要。
+    #[derive(Default, Debug, Clone, PartialEq, Eq)]
+    pub struct ProjectDiagnostic {
+        pub code: String,
+        pub category: String,
+        pub detail: String,
+    }
+
+    /// 工程操作的快照结果。
+    #[derive(Default)]
+    pub struct ProjectSnapshotResult {
+        pub value: ProjectSnapshot,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// 一次已提交导入的结果。
+    #[derive(Default)]
+    pub struct ProjectImportResult {
+        pub value: ProjectImport,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// 当前工程导入记录列表；空列表也可为成功。
+    #[derive(Default)]
+    pub struct ProjectImportsResult {
+        pub value: Vec<ProjectImport>,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// STL 预检元数据结果。
+    #[derive(Default)]
+    pub struct StlImportPreviewResult {
+        pub value: StlImportPreview,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// 内置材料摘要结果。
+    #[derive(Default)]
+    pub struct MaterialDefinitionResult {
+        pub value: MaterialDefinition,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// 确认请求 / 轮询结果；成功 value=false 分别表示无需写入 / 尚未完成。
+    #[derive(Default)]
+    pub struct ProjectConfirmationResult {
+        pub value: bool,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// 驻留 Mesh 的显示快照结果。
+    #[derive(Default)]
+    pub struct SurfaceMeshSnapshotResult {
+        pub value: SurfaceMeshSnapshot,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// 资产激活请求的相关性句柄结果。
+    #[derive(Default)]
+    pub struct ActivationAttemptResult {
+        pub value: ActivationAttempt,
+        pub error: ProjectDiagnostic,
     }
 
     unsafe extern "C++" {
@@ -316,84 +399,101 @@ pub mod bridge {
         type ProjectService;
 
         fn project_service_new() -> Box<ProjectService>;
+        #[rust_name = "project_service_create_response"]
         fn project_service_create(
             service: &mut ProjectService,
             location: String,
             name: String,
-        ) -> Result<ProjectSnapshot>;
+        ) -> ProjectSnapshotResult;
+        #[rust_name = "project_service_open_response"]
         fn project_service_open(
             service: &mut ProjectService,
             path: String,
-        ) -> Result<ProjectSnapshot>;
-        fn project_service_save(service: &mut ProjectService) -> Result<ProjectSnapshot>;
+        ) -> ProjectSnapshotResult;
+        #[rust_name = "project_service_save_response"]
+        fn project_service_save(service: &mut ProjectService) -> ProjectSnapshotResult;
+        #[rust_name = "project_service_execute_response"]
         fn project_service_execute(
             service: &mut ProjectService,
             command: ProjectCommand,
-        ) -> Result<ProjectSnapshot>;
-        fn project_service_current(service: &ProjectService) -> Result<ProjectSnapshot>;
+        ) -> ProjectSnapshotResult;
+        #[rust_name = "project_service_current_response"]
+        fn project_service_current(service: &ProjectService) -> ProjectSnapshotResult;
+        #[rust_name = "project_service_import_stl_response"]
         fn project_service_import_stl(
             service: &mut ProjectService,
             source: String,
             mesh_type: String,
             units: String,
             show_import_log: bool,
-        ) -> Result<ProjectImport>;
-        fn project_service_imports(service: &ProjectService) -> Result<Vec<ProjectImport>>;
+        ) -> ProjectImportResult;
+        #[rust_name = "project_service_imports_response"]
+        fn project_service_imports(service: &ProjectService) -> ProjectImportsResult;
         fn analysis_sequence_catalog() -> Vec<ChoiceDefinition>;
         fn mesh_type_catalog() -> Vec<ChoiceDefinition>;
         fn default_mesh_type() -> String;
-        fn default_material() -> Result<MaterialDefinition>;
+        #[rust_name = "default_material_response"]
+        fn default_material() -> MaterialDefinitionResult;
+        #[rust_name = "project_service_begin_material_confirmation_response"]
         fn project_service_begin_material_confirmation(
             service: &mut ProjectService,
             project_path: &str,
             revision: u64,
             import_id: &str,
             material_id: &str,
-        ) -> Result<bool>;
+        ) -> ProjectConfirmationResult;
+        #[rust_name = "project_service_finish_material_confirmation_response"]
         fn project_service_finish_material_confirmation(
             service: &mut ProjectService,
-        ) -> Result<bool>;
+        ) -> ProjectConfirmationResult;
+        #[rust_name = "project_service_begin_fill_settings_confirmation_response"]
         fn project_service_begin_fill_settings_confirmation(
             service: &mut ProjectService,
             project_path: &str,
             revision: u64,
             import_id: &str,
             settings: FillSettings,
-        ) -> Result<bool>;
+        ) -> ProjectConfirmationResult;
+        #[rust_name = "project_service_finish_fill_settings_confirmation_response"]
         fn project_service_finish_fill_settings_confirmation(
             service: &mut ProjectService,
-        ) -> Result<bool>;
+        ) -> ProjectConfirmationResult;
+        #[rust_name = "project_service_begin_gate_location_settings_confirmation_response"]
         fn project_service_begin_gate_location_settings_confirmation(
             service: &mut ProjectService,
             project_path: &str,
             revision: u64,
             import_id: &str,
             settings: GateLocationSettings,
-        ) -> Result<bool>;
+        ) -> ProjectConfirmationResult;
+        #[rust_name = "project_service_finish_gate_location_settings_confirmation_response"]
         fn project_service_finish_gate_location_settings_confirmation(
             service: &mut ProjectService,
-        ) -> Result<bool>;
+        ) -> ProjectConfirmationResult;
         fn project_service_plan_settings(
             service: &ProjectService,
             preferred_import_id: &str,
         ) -> PlanSettings;
+        #[rust_name = "project_service_set_analysis_sequence_response"]
         fn project_service_set_analysis_sequence(
             service: &mut ProjectService,
             project_path: &str,
             revision: u64,
             import_id: &str,
             sequence_id: &str,
-        ) -> Result<ProjectSnapshot>;
+        ) -> ProjectSnapshotResult;
 
+        #[rust_name = "project_service_inspect_stl_response"]
         fn project_service_inspect_stl(
             service: &mut ProjectService,
             source: String,
-        ) -> Result<StlImportPreview>;
+        ) -> StlImportPreviewResult;
         /// 已驻留 Mesh 的一次性显示快照；只由文档激活路径调用，不用于逐帧读取。
+        #[rust_name = "project_service_mesh_snapshot_for_import_response"]
         fn project_service_mesh_snapshot_for_import(
             service: &ProjectService,
             import_id: &str,
-        ) -> Result<SurfaceMeshSnapshot>;
+        ) -> SurfaceMeshSnapshotResult;
         /// 活动页签 pin/unpin 与关闭释放属于粗粒度文档状态变化。
         fn project_service_activate_mesh_document(
             service: &mut ProjectService,
@@ -405,10 +505,11 @@ pub mod bridge {
 
         /// 只读资产激活（073 首个 FSM 消费者）：按稳定 ImportRecord ID
         /// 异步读取并解析已提交 STL；结果只在会话仍有效时发布。
+        #[rust_name = "project_service_begin_asset_activation_response"]
         fn project_service_begin_asset_activation(
             service: &mut ProjectService,
             import_id: &str,
-        ) -> Result<ActivationAttempt>;
+        ) -> ActivationAttemptResult;
         fn project_service_cancel_asset_activation(
             service: &mut ProjectService,
             attempt: u64,
@@ -706,7 +807,7 @@ fn resolve_with(
         .map_err(|error| error.to_string())
 }
 
-/// Rust 工程 application service 的 CXX 适配器：只负责字符串 DTO 和错误文本，
+/// Rust 工程服务的 CXX 适配器：只负责 DTO 映射与结构化诊断，
 /// 工程校验、清单事务及模型状态均保留在 panta-core。
 pub struct ProjectService {
     service: panta_core::project::ProjectService,
@@ -722,58 +823,50 @@ fn project_service_create(
     service: &mut ProjectService,
     location: String,
     name: String,
-) -> Result<bridge::ProjectSnapshot, String> {
+) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
     service
         .service
         .create(std::path::Path::new(&location), &name)
         .map(project_snapshot)
-        .map_err(|error| error.to_string())
 }
 
 fn project_service_open(
     service: &mut ProjectService,
     path: String,
-) -> Result<bridge::ProjectSnapshot, String> {
+) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
     service
         .service
         .open(std::path::Path::new(&path))
         .map(project_snapshot)
-        .map_err(|error| error.to_string())
 }
 
-fn project_service_save(service: &mut ProjectService) -> Result<bridge::ProjectSnapshot, String> {
-    service
-        .service
-        .save()
-        .map(project_snapshot)
-        .map_err(|error| error.to_string())
+fn project_service_save(
+    service: &mut ProjectService,
+) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
+    service.service.save().map(project_snapshot)
 }
 
 fn project_service_execute(
     service: &mut ProjectService,
     command: bridge::ProjectCommand,
-) -> Result<bridge::ProjectSnapshot, String> {
+) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
     let command = match command.kind {
         bridge::ProjectCommandKind::Rename => panta_core::project::ProjectCommand::Rename {
             name: command.value,
         },
         _ => {
-            return Err("project.command_invalid: unknown command".to_owned());
+            return Err(panta_core::project::ProjectError::CommandInvalid(
+                "unknown command".to_owned(),
+            ));
         }
     };
-    service
-        .service
-        .execute(command)
-        .map(project_snapshot)
-        .map_err(|error| error.to_string())
+    service.service.execute(command).map(project_snapshot)
 }
 
-fn project_service_current(service: &ProjectService) -> Result<bridge::ProjectSnapshot, String> {
-    service
-        .service
-        .current()
-        .map(project_snapshot)
-        .map_err(|error| error.to_string())
+fn project_service_current(
+    service: &ProjectService,
+) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
+    service.service.current().map(project_snapshot)
 }
 
 fn project_service_import_stl(
@@ -782,7 +875,7 @@ fn project_service_import_stl(
     mesh_type: String,
     units: String,
     show_import_log: bool,
-) -> Result<bridge::ProjectImport, String> {
+) -> Result<bridge::ProjectImport, panta_core::project::ProjectError> {
     service
         .service
         .import_stl(
@@ -792,15 +885,15 @@ fn project_service_import_stl(
             show_import_log,
         )
         .map(project_import)
-        .map_err(|error| error.to_string())
 }
 
-fn project_service_imports(service: &ProjectService) -> Result<Vec<bridge::ProjectImport>, String> {
+fn project_service_imports(
+    service: &ProjectService,
+) -> Result<Vec<bridge::ProjectImport>, panta_core::project::ProjectError> {
     service
         .service
         .imports()
         .map(|imports| imports.into_iter().map(project_import).collect())
-        .map_err(|error| error.to_string())
 }
 
 fn mesh_type_catalog() -> Vec<bridge::ChoiceDefinition> {
@@ -827,8 +920,8 @@ fn analysis_sequence_catalog() -> Vec<bridge::ChoiceDefinition> {
         .collect()
 }
 
-fn default_material() -> Result<bridge::MaterialDefinition, String> {
-    let material = panta_core::project::default_material().map_err(|error| error.to_string())?;
+fn default_material() -> Result<bridge::MaterialDefinition, panta_core::project::ProjectError> {
+    let material = panta_core::project::default_material()?;
     Ok(bridge::MaterialDefinition {
         family_source_text: material.family_source_text.clone(),
         id: material.id.clone(),
@@ -888,25 +981,19 @@ fn project_service_begin_material_confirmation(
     revision: u64,
     import_id: &str,
     material_id: &str,
-) -> Result<bool, String> {
-    service
-        .service
-        .begin_material_confirmation(
-            std::path::Path::new(project_path),
-            revision,
-            import_id,
-            material_id,
-        )
-        .map_err(|error| error.to_string())
+) -> Result<bool, panta_core::project::ProjectError> {
+    service.service.begin_material_confirmation(
+        std::path::Path::new(project_path),
+        revision,
+        import_id,
+        material_id,
+    )
 }
 
 fn project_service_finish_material_confirmation(
     service: &mut ProjectService,
-) -> Result<bool, String> {
-    service
-        .service
-        .finish_material_confirmation()
-        .map_err(|error| error.to_string())
+) -> Result<bool, panta_core::project::ProjectError> {
+    service.service.finish_material_confirmation()
 }
 
 fn project_service_set_analysis_sequence(
@@ -915,7 +1002,7 @@ fn project_service_set_analysis_sequence(
     revision: u64,
     import_id: &str,
     sequence_id: &str,
-) -> Result<bridge::ProjectSnapshot, String> {
+) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
     service
         .service
         .set_analysis_sequence(
@@ -925,18 +1012,16 @@ fn project_service_set_analysis_sequence(
             sequence_id,
         )
         .map(project_snapshot)
-        .map_err(|error| error.to_string())
 }
 
 fn project_service_inspect_stl(
     service: &mut ProjectService,
     source: String,
-) -> Result<bridge::StlImportPreview, String> {
+) -> Result<bridge::StlImportPreview, panta_core::project::ProjectError> {
     service
         .service
         .inspect_stl(std::path::Path::new(&source))
         .map(stl_import_preview)
-        .map_err(|error| error.to_string())
 }
 
 fn mesh_validate_tet(data: bridge::TetMeshData) -> bridge::TetMeshValidation {
@@ -1015,7 +1100,7 @@ fn mesh_validate_tet(data: bridge::TetMeshData) -> bridge::TetMeshValidation {
     }
 }
 
-/// SurfaceMesh → 扁平坐标缓冲；分配失败以稳定文本错误返回。
+/// SurfaceMesh → 扁平坐标缓冲；分配失败的上下文由调用方配上稳定诊断码。
 fn mesh_coordinates(mesh: &panta_mesh::SurfaceMesh) -> Result<Vec<f64>, String> {
     let mut coordinates = Vec::new();
     let values = mesh
@@ -1037,17 +1122,18 @@ fn mesh_coordinates(mesh: &panta_mesh::SurfaceMesh) -> Result<Vec<f64>, String> 
 fn project_service_mesh_snapshot_for_import(
     service: &ProjectService,
     import_id: &str,
-) -> Result<bridge::SurfaceMeshSnapshot, String> {
+) -> Result<bridge::SurfaceMeshSnapshot, bridge::ProjectDiagnostic> {
     let snapshot = service
         .service
         .current()
-        .map_err(|error| error.to_string())?;
-    let mesh = service
-        .service
-        .mesh_for_import(import_id)
-        .ok_or_else(|| "project.mesh_not_resident".to_owned())?;
+        .map_err(bridge::ProjectDiagnostic::from)?;
+    let mesh = service.service.mesh_for_import(import_id).ok_or_else(|| {
+        project_response::diagnostic("project.mesh_not_resident", "state", import_id.to_owned())
+    })?;
     Ok(bridge::SurfaceMeshSnapshot {
-        coordinates: mesh_coordinates(mesh)?,
+        coordinates: mesh_coordinates(mesh).map_err(|detail| {
+            project_response::diagnostic("project.mesh_allocation_failed", "resource", detail)
+        })?,
         revision: snapshot.revision,
     })
 }
@@ -1071,7 +1157,7 @@ fn project_service_resident_mesh_ids(service: &ProjectService) -> Vec<String> {
 fn project_service_begin_asset_activation(
     service: &mut ProjectService,
     import_id: &str,
-) -> Result<bridge::ActivationAttempt, String> {
+) -> Result<bridge::ActivationAttempt, panta_core::project::ProjectError> {
     service
         .service
         .begin_asset_activation(import_id)
@@ -1079,7 +1165,6 @@ fn project_service_begin_asset_activation(
             attempt: attempt.attempt,
             generation: attempt.generation,
         })
-        .map_err(|error| error.to_string())
 }
 
 fn project_service_cancel_asset_activation(service: &mut ProjectService, attempt: u64) -> bool {
@@ -1101,34 +1186,31 @@ fn activation_outcome_to_bridge(
     service: &mut panta_core::project::ProjectService,
     outcome: panta_core::project::Outcome,
 ) -> bridge::ActivationOutcome {
-    let (kind, code, detail, coordinates) = match outcome.kind {
+    let (kind, error, coordinates) = match outcome.kind {
         panta_core::project::OutcomeKind::Succeeded
             if !service.is_current_activation_attempt(&outcome.import_id, outcome.attempt) =>
         {
-            // 同 ID 页签重开会产生新 attempt；旧成功结果既不进缓存，也不跨 FFI 携带大网格。
+            // 旧 attempt 的成功结果既不进缓存，也不跨 FFI 携带大网格。
             (
                 bridge::ActivationOutcomeKind::Expired,
-                String::new(),
-                String::new(),
+                bridge::ProjectDiagnostic::default(),
                 Vec::new(),
             )
         }
         panta_core::project::OutcomeKind::Succeeded => match outcome.mesh {
             Some(mesh) => match mesh_coordinates(&mesh) {
                 Ok(coordinates) => {
-                    // DTO 由此 outcome 自己的 Mesh 构造；缓存提交再次校验 attempt。
+                    // DTO 由当前 outcome 的 Mesh 构造；缓存提交再次校验 attempt。
                     if service.cache_activation_result(&outcome.import_id, outcome.attempt, mesh) {
                         (
                             bridge::ActivationOutcomeKind::Succeeded,
-                            outcome.code,
-                            outcome.detail,
+                            bridge::ProjectDiagnostic::default(),
                             coordinates,
                         )
                     } else {
                         (
                             bridge::ActivationOutcomeKind::Expired,
-                            String::new(),
-                            String::new(),
+                            bridge::ProjectDiagnostic::default(),
                             Vec::new(),
                         )
                     }
@@ -1137,8 +1219,11 @@ fn activation_outcome_to_bridge(
                     service.finish_asset_activation(&outcome.import_id, outcome.attempt);
                     (
                         bridge::ActivationOutcomeKind::Failed,
-                        "project.mesh_allocation_failed".to_owned(),
-                        detail,
+                        project_response::diagnostic(
+                            "project.mesh_allocation_failed",
+                            "resource",
+                            detail,
+                        ),
                         Vec::new(),
                     )
                 }
@@ -1147,20 +1232,23 @@ fn activation_outcome_to_bridge(
                 service.finish_asset_activation(&outcome.import_id, outcome.attempt);
                 (
                     bridge::ActivationOutcomeKind::Failed,
-                    "project.mesh_missing".to_owned(),
-                    String::new(),
+                    project_response::diagnostic(
+                        "project.mesh_missing",
+                        "state",
+                        outcome.import_id.clone(),
+                    ),
                     Vec::new(),
                 )
             }
         },
         kind => {
             service.finish_asset_activation(&outcome.import_id, outcome.attempt);
-            (
-                activation_kind(kind),
-                outcome.code,
-                outcome.detail,
-                Vec::new(),
-            )
+            let error = bridge::ProjectDiagnostic {
+                code: outcome.code,
+                category: outcome.category.to_owned(),
+                detail: outcome.detail,
+            };
+            (activation_kind(kind), error, Vec::new())
         }
     };
     bridge::ActivationOutcome {
@@ -1168,8 +1256,7 @@ fn activation_outcome_to_bridge(
         generation: outcome.generation,
         import_id: outcome.import_id,
         kind,
-        code,
-        detail,
+        error,
         coordinates,
     }
 }
@@ -1264,33 +1351,26 @@ fn project_service_begin_gate_location_settings_confirmation(
     revision: u64,
     import_id: &str,
     settings: bridge::GateLocationSettings,
-) -> Result<bool, String> {
-    let algorithm = panta_core::project::GateLocatorAlgorithm::from_id(&settings.algorithm_id)
-        .map_err(|error| error.to_string())?;
-    service
-        .service
-        .begin_gate_location_settings_confirmation(
-            std::path::Path::new(project_path),
-            revision,
-            import_id,
-            panta_core::project::GateLocationSettings {
-                machine_id: settings.machine_id,
-                mold_temperature_celsius: settings.mold_temperature_celsius,
-                melt_temperature_celsius: settings.melt_temperature_celsius,
-                algorithm,
-                number_of_gates: settings.number_of_gates,
-            },
-        )
-        .map_err(|error| error.to_string())
+) -> Result<bool, panta_core::project::ProjectError> {
+    let algorithm = panta_core::project::GateLocatorAlgorithm::from_id(&settings.algorithm_id)?;
+    service.service.begin_gate_location_settings_confirmation(
+        std::path::Path::new(project_path),
+        revision,
+        import_id,
+        panta_core::project::GateLocationSettings {
+            machine_id: settings.machine_id,
+            mold_temperature_celsius: settings.mold_temperature_celsius,
+            melt_temperature_celsius: settings.melt_temperature_celsius,
+            algorithm,
+            number_of_gates: settings.number_of_gates,
+        },
+    )
 }
 
 fn project_service_finish_gate_location_settings_confirmation(
     service: &mut ProjectService,
-) -> Result<bool, String> {
-    service
-        .service
-        .finish_gate_location_settings_confirmation()
-        .map_err(|error| error.to_string())
+) -> Result<bool, panta_core::project::ProjectError> {
+    service.service.finish_gate_location_settings_confirmation()
 }
 
 fn fill_settings_dto(settings: panta_core::project::FillSettings) -> bridge::FillSettings {
@@ -1318,40 +1398,34 @@ fn project_service_begin_fill_settings_confirmation(
     revision: u64,
     import_id: &str,
     settings: bridge::FillSettings,
-) -> Result<bool, String> {
-    service
-        .service
-        .begin_fill_settings_confirmation(
-            std::path::Path::new(project_path),
-            revision,
-            import_id,
-            panta_core::project::FillSettings {
-                mold_temperature_celsius: settings.mold_temperature_celsius,
-                melt_temperature_celsius: settings.melt_temperature_celsius,
-                flow_rate_cm3_per_second: settings.flow_rate_cm3_per_second,
-                switch_over_volume_percent: settings.switch_over_volume_percent,
-                fiber_orientation: settings.fiber_orientation,
-                crystallization: settings.crystallization,
-                holding_profile: settings
-                    .holding_profile
-                    .into_iter()
-                    .map(|point| panta_core::project::HoldingProfilePoint {
-                        duration_seconds: point.duration_seconds,
-                        pressure_percent: point.pressure_percent,
-                    })
-                    .collect(),
-            },
-        )
-        .map_err(|error| error.to_string())
+) -> Result<bool, panta_core::project::ProjectError> {
+    service.service.begin_fill_settings_confirmation(
+        std::path::Path::new(project_path),
+        revision,
+        import_id,
+        panta_core::project::FillSettings {
+            mold_temperature_celsius: settings.mold_temperature_celsius,
+            melt_temperature_celsius: settings.melt_temperature_celsius,
+            flow_rate_cm3_per_second: settings.flow_rate_cm3_per_second,
+            switch_over_volume_percent: settings.switch_over_volume_percent,
+            fiber_orientation: settings.fiber_orientation,
+            crystallization: settings.crystallization,
+            holding_profile: settings
+                .holding_profile
+                .into_iter()
+                .map(|point| panta_core::project::HoldingProfilePoint {
+                    duration_seconds: point.duration_seconds,
+                    pressure_percent: point.pressure_percent,
+                })
+                .collect(),
+        },
+    )
 }
 
 fn project_service_finish_fill_settings_confirmation(
     service: &mut ProjectService,
-) -> Result<bool, String> {
-    service
-        .service
-        .finish_fill_settings_confirmation()
-        .map_err(|error| error.to_string())
+) -> Result<bool, panta_core::project::ProjectError> {
+    service.service.finish_fill_settings_confirmation()
 }
 
 #[cfg(test)]
@@ -1700,10 +1774,10 @@ mod tests {
 
     fn wait_confirmation(
         service: &mut super::ProjectService,
-        finish: fn(&mut super::ProjectService) -> Result<bool, String>,
+        finish: fn(&mut super::ProjectService) -> Result<bool, panta_core::project::ProjectError>,
     ) -> Result<(), String> {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while !finish(service)? {
+        while !finish(service).map_err(|error| error.to_string())? {
             if std::time::Instant::now() >= deadline {
                 return Err("metadata confirmation timed out".into());
             }
@@ -1943,19 +2017,20 @@ mod tests {
             Ok(snapshot) => panic!("empty service returned {}", snapshot.name),
             Err(error) => error,
         };
-        assert_eq!(no_project, "project.no_project");
+        assert_eq!(no_project.code(), "project.no_project");
 
         let create_error =
             match project_service_create(&mut service, "relative".to_owned(), "Demo".to_owned()) {
                 Ok(snapshot) => panic!("relative project created at {}", snapshot.path),
                 Err(error) => error,
             };
-        assert_eq!(create_error, "project.location_not_absolute: relative");
+        assert_eq!(create_error.code(), "project.location_not_absolute");
+        assert_eq!(create_error.detail(), "relative");
         let save_error = match project_service_save(&mut service) {
             Ok(snapshot) => panic!("empty service saved {}", snapshot.name),
             Err(error) => error,
         };
-        assert_eq!(save_error, "project.no_project");
+        assert_eq!(save_error.code(), "project.no_project");
 
         let created =
             project_service_create(&mut service, root.display().to_string(), "Demo".to_owned())?;
@@ -1991,7 +2066,8 @@ mod tests {
             ),
             Err(error) => error,
         };
-        assert_eq!(unchanged, "project.command_invalid: name is unchanged");
+        assert_eq!(unchanged.code(), "project.command_invalid");
+        assert_eq!(unchanged.detail(), "name is unchanged");
 
         let mut reopened = project_service_new();
         let opened = project_service_open(&mut reopened, created.path.clone())?;
@@ -2005,8 +2081,8 @@ mod tests {
                 Err(error) => error,
             };
         assert_eq!(
-            invalid_file_error,
-            format!("project.invalid_file: {}", invalid_file.display())
+            invalid_file_error.detail(),
+            invalid_file.display().to_string()
         );
 
         let _ = fs::remove_dir_all(&root);
@@ -2045,7 +2121,7 @@ endsolid
             Ok(attempt) => panic!("unknown record admitted as attempt {}", attempt.attempt),
             Err(error) => error,
         };
-        assert!(missing.contains("project.import_record_missing"));
+        assert_eq!(missing.code(), "project.import_record_missing");
         assert!(!crate::project_service_cancel_asset_activation(
             &mut service,
             u64::MAX
@@ -2103,7 +2179,7 @@ endsolid
             Ok(imports) => panic!("empty project returned {} imports", imports.len()),
             Err(error) => error,
         };
-        assert_eq!(no_project, "project.no_project");
+        assert_eq!(no_project.code(), "project.no_project");
         let preview =
             crate::project_service_inspect_stl(&mut service, source.display().to_string())?;
         assert_eq!(preview.source_name, "part.stl");
@@ -2122,7 +2198,7 @@ endsolid
             Ok(imported) => panic!("import without a project succeeded as {}", imported.id),
             Err(error) => error,
         };
-        assert_eq!(import_without_project, "project.no_project");
+        assert_eq!(import_without_project.code(), "project.no_project");
 
         let created =
             project_service_create(&mut service, root.display().to_string(), "Demo".to_owned())?;
@@ -2166,7 +2242,8 @@ endsolid
             Ok(_) => panic!("unloaded mesh returned a display snapshot"),
             Err(error) => error,
         };
-        assert_eq!(unloaded, "project.mesh_not_resident");
+        assert_eq!(unloaded.code, "project.mesh_not_resident");
+        assert_eq!(unloaded.detail, imported.id);
 
         let step_source = root.join("part.step");
         fs::write(&step_source, b"not a supported STL source")?;
@@ -2180,7 +2257,7 @@ endsolid
             ),
             Err(error) => error,
         };
-        assert!(unsupported.starts_with("project.import_invalid_file:"));
+        assert_eq!(unsupported.code(), "project.import_invalid_file");
 
         crate::project_service_inspect_stl(&mut service, source.display().to_string())?;
         fs::write(&source, b"vertex 0 0 0\nvertex 3 0 0\nvertex 0 4 0\n")?;
@@ -2194,7 +2271,7 @@ endsolid
             Ok(imported) => panic!("changed source was imported as {}", imported.id),
             Err(error) => error,
         };
-        assert!(changed.starts_with("project.import_source_changed:"));
+        assert_eq!(changed.code(), "project.import_source_changed");
         assert_eq!(crate::project_service_imports(&service)?.len(), 1);
 
         fs::write(&source, original)?;
@@ -2208,7 +2285,10 @@ endsolid
             Ok(imported) => panic!("unsupported mesh type was imported as {}", imported.id),
             Err(error) => error,
         };
-        assert!(invalid_options.starts_with("project.import_unsupported_mesh_type:"));
+        assert_eq!(
+            invalid_options.code(),
+            "project.import_unsupported_mesh_type"
+        );
         assert_eq!(crate::project_service_imports(&service)?.len(), 1);
 
         let invalid_units = match crate::project_service_import_stl(
@@ -2221,11 +2301,35 @@ endsolid
             Ok(imported) => panic!("unsupported units were imported as {}", imported.id),
             Err(error) => error,
         };
-        assert!(invalid_units.starts_with("project.import_unsupported_units:"));
+        assert_eq!(invalid_units.code(), "project.import_unsupported_units");
         assert_eq!(crate::project_service_imports(&service)?.len(), 1);
 
         let _ = fs::remove_dir_all(&root);
         Ok(())
+    }
+
+    #[test]
+    fn failed_activation_transfers_structured_diagnostics_without_mesh_payload() {
+        let mut service = project_service_new();
+        let outcome = panta_core::project::Outcome {
+            attempt: 7,
+            generation: 3,
+            import_id: "import-2".into(),
+            kind: panta_core::project::OutcomeKind::Failed,
+            code: "project.asset_read_failed".into(),
+            category: "io",
+            detail: "C:\\资产: read denied".into(),
+            mesh: None,
+        };
+        let result = activation_outcome_to_bridge(&mut service.service, outcome);
+        assert!(result.kind == bridge::ActivationOutcomeKind::Failed);
+        assert_eq!(result.attempt, 7);
+        assert_eq!(result.generation, 3);
+        assert_eq!(result.import_id, "import-2");
+        assert_eq!(result.error.code, "project.asset_read_failed");
+        assert_eq!(result.error.category, "io");
+        assert_eq!(result.error.detail, "C:\\资产: read denied");
+        assert!(result.coordinates.is_empty());
     }
 
     #[test]
@@ -2237,6 +2341,7 @@ endsolid
             import_id: "import-1".to_owned(),
             kind: panta_core::project::OutcomeKind::Succeeded,
             code: String::new(),
+            category: "",
             detail: String::new(),
             mesh: Some(panta_mesh::SurfaceMesh {
                 triangles: vec![[[x, 0.0, 0.0], [x + 1.0, 0.0, 0.0], [x, 1.0, 0.0]]],

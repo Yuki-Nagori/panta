@@ -39,12 +39,14 @@ pub enum OutcomeKind {
 }
 
 /// 穿越所有权的终态结果：`mesh` 由接收方释放，drain 过滤的过期快照就地释放。
+/// code / category / detail 仅 Failed 非空；分类由类型化错误映射，不依赖文案。
 pub struct Outcome {
     pub attempt: u64,
     pub generation: u64,
     pub import_id: String,
     pub kind: OutcomeKind,
     pub code: String,
+    pub category: &'static str,
     pub detail: String,
     pub mesh: Option<SurfaceMesh>,
 }
@@ -53,8 +55,14 @@ pub struct Outcome {
 pub(crate) enum Event {
     OpenRequested,
     AssetRead,
-    ParseSucceeded { mesh: SurfaceMesh },
-    Fail { code: &'static str, detail: String },
+    ParseSucceeded {
+        mesh: SurfaceMesh,
+    },
+    Fail {
+        code: &'static str,
+        category: &'static str,
+        detail: String,
+    },
     CancelAcknowledged,
     GenerationInvalidated,
 }
@@ -315,6 +323,7 @@ fn dispatch_admission_failure(
         attempt,
         Event::Fail {
             code: "project.activation_spawn_failed",
+            category: "resource",
             detail,
         },
         false,
@@ -363,6 +372,7 @@ fn outcome_for(entry: &AttemptEntry, state: fsm::State, attempt: u64, event: Eve
         import_id: entry.import_id.clone(),
         kind: OutcomeKind::Expired,
         code: String::new(),
+        category: "",
         detail: String::new(),
         mesh: None,
     };
@@ -371,9 +381,17 @@ fn outcome_for(entry: &AttemptEntry, state: fsm::State, attempt: u64, event: Eve
             outcome.kind = OutcomeKind::Succeeded;
             outcome.mesh = Some(mesh);
         }
-        (fsm::State::Failed, Event::Fail { code, detail }) => {
+        (
+            fsm::State::Failed,
+            Event::Fail {
+                code,
+                category,
+                detail,
+            },
+        ) => {
             outcome.kind = OutcomeKind::Failed;
             outcome.code = code.to_owned();
+            outcome.category = category;
             outcome.detail = detail;
         }
         (fsm::State::Cancelled, _) => outcome.kind = OutcomeKind::Cancelled,
@@ -404,8 +422,15 @@ fn run_attempt(
             return;
         }
         Err(CheckedReadError::Failed(error)) => {
-            let (code, detail) = activation_failure(&error);
-            coordinator.complete(attempt, Event::Fail { code, detail });
+            let (code, category, detail) = activation_failure(&error);
+            coordinator.complete(
+                attempt,
+                Event::Fail {
+                    code,
+                    category,
+                    detail,
+                },
+            );
             return;
         }
     };
@@ -417,8 +442,15 @@ fn run_attempt(
     match parse_stl_asset(&snapshot, &request.units) {
         Ok(mesh) => coordinator.complete(attempt, Event::ParseSucceeded { mesh }),
         Err(error) => {
-            let (code, detail) = activation_failure(&error);
-            coordinator.complete(attempt, Event::Fail { code, detail });
+            let (code, category, detail) = activation_failure(&error);
+            coordinator.complete(
+                attempt,
+                Event::Fail {
+                    code,
+                    category,
+                    detail,
+                },
+            );
         }
     }
 }
@@ -436,19 +468,28 @@ fn spawn_activation_worker(
         .map(drop)
 }
 
-fn activation_failure(error: &ImportError) -> (&'static str, String) {
+fn activation_failure(error: &ImportError) -> (&'static str, &'static str, String) {
     match error {
-        ImportError::Missing(path) => ("project.asset_missing", path.clone()),
-        ImportError::UnsupportedFormat(path) => ("project.asset_unsupported_format", path.clone()),
-        ImportError::Read(detail) => ("project.asset_read_failed", detail.clone()),
-        ImportError::Parse(error) => ("project.asset_parse_failed", error.to_string()),
-        ImportError::SourceChanged(path) => ("project.asset_source_changed", path.clone()),
-        ImportError::UnsupportedUnits(units) => ("project.import_unsupported_units", units.clone()),
-        ImportError::UnsupportedMeshType(kind) => {
-            ("project.import_unsupported_mesh_type", kind.clone())
+        ImportError::Missing(path) => ("project.asset_missing", "missing", path.clone()),
+        ImportError::UnsupportedFormat(path) => {
+            ("project.asset_unsupported_format", "format", path.clone())
         }
+        ImportError::Read(detail) => ("project.asset_read_failed", "io", detail.clone()),
+        ImportError::Parse(error) => ("project.asset_parse_failed", "format", error.to_string()),
+        ImportError::SourceChanged(path) => {
+            ("project.asset_source_changed", "conflict", path.clone())
+        }
+        ImportError::UnsupportedUnits(units) => {
+            ("project.import_unsupported_units", "format", units.clone())
+        }
+        ImportError::UnsupportedMeshType(kind) => (
+            "project.import_unsupported_mesh_type",
+            "format",
+            kind.clone(),
+        ),
         ImportError::CoordinateOverflow => (
             "project.asset_coordinate_overflow",
+            "format",
             "millimeter coordinate overflow".to_owned(),
         ),
     }
@@ -457,6 +498,71 @@ fn activation_failure(error: &ImportError) -> (&'static str, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn activation_diagnostics_preserve_typed_categories_and_context() {
+        let context = "参数: 中文 / C:\\零件.stl";
+        let cases = [
+            (
+                ImportError::Missing(context.into()),
+                "project.asset_missing",
+                "missing",
+                context,
+            ),
+            (
+                ImportError::UnsupportedFormat(context.into()),
+                "project.asset_unsupported_format",
+                "format",
+                context,
+            ),
+            (
+                ImportError::Read(context.into()),
+                "project.asset_read_failed",
+                "io",
+                context,
+            ),
+            (
+                ImportError::SourceChanged(context.into()),
+                "project.asset_source_changed",
+                "conflict",
+                context,
+            ),
+            (
+                ImportError::UnsupportedUnits(context.into()),
+                "project.import_unsupported_units",
+                "format",
+                context,
+            ),
+            (
+                ImportError::UnsupportedMeshType(context.into()),
+                "project.import_unsupported_mesh_type",
+                "format",
+                context,
+            ),
+            (
+                ImportError::CoordinateOverflow,
+                "project.asset_coordinate_overflow",
+                "format",
+                "millimeter coordinate overflow",
+            ),
+        ];
+        for (error, code, category, detail) in cases {
+            assert_eq!(activation_failure(&error), (code, category, detail.into()));
+        }
+        for error in [
+            panta_mesh::StlError::Empty,
+            panta_mesh::StlError::InvalidEncoding,
+            panta_mesh::StlError::InvalidData,
+            panta_mesh::StlError::NonFiniteCoordinate,
+            panta_mesh::StlError::SizeOverflow,
+        ] {
+            let detail = error.to_string();
+            assert_eq!(
+                activation_failure(&ImportError::Parse(error)),
+                ("project.asset_parse_failed", "format", detail)
+            );
+        }
+    }
 
     /// 双向结构校验（073）：生成转移表 × 手写决策全对全比较。声明边在
     /// guard 为真时必须 Enter(to)、为假时必须 GuardRejected；未声明组合
@@ -645,6 +751,7 @@ mod tests {
             attempt.attempt,
             Event::Fail {
                 code: "project.asset_missing",
+                category: "missing",
                 detail: "part.stl".to_owned(),
             },
         );
@@ -652,6 +759,7 @@ mod tests {
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
         assert_eq!(outcomes[0].code, "project.asset_missing");
+        assert_eq!(outcomes[0].category, "missing");
 
         let (coordinator, attempt) = coordinator_with_request();
         coordinator.complete(attempt.attempt, Event::CancelAcknowledged);
@@ -740,6 +848,7 @@ mod tests {
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
         assert_eq!(outcomes[0].code, "project.activation_spawn_failed");
+        assert_eq!(outcomes[0].category, "resource");
         assert_eq!(outcomes[0].attempt, attempt.attempt);
     }
 
@@ -753,6 +862,7 @@ mod tests {
             attempt.attempt,
             Event::Fail {
                 code: "project.asset_parse_failed",
+                category: "format",
                 detail: "invalid stl".to_owned(),
             },
         );
@@ -760,5 +870,6 @@ mod tests {
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
         assert_eq!(outcomes[0].code, "project.asset_parse_failed");
+        assert_eq!(outcomes[0].category, "format");
     }
 }

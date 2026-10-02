@@ -26,6 +26,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QUrl defaultLocationUrl READ defaultLocationUrl CONSTANT)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(QString errorCode READ errorCode NOTIFY errorChanged)
+    Q_PROPERTY(QString errorCategory READ errorCategory NOTIFY errorChanged)
+    Q_PROPERTY(QString errorDetail READ errorDetail NOTIFY errorChanged)
     Q_PROPERTY(QString currentPath READ currentPath NOTIFY projectChanged)
     Q_PROPERTY(QString currentName READ currentName NOTIFY projectChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY projectChanged)
@@ -75,6 +77,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 最近一次可恢复失败的用户可读摘要；空串表示无错误。
     [[nodiscard]] const QString& error() const;
     [[nodiscard]] const QString& errorCode() const;
+    /// 稳定诊断类别与原始上下文；detail 供诊断，不参与业务判断。
+    [[nodiscard]] const QString& errorCategory() const;
+    [[nodiscard]] const QString& errorDetail() const;
 
     [[nodiscard]] const QString& currentPath() const;
     [[nodiscard]] const QString& currentName() const;
@@ -199,10 +204,14 @@ class ProjectViewModel : public panta::visualization::MeshSource {
         QString kind;  // "welcome" | "import"
         QString state; // "ready" | "loading" | "failed" | "unloaded"
         QString title;
-        QString message; // Failed 态的用户可读原因
+        QString message;          // Failed 态的用户可读原因
+        QVariantMap diagnostic{}; // code / category / detail，非失败态为空
     };
 
-    bool fail(const QString& boundaryError);
+    bool fail(const panta::ffi::ProjectDiagnostic& diagnostic);
+    bool fail(const QString& code, const QString& category = QStringLiteral("validation"),
+              const QString& detail = {});
+    bool applySnapshot(const panta::ffi::ProjectSnapshotResult& result);
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
@@ -237,6 +246,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     QVariantMap m_defaultMaterial;
     QString m_error;
     QString m_errorCode;
+    QString m_errorCategory;
+    QString m_errorDetail;
     QString m_currentPath;
     QString m_currentName;
     QString m_lastCreatedPath;

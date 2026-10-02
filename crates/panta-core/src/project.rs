@@ -86,7 +86,7 @@ struct ProjectManifest {
     gate_location_settings: BTreeMap<String, GateLocationSettings>,
 }
 
-/// 工程 service 的可恢复错误；`Display` 的前缀是跨语言稳定错误码。
+/// 工程服务的可恢复错误；跨语言消费者使用显式字段，Display 仅供日志。
 #[derive(Debug)]
 pub enum ProjectError {
     EmptyName,
@@ -113,7 +113,8 @@ pub enum ProjectError {
 }
 
 impl ProjectError {
-    fn code(&self) -> &'static str {
+    /// 稳定错误码，不依赖系统错误文案或文件名。
+    pub fn code(&self) -> &'static str {
         match self {
             Self::EmptyName => "project.empty_name",
             Self::InvalidName(_) => "project.invalid_name",
@@ -139,7 +140,32 @@ impl ProjectError {
         }
     }
 
-    fn detail(&self) -> String {
+    /// 稳定诊断类别；本地化消息由界面按 code 选择。
+    pub fn category(&self) -> &'static str {
+        match self {
+            Self::EmptyName
+            | Self::InvalidName(_)
+            | Self::LocationEmpty
+            | Self::LocationNotAbsolute(_)
+            | Self::CommandInvalid(_) => "validation",
+            Self::FileMissing(_) | Self::ImportFileMissing(_) | Self::ImportRecordMissing(_) => {
+                "missing"
+            }
+            Self::AlreadyExists(_) | Self::ImportSourceChanged(_) => "conflict",
+            Self::NoProject => "state",
+            Self::InvalidFile(_)
+            | Self::ManifestInvalid(_)
+            | Self::UnsupportedSchema(_)
+            | Self::ImportInvalidFile(_)
+            | Self::ImportUnsupportedMeshType(_)
+            | Self::ImportUnsupportedUnits(_)
+            | Self::ImportParseFailed(_) => "format",
+            Self::LocationCreateFailed(_) | Self::ImportAssetCopyFailed(_) | Self::Io(_) => "io",
+        }
+    }
+
+    /// 原始上下文，可包含路径、参数或系统错误；不得用它推断错误类型。
+    pub fn detail(&self) -> String {
         match self {
             Self::EmptyName | Self::LocationEmpty | Self::NoProject => String::new(),
             Self::InvalidName(name)

@@ -14,7 +14,7 @@ QML 负责布局、主题、控件和状态绑定。`CaeViewport` 是嵌入 QML 
 
 ## ViewModel 契约
 
-`QObject` 派生 ViewModel 暴露可观察属性、命令和事件。任务 057 已注册 `ProjectViewModel`，提供工程默认目录、创建/打开/保存、重命名命令、dirty 状态和结构化错误；它只做 Qt 字符串/URL 与 Rust application service 的适配。几何导入、网格生成等长任务仍按后续 ViewModel 契约接入。
+`QObject` 派生 ViewModel 暴露可观察属性、命令和事件。任务 057 已注册 `ProjectViewModel`，提供工程默认目录、创建/打开/保存、重命名命令和 dirty 状态。任务 063 将工程 / STL 操作错误迁为 CXX 值 DTO：`ProjectDiagnostic` 独立携带 code / category / detail，code 为空才可消费结果 value；失败占位值不能覆盖旧状态。ViewModel 适配为 `errorCode` / `errorCategory` / `errorDetail` 与用户摘要，QML 按稳定码翻译，不解析异常文本。保存资产异步激活失败时，文档模型的 `diagnostic` 保存同一结构；成功或重试后清空。它只做 Qt 字符串/URL 与 Rust 应用服务的适配；实际网格生成仍按后续任务接入。
 
 属性变化通过 NOTIFY 信号通知，错误以结构化错误加用户可读摘要呈现。长任务返回任务标识或提供可追踪的任务状态，不能仅用一个全局 busy 布尔值掩盖多个并发操作。按钮启用条件来自模型状态，例如没有有效几何时禁用网格生成。
 
