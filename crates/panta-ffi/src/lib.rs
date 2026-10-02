@@ -8,14 +8,16 @@ use project_response::{
     default_material_response, project_service_begin_asset_activation_response,
     project_service_begin_fill_settings_confirmation_response,
     project_service_begin_gate_location_settings_confirmation_response,
-    project_service_begin_material_confirmation_response, project_service_create_response,
-    project_service_current_response, project_service_execute_response,
-    project_service_finish_fill_settings_confirmation_response,
+    project_service_begin_material_confirmation_response,
+    project_service_begin_stl_preview_response, project_service_cancel_stl_preview,
+    project_service_create_response, project_service_current_response,
+    project_service_execute_response, project_service_finish_fill_settings_confirmation_response,
     project_service_finish_gate_location_settings_confirmation_response,
-    project_service_finish_material_confirmation_response, project_service_import_stl_response,
-    project_service_imports_response, project_service_inspect_stl_response,
-    project_service_mesh_snapshot_for_import_response, project_service_open_response,
-    project_service_save_response, project_service_set_analysis_sequence_response,
+    project_service_finish_material_confirmation_response,
+    project_service_finish_stl_preview_response, project_service_import_stl_response,
+    project_service_imports_response, project_service_mesh_snapshot_for_import_response,
+    project_service_open_response, project_service_save_response,
+    project_service_set_analysis_sequence_response,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -282,9 +284,17 @@ pub mod bridge {
         pub error: ProjectDiagnostic,
     }
 
-    /// STL 预检元数据结果。
+    /// 只读预检的运行期请求编号；失败 value 不可消费。
     #[derive(Default)]
-    pub struct StlImportPreviewResult {
+    pub struct StlPreviewRequestResult {
+        pub value: u64,
+        pub error: ProjectDiagnostic,
+    }
+
+    /// ready=false 且诊断为空表示尚未完成；只有 ready=true 才能消费 value。
+    #[derive(Default)]
+    pub struct StlPreviewPoll {
+        pub ready: bool,
         pub value: StlImportPreview,
         pub error: ProjectDiagnostic,
     }
@@ -483,11 +493,17 @@ pub mod bridge {
             sequence_id: &str,
         ) -> ProjectSnapshotResult;
 
-        #[rust_name = "project_service_inspect_stl_response"]
-        fn project_service_inspect_stl(
+        #[rust_name = "project_service_begin_stl_preview_response"]
+        fn project_service_begin_stl_preview(
             service: &mut ProjectService,
             source: String,
-        ) -> StlImportPreviewResult;
+        ) -> StlPreviewRequestResult;
+        #[rust_name = "project_service_finish_stl_preview_response"]
+        fn project_service_finish_stl_preview(
+            service: &mut ProjectService,
+            request: u64,
+        ) -> StlPreviewPoll;
+        fn project_service_cancel_stl_preview(service: &mut ProjectService, request: u64) -> bool;
         /// 已驻留 Mesh 的一次性显示快照；只由文档激活路径调用，不用于逐帧读取。
         #[rust_name = "project_service_mesh_snapshot_for_import_response"]
         fn project_service_mesh_snapshot_for_import(
@@ -1014,6 +1030,7 @@ fn project_service_set_analysis_sequence(
         .map(project_snapshot)
 }
 
+#[cfg(test)]
 fn project_service_inspect_stl(
     service: &mut ProjectService,
     source: String,

@@ -52,6 +52,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
         bool gateLocationSettingsConfirmationPending READ gateLocationSettingsConfirmationPending
             NOTIFY gateLocationSettingsConfirmationPendingChanged)
     Q_PROPERTY(QVariantMap planSettings READ planSettings NOTIFY planSettingsChanged)
+    Q_PROPERTY(bool importPreviewPending READ importPreviewPending NOTIFY importPreviewChanged)
     Q_PROPERTY(bool importPreviewReady READ importPreviewReady NOTIFY importPreviewChanged)
     Q_PROPERTY(QString importPreviewName READ importPreviewName NOTIFY importPreviewChanged)
     Q_PROPERTY(
@@ -93,6 +94,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] const QString& importedUnits() const;
     [[nodiscard]] const QString& importedDimensions() const;
     [[nodiscard]] quint64 importedTriangleCount() const;
+    [[nodiscard]] bool importPreviewPending() const;
     [[nodiscard]] bool importPreviewReady() const;
     [[nodiscard]] const QString& importPreviewName() const;
     [[nodiscard]] const QString& importPreviewDimensions() const;
@@ -141,8 +143,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_INVOKABLE bool importStl(const QString& path, const QString& meshType, const QString& units,
                                bool showImportLog);
 
-    /// 预检 STL 元数据供导入对话框展示，不改变当前工程。
+    /// 发起 Rust 后台预检；返回请求是否被接受，完成由 importPreviewFinished 通知。
+    /// 新选择替换旧请求，关闭弹窗需调用 cancelImportPreview，不等待解析线程。
     Q_INVOKABLE bool inspectStl(const QString& path);
+    /// 废弃进行中的请求及已完成的预检快照，清空表单投影。
+    Q_INVOKABLE void cancelImportPreview();
 
     /// 确认打开弹窗时的方案选择；Rust 校验工程身份与修订并事务保存。
     /// 失败保留已确认值，错误由 error/errorCode 提供。
@@ -194,6 +199,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void gateLocationSettingsConfirmationFinished(bool succeeded);
     void projectImported(const QString& path);
     void importPreviewChanged();
+    /// 当前请求完成且发布快照后触发；取消或在通知中被替换的请求不触发。
+    void importPreviewFinished(quint64 requestId, bool succeeded);
     void documentsChanged();
     void activeDocumentChanged();
 
@@ -238,6 +245,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void begin_import_activation(const QString& recordId);
     void drain_activations();
     void sync_activation_poll();
+    void finish_import_preview();
 
     QString m_defaultLocation;
     const QVariantList m_analysisSequences;
@@ -271,6 +279,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 当前活动文档的 C++ 显示 DTO；Rust ProjectService 拥有所有驻留 Mesh 与缓存策略。
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_activeMesh;
     QMap<QString, quint64> m_activationAttempts;
+    QTimer m_importPreviewPoll;
+    quint64 m_previewRequest = 0;
+    bool m_importPreviewPending = false;
     QTimer m_activationPoll;
     QTimer m_metadataConfirmationPoll;
     ConfirmationKind m_pendingConfirmation = ConfirmationKind::None;

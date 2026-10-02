@@ -11,7 +11,7 @@
 
 将 Home 工具栏的 Import 从视觉入口推进为第一条真实导入流程：选择一个或多个 `.stl` 文件，随后显示网格类型、单位、导入日志和近似尺寸确认窗口；确认后把源文件及影响几何解释的选项纳入当前 `.panta` 工程，并在工程树中展示多个独立零件。左侧工程工作区上下分区：上方展示工程与导入文件，下方展示当前选择零件的任务和属性；右侧视口显示所选 STL，后续再扩展其他格式。
 
-本任务先完成可验收的 HTML 状态参考和持久化边界设计，再分阶段实现 QML、C++ ViewModel、Rust 导入服务与视口数据流。HTML 参考覆盖新建项目弹窗。当前首期 STL 运行时闭环已落地，结构化导入 / 工程诊断本批已迁移；剩余为同步预检 / 写入导入的异步任务化及窗口验收收尾。实际网格生成不在本任务范围。
+本任务先完成可验收的 HTML 状态参考和持久化边界设计，再分阶段实现 QML、C++ ViewModel、Rust 导入服务与视口数据流。HTML 参考覆盖新建项目弹窗。当前首期 STL 运行时闭环已落地，结构化导入 / 工程诊断已迁移；本批迁移只读预检，写入导入的异步事务及窗口验收继续跟踪。实际网格生成不在本任务范围。
 
 ## 必读
 
@@ -81,18 +81,29 @@
 
 ## 验证计划与结果
 
-本批验证平台为 macOS，cwd 为仓库根目录，沿用仓库锁定工具链与现有 target：
+### 结构化诊断批次（提交 2f6260c）
+
+验证平台为 macOS，cwd 为仓库根目录，沿用仓库锁定工具链与现有 target：
 
 - `cargo test --locked --workspace`：通过 Rust 工作区测试、qmllint 与 70/70 个 native / QML CTest。新增覆盖全部 21 类工程诊断、八种结果 DTO、Unicode / 冒号 / Windows 路径上下文、失败占位值隔离、全部资产激活错误类别与 STL 解析错误、四类过期元数据请求、资产复制冲突、失败回滚、异步失败及修复后诊断清空。
 - `cargo build --locked`、`cargo format --check`、`cargo lint --check`：通过；质量入口覆盖格式、Clippy、QML、CMake、clang-tidy、include-cleaner、cppcheck。
 - `cargo sanitize`：通过 native ASan/UBSan 70/70 与 TSan 53/53 个 CTest；记录分别位于 `target/native/debug-sanitizer-address`、`debug-sanitizer-thread`。
+- 跨平台 CI：[运行 36994873700](https://github.com/Yuki-Nagori/panta/actions/runs/36994873700)，对应提交 `2f6260c15d4d5ffccaad599d24cee631cb40be44`，结论 success。macOS / Linux / Windows 的 Cargo 检查、构建、聚合测试及 sanitizer 均通过；Rust coverage、native C++ coverage / QML 测试、格式、Clippy、qmllint、CMake、clang-tidy、include-cleaner、cppcheck、machete 与 Miri 通过。cargo audit 因路径过滤跳过，不记为已执行通过。
 - 真实 Cocoa / GPU 窗口：使用隔离临时工程，确认新建、STL 文件选择、1 × 1 × 0 mm 预览、三角面显示、取消不改动原页签 / 视口，以及关闭后从工程树重新激活并恢复显示。截图及 AX 证据位于忽略目录 `artifacts/task-063/import-cancel.*`、`reactivated.*`；临时 app wrapper 验收后删除。
 
 本批不改 manifest schema、UI 样式或 STL 几何算法。已删除 `ProjectViewModel` 对 `rust::Error` 的冒号文本解析；保存资产激活的失败页签另有 code / category / detail，成功或重试时清空。
 
-未覆盖：本批跨平台 CI、四档缩放及性能基准。已保存资产由 073/080 异步激活，但 `inspectStl` / `importStl` 仍同步调用包含文件 I/O 与格式解析的服务；其后台任务迁移继续由 063 跟踪，不能据本批错误边界和小夹具窗口通过认定完整分层验收通过。
+未覆盖：四档缩放及性能基准。该提交中的 `inspectStl` / `importStl` 仍同步执行文件 I/O 与格式解析；不能据诊断边界和小夹具窗口通过认定完整分层验收通过。
+
+### 只读预检批次（当前工作区）
+
+Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的写入事务仍同步。评审补充属性 / 错误通知中替换或取消请求的重入回归，完成事件仅发布仍有效的请求；整理快照取消契约、测试断言与 ViewModel 声明，同步 Qt 交互模块中的预检回执说明。`cargo test --locked --workspace` 通过 Rust 工作区测试、qmllint 与 72/72 个 native / QML CTest，包含取消 / 替换 / 工程切换、快照来源变化、桥接失败占位值及通知重入回归。`cargo build --locked`、`cargo format --check`、`cargo lint --check` 均通过。真实 Cocoa 窗口通过 STL 文件选择、1 × 1 × 0 mm 尺寸预览与 OK 启用、取消后空工程 / Welcome 不变，以及重开后文件 / 尺寸清空、OK 禁用；取消后的 manifest imports 仍为空。截图与 AX 证据位于 `artifacts/task-063/async-preview.*`、`async-cancel.*`、`async-reopen.*`，临时 app wrapper 已退出并删除。`cargo sanitize` 通过 ASan/UBSan 72/72、TSan 55/55 个 CTest（包括新增预检取消与通知重入回归）；本批未测四档缩放及性能基准，也未将小夹具窗口验收视为大文件性能证据。
 
 ## 风险与工作记录
+
+- 2026-10-02：异步迁移按可验证边界分批实施。首批将 STL 预检迁入 Rust 后台；请求拥有独立编号、取消标志和字节 / 网格快照，GUI 线程只发起、取消和拉取结果。替换文件选择、关闭弹窗及成功切换工程均废弃旧请求，旧结果不得重新启用 OK 或污染新表单；预检成功后保留同一来源快照供确认时检查源文件变化。补充 Rust / CXX / Qt 的失败、取消、迟到结果与工程不变回归。确认导入的写入事务及取消截止点留在下一批，当前不标异步导入验收完成。
+
+- 2026-10-02：经 gh 核实提交 `2f6260c` 的 CI 运行 36994873700 成功，补齐三平台测试、sanitizer、覆盖率及质量检查证据；移除已完成的 CI 待验收描述。异步导入迁移与四档缩放仍未完成，任务及索引保持 in-progress。
 
 - 2026-10-02：推进剩余诊断边界。Rust `ProjectError` 显式提供稳定 code / category / detail，CXX 工程操作返回带诊断的值 DTO；覆盖创建、打开、保存、命令、STL 预检 / 导入、元数据确认及资产激活入口，删除 ViewModel 按冒号拆分异常文本的逻辑。Qt 暴露分类与上下文，用户摘要继续按稳定码本地化；失败保留既有工程、导入记录及有效视口。补充跨语言失败 / 修订 / 上下文回归，已执行 Cargo 聚合、sanitizer、质量检查与真实窗口复核。UI 样式、manifest schema 与已保存资产保持现状。
 
@@ -109,7 +120,7 @@
 
 ## 完成摘要
 
-已完成任务登记、`.panta` 持久化边界说明、首期 HTML 状态参考，以及首期 STL 预检 / 导入 / 资产复制 / 重开恢复 / 任务树 / VTK 视口链路。本批完成结构化错误迁移、失败回归及 macOS 真实窗口复核。剩余同步预检 / 写入导入的异步任务化、跨平台 CI 与四档缩放验收，状态保持 in-progress；保存资产的异步激活已有 073/080 实现。实际 Create Mesh 不属于本任务。
+已完成任务登记、`.panta` 持久化边界说明、首期 HTML 状态参考，以及首期 STL 预检 / 导入 / 资产复制 / 重开恢复 / 任务树 / VTK 视口链路。结构化错误迁移、失败回归及 macOS 真实窗口复核已完成；本批完成只读预检后台化、取消与通知重入回归，Cargo 聚合 / 质量 / sanitizer 与真实窗口验证通过。剩余写入导入的异步事务与四档缩放验收，状态保持 in-progress；保存资产的异步激活已有 073/080 实现。实际 Create Mesh 不属于本任务。
 
 ## 契约更新（080，2026-09-26）
 

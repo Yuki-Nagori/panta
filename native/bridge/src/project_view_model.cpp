@@ -115,6 +115,8 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
     m_metadataConfirmationPoll.setInterval(10);
     connect(&m_metadataConfirmationPoll, &QTimer::timeout, this,
             &ProjectViewModel::finish_metadata_confirmation);
+    m_importPreviewPoll.setInterval(10);
+    connect(&m_importPreviewPoll, &QTimer::timeout, this, &ProjectViewModel::finish_import_preview);
     reset_documents();
 }
 
@@ -487,6 +489,8 @@ const QString& ProjectViewModel::importedDimensions() const { return m_importedD
 
 quint64 ProjectViewModel::importedTriangleCount() const { return m_importedTriangleCount; }
 
+bool ProjectViewModel::importPreviewPending() const { return m_importPreviewPending; }
+
 bool ProjectViewModel::importPreviewReady() const { return m_importPreviewReady; }
 
 const QString& ProjectViewModel::importPreviewName() const { return m_importPreviewName; }
@@ -510,6 +514,8 @@ bool ProjectViewModel::createProject(const QString& rawName, const QString& rawL
         return fail(conversionError);
     }
     const auto snapshot = panta::ffi::project_service_create(*m_service, location, name);
+    if (snapshot.error.code.empty())
+        cancelImportPreview();
     if (!applySnapshot(snapshot)) {
         return false;
     }
@@ -543,6 +549,8 @@ bool ProjectViewModel::openProject(const QString& path) {
         return fail(conversionError);
     }
     const auto snapshot = panta::ffi::project_service_open(*m_service, boundaryPath);
+    if (snapshot.error.code.empty())
+        cancelImportPreview();
     if (!applySnapshot(snapshot)) {
         return false;
     }
@@ -627,39 +635,64 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
     return true;
 }
 
-bool ProjectViewModel::inspectStl(const QString& rawPath) {
-    clearError();
-    if (m_importPreviewReady) {
-        m_importPreviewReady = false;
-        m_importPreviewName.clear();
-        m_importPreviewDimensions.clear();
-        m_importPreviewTriangleCount = 0;
-        emit importPreviewChanged();
+void ProjectViewModel::cancelImportPreview() {
+    m_importPreviewPoll.stop();
+    if (m_previewRequest != 0) {
+        panta::ffi::project_service_cancel_stl_preview(*m_service, m_previewRequest);
+        m_previewRequest = 0;
     }
+    const bool changed = m_importPreviewPending || m_importPreviewReady;
+    m_importPreviewPending = false;
+    m_importPreviewReady = false;
+    m_importPreviewName.clear();
+    m_importPreviewDimensions.clear();
+    m_importPreviewTriangleCount = 0;
+    if (changed)
+        emit importPreviewChanged();
+}
+
+bool ProjectViewModel::inspectStl(const QString& rawPath) {
+    cancelImportPreview();
+    clearError();
     std::string path;
     QString conversionError;
     if (!toBoundaryText(QDir::cleanPath(QDir::fromNativeSeparators(rawPath.trimmed())), &path,
                         &conversionError)) {
         return fail(conversionError);
     }
-    const auto result = panta::ffi::project_service_inspect_stl(*m_service, path);
-    if (!result.error.code.empty()) {
+    const auto result = panta::ffi::project_service_begin_stl_preview(*m_service, path);
+    if (!result.error.code.empty())
         return fail(result.error);
-    }
-    const auto& preview = result.value;
-    const QString name = QString::fromUtf8(preview.source_name);
-    const QString dimensions = format_dimensions(preview.size_x, preview.size_y, preview.size_z);
-    const bool changed = !m_importPreviewReady || m_importPreviewName != name ||
-                         m_importPreviewDimensions != dimensions ||
-                         m_importPreviewTriangleCount != preview.triangle_count;
-    m_importPreviewReady = true;
-    m_importPreviewName = name;
-    m_importPreviewDimensions = dimensions;
-    m_importPreviewTriangleCount = preview.triangle_count;
-    if (changed) {
-        emit importPreviewChanged();
-    }
+    m_previewRequest = result.value;
+    m_importPreviewPending = true;
+    m_importPreviewPoll.start();
+    emit importPreviewChanged();
     return true;
+}
+
+void ProjectViewModel::finish_import_preview() {
+    const auto request = m_previewRequest;
+    const auto result = panta::ffi::project_service_finish_stl_preview(*m_service, request);
+    if (!result.ready && result.error.code.empty())
+        return;
+    m_importPreviewPoll.stop();
+    m_importPreviewPending = false;
+    const bool succeeded = result.error.code.empty();
+    if (succeeded) {
+        m_importPreviewReady = true;
+        m_importPreviewName = QString::fromUtf8(result.value.source_name);
+        m_importPreviewDimensions =
+            format_dimensions(result.value.size_x, result.value.size_y, result.value.size_z);
+        m_importPreviewTriangleCount = result.value.triangle_count;
+    } else {
+        fail(result.error);
+    }
+    // 错误或属性通知可重入并替换请求；旧完成事件不能再驱动新表单。
+    if (m_previewRequest != request)
+        return;
+    emit importPreviewChanged();
+    if (m_previewRequest == request)
+        emit importPreviewFinished(request, succeeded);
 }
 
 bool ProjectViewModel::fail(const panta::ffi::ProjectDiagnostic& diagnostic) {

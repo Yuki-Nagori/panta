@@ -767,6 +767,46 @@ class ShellModuleLoadTest final : public QObject {
         }
     }
 
+    void import_preview_waits_for_background_result_and_close_cancels() {
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        const auto path = fixture.filePath(QStringLiteral("preview.stl"));
+        QFile source(path);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QVERIFY(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n") > 0);
+        source.close();
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* root = engine.rootObjects().constFirst();
+        auto* dialog = root->findChild<QObject*>(QStringLiteral("importDialog"));
+        auto* model =
+            root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        QVERIFY(dialog && model);
+        auto* accept = dialog->findChild<QObject*>(QStringLiteral("importAccept"));
+        QVERIFY(accept);
+        QSignalSpy finished(model, &panta::bridge::ProjectViewModel::importPreviewFinished);
+        QVERIFY(finished.isValid());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        dialog->setProperty("sourcePath", path);
+        QVERIFY(model->inspectStl(path));
+        QVERIFY(model->importPreviewPending());
+        QVERIFY(!accept->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QVERIFY(!model->importPreviewPending());
+        QVERIFY(!model->importPreviewReady());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        dialog->setProperty("sourcePath", path);
+        QVERIFY(model->inspectStl(path));
+        QTRY_VERIFY(model->importPreviewReady());
+        QVERIFY(accept->property("enabled").toBool());
+        QCOMPARE(finished.count(), 1);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QVERIFY(!model->importPreviewReady());
+        QVERIFY(!accept->property("enabled").toBool());
+    }
+
     void layers_tab_row_tracks_imports_and_reopened_projects() {
         QTemporaryDir fixture;
         QVERIFY(fixture.isValid());
@@ -810,6 +850,7 @@ class ShellModuleLoadTest final : public QObject {
                                "endsolid sample\n") > 0);
         firstStl.close();
         QVERIFY(project->inspectStl(firstStlPath));
+        QTRY_VERIFY(project->importPreviewReady());
         QVERIFY(project->importStl(firstStlPath, QStringLiteral("dual-domain"),
                                    QStringLiteral("millimeters"), false));
         QTRY_VERIFY(tabRow->isVisible());
@@ -819,6 +860,7 @@ class ShellModuleLoadTest final : public QObject {
         const QString secondStlPath = fixture.filePath(QStringLiteral("second.stl"));
         QVERIFY(QFile::copy(firstStlPath, secondStlPath));
         QVERIFY(project->inspectStl(secondStlPath));
+        QTRY_VERIFY(project->importPreviewReady());
         QVERIFY(project->importStl(secondStlPath, QStringLiteral("dual-domain"),
                                    QStringLiteral("millimeters"), false));
         QTRY_COMPARE(visual_items(sidebarPanel, QStringLiteral("importedPartEntry")).size(), 2);

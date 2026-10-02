@@ -311,9 +311,26 @@ impl StlImportSession {
     }
 
     pub fn preview(&mut self, path: &Path) -> Result<StlImportPreview, ImportError> {
+        match self.preview_checked(path, || false) {
+            Ok(preview) => Ok(preview),
+            Err(CheckedReadError::Failed(error)) => Err(error),
+            Err(CheckedReadError::Cancelled(_)) => unreachable!("uncancellable preview"),
+        }
+    }
+
+    /// 后台预检使用分块读取检查取消；解析不能中断，解析后的快照发布前再次检查。
+    /// 取消与失败都清空本次预览，不改变源文件。
+    pub fn preview_checked(
+        &mut self,
+        path: &Path,
+        is_cancelled: impl Fn() -> bool,
+    ) -> Result<StlImportPreview, CheckedReadError> {
         self.preview = None;
-        let input = read_source(path)?;
-        let mesh = parse_stl_snapshot(&input)?;
+        let input = read_source_checked(path, &is_cancelled)?;
+        let mesh = parse_stl_snapshot(&input).map_err(CheckedReadError::Failed)?;
+        if is_cancelled() {
+            return Err(CheckedReadError::Cancelled(path.display().to_string()));
+        }
         let summary = mesh.summary();
         let source_name = input.source_name.clone();
         self.preview = Some(PreparedStl {
@@ -417,6 +434,29 @@ mod tests {
             Some(ImportFormat::Iges)
         );
         assert!(detect_format(Path::new("a.txt")).is_err());
+    }
+
+    #[test]
+    fn preview_cancellation_before_read_and_after_parse_does_not_publish_a_snapshot()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = Fixture::new()?;
+        let path = fixture.root.join("preview.stl");
+        fs::write(&path, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+        let mut session = StlImportSession::default();
+        assert!(matches!(
+            session.preview_checked(&path, || true),
+            Err(CheckedReadError::Cancelled(_))
+        ));
+        assert!(session.preview.is_none());
+        let checks = AtomicUsize::new(0);
+        // 小文件经过两次读检查（数据、EOF），第三次位于解析后发布前。
+        assert!(matches!(
+            session.preview_checked(&path, || checks.fetch_add(1, Ordering::Relaxed) >= 2),
+            Err(CheckedReadError::Cancelled(_))
+        ));
+        assert!(session.preview.is_none());
+        assert_eq!(session.preview(&path)?.triangle_count, 1);
+        Ok(())
     }
 
     #[test]

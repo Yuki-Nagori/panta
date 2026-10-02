@@ -14,6 +14,11 @@ impl ProjectService {
         show_import_log: bool,
     ) -> Result<ImportRecord, ProjectError> {
         self.ensure_project_writable()?;
+        if self.pending_preview.is_some() {
+            return Err(ProjectError::CommandInvalid(
+                "STL preview pending".to_owned(),
+            ));
+        }
         if self.current.is_none() {
             return Err(ProjectError::NoProject);
         }
@@ -80,8 +85,9 @@ impl ProjectService {
         Ok(record)
     }
 
-    /// Parse STL metadata without requiring an open project or mutating disk.
+    /// 同步领域入口，供无 GUI 的调用方使用；Qt 使用后台 begin / finish 入口。
     pub fn inspect_stl(&mut self, source: &Path) -> Result<StlImportPreview, ProjectError> {
+        self.clear_stl_preview();
         self.import_session
             .preview(source)
             .map_err(map_import_error)

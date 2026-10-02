@@ -141,7 +141,8 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
     manifest.close();
 
     const QString missing = fixture.filePath(QStringLiteral("不存在 sample.stl"));
-    EXPECT_FALSE(model.inspectStl(missing));
+    ASSERT_TRUE(model.inspectStl(missing));
+    QTRY_VERIFY(!model.importPreviewPending());
     EXPECT_EQ(model.errorCode(), QStringLiteral("project.import_file_missing"));
     EXPECT_EQ(model.errorCategory(), QStringLiteral("missing"));
     EXPECT_EQ(model.errorDetail(), missing);
@@ -205,6 +206,8 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
     manifest.close();
 
     ASSERT_TRUE(model.inspectStl(sourcePath));
+    EXPECT_TRUE(model.importPreviewPending());
+    QTRY_VERIFY(!model.importPreviewPending());
     EXPECT_TRUE(model.error().isEmpty());
     EXPECT_TRUE(model.errorCode().isEmpty());
     EXPECT_TRUE(model.errorCategory().isEmpty());
@@ -235,6 +238,8 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
     EXPECT_TRUE(view_model.importedPartNames().isEmpty());
     ASSERT_TRUE(view_model.inspectStl(sourcePath));
+    EXPECT_TRUE(view_model.importPreviewPending());
+    QTRY_VERIFY(!view_model.importPreviewPending());
     EXPECT_TRUE(view_model.importPreviewReady());
     EXPECT_EQ(view_model.importPreviewName(), QStringLiteral("sample.stl"));
     EXPECT_EQ(view_model.importPreviewDimensions(), QStringLiteral("1.00 × 1.00 × 0.00"));
@@ -315,9 +320,90 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     EXPECT_EQ(replacement->vertices[1], (std::array<double, 3>{2.0, 0.0, 0.0}));
     EXPECT_EQ(mesh->vertices[1], (std::array<double, 3>{1.0, 0.0, 0.0}));
     ASSERT_TRUE(view_model.inspectStl(sourcePath));
-    EXPECT_FALSE(view_model.inspectStl(sourcePath + QStringLiteral(".missing")));
+    EXPECT_TRUE(view_model.importPreviewPending());
+    QTRY_VERIFY(!view_model.importPreviewPending());
+    ASSERT_TRUE(view_model.inspectStl(sourcePath + QStringLiteral(".missing")));
+    QTRY_VERIFY(!view_model.importPreviewPending());
+    EXPECT_EQ(view_model.errorCode(), QStringLiteral("project.import_file_missing"));
     EXPECT_FALSE(view_model.importPreviewReady());
     EXPECT_EQ(view_model.importedPartNames().size(), 3);
+}
+
+TEST(ProjectViewModelTest, PreviewCancellationReplacementAndProjectSwitchIgnoreOldResults) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto a = fixture.filePath(QStringLiteral("a.stl"));
+    const auto b = fixture.filePath(QStringLiteral("b.stl"));
+    for (const auto& path : {a, b}) {
+        QFile source(path);
+        ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+        ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    }
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    const auto plan = model.planSettings();
+    QSignalSpy finished(&model, &ProjectViewModel::importPreviewFinished);
+    ASSERT_TRUE(model.inspectStl(a));
+    EXPECT_TRUE(model.importPreviewPending());
+    EXPECT_FALSE(model.importPreviewReady());
+    model.cancelImportPreview();
+    EXPECT_FALSE(model.importPreviewPending());
+    EXPECT_FALSE(model.importPreviewReady());
+    ASSERT_TRUE(model.inspectStl(a));
+    ASSERT_TRUE(model.inspectStl(b));
+    QTRY_VERIFY(!model.importPreviewPending());
+    ASSERT_TRUE(model.importPreviewReady());
+    EXPECT_EQ(model.importPreviewName(), QStringLiteral("b.stl"));
+    ASSERT_EQ(finished.count(), 1);
+    EXPECT_TRUE(finished.at(0).at(1).toBool());
+    EXPECT_EQ(model.planSettings(), plan);
+    EXPECT_TRUE(model.importedPartNames().isEmpty());
+    ASSERT_TRUE(model.inspectStl(a));
+    ASSERT_TRUE(model.createProject(QStringLiteral("Other"), fixture.path()));
+    EXPECT_FALSE(model.importPreviewPending());
+    EXPECT_FALSE(model.importPreviewReady());
+    ASSERT_TRUE(model.inspectStl(b));
+    QTRY_VERIFY(!model.importPreviewPending());
+    EXPECT_EQ(model.importPreviewName(), QStringLiteral("b.stl"));
+    EXPECT_EQ(finished.count(), 2);
+    EXPECT_EQ(model.currentName(), QStringLiteral("Other"));
+}
+
+TEST(ProjectViewModelTest, PreviewNotificationsCanReplaceOrCancelTheCompletedRequest) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto path = fixture.filePath(QStringLiteral("preview.stl"));
+    QFile source(path);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+    ProjectViewModel model;
+    QSignalSpy finished(&model, &ProjectViewModel::importPreviewFinished);
+    bool replaced = false;
+    const auto replacement =
+        QObject::connect(&model, &ProjectViewModel::importPreviewChanged, &model, [&] {
+            if (!replaced && model.importPreviewReady()) {
+                replaced = true;
+                EXPECT_TRUE(model.inspectStl(path));
+            }
+        });
+    ASSERT_TRUE(model.inspectStl(path));
+    QTRY_VERIFY(!model.importPreviewPending());
+    EXPECT_TRUE(replaced);
+    EXPECT_TRUE(model.importPreviewReady());
+    EXPECT_EQ(finished.count(), 1);
+    QObject::disconnect(replacement);
+    const auto cancellation =
+        QObject::connect(&model, &ProjectViewModel::errorChanged, &model, [&] {
+            if (!model.errorCode().isEmpty())
+                model.cancelImportPreview();
+        });
+    ASSERT_TRUE(model.inspectStl(path + QStringLiteral(".missing")));
+    QTRY_VERIFY(!model.errorCode().isEmpty());
+    EXPECT_FALSE(model.importPreviewPending());
+    EXPECT_FALSE(model.importPreviewReady());
+    EXPECT_EQ(finished.count(), 1);
+    QObject::disconnect(cancellation);
 }
 
 int main(int argc, char** argv) {

@@ -34,7 +34,7 @@
 
 - 063 的导入与预览接口、失败行为及现有测试需先收口，026 的 QML 注册入口保持一致。
 - 核实三平台官方预编译包中提供 StateMachine 的具体归档、依赖、文件清单与 SHA256，再扩展现有 Qt provision；当前没有对应制品验证证据，不假定已有 qtbase / qtdeclarative 归档足够。
-- **074 的首期交付不依赖 073。** 可以基于现有同步服务结果改造 UI 编排，但必须保留“同步路径尚不能保证长任务响应”的现状说明，不能声称 QStateMachine 自动使 I/O 异步。
+- **074 的首期交付不依赖 073。** 可以基于现有服务结果改造 UI 编排：063 的只读预检已有请求编号和异步完成信号，确认导入仍同步；必须保留“同步写入路径尚不能保证长任务响应”的现状说明，不能声称 QStateMachine 自动使 I/O 异步。
 - 073 也不以 074 为 Rust 核心实现前置条件。待 073 的 TaskId、能力快照和取消回执可用后，登记两者的联调范围与证据；不能要求两个任务互相完成后才开始。没有真实异步后端时不交付虚假的业务取消按钮，提交前的表单关闭仍可用。
 - 027 的热重载不是前置条件；本任务验证普通销毁 / 重建，027 后续复用恢复契约。
 
@@ -64,7 +64,7 @@
 
 ## 验证计划与结果
 
-实现验证尚未执行。仓库根目录按锁定工具链运行 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`；补充 `cargo build --locked --no-default-features` 验证 bridge 裁剪。控制器行为用 GTest / QtTest，QML 用真实绑定测试，最终由 Cargo 聚合。真实窗口按仓库规范启动 native 应用，验证正常、错误、重复点击和关闭重开；实际异步取消与长任务响应证据由 073 联调补充，不能以本任务同步路径代替。
+实现验证尚未执行。仓库根目录按锁定工具链运行 `cargo build --locked`、`cargo test --locked --workspace`、`cargo format --check`、`cargo lint`；补充 `cargo build --locked --no-default-features` 验证 bridge 裁剪。控制器行为用 GTest / QtTest，QML 用真实绑定测试，最终由 Cargo 聚合。真实窗口按仓库规范启动 native 应用，验证正常、错误、重复点击和关闭重开；只读预检的取消与迟到结果由 063 回归覆盖；未来写入任务的异步取消与长任务响应需按实际服务联调补充，不能以同步写入路径代替。
 
 | 日期 | 场景 | 结果 / 证据 |
 |---|---|---|

@@ -1155,3 +1155,94 @@ fn gate_location_manifest_rejects_missing_import_and_invalid_settings()
     assert_eq!(service.current()?, before);
     Ok(())
 }
+
+fn finish_preview(
+    service: &mut ProjectService,
+    request: u64,
+) -> Result<panta_core::project::StlImportPreview, ProjectError> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        if let Some(preview) = service.finish_stl_preview(request)? {
+            return Ok(preview);
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "STL preview timed out"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn asynchronous_preview_retains_source_snapshot_and_preserves_committed_state()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let path = fixture.root.join("零件.stl");
+    fs::write(&path, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Demo")?;
+    let manifest = fs::read(&project.path)?;
+    let request = service.begin_stl_preview(&path)?;
+    // 即使 worker 已就绪，必须先消费预检结果，不能绕过已显示的来源快照。
+    assert_eq!(
+        service
+            .import_stl(&path, "solid-3d", "millimeters", false)
+            .err()
+            .map(|error| error.code()),
+        Some("project.command_invalid")
+    );
+    let preview = finish_preview(&mut service, request)?;
+    assert_eq!(preview.source_name, "零件.stl");
+    assert_eq!(preview.dimensions, [1.0, 1.0, 0.0]);
+    assert_eq!(fs::read(&project.path)?, manifest);
+    assert!(service.imports()?.is_empty());
+    fs::write(&path, "vertex 0 0 0\nvertex 2 0 0\nvertex 0 1 0\n")?;
+    assert_eq!(
+        service
+            .import_stl(&path, "solid-3d", "millimeters", false)
+            .err()
+            .map(|error| error.code()),
+        Some("project.import_source_changed")
+    );
+    assert_eq!(fs::read(&project.path)?, manifest);
+    let request = service.begin_stl_preview(&path)?;
+    assert_eq!(
+        finish_preview(&mut service, request)?.dimensions,
+        [2.0, 1.0, 0.0]
+    );
+    service.import_stl(&path, "solid-3d", "millimeters", false)?;
+    assert_eq!(service.imports()?.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn asynchronous_preview_rejects_replaced_cancelled_and_old_project_requests()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let path = fixture.root.join("sample.stl");
+    fs::write(&path, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let first = service.begin_stl_preview(&path)?;
+    assert!(service.cancel_stl_preview(first));
+    assert!(service.finish_stl_preview(first).is_err());
+    let second = service.begin_stl_preview(&path)?;
+    let third = service.begin_stl_preview(&path)?;
+    assert!(third > second);
+    assert!(!service.cancel_stl_preview(second));
+    assert!(service.finish_stl_preview(second).is_err());
+    assert_eq!(finish_preview(&mut service, third)?.triangle_count, 1);
+    let previous = service.begin_stl_preview(&path)?;
+    service.create(&fixture.root, "Demo")?;
+    assert!(service.finish_stl_preview(previous).is_err());
+    let failed = service.begin_stl_preview(&fixture.root.join("missing.stl"))?;
+    let error = finish_preview(&mut service, failed)
+        .err()
+        .ok_or("missing STL unexpectedly succeeded")?;
+    assert_eq!(error.code(), "project.import_file_missing");
+    assert_eq!(error.category(), "missing");
+    assert!(service.imports()?.is_empty());
+    let next = service.begin_stl_preview(&path)?;
+    assert_eq!(finish_preview(&mut service, next)?.triangle_count, 1);
+    assert!(service.cancel_stl_preview(next));
+    Ok(())
+}

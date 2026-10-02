@@ -25,6 +25,7 @@ pub use gate_location::{GateLocationSettings, GateLocatorAlgorithm};
 mod material;
 pub use material::{MaterialDefinition, MaterialProperty, default_material};
 mod import;
+mod preview;
 mod storage;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -324,6 +325,8 @@ pub struct ProjectService {
     activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
     // 候选提交期间锁住工程元数据；Mesh 驻留和只读显示操作仍可继续。
     pending_metadata: Option<storage::PendingMetadataWrite>,
+    pending_preview: Option<preview::PendingPreview>,
+    preview_request: u64,
 }
 
 impl ProjectService {
@@ -401,6 +404,7 @@ impl ProjectService {
             return Err(error);
         }
         self.current = Some(state);
+        self.clear_stl_preview();
         self.latest_mesh_id = None;
         self.mesh_cache.clear();
         self.activation_attempts.clear();
@@ -454,7 +458,7 @@ impl ProjectService {
         self.latest_mesh_id = None;
         self.mesh_cache.clear();
         self.activation_attempts.clear();
-        self.import_session.clear();
+        self.clear_stl_preview();
         self.activation.advance_generation();
         self.snapshot()
     }

@@ -39,7 +39,6 @@ macro_rules! response_conversion {
 response_conversion!(bridge::ProjectSnapshotResult, bridge::ProjectSnapshot);
 response_conversion!(bridge::ProjectImportResult, bridge::ProjectImport);
 response_conversion!(bridge::ProjectImportsResult, Vec<bridge::ProjectImport>);
-response_conversion!(bridge::StlImportPreviewResult, bridge::StlImportPreview);
 response_conversion!(bridge::MaterialDefinitionResult, bridge::MaterialDefinition);
 response_conversion!(bridge::ProjectConfirmationResult, bool);
 response_conversion!(
@@ -47,6 +46,7 @@ response_conversion!(
     bridge::SurfaceMeshSnapshot
 );
 response_conversion!(bridge::ActivationAttemptResult, bridge::ActivationAttempt);
+response_conversion!(bridge::StlPreviewRequestResult, u64);
 
 pub(super) fn project_service_create_response(
     service: &mut ProjectService,
@@ -115,11 +115,39 @@ pub(super) fn project_service_imports_response(
     crate::project_service_imports(service).into()
 }
 
-pub(super) fn project_service_inspect_stl_response(
+pub(super) fn project_service_begin_stl_preview_response(
     service: &mut ProjectService,
     source: String,
-) -> bridge::StlImportPreviewResult {
-    crate::project_service_inspect_stl(service, source).into()
+) -> bridge::StlPreviewRequestResult {
+    service
+        .service
+        .begin_stl_preview(std::path::Path::new(&source))
+        .into()
+}
+
+pub(super) fn project_service_finish_stl_preview_response(
+    service: &mut ProjectService,
+    request: u64,
+) -> bridge::StlPreviewPoll {
+    match service.service.finish_stl_preview(request) {
+        Ok(Some(preview)) => bridge::StlPreviewPoll {
+            ready: true,
+            value: crate::stl_import_preview(preview),
+            ..Default::default()
+        },
+        Ok(None) => bridge::StlPreviewPoll::default(),
+        Err(error) => bridge::StlPreviewPoll {
+            error: error.into(),
+            ..Default::default()
+        },
+    }
+}
+
+pub(super) fn project_service_cancel_stl_preview(
+    service: &mut ProjectService,
+    request: u64,
+) -> bool {
+    service.service.cancel_stl_preview(request)
 }
 
 pub(super) fn default_material_response() -> bridge::MaterialDefinitionResult {
@@ -222,8 +250,64 @@ impl std::fmt::Display for bridge::ProjectDiagnostic {
 impl std::error::Error for bridge::ProjectDiagnostic {}
 
 #[cfg(test)]
+#[path = "../../../tests/support/rust/temp_directory.rs"]
+mod temp_directory;
+
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    fn poll_preview(service: &mut ProjectService, request: u64) -> bridge::StlPreviewPoll {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let result = project_service_finish_stl_preview_response(service, request);
+            if result.ready || !result.error.code.is_empty() {
+                return result;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "bridge preview timed out"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    fn preview_bridge_distinguishes_pending_success_failure_and_cancelled_requests()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("preview.stl");
+        std::fs::write(&source, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+        let mut service = crate::project_service_new();
+        let request =
+            project_service_begin_stl_preview_response(&mut service, source.display().to_string());
+        assert_eq!(request.error, bridge::ProjectDiagnostic::default());
+        assert!(request.value > 0);
+        let result = poll_preview(&mut service, request.value);
+        assert!(result.ready);
+        assert_eq!(result.error, bridge::ProjectDiagnostic::default());
+        assert_eq!(result.value.source_name, "preview.stl");
+        assert_eq!(result.value.triangle_count, 1);
+        assert!(project_service_cancel_stl_preview(
+            &mut service,
+            request.value
+        ));
+        let invalid = project_service_finish_stl_preview_response(&mut service, request.value);
+        assert!(!invalid.ready);
+        assert_eq!(invalid.error.code, "project.command_invalid");
+        assert!(invalid.value.source_name.is_empty());
+        let request = project_service_begin_stl_preview_response(
+            &mut service,
+            fixture.root.join("missing.stl").display().to_string(),
+        );
+        let failed = poll_preview(&mut service, request.value);
+        assert!(!failed.ready);
+        assert_eq!(failed.error.code, "project.import_file_missing");
+        assert_eq!(failed.error.category, "missing");
+        assert!(failed.error.detail.ends_with("missing.stl"));
+        assert!(failed.value.source_name.is_empty());
+        Ok(())
+    }
 
     #[test]
     fn domain_diagnostics_preserve_codes_categories_and_verbatim_context() {
@@ -374,7 +458,7 @@ mod tests {
         check!(bridge::ProjectSnapshotResult, bridge::ProjectSnapshot);
         check!(bridge::ProjectImportResult, bridge::ProjectImport);
         check!(bridge::ProjectImportsResult, Vec<bridge::ProjectImport>);
-        check!(bridge::StlImportPreviewResult, bridge::StlImportPreview);
+        check!(bridge::StlPreviewRequestResult, u64);
         check!(bridge::MaterialDefinitionResult, bridge::MaterialDefinition);
         check!(bridge::ProjectConfirmationResult, bool);
         check!(

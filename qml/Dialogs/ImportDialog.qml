@@ -1,4 +1,4 @@
-// STL 预检与导入窗口；文件解析和工程持久化由 ProjectViewModel 完成。
+// 导入窗口只提交意图；预检由 Rust 后台完成，工程提交由服务持有。
 import QtQuick
 import QtQuick.Dialogs
 import QtQuick.Layouts
@@ -20,7 +20,13 @@ DialogWindow {
     readonly property var meshTypes: projectModel.meshTypes
     readonly property var unitValues: ["millimeters", "centimeters", "inches"]
 
+    onVisibleChanged: {
+        if (!visible)
+            projectModel.cancelImportPreview();
+    }
+
     function resetFields() {
+        projectModel.cancelImportPreview();
         projectModel.clearError();
         sourcePath = "";
         meshTypeCombo.currentIndex = meshTypes.findIndex(entry => entry.id === projectModel.defaultMeshType);
@@ -198,6 +204,7 @@ DialogWindow {
 
                 ThemedButton {
                     text: qsTranslate("DialogAction", "OK")
+                    objectName: "importAccept"
                     primaryAction: true
                     enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady
                     contentColor: Theme.colorText
@@ -221,6 +228,8 @@ DialogWindow {
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTranslate("ImportDialogFile", "STL files (*.stl)")]
         onAccepted: {
+            if (!dialog.visible)
+                return;
             const selectedPath = dialog.projectModel.localPath(selectedFile);
             if (!selectedPath)
                 return;
