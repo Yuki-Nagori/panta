@@ -1,6 +1,6 @@
 # 104 — Windows 工程选择器路径回归修复
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：103
 - 优先级：P1
@@ -20,7 +20,7 @@ CI run [36939813938](https://github.com/Yuki-Nagori/panta/actions/runs/369398139
 - [x] 接线断言采用所选 file URL 解码后的本地路径，保留 plain / 中文、空格、#、% 的准确路径与工程状态断言。
 - [x] Cargo 聚合、格式、lint 与 diff 检查通过，记录 Windows 验证限制。
 - [x] 任务与索引同步；无生产接口或兼容分支改动。
-- [ ] 修复提交后的 Windows Cargo 聚合 CI 通过。
+- [x] 修复提交后的 Windows Cargo 聚合 CI 通过。
 
 ## 验证与工作记录
 
@@ -35,4 +35,4 @@ CI run [36939813938](https://github.com/Yuki-Nagori/panta/actions/runs/369398139
 
 ## 本批进展
 
-测试路径预期已修正，本地聚合与质量检查通过；等待修复提交后的 Windows CI，尚未标 done。
+测试路径预期已修正，本地聚合与质量检查通过；CI run [36982743570](https://github.com/Yuki-Nagori/panta/actions/runs/36982743570) 对修复提交 `6d56c70878f11aa701aa46beb40855f779ebe7e4` 验证成功：Windows / macOS / Linux Cargo 聚合、三平台 sanitizer、native coverage 和适用质量作业成功；audit、Miri、machete 因路径过滤跳过，不计为执行通过。Windows 路径断言已复验，任务完成。
