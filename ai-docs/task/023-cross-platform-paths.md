@@ -1,6 +1,6 @@
 # 023 — 跨平台路径与资源引用服务
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[005](005-qt-qml-shell.md)（已完成）、[006](006-rust-cpp-boundary.md)（已完成）
 - 优先级：P1
@@ -9,7 +9,7 @@
 
 ## 目标与背景
 
-建立与 cwd 无关的路径服务和逻辑资源引用，为工程搬迁和运行时提供可验证边界。Rust 路径服务、FFI DTO 与 Qt `PathHost` 已落地；任务 086 将标准目录发现从 Bridge 的直接 `QStandardPaths` 调用迁入 `native/qt-adapter`，不改变本任务的路径语义。任务保持 in-progress，剩余平台验收见下方清单与验证记录。
+建立与 cwd 无关的路径服务和逻辑资源引用，为工程搬迁和运行时提供可验证边界。Rust 路径服务、FFI DTO 与 Qt `PathHost` 已落地；任务 086 将标准目录发现从 Bridge 的直接 `QStandardPaths` 调用迁入 `native/qt-adapter`，不改变本任务的路径语义。三平台验收已通过，结果见下方清单与验证记录。
 
 ## 必读
 
@@ -49,8 +49,8 @@
 ## 验收标准
 
 - [x] 切换 cwd 与搬迁工程根后，相对资产仍正确解析；内置 qrc 资源只读且不当作本机路径。
-- [ ] 覆盖空格、中文、file URL 编码、Windows 盘符/UNC、大小写与非 Unicode 策略，三平台记录实际结果。（既有 Rust / C++ 场景已有三平台 CI；新增盘符 / UNC URL 和反斜杠拒绝矩阵本地通过，新增场景三平台记录待补）
-- [ ] 拒绝绝对路径冒充相对引用、`..` 越界及符号链接/junction 越界，覆盖尚不存在的写入目标。（绝对路径/`..`/未创建写目标/Unix 符号链接已测；新增 Windows junction 测试待 Windows CI 平台证据）
+- [x] 覆盖空格、中文、file URL 编码、Windows 盘符/UNC、大小写与非 Unicode 策略，三平台记录实际结果。（CI 36986763080 的三平台 Cargo 聚合通过，包含盘符 / UNC URL 单次解码和反斜杠拒绝矩阵；UNC 网络共享 I/O 未测试）
+- [x] 拒绝绝对路径冒充相对引用、`..` 越界及符号链接/junction 越界，覆盖尚不存在的写入目标。（CI 36986763080 的 Unix 符号链接及 Windows 真实 junction 用例通过，Windows 普通测试与 ASan 均执行读 / 写越界及清理断言）
 - [x] 标准目录为空、不可写、资产缺失返回明确错误，不静默退到 cwd；FFI 往返无有损编码。（空/相对路径注入、不可写目录（Unix 只读 + 写探针）、缺失目录自动创建且无探针残留、资产缺失 `path.not_found`、非 Unicode 往返均有夹具；注入语义：标准目录缺失即创建、写探针验证真实可写）
 - [x] 代码、测试、配置和文档一致，删除废弃实现；记录真实验证并同步索引。（无被替代的旧路径实现，记录为无废弃项）
 
@@ -87,7 +87,7 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 - 2026-09-29：任务 086 将 `PathHost` 和 `ProjectViewModel` 的标准目录查询迁至 `panta::qt_adapter::standard_location`；类别映射、UTF-8 边界、根注入及错误语义保持不变。原有 QStandardPaths 行为验证仍适用于该 adapter 转发，平台覆盖缺口按本任务验收清单保留。
 
 ## 完成摘要
-未完成（保持 in-progress）。已落地：Rust 路径层（根类别/逻辑引用/三层解析/拒绝矩阵/大小写不折叠，`panta-core::path`）、FFI DTO 与 `PathService`（`panta-ffi`，越界枚举拒绝）、Qt 宿主 `PathHost`（标准目录注入映射——同时作为 013 的安装布局接口、注入时缺失目录自动创建 + 写探针验证可写、UTF-8 往返校验、file URL 单次解码）及 macOS 全量测试（Rust 18+9、C++ 10 项，ctest 27/27），Rust 侧随 CI 三平台通过。既有 PathHost 测试已纳入 Cargo 聚合并通过三平台 CI；待补新增 Windows junction 与 UNC URL / 拒绝矩阵的三平台记录。
+已完成 Rust 路径层（根类别、逻辑引用、三层解析、拒绝矩阵、大小写不折叠）、CXX `PathRef` / `PathService` 与 Qt `PathHost`（标准目录注入、创建与写探针、UTF-8 往返、file URL 单次解码）。CI 36986763080 补齐新增场景的三平台证据，Windows 真实 junction 的读 / 写越界拒绝及清理验证在普通测试和 ASan 下通过。UNC 验收覆盖 URL 与逻辑引用语义，未验证网络共享 I/O。任务与索引同步为 done。
 
 
 ## 2026-10-02 平台回归补充
@@ -106,3 +106,9 @@ Rust/native 路径行为测试与三平台 CI，使用隔离临时目录；Windo
 - 提交前评审：`cargo format --check`、`cargo lint --check` 与 `git diff HEAD --check` 通过，lint 日志 `/tmp/panta-023-lint.log`。Rust 负责逻辑引用规则，C++ 仅做 Qt URL 适配及跨语言测试；无重复规则、旧路径实现或兼容分支。
 
 - CI 夹具修复后的 macOS arm64 回归：`cargo test --locked --workspace` 通过，69/69 CTest，日志 `/tmp/panta-023-ci-fix-tests.log`；`cargo format --check`、`cargo lint --check` 与 `git diff HEAD --check` 通过，质量检查日志 `/tmp/panta-023-ci-fix-lint.log`。评审核对保留原有 Rust 根包含规则及读 / 写越界、目标未被写入、清理后目标文件仍在的断言，无生产代码或 UI 改动。Windows 专用修复尚未本地执行，不以 macOS 聚合结果代替 Windows junction / ASan 验收；任务与索引继续 in-progress。
+
+### CI 最终验收
+
+- 2026-10-02：通过 `gh run view` 核对 [36986763080](https://github.com/Yuki-Nagori/panta/actions/runs/36986763080)，对应修复提交 `9a2f3d07a54a9f9699514c5c865cab3e9acfc892`。macOS / Linux / Windows Cargo 聚合及三平台 sanitizer 全部成功；日志确认 Windows `JunctionEscapeOutsideRootIsRejected` 在普通测试与 ASan 中实际通过，URL 解码及引用拒绝用例也通过，补齐前述平台缺口。
+- Rust coverage、native C++ coverage / QML 测试、format、Clippy、qmllint、CMake、clang-tidy、include-cleaner、cppcheck 均成功；machete、audit、Miri 因路径过滤跳过，不记录为执行通过。日志保存在 `/tmp/panta-023-ci-success.log`。
+- 本次仅更新任务验收与索引，保留历史失败及当时待验收记录；`git diff HEAD --check` 通过，未重复运行行为测试。
