@@ -1449,7 +1449,7 @@ fn project_service_finish_fill_settings_confirmation(
 mod tests {
     use super::{
         FfiRequest, FfiResponse, MAX_LABEL_BYTES, activation_outcome_to_bridge, bridge,
-        panic_probe, path_ref_parse, path_service_new, path_service_resolve,
+        install_crash_handler, panic_probe, path_ref_parse, path_service_new, path_service_resolve,
         path_service_resolve_existing, path_service_resolve_write_target, path_service_set_root,
         process, project_service_create, project_service_current, project_service_execute,
         project_service_mesh_snapshot_for_import, project_service_new, project_service_open,
@@ -2401,5 +2401,21 @@ endsolid
         let domain = crate::mesh_validate_tet(invalid_mesh);
         assert!(!domain.issues.is_empty());
         assert_eq!(domain.volume_mm3, 0.0);
+    }
+
+    #[test]
+    fn crash_handler_rejects_a_file_used_as_log_directory() -> std::io::Result<()> {
+        let path =
+            std::env::temp_dir().join(format!("panta-ffi-crash-not-dir-{}", std::process::id()));
+        std::fs::write(&path, b"not a directory")?;
+        let text = path.to_str().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "临时路径不是 UTF-8")
+        })?;
+        let error = install_crash_handler(text)
+            .err()
+            .ok_or_else(|| std::io::Error::other("文件路径不应成为日志目录"))?;
+        assert!(!error.is_empty());
+        std::fs::remove_file(path)?;
+        Ok(())
     }
 }

@@ -128,3 +128,11 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 `cargo coverage` 通过：全局函数 664/732（90.71%）、行 7645/8155（93.75%）。`panta-dsl-core` 为函数 123/145（84.83%）、行 1922/2058（93.39%）。上一轮同一命令是全局 657/726（90.50%），dsl-core 116/139（83.45%）。分母包含新增测试函数。`panta-ffi` 行覆盖仍是 1713/1920（89.22%）。C++ line/branch、逐模块防下降和函数 100% 仍未完成。
 
 `cargo test -p panta-dsl-core --locked` 通过（lib 13、集成与 fsm 用例见该次输出）。`cargo clippy -p panta-dsl-core --locked --all-targets -- -D warnings` 通过。未跑完整 workspace 测试。
+
+## 2026-10-02 FFI 确认响应
+
+无工程时，打开、STL 导入、分析序列、材料确认、Fill 与 Gate Location 的 CXX 响应包装都返回诊断，并且不填成功载荷。`ProjectDiagnostic` 在 detail 为空时只显示 code，否则显示 `code: detail`。崩溃日志安装拒绝把普通文件当作目录，且不注册信号处理器。
+
+`cargo coverage` 通过：全局函数 677/736（91.98%）、行 7818/8237（94.91%）。`panta-ffi` 为函数 152/160（95.00%）、行 1886/2002（94.21%），行覆盖越过 92%。上一轮全局是 664/732（90.71%），ffi 行覆盖是 1713/1920（89.22%）。门槛仍是 89% / 92%。函数 100%、C++ line/branch 和逐模块防下降仍未完成。
+
+`cargo test -p panta-ffi --locked --lib` 25 passed。`cargo clippy -p panta-ffi --locked --all-targets -- -D warnings` 通过。未跑完整 workspace 测试。

@@ -518,4 +518,95 @@ mod tests {
         assert!(material.error.code.is_empty());
         assert!(!material.value.id.is_empty());
     }
+
+    #[test]
+    fn confirmation_responses_fail_without_a_project() {
+        let mut service = crate::project_service_new();
+        let opened = project_service_open_response(&mut service, "relative".into());
+        assert_eq!(opened.error.code, "project.file_missing");
+        assert!(opened.value.path.is_empty());
+
+        let imported = project_service_import_stl_response(
+            &mut service,
+            "part.stl".into(),
+            "solid-3d".into(),
+            "millimeters".into(),
+            false,
+        );
+        assert_eq!(imported.error.code, "project.no_project");
+        assert!(imported.value.id.is_empty());
+
+        let sequence = project_service_set_analysis_sequence_response(
+            &mut service,
+            "/tmp/missing.panta",
+            1,
+            "import-1",
+            "sequence-1",
+        );
+        assert!(!sequence.error.code.is_empty());
+        assert!(sequence.value.path.is_empty());
+
+        let material = project_service_begin_material_confirmation_response(
+            &mut service,
+            "/tmp/missing.panta",
+            1,
+            "import-1",
+            "material-1",
+        );
+        assert_eq!(material.error.code, "project.no_project");
+        assert!(!material.value);
+
+        let fill = bridge::FillSettings {
+            mold_temperature_celsius: 40.0,
+            melt_temperature_celsius: 240.0,
+            flow_rate_cm3_per_second: 20.0,
+            switch_over_volume_percent: 98.0,
+            fiber_orientation: false,
+            crystallization: false,
+            holding_profile: Vec::new(),
+        };
+        let fill_begin = project_service_begin_fill_settings_confirmation_response(
+            &mut service,
+            "/tmp/missing.panta",
+            1,
+            "import-1",
+            fill,
+        );
+        assert_eq!(fill_begin.error.code, "project.no_project");
+        assert_eq!(
+            project_service_finish_fill_settings_confirmation_response(&mut service)
+                .error
+                .code,
+            "project.command_invalid"
+        );
+
+        let gate = bridge::GateLocationSettings {
+            machine_id: "default".into(),
+            machine_source_text: String::new(),
+            mold_temperature_celsius: 40.0,
+            melt_temperature_celsius: 240.0,
+            algorithm_id: "missing-algorithm".into(),
+            algorithm_source_text: String::new(),
+            number_of_gates: 1,
+        };
+        let gate_begin = project_service_begin_gate_location_settings_confirmation_response(
+            &mut service,
+            "/tmp/missing.panta",
+            1,
+            "import-1",
+            gate,
+        );
+        assert_eq!(gate_begin.error.code, "project.command_invalid");
+        assert_eq!(
+            project_service_finish_gate_location_settings_confirmation_response(&mut service)
+                .error
+                .code,
+            "project.command_invalid"
+        );
+
+        let empty = bridge::ProjectDiagnostic::default();
+        assert_eq!(empty.to_string(), "");
+        let detailed = diagnostic("project.io", "io", "disk full".into());
+        assert_eq!(detailed.to_string(), "project.io: disk full");
+    }
 }
