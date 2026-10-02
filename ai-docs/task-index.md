@@ -166,6 +166,7 @@ ai-docs/
 | 101 | [进行中任务 CI 验收复查（2026-10-02）](task/101-active-task-ci-acceptance.md) | 文档维护 | — | done |
 | 102 | [弹窗 GUI 与文档页签读屏验收](task/102-gui-and-screen-reader-acceptance.md) | 验证基础 | 091, 092, 094, 095, 096, 080 | done |
 | 103 | [macOS 工程文件选择器打开状态复查](task/103-macos-project-open-dialog.md) | 验证基础 | 063, 102 | done |
+| 104 | [Windows 工程选择器路径回归修复](task/104-ci-project-dialog-paths.md) | 验证基础 | 103 | in-progress |
 
 ## 执行顺序与交付边界
 

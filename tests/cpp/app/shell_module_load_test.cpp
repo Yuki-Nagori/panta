@@ -577,6 +577,8 @@ class ShellModuleLoadTest final : public QObject {
         panta::bridge::ProjectViewModel stored;
         QVERIFY(stored.createProject(storedName, fixture.path()));
         const QUrl selectedUrl = QUrl::fromLocalFile(stored.currentPath());
+        // Qt 解码本地 URL 后使用 /；Windows 新建工程快照可含原生反斜杠。
+        const QString selectedPath = selectedUrl.toLocalFile();
 
         QQmlApplicationEngine engine;
         panta::install_icon_provider(engine);
@@ -649,8 +651,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(dialog->setProperty("selectedFile", selectedUrl));
         QVERIFY(QMetaObject::invokeMethod(dialog, "accepted"));
         QCOMPARE(opened.count(), 1);
-        QCOMPARE(opened.constFirst().constFirst().toString(), stored.currentPath());
-        QCOMPARE(project->currentPath(), stored.currentPath());
+        QCOMPARE(opened.constFirst().constFirst().toString(), selectedPath);
+        QCOMPARE(project->currentPath(), selectedPath);
         QCOMPARE(project->currentName(), storedName);
         QVERIFY(!project->dirty());
         QVERIFY(project->errorCode().isEmpty());
