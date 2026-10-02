@@ -1533,4 +1533,74 @@ mod tests {
                 .any(|item| item.code == "pa.placeholder_mismatch")
         );
     }
+
+    #[test]
+    fn classifies_source_kind_from_the_header_block() {
+        assert_eq!(
+            source_kind("// note\nkind: language\n\nignored: later\n"),
+            Some(SourceKind::Language)
+        );
+        assert_eq!(source_kind("kind: theme\n"), Some(SourceKind::Theme));
+        assert_eq!(
+            source_kind("kind: variables\n"),
+            Some(SourceKind::Variables)
+        );
+        assert_eq!(source_kind("kind: fsm\n"), Some(SourceKind::Fsm));
+        assert_eq!(source_kind("kind: other\n"), None);
+        assert_eq!(source_kind("\nkind: language\n"), None);
+        assert_eq!(source_kind("version: 1\n"), None);
+    }
+
+    #[test]
+    fn reports_duplicate_headers_fields_and_syntax() {
+        let duplicates = parse(
+            "version: 1\nkind: language\ncatalog: Alpha\ncatalog: Beta\n\n[Menu]\na:\n  src: One\n  src: Two\n  tr: Uno\n",
+        )
+        .expect_err("repeated catalog and src");
+        assert!(
+            duplicates
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.duplicate_header")
+        );
+        assert!(
+            duplicates
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.duplicate_field")
+        );
+        let rendered = duplicates.to_string();
+        assert!(rendered.contains("pa.duplicate_header at "));
+        assert!(rendered.contains('\n'));
+
+        let syntax = parse("version: nope\n").expect_err("pest syntax");
+        assert_eq!(syntax.diagnostics[0].code, "pa.syntax");
+        assert!(syntax.to_string().starts_with("pa.syntax at "));
+
+        let orphan = parse("version: 1\nkind: language\n\n  src: Orphan\n").expect_err("orphan");
+        assert!(
+            orphan
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.field_without_message")
+        );
+
+        let huge = "a".repeat(1_048_577);
+        let too_large = parse(&huge).expect_err("source limit");
+        assert_eq!(too_large.diagnostics[0].code, "pa.source_too_large");
+    }
+
+    #[test]
+    fn formats_theme_kind_and_vanished_status() {
+        let theme =
+            format_source("version: 1\nkind: theme\n\nvalues:\n  gap: int = 4\n").expect("theme");
+        assert!(theme.contains("kind: theme\n"));
+        assert!(theme.contains("  gap: int = 4\n"));
+
+        let vanished = format_source(
+            "version: 1\nkind: language\nlanguage: en\n\n[Menu]\nold:\n  src: Old\n  tr: Old\n  st: vanished\n",
+        )
+        .expect("vanished");
+        assert!(vanished.contains("  st: vanished\n"));
+    }
 }

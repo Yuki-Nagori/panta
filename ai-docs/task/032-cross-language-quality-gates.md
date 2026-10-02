@@ -120,3 +120,11 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 同一份旧报告（`d0870c2`，树已脏）里 foundation 是函数 6/13（46.15%）、行 83/171（48.54%）。两次分母不同，只说明记录路径已经进入覆盖，不拿全局百分比和那份旧报告比高低。`panta-ffi` 行覆盖 1713/1920（89.22%）仍低于全局行下限，目前由其他 crate 补上。C++ line/branch、逐模块防下降和函数 100% 仍未完成，任务保持 in-progress。
 
 本批还跑了 `cargo test -p panta-foundation --locked`（4 passed，1 ignored）和 `cargo clippy -p panta-foundation --locked --all-targets -- -D warnings`。未跑完整 `cargo test --locked --workspace`。
+
+## 2026-10-02 DSL 头部与重复字段
+
+`panta-dsl-core` 的 `source_kind`、重复 catalog/src、Pest 语法诊断、`Diagnostics` 显示、超限源、theme 格式化和 vanished 状态此前没有直接断言。补上这些路径后，阶段门禁仍是函数 89% / 行 92%。
+
+`cargo coverage` 通过：全局函数 664/732（90.71%）、行 7645/8155（93.75%）。`panta-dsl-core` 为函数 123/145（84.83%）、行 1922/2058（93.39%）。上一轮同一命令是全局 657/726（90.50%），dsl-core 116/139（83.45%）。分母包含新增测试函数。`panta-ffi` 行覆盖仍是 1713/1920（89.22%）。C++ line/branch、逐模块防下降和函数 100% 仍未完成。
+
+`cargo test -p panta-dsl-core --locked` 通过（lib 13、集成与 fsm 用例见该次输出）。`cargo clippy -p panta-dsl-core --locked --all-targets -- -D warnings` 通过。未跑完整 workspace 测试。
