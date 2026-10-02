@@ -40,6 +40,7 @@
 #include <vtkObject.h>
 #include <vtkProperty.h>
 #include <vtkWebGPUConfiguration.h>
+#include <webgpu/webgpu_cpp.h>
 #if defined(Q_OS_MACOS)
 #include <vtkCocoaRenderWindowInteractor.h>
 #elif defined(Q_OS_WIN)
@@ -63,6 +64,32 @@ constexpr int kCameraTransitionDurationMs = 260;
 constexpr double kModelCameraFitMargin = 1.25;
 // Welcome 字标独立留出更大适配边距；导入模型继续使用标准视口边距。
 constexpr double kWelcomeCameraFitMargin = 2.25;
+constexpr uint64_t kAdapterProbeTimeoutNs = 2'000'000'000ULL;
+
+// VTK 9.7.0 的 vtkWebGPUConfiguration::Initialize 在 RequestAdapter 失败后
+// 仍对空 adapter 调用 PopulateRequiredLimits，Dawn 会空指针崩溃。预检使用
+// 独立 instance，结束即释放，避免碰 VTK 稍后创建的共享 instance。
+bool dawn_adapter_available(wgpu::BackendType backend) {
+    wgpu::InstanceDescriptor descriptor;
+    const wgpu::InstanceFeatureName feature = wgpu::InstanceFeatureName::TimedWaitAny;
+    descriptor.requiredFeatureCount = 1;
+    descriptor.requiredFeatures = &feature;
+    const wgpu::Instance instance = wgpu::CreateInstance(&descriptor);
+    if (!instance) {
+        return false;
+    }
+
+    wgpu::RequestAdapterOptions options;
+    options.backendType = backend;
+    bool available = false;
+    const wgpu::Future future = instance.RequestAdapter(
+        &options, wgpu::CallbackMode::WaitAnyOnly,
+        [&available](wgpu::RequestAdapterStatus status, wgpu::Adapter adapter, const char*) {
+            available = status == wgpu::RequestAdapterStatus::Success && adapter != nullptr;
+        });
+    const wgpu::WaitStatus wait = instance.WaitAny(future, kAdapterProbeTimeoutNs);
+    return wait == wgpu::WaitStatus::Success && available;
+}
 
 using Vector3 = std::array<double, 3>;
 
@@ -113,6 +140,7 @@ struct VtkViewport::Impl {
     bool refresh_scheduled = false;
     bool scene_dirty = true;
     bool creation_warning_emitted = false;
+    bool fail_webgpu_device = false;
     std::shared_ptr<const SurfaceMeshSnapshot> applied_mesh;
     bool pointer_dragging = false;
     bool cube_pressed = false;
@@ -191,6 +219,14 @@ bool VtkViewport::test_previous_window_resources_released() const {
            impl_->retired_hardware_window.GetPointer() == nullptr &&
            impl_->retired_webgpu_configuration.GetPointer() == nullptr;
 }
+
+bool VtkViewport::test_render_resources_absent() const {
+    return impl_->render_window == nullptr && impl_->hardware_window == nullptr &&
+           impl_->interactor == nullptr && impl_->renderer == nullptr &&
+           impl_->native_surface.view == nullptr;
+}
+
+void VtkViewport::test_fail_webgpu_device_initialization() { impl_->fail_webgpu_device = true; }
 
 void VtkViewport::apply_state(const RenderScene& state) {
     if (state.revision < impl_->pending.revision) {
@@ -291,6 +327,15 @@ void VtkViewport::ensure_render_window() {
         impl_->native_surface = {};
         impl_->hardware_window->Destroy();
         impl_->hardware_window.reset();
+        return;
+    }
+
+    // 失败时不能调用 render window Initialize：锁定的 VTK 会在空 adapter 上崩溃。
+    const wgpu::BackendType probe_backend =
+        impl_->fail_webgpu_device ? wgpu::BackendType::OpenGL : wgpu::BackendType::Undefined;
+    if (!dawn_adapter_available(probe_backend)) {
+        warn_once("VtkViewport: VTK WebGPU device 初始化失败");
+        destroy_render_window();
         return;
     }
 

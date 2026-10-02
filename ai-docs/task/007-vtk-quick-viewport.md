@@ -1,6 +1,6 @@
 # 007 — VTK WebGPU 硬件窗口原生视口
 
-- 状态：in-progress
+- 状态：deferred
 - 阶段：M0
 - 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（WebGPU 硬件窗口制品已登记）
 - 优先级：P0
@@ -113,6 +113,24 @@ WebGPU 原生视口与三平台 surface bridge 已实现，三平台 SDK 消费�
 - 原生生命周期测试首次在沙箱运行因无可用屏幕失败；获得桌面访问后，以 `QT_QPA_PLATFORM=cocoa PANTA_TEST_NATIVE_VIEWPORT=1` 分别运行 `target/native/debug/app/panta_qml_viewport_module_test` 和 `target/native/debug/visualization/panta_native_surface_lifecycle_test`，结果 5/5 与 3/3，通过且无跳过。日志 `/tmp/panta-007-lifecycle-native.log`、`/tmp/panta-007-surface-native.log`。覆盖 12 轮网格替换、隐藏时释放、跨窗口重建后的旧资源释放、排队刷新析构及 Cocoa 晚到鼠标事件；帧提交计数不表示已呈现，真实画面证据另见上项。
 - 源码复核：`VtkViewport::schedule_refresh()` 的 QObject 上下文定时器将刷新串行投递回条目线程；跨线程窗口信号使用自动连接。场景更新经适配器排队，不在 worker 修改 VTK。按本机固定 SDK 的 `vtkWebGPURenderWindow.h`、`vtkCocoaHardwareWindow.h` 核对 Initialize / Finalize、Create / Destroy、GetViewId / GetMetalLayer；硬件 view 解绑先清空反向指针，避免 AppKit 晚到事件访问已释放窗口。初始化缺平台 surface / device 的路径输出告警，不把源码审计视作故障注入通过。
 - 搜索产品 `native/`、`qml/`、`crates/` 未发现旧 QQuickVTKItem / GUISupportQtQuick / RenderingQt 实现或依赖；历史任务与规范中的路线说明保留。
-- 仍未完成：实际跨显示器 DPR 切换、本轮 `cargo run` 路径的窗口操作与初始化失败注入，以及缺少环境的目标平台补验。640×512 逻辑窗口中坐标轴右侧标签裁切、定位器文字偏小已交任务 064 跟进；因此不将整个 resize / 高 DPI 验收勾选或关闭本任务。
+- 仍未完成：跨显示器 DPR 切换、`cargo run` 的画面与控件操作，以及 Linux Wayland 真实窗口。640×512 逻辑窗口中坐标轴右侧标签裁切、定位器文字偏小已交任务 064 跟进；因此不将整个 resize / 高 DPI 验收勾选或关闭本任务。维护者确认当前无法做跨显示器 DPR。
 
-- Cargo 聚合验证：`cargo test --locked --workspace` 通过，native CTest 69/69，Rust 测试与 qmllint 通过；日志 `/tmp/panta-007-workspace-tests.log`。本轮未修改产品代码，也未新增测试或重复执行性能基准。
+## 2026-10-02 初始化失败注入
+
+offscreen 平台缺少原生 surface 时，视口只告警一次，不发 `sceneInitialized`，也不创建 render / hardware window。该路径已有回归。
+
+VTK 9.7.0 的 `vtkWebGPUConfiguration::Initialize` 在 adapter 请求失败后仍调用 `PopulateRequiredLimits`，Dawn 对空 adapter 崩溃。视口在调用 render window `Initialize` 之前用独立 Dawn instance 预检 adapter，失败则告警并拆除已接入的 hardware window，不进入会崩溃的 VTK 初始化。预检 instance 在函数返回前释放。测试接缝把预检 backend 设为 OpenGL，生产路径使用 `Undefined`。
+
+验证：仓库根目录，macOS 26.3.1 / arm64，Qt 6.11.2，VTK 9.7.0。
+
+- `QT_QPA_PLATFORM=offscreen ./target/native/debug/app/panta_qml_viewport_module_test`：5 passed、2 skipped。跳过的是原生 GPU 与 device 失败用例。`reports_missing_native_surface_once` 通过。
+- `QT_QPA_PLATFORM=cocoa PANTA_TEST_NATIVE_VIEWPORT=1` 运行 `reports_webgpu_device_initialization_failure`：通过，144ms，告警一次，无 `sceneInitialized`，资源已释放，进程未崩溃。
+- 同一环境运行 `native_refresh_and_window_lifecycle`：通过，1409ms。正常 Metal adapter 预检后原有窗口生命周期仍成立。
+
+`cargo run -p panta-launcher` 已启动 `target/native/debug/app/panta-native`（pid 17723）。CoreGraphics 列出该进程的 1470×841 与 1918×1040 窗口。`screencapture` 报 `could not create image from display`，System Events 报辅助访问被拒绝，因此没有截图，也没有完成隐藏、关闭 Welcome 和空视口操作。窗口存在不记为 `cargo run` 画面验收。进程已退出。
+
+Windows 真实窗口生命周期仍以 2026-09-26 的记录为准，本批没有重跑。本环境没有 Linux Wayland 图形会话。跨显示器 DPR 按维护者说明留待以后。
+
+2026-10-02：维护者要求本任务暂时延后。adapter 预检、offscreen 缺 surface 回归和本批验证保留；跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口未关闭。状态改为 deferred，不排入当前交付。恢复时从这三项继续，不把已有 Cocoa 测试或窗口存在当成这三项通过。
+
+- 本批 `cargo test --locked --workspace` 通过，native CTest 72/72，Rust 测试与 qmllint 通过；日志 `/tmp/panta-007-workspace-tests.log`。此前 69/69 的记录属于上一轮未改产品代码的窗口证据。

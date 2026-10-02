@@ -55,6 +55,11 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     bool test_previous_mapper_released() const;
     bool test_interaction_observers_registered() const;
     bool test_previous_window_resources_released() const;
+    /// 当前没有 render window、hardware window、interactor 或已接入的原生 view。
+    bool test_render_resources_absent() const;
+    /// 下次初始化用 Dawn 不提供的 backend 预检 adapter，走 device 失败清理。
+    /// 生产路径不调用。VTK 9.7.0 在 adapter 为空时会于 Initialize 内崩溃。
+    void test_fail_webgpu_device_initialization();
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

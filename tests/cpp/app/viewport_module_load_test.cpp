@@ -2,8 +2,9 @@
 /// Panta.Visualization 运行时加载测试（任务 007）：验证静态模块注册与
 /// CaeViewport 类型可创建。
 ///
-/// 默认只验证无头模块加载；PANTA_TEST_NATIVE_VIEWPORT=1 时在真实桌面
-/// 验证帧合并、隐藏恢复、跨窗口重建与析构，不能使用 offscreen 平台。
+/// 默认验证无头模块加载，并在 offscreen 平台确认缺少原生 surface 时只告警一次。
+/// PANTA_TEST_NATIVE_VIEWPORT=1 时在真实桌面验证帧合并、隐藏恢复、跨窗口重建、析构，
+/// 以及 WebGPU adapter 不可用时的失败清理。生命周期用例不能使用 offscreen 平台。
 
 #include "panta/visualization/mesh_source.hpp"
 #include <QGuiApplication>
@@ -15,8 +16,10 @@
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QString>
+#include <QStringList>
 #include <QUrl>
 #include <QtCore/qtmetamacros.h>
+#include <QtLogging>
 #include <QtQml/qqmlextensionplugin.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
@@ -48,8 +51,61 @@ class ViewportTestAccess final {
     static bool previous_window_resources_released(const VtkViewport& viewport) {
         return viewport.test_previous_window_resources_released();
     }
+    static bool render_resources_absent(const VtkViewport& viewport) {
+        return viewport.test_render_resources_absent();
+    }
+    static void fail_webgpu_device_initialization(VtkViewport& viewport) {
+        viewport.test_fail_webgpu_device_initialization();
+    }
 };
 } // namespace panta::visualization
+
+class WarningCapture final {
+  public:
+    WarningCapture() {
+        previous_active_ = active_;
+        active_ = this;
+        if (previous_active_ == nullptr) {
+            previous_handler_ = qInstallMessageHandler(&WarningCapture::handle);
+        }
+    }
+    ~WarningCapture() {
+        active_ = previous_active_;
+        if (active_ == nullptr) {
+            qInstallMessageHandler(previous_handler_);
+        }
+    }
+    WarningCapture(const WarningCapture&) = delete;
+    WarningCapture& operator=(const WarningCapture&) = delete;
+
+    int count_containing(const QString& fragment) const {
+        int count = 0;
+        for (const QString& message : messages_) {
+            if (message.contains(fragment)) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+  private:
+    static void handle(QtMsgType type, const QMessageLogContext& context, const QString& message) {
+        if (type == QtWarningMsg && active_ != nullptr) {
+            active_->messages_.append(message);
+        }
+        if (previous_handler_ != nullptr) {
+            previous_handler_(type, context, message);
+        }
+    }
+
+    static WarningCapture* active_;
+    static QtMessageHandler previous_handler_;
+    WarningCapture* previous_active_ = nullptr;
+    QStringList messages_;
+};
+
+WarningCapture* WarningCapture::active_ = nullptr;
+QtMessageHandler WarningCapture::previous_handler_ = nullptr;
 
 class ViewportModuleLoadTest final : public QObject {
     Q_OBJECT
@@ -181,6 +237,58 @@ class ViewportModuleLoadTest final : public QObject {
         // 原窗口关闭后新宿主仍可更新；排队刷新在条目析构后不会再执行。
         first.close();
         viewport.setWidth(420);
+    }
+
+    void reports_missing_native_surface_once() {
+        if (QGuiApplication::platformName() != QStringLiteral("offscreen")) {
+            QSKIP("Missing native surface is reported on the offscreen platform");
+        }
+        WarningCapture warnings;
+        QQuickWindow window;
+        window.resize(320, 240);
+        QQuickItem parent(window.contentItem());
+        panta::visualization::VtkViewport viewport(&parent);
+        viewport.setSize(QSizeF(200, 150));
+        QSignalSpy initialized(&viewport, &panta::visualization::VtkViewport::sceneInitialized);
+        window.show();
+        QVERIFY(window.isVisible());
+        viewport.apply_state({});
+        QCoreApplication::processEvents();
+        viewport.apply_state({});
+        QCoreApplication::processEvents();
+        QCOMPARE(initialized.count(), 0);
+        QCOMPARE(warnings.count_containing(
+                     QStringLiteral("offscreen 平台没有原生 surface，跳过 WebGPU 视口初始化")),
+                 1);
+        QVERIFY(panta::visualization::ViewportTestAccess::render_resources_absent(viewport));
+    }
+
+    void reports_webgpu_device_initialization_failure() {
+        if (!qEnvironmentVariableIsSet("PANTA_TEST_NATIVE_VIEWPORT")) {
+            QSKIP("WebGPU device failure requires PANTA_TEST_NATIVE_VIEWPORT=1 and a real desktop");
+        }
+        if (QGuiApplication::platformName() == QStringLiteral("offscreen")) {
+            QSKIP("WebGPU device failure requires a native surface platform");
+        }
+        WarningCapture warnings;
+        QQuickWindow window;
+        window.resize(320, 240);
+        QQuickItem parent(window.contentItem());
+        panta::visualization::VtkViewport viewport(&parent);
+        panta::visualization::ViewportTestAccess::fail_webgpu_device_initialization(viewport);
+        viewport.setSize(QSizeF(200, 150));
+        QSignalSpy initialized(&viewport, &panta::visualization::VtkViewport::sceneInitialized);
+        window.show();
+        QVERIFY(window.isVisible());
+        QTRY_COMPARE_WITH_TIMEOUT(
+            warnings.count_containing(QStringLiteral("VTK WebGPU device 初始化失败")), 1, 10000);
+        viewport.apply_state({});
+        QCoreApplication::processEvents();
+        QCOMPARE(initialized.count(), 0);
+        QCOMPARE(warnings.count_containing(QStringLiteral("VTK WebGPU device 初始化失败")), 1);
+        QVERIFY(panta::visualization::ViewportTestAccess::render_resources_absent(viewport));
+        QVERIFY(
+            panta::visualization::ViewportTestAccess::previous_window_resources_released(viewport));
     }
 
     void destroys_attached_viewport_with_pending_refresh() {
