@@ -28,6 +28,7 @@
 #include <QtGlobal>
 #include <QtLogging>
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
@@ -64,7 +65,7 @@ constexpr int kCameraTransitionDurationMs = 260;
 constexpr double kModelCameraFitMargin = 1.25;
 // Welcome 字标独立留出更大适配边距；导入模型继续使用标准视口边距。
 constexpr double kWelcomeCameraFitMargin = 2.25;
-constexpr uint64_t kAdapterProbeTimeoutNs = 2'000'000'000ULL;
+constexpr std::uint64_t kAdapterProbeTimeoutNs = 2'000'000'000ULL;
 
 // VTK 9.7.0 的 vtkWebGPUConfiguration::Initialize 在 RequestAdapter 失败后
 // 仍对空 adapter 调用 PopulateRequiredLimits，Dawn 会空指针崩溃。预检使用
@@ -84,7 +85,7 @@ bool dawn_adapter_available(wgpu::BackendType backend) {
     bool available = false;
     const wgpu::Future future = instance.RequestAdapter(
         &options, wgpu::CallbackMode::WaitAnyOnly,
-        [&available](wgpu::RequestAdapterStatus status, wgpu::Adapter adapter, const char*) {
+        [&available](wgpu::RequestAdapterStatus status, const wgpu::Adapter& adapter, const char*) {
             available = status == wgpu::RequestAdapterStatus::Success && adapter != nullptr;
         });
     const wgpu::WaitStatus wait = instance.WaitAny(future, kAdapterProbeTimeoutNs);

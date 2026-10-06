@@ -1,8 +1,8 @@
 # Python 自动化与包管理
 
-查阅日期：2026-09-18。状态：uv + pyproject + uv.lock 已用于 CMake formatter；Python 业务运行时和 binding 仍未接入。
+更新日期：2026-10-07；官方资料查阅日期：2026-09-18。状态：uv + pyproject + uv.lock 已用于 CMake formatter；Python 业务运行时和 binding 仍未接入。
 
-工具包支持 Python 3.12–3.14；实际执行固定为 uv 托管 CPython 3.13.7，解释器和缓存均放在 Cargo target。它只用于质量工具，不属于桌面运行时。
+工具包支持 Python 3.12–3.14；实际执行固定为 uv 0.12.18 托管 CPython 3.14.7，解释器和缓存均放在 Cargo target。它只用于质量工具，不属于桌面运行时。
 
 ## 官方依据
 

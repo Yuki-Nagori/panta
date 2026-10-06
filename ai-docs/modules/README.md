@@ -4,7 +4,7 @@
 
 本目录保存跨任务的重要模块设计：职责、数据流、生命周期、方案取舍与演进门槛。架构文档维护全局分层；规范维护通用约束；实施进展与验证证据仍以 task 为准，不在这里复制状态表。
 
-除 034/035 已落地的 `.pa` parser、formatter 和 037 的增量更新规划外，以下模块仍为规划；已有桌面骨架不代表其它能力已经实现。
+本目录同时记录已实现基础和后续规划。跨平台路径层（023）、静态 QML 模块注册（026）、原子 / 组合组件（029）及 `.pa` parser / formatter（034/035）已落地；Rust FSM 已接入只读 STL 视口资源激活。运行时、变量 DSL、主题 DSL、UI 重载及增量更新等后续能力仍按对应任务推进，具体边界见各模块说明与实现。
 
 | 方向 | 设计说明 | 实施任务 |
 |---|---|---|
@@ -17,13 +17,13 @@
 | 跨语言格式、测试、审计与 100% 覆盖率 | [质量工具链](quality-tooling.md) | [032](../task/032-cross-language-quality-gates.md) |
 | `.pa` 解析、聚合与 TS/QM 工具链 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [034](../task/034-rust-panta-artifact-parser.md) |
 | `.pa` 格式化与校验 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [035](../task/035-pa-formatter-and-validator.md) |
-| 编译期 FSM 声明、Rust 状态机与异步事务（规划） | [FSM 与状态机](fsm.md) | [072 评估](../task/072-flow-state-machine-planning.md)、[073 实施](../task/073-fsm-dsl-and-import-state-machine.md) |
+| 编译期 FSM 声明、Rust 状态机与异步事务 | [FSM 与状态机](fsm.md) | [072 评估](../task/072-flow-state-machine-planning.md)、[073 实施](../task/073-fsm-dsl-and-import-state-machine.md) |
 | Mesh 资产 revision、旁置存储与按需加载（规划） | [工程存储](../architecture/application-and-storage.md)、[网格架构](../architecture/mesh.md) | [088](../task/088-mesh-asset-sidecar-storage.md) |
 | Qt 交互流程、导入窗口与状态恢复（规划） | [Qt 交互状态机](qt-interaction-state-machines.md) | [074](../task/074-qt-interaction-state-machine.md) |
 | 打包后软件内增量更新、签名、回滚 | [软件内增量更新](incremental-updates.md) | [037](../task/037-incremental-update-foundation.md) |
 | VTK/OCCT/Netgen 预编译 SDK 与受信制品 | [Native 依赖供给](native-dependency-supply.md) | [031](../task/031-prebuilt-native-dependencies.md)、[038](../task/038-native-sdk-artifact-production.md) |
 | 性能基线、剖析与回归对比（开发侧，非 CI 门禁） | [性能测试与剖析](performance.md) | [048](../task/048-performance-testing.md) |
 
-优先推进 022、023、026；024 在路径与基础任务服务就绪后推进，025 建立在运行时之上，027 最后验证 UI 重载。它们不成为现有 M0 视口主线的额外前置条件。
+023 与 026 已完成；后续 022 跟踪语言切换，024 跟踪工程运行时，025 建立在运行时之上，027 验证 UI 重载。它们不成为现有 M0 视口主线的额外前置条件。
 
-组件库 029 已按 050 复刻件落地原子/组合组件与 Shell 框架拼装；025 + 029 → 030 完成主题 DSL 接入，不依赖 027 引擎热重载。
+组件库 029 已按 050 复刻件落地原子/组合组件与 Shell 框架拼装；后续由 025 + 029 → 030 推进主题 DSL 接入，不依赖 027 引擎热重载。
