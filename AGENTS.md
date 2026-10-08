@@ -13,10 +13,11 @@
 
 工作约束：
 
-- 先写或更新 `ai-docs/task/NNN-name.md` 并登记索引，再实施；元数据使用无序列表，任务保持单文件。完成后记录真实验证并同步状态。
+- 先写或更新 `ai-docs/task/NNN-name.md` 并登记索引，再实施；元数据使用无序列表，任务保持单文件。CI 修复等小范围修改更新所属 task 的范围与验证记录，不另建 task。完成后记录真实验证并同步状态。
 - 修改代码遵循 [注释规范](ai-docs/standards/comments.md)，新增文件遵循 [仓库文件规范](ai-docs/standards/repository-hygiene.md)；验证要求见 [验证与评审](ai-docs/standards/validation-and-review.md)。
 - 不保留死代码或废弃实现；替换时同步清理，默认不写前向/后向兼容代码。必要例外必须使用 `COMPAT(...)` 标记并登记清理任务，见 [代码生命周期](ai-docs/standards/code-lifecycle.md)。
 - 每次 commit 保持功能、测试、配置、文档和 task 一致，遵循 [提交规范](ai-docs/standards/commits.md)；不把已知损坏状态留给下一提交修复。
+- 每个 task 实施完成后增加一次独立 subagent review，重点检查行为、架构边界、失败路径、测试和文档一致性；处理评审发现并复验后再提交，评审结果记入所属 task。
 - 只阅读任务相关的架构与规范；范围变化先更新任务，长期决策同步对应文档。
 - QML 经 C++ ViewModel 调用服务，不直接操作 OCCT、Netgen、VTK；自有 C++ 使用 C++20。
 - Rust 承担领域数据、业务规则与编排；CXX 仅声明映射和签名，C++ 适配层实际调用重库并封装类型、异常与所有权。VTK 的窗口、输入和逐帧显示留在 C++，具体边界与 crate 规划见 [分层规则](ai-docs/standards/layering.md) / [职责审计](ai-docs/architecture/native-domain-boundaries.md)。

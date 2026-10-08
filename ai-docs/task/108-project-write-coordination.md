@@ -38,6 +38,8 @@ macOS / Rust 1.98.1、仓库根目录：定向 `cargo test --locked -p panta-cor
 
 ## 工作记录
 
+- 2026-10-08：c6cfb5e 的 [CI 37741374442](https://github.com/Yuki-Nagori/panta/actions/runs/37741374442) 全部通过；后续 CI 暴露租约释放风险，在 [109 的 CI 收尾](109-bounded-background-execution.md) 中复现共享句柄延长锁寿命的机制，销毁改为显式 unlock 后关闭句柄；原 CI 的具体触发条件及新提交的 Linux 效果尚待复验。
+
 - 2026-10-08：按用户要求一次登记剩余 Rust 架构任务，先提交规划后实施。
 - 2026-10-08：用户要求已有文件锁一起迁移到 fs4；核对 [fs4 1.1.0 文档](https://docs.rs/fs4/1.1.0/fs4/)，同步特性 MSRV 1.75 满足仓库 1.88。既有 panta-build 安装锁和新工程写入租约统一使用显式 trait 调用及 WouldBlock / Error 分类，清除直接 fs2 依赖和锁文件项。
 - 2026-10-08：集中 repository 租约，分离内存与已保存修订；导入写资产及回滚共享租约。以文件内容 sync 后 rename 为提交点，独立 staging 候选使用 create_new / RAII。完成并行、子进程、过期修订、碰撞及失败恢复回归和 Cargo 聚合质量检查，状态 / 索引同步 done。#7 的 FFI 私有测试归属由 112 独立提交。

@@ -51,6 +51,12 @@ macOS / Rust 1.98.1、仓库根目录：`cargo test --locked --workspace` 通过
 
 ## 工作记录
 
+- 2026-10-08：独立 subagent review 检查锁释放、失败 / 提交语义、复制句柄断言、fs4 Unix / Windows 源码和文档一致性，未发现代码行为阻断项；按评审修正原 CI 根因的证据范围及提交点注释。评审为只读检查，未将本机验证或源码检查写成 Linux / Windows 新提交通过。后续小 CI 修复归所属 task，任务完成后独立 review 的规则登记在 AGENTS.md。
+
+- 2026-10-08：CI 收尾：Linux 工程回归报 project write pending。新增句柄复制回归在修复前稳定返回 WouldBlock；依据 [flock(2)](https://man7.org/linux/man-pages/man2/flock.2.html) 与 fs4 源码，租约销毁改为显式 unlock 后关闭句柄，保留争用拒绝及 rename 提交点，解锁诊断不改变已提交结果。与该报错一致的释放机制已确定复现，但不能据此证明原 CI 发生了 fork 继承。macOS Cargo 工作区聚合（69 core 单元、72/72 native / QML）、构建、完整 lint、格式及新回归的 Miri 检查通过；修复提交的 Linux CI 尚待复验。按用户要求撤掉未提交的独立 CI task，更新本任务，新增独立 subagent review 环节。
+
+- 2026-10-08：[CI 37751188859](https://github.com/Yuki-Nagori/panta/actions/runs/37751188859) 的 Linux 工程集成回归报 project write pending，其余检查成功；在本任务 CI 收尾中复现描述符共享延长锁寿命的机制并修正租约释放；原 CI 的具体触发条件尚未直接捕获，不将本次失败写为跨平台验收通过。
+
 - 2026-10-08：登记剩余 Rust 架构任务，按 108 完成后的顺序实施。
 - 2026-10-08：预检、激活、元数据提交及模拟任务接入共享有界执行。删除逐任务句柄积累，分离模拟执行体，任务 drain 回收终态；激活限制在飞 / 未消费结果，取消旧代次读取并释放结果。
 - 2026-10-08：补齐应用正常退出收尾；QML 服务销毁后由 Rust 关闭后台写入准入并等已接受提交，宿主关闭后的提交错误仍写 stderr。补充容量、失败、关闭、编号与 FFI 回归及手动 CPU 负载。

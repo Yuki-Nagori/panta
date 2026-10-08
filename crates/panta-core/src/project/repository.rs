@@ -9,12 +9,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static NEXT_TEMPORARY: AtomicU64 = AtomicU64::new(0);
 const TEMPORARY_ATTEMPTS: usize = 32;
 
-/// 租约覆盖资产写入、清单提交及失败回滚；文件句柄销毁释放协作锁。
+/// 租约覆盖资产写入、清单提交及失败回滚；销毁时先显式解锁再关闭句柄。
 /// 稳定锁文件不能删除，否则另一个等待者可能持有不同 inode。
 pub(super) struct WriteLease {
     target: PathBuf,
     expected_revision: Option<u64>,
-    _lock: File,
+    lock: File,
 }
 
 impl WriteLease {
@@ -36,7 +36,7 @@ impl WriteLease {
         let lease = Self {
             target: state.path.clone(),
             expected_revision: state.persisted_revision,
-            _lock: lock,
+            lock,
         };
         lease.check_disk_revision()?;
         Ok(lease)
@@ -65,7 +65,7 @@ impl WriteLease {
         Ok(())
     }
 
-    /// rename 成功就是提交点；其后只更新内存标记，不再执行可能失败的 I/O。
+    /// rename 成功就是提交点；其后不再执行会改变提交结果的可失败操作。
     /// sync_all 保证文件内容同步，不承诺各平台断电后的目录项持久性。
     pub(super) fn commit(&self, state: &mut ProjectState) -> Result<(), ProjectError> {
         if state.path != self.target || state.persisted_revision != self.expected_revision {
@@ -101,6 +101,20 @@ impl WriteLease {
         temporary.committed = true;
         state.persisted_revision = Some(state.revision);
         Ok(())
+    }
+}
+
+impl Drop for WriteLease {
+    fn drop(&mut self) {
+        // fork / dup 可保留同一 open file description，单独 close 不能及时释放锁。
+        // 提交点已由 rename 裁定，解锁失败仅记录诊断；不把已提交状态改报失败。
+        if let Err(error) = FileExt::unlock(&self.lock) {
+            let _ = writeln!(
+                std::io::stderr().lock(),
+                "panta: release project write lease {}: {error}",
+                self.target.display()
+            );
+        }
     }
 }
 
@@ -233,6 +247,50 @@ mod tests {
                 "preserve"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn lease_release_is_not_prolonged_by_a_duplicated_file_handle()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = super::super::ProjectService::new();
+        let project = service.create(&fixture.root, "Duplicated")?;
+        let mut state = service.current.as_ref().ok_or("missing project")?.clone();
+        let lease = super::WriteLease::acquire(&state)?;
+        // dup 与 fork 继承共享 open file description，控制其存活期即可复现竞态。
+        let duplicated = lease.lock.try_clone()?;
+        let probe = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(project.path.with_extension("panta.lock"))?;
+        assert!(matches!(
+            fs4::FileExt::try_lock(&probe),
+            Err(fs4::TryLockError::WouldBlock)
+        ));
+        state.name = "Committed".into();
+        state.revision += 1;
+        lease.commit(&mut state)?;
+        assert!(matches!(
+            fs4::FileExt::try_lock(&probe),
+            Err(fs4::TryLockError::WouldBlock)
+        ));
+        drop(lease);
+        fs4::FileExt::try_lock(&probe)?;
+        drop(duplicated);
+        let competing = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(project.path.with_extension("panta.lock"))?;
+        assert!(matches!(
+            fs4::FileExt::try_lock(&competing),
+            Err(fs4::TryLockError::WouldBlock)
+        ));
+        fs4::FileExt::unlock(&probe)?;
+        let mut reopened = super::super::ProjectService::new();
+        reopened.open(&project.path)?;
+        assert_eq!(reopened.current()?.name, "Committed");
+        assert_eq!(reopened.current()?.revision, 1);
         Ok(())
     }
 }
