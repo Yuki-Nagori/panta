@@ -101,6 +101,8 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 ## 风险与工作记录
 
+- 2026-10-08：后续写入导入后台化按 108 的工程写入协调和 109 的执行基础契约接入；沿用本任务的基础依赖，避免把历史导入基础与后续架构整理连成循环依赖。只读预检已完成，写入取消 / 提交截止点仍待实现。
+
 - 2026-10-02：CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/37005793824) 的 Linux TSan 在四个新接入后台预检的 ViewModel 用例中报告 Rust std mpsc 交付 / 释放竞态。当前 sanitizer 仅插桩自有 C++，Rust std 同步不可见，属于 042 已登记的工具边界；本轮按精确用例名补齐 TSan 组合排除，普通聚合及 ASan/UBSan 继续执行全部预检回归，Rust 并发正确性由既有 Miri 入口覆盖。不改业务同步实现或新增运行时抑制；修复后 macOS `cargo test --locked --workspace` 通过 Rust 测试及 72/72 个 native / QML CTest；`cargo sanitize` 通过 ASan/UBSan 72/72、TSan 51/51，`cargo format --check` 通过。用 CTest `--show-only=json-v1 -E` 对比实际清单，确认相对原名单仅减少这四个用例。`cargo lint --check` 全部通过；Linux 最终结果待新 CI 验证。
 
 - 2026-10-02：异步迁移按可验证边界分批实施。首批将 STL 预检迁入 Rust 后台；请求拥有独立编号、取消标志和字节 / 网格快照，GUI 线程只发起、取消和拉取结果。替换文件选择、关闭弹窗及成功切换工程均废弃旧请求，旧结果不得重新启用 OK 或污染新表单；预检成功后保留同一来源快照供确认时检查源文件变化。补充 Rust / CXX / Qt 的失败、取消、迟到结果与工程不变回归。确认导入的写入事务及取消截止点留在下一批，当前不标异步导入验收完成。
