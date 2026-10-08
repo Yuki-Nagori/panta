@@ -51,6 +51,8 @@ macOS / Rust 1.98.1、仓库根目录：`cargo test --locked --workspace` 通过
 
 ## 工作记录
 
+- 2026-10-08：按用户要求，将小范围 CI 修复的 commit / push / CI 等待流程登记在 AGENTS.md；本次锁释放修复将随流程文档一并推送，跟进对应提交的运行，失败继续修复。独立 subagent 复核本次规则与用户授权一致；文档差异检查通过。
+
 - 2026-10-08：独立 subagent review 检查锁释放、失败 / 提交语义、复制句柄断言、fs4 Unix / Windows 源码和文档一致性，未发现代码行为阻断项；按评审修正原 CI 根因的证据范围及提交点注释。评审为只读检查，未将本机验证或源码检查写成 Linux / Windows 新提交通过。后续小 CI 修复归所属 task，任务完成后独立 review 的规则登记在 AGENTS.md。
 
 - 2026-10-08：CI 收尾：Linux 工程回归报 project write pending。新增句柄复制回归在修复前稳定返回 WouldBlock；依据 [flock(2)](https://man7.org/linux/man-pages/man2/flock.2.html) 与 fs4 源码，租约销毁改为显式 unlock 后关闭句柄，保留争用拒绝及 rename 提交点，解锁诊断不改变已提交结果。与该报错一致的释放机制已确定复现，但不能据此证明原 CI 发生了 fork 继承。macOS Cargo 工作区聚合（69 core 单元、72/72 native / QML）、构建、完整 lint、格式及新回归的 Miri 检查通过；修复提交的 Linux CI 尚待复验。按用户要求撤掉未提交的独立 CI task，更新本任务，新增独立 subagent review 环节。
