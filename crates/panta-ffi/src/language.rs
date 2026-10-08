@@ -44,3 +44,26 @@ pub(super) fn language_service_commit(
     service.service.commit(locale);
     Ok(service.service.current().as_str().to_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn language_bridge_validates_before_committing() -> Result<(), String> {
+        let mut service = crate::language_service_new();
+        assert_eq!(crate::language_service_supported_locales(), ["en", "zh-CN"]);
+        assert_eq!(crate::language_service_current(&service), "en");
+        assert_eq!(
+            crate::language_service_validate(&service, "zh-CN".into())?,
+            "zh-CN"
+        );
+        assert_eq!(crate::language_service_current(&service), "en");
+        assert!(crate::language_service_validate(&service, "unknown".into()).is_err());
+        assert!(crate::language_service_commit(&mut service, "unknown".into()).is_err());
+        assert_eq!(
+            crate::language_service_commit(&mut service, "zh-CN".into())?,
+            "zh-CN"
+        );
+        assert_eq!(crate::language_service_current(&service), "zh-CN");
+        Ok(())
+    }
+}

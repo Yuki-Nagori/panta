@@ -77,3 +77,105 @@ pub(super) fn task_service_recent_logs(service: &TaskService) -> Vec<bridge::Tas
 pub(super) fn task_service_running(service: &TaskService) -> u32 {
     u32::try_from(service.manager.running_tasks()).unwrap_or(u32::MAX)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        bridge, task_service_cancel, task_service_drain, task_service_new,
+        task_service_recent_logs, task_service_running, task_service_submit,
+    };
+    #[test]
+    fn task_service_drains_events_through_bridge() -> Result<(), Box<dyn std::error::Error>> {
+        let service = task_service_new();
+        let id = match task_service_submit(&service, "桥接-θ".to_owned(), 20, false) {
+            Ok(id) => id,
+            Err(error) => panic!("submit failed: {error}"),
+        };
+
+        // 轮询到终态；等待上界远大于任务时长，避免偶发失败。
+        for _ in 0..400 {
+            if task_service_running(&service) == 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert_eq!(task_service_running(&service), 0);
+
+        let events = task_service_drain(&service);
+        let started = events
+            .iter()
+            .position(|event| matches!(event.kind, bridge::TaskEventKind::Started));
+        let succeeded = events
+            .iter()
+            .position(|event| matches!(event.kind, bridge::TaskEventKind::Succeeded));
+        match (started, succeeded) {
+            (Some(started_index), Some(succeeded_index)) => {
+                assert!(started_index < succeeded_index)
+            }
+            _ => panic!(
+                "expected started+succeeded, got started={started:?} succeeded={succeeded:?}"
+            ),
+        }
+        assert!(events.iter().all(|event| event.task_id == id));
+
+        let logs = task_service_recent_logs(&service);
+        assert!(
+            logs.iter()
+                .any(|line| line.task_id == id && line.message.contains("succeeded"))
+        );
+
+        // 无效输入映射为稳定错误码。
+        match task_service_submit(&service, String::new(), 1, false) {
+            Ok(_) => panic!("empty label accepted"),
+            Err(error) => assert_eq!(error, "task.empty_label"),
+        }
+        match task_service_submit(&service, "x".to_owned(), 60_001, false) {
+            Ok(_) => panic!("oversized duration accepted"),
+            Err(error) => assert!(error.starts_with("task.invalid_duration:")),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn task_service_lifecycle_maps_cancel_failed_and_cancelled_events()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let service = task_service_new();
+        // 失败任务:Failed 事件经桥接枚举映射。
+        let failed_id = task_service_submit(&service, "失败任务".to_owned(), 10, true)?;
+        for _ in 0..400 {
+            if task_service_running(&service) == 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let events = task_service_drain(&service);
+        assert!(
+            events.iter().any(|event| {
+                event.task_id == failed_id
+                    && matches!(event.kind, bridge::TaskEventKind::Failed)
+                    && !event.code.is_empty()
+            }),
+            "失败任务必须携带 Failed 事件与错误码"
+        );
+        // 取消长任务:Cancelled 事件经桥接枚举映射;cancel 返回 true。
+        let long_id = task_service_submit(&service, "长任务".to_owned(), 5_000, false)?;
+        assert!(
+            task_service_cancel(&service, long_id),
+            "运行中任务必须可取消"
+        );
+        for _ in 0..400 {
+            if task_service_running(&service) == 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let events = task_service_drain(&service);
+        assert!(
+            events.iter().any(|event| {
+                event.task_id == long_id && matches!(event.kind, bridge::TaskEventKind::Cancelled)
+            }),
+            "取消必须产生 Cancelled 事件"
+        );
+        Ok(())
+    }
+}

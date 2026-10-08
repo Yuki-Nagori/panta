@@ -95,3 +95,36 @@ pub(super) fn mesh_coordinates(mesh: &panta_mesh::SurfaceMesh) -> Result<Vec<f64
     }
     Ok(coordinates)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::bridge;
+    #[test]
+    fn tet_mesh_bridge_checks_layout_and_domain_data() {
+        let mesh_data = || bridge::TetMeshData {
+            nodes: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            tets: vec![0, 1, 2, 3],
+            tet_regions: vec![0],
+            boundary: vec![0, 1, 2],
+            boundary_groups: vec![0],
+            region_count: 1,
+            boundary_group_count: 1,
+        };
+
+        let valid = crate::mesh_validate_tet(mesh_data());
+        assert!(valid.issues.is_empty());
+        assert_eq!(valid.volume_mm3, 1.0 / 6.0);
+
+        let mut invalid_layout = mesh_data();
+        invalid_layout.nodes.pop();
+        let layout = crate::mesh_validate_tet(invalid_layout);
+        assert_eq!(layout.issues, ["invalid mesh DTO layout"]);
+        assert_eq!(layout.volume_mm3, 0.0);
+
+        let mut invalid_mesh = mesh_data();
+        invalid_mesh.tets[3] = 9;
+        let domain = crate::mesh_validate_tet(invalid_mesh);
+        assert!(!domain.issues.is_empty());
+        assert_eq!(domain.volume_mm3, 0.0);
+    }
+}

@@ -589,7 +589,3 @@ pub mod bridge {
 }
 
 pub use bridge::{FfiRequest, FfiResponse};
-
-#[cfg(test)]
-#[path = "../../../tests/rust/ffi.rs"]
-mod tests;

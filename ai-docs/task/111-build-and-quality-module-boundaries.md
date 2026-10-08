@@ -9,7 +9,7 @@
 
 ## 目标与范围
 
-分离 panta-build 的工具资产登记、安装 / 校验、编译器 / 平台环境；沿现有 coverage / performance 模块组织质量入口的 build / lint / sanitizer。保持 Cargo / CMake 职责、固定版本与供给锁。同步 Rust 单测文件布局规则：仍在所属 crate 的 cfg(test) 模块执行，文件提取保持私有项访问，明确与黑盒集成测试的区别。
+分离 panta-build 的工具资产登记、安装 / 校验、编译器 / 平台环境；沿现有 coverage / performance 模块组织质量入口的 build / lint / sanitizer。保持 Cargo / CMake 职责、固定版本与供给锁。沿用现行测试布局：私有单元测试保留在源码内联 cfg(test) 模块，公共 API 黑盒测试在 tests/rust 注册；107 的 FFI 测试归属问题由 112 修正。
 
 本任务对应 [106 架构评审](106-rust-architecture-review.md) 的后续建议；确认导入后台化仍由 063 实施。保持 UI 与正常工程 schema，不将新基础接口描述为已经实现。
 
