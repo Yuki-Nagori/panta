@@ -15,9 +15,12 @@
 name: CI
 
 on:
+  # 仅 Markdown 变更不创建 run；混合变更继续由 changes 分类。
   push:
     branches: [main]
+    paths-ignore: ["**/*.md"]
   pull_request:
+    paths-ignore: ["**/*.md"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -5,7 +5,7 @@
 - 依赖：[018](018-cross-platform-ci.md)、[012](012-ci-reproducibility.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-19 / 2026-09-19
+- 创建 / 更新：2026-09-19 / 2026-10-08
 
 ## 目标与背景
 
@@ -26,7 +26,7 @@
 
 ## 范围与非目标
 
-范围：`.github/workflows/ci.yml` 触发拆分与缓存结构；索引与相关模块文档同步。不改变任何本地构建/供给实现（`panta-build`、`native/cmake` 不动），不在本轮做 sanitizer、LLVM 换源或制品外置。跳过判定必须保守：未知路径一律视为代码触发全量检查。
+范围：`.github/workflows/ci.yml` 触发拆分与缓存结构；2026-10-08 补充 push / PR 事件层过滤，纯 Markdown 不创建 CI run，混合或非 Markdown 变更仍进入既有路径分类。索引与相关模块文档同步。不改变任何本地构建/供给实现（`panta-build`、`native/cmake` 不动），不在本轮做 sanitizer、LLVM 换源或制品外置。跳过判定必须保守：未知路径一律视为代码触发全量检查。
 
 ## 实施步骤
 
@@ -50,7 +50,7 @@
 
 ## 验收标准
 
-- [x] 纯文档（`*.md`、`ai-docs/**` 等）push/PR 仅运行 `changes` job，其余 job 显示 skipped 且 run 绿。（分类断言 docs-only → code=false，与实跑观测到的 skipped 机制同一条 `needs/if` 链路；整场跳过的端到端观测随下一次纯文档 push 补记）
+- [x] 纯 Markdown push / PR 不创建 CI run；混合或非 Markdown 变更进入 `changes` 分类，文档路径无需质量构建。（2026-10-08 事件层过滤；静态语法与路径样例检查见工作记录。）
 - [x] 未知或代码路径变更触发全量检查；deny.toml 仅触发 dependency-audit；machete/cmake-lint/qmllint 按域触发。（run 35432248243：仅 native 变更 → check×3/format/clippy/clang-tidy/includes/cppcheck/qmllint 全跑，machete 与 audit skipped；run 35431220221：crates 变更 → machete 跑、cmake/qmllint/audit skipped；deny-only 由分类脚本断言覆盖）
 - [x] 三平台新缓存条目合计 ≤ 8 GB（按 job 日志 Cache Size 汇总），main push 后 restore 命中。（macOS 757 MB + 4 MB、Windows 1.42 GB + 7 MB，Ubuntu 条目日志未抓取但同布局，合计约 2.2–3.3 GB；cargo-home 精确命中、panta-cache 恢复成功）
 - [x] 缓存瘦身由供给代码完成：panta-build 发布即删归档并裁剪 LLVM（单元测试覆盖白名单与资源目录保留），Qt/SDK 供给发布即删归档且复用不依赖归档；CI 保存动作不做内容清理。
@@ -71,6 +71,8 @@
 
 ## 决策与工作记录
 
+- 2026-10-08：按用户要求优化纯 Markdown 的 CI 触发：push / pull_request 增加 `paths-ignore: ["**/*.md"]`，避免仅修改 Markdown 时仍分配 changes runner；混合变更保留当前分类与质量门禁。SDK 管线仅手动触发，无需修改。`actionlint .github/workflows/ci.yml` 与差异空白检查通过；Ruby glob 本地模型对 push / PR 共 14 个路径样例断言通过（根目录 / 嵌套 Markdown、混合代码 / workflow、HTML 草稿脚本与未知路径），不将本地模型当作 GitHub 服务端事件验收。独立 subagent review 通过，无阻断项；当前 ruleset 无必需状态检查，传统分支保护接口返回未保护。将推送并跟进对应 CI；纯 Markdown 的服务端跳过将在验收记录提交中核对。
+
 - 2026-09-19：创建任务。选 DIY diff 脚本而非第三方 paths-filter action（少一个供应链面，未知路径默认全量）。
 - 2026-09-19（撤销 test 拆分）：曾把 test 拆为独立 job 经 artifact 传递构建树，实测 upload-artifact 保留构建时 mtime、新 checkout 源码反而更新，cargo 全量重编（run 35429575198 macOS/Ubuntu test 失败于此），收益为负；按维护者决定回到 check/build/verify/test 单 job。
 - 2026-09-19（瘦身下沉供给层）：维护者指出可在代码层优化的不要放进 CI。CI 保存动作只负责存取，裁剪下沉：panta-build 发布即删归档 + `slim_llvm` 白名单裁剪（本地开发机同步受益），Qt/SDK CMake 供给发布即删归档并把复用判定改为指纹 + staging 完整性。legacy `panta-deps-*` 恢复键随首代新键落地移除。
@@ -79,4 +81,4 @@
 
 ## 完成摘要
 
-已交付：CI 按变更路径拆分触发（纯文档整场跳过、依赖审计按清单、machete/cmake/qmllint 按域，未知路径保守全量）；缓存收敛为 cargo-home 与 panta-cache 两键，仅 main push 的 check job 保存、其余 job 只恢复；瘦身下沉到供给代码——panta-build 安装归档发布即删并按白名单裁剪 LLVM（约 7.4 GB → 约 2 GB，本地与 CI 同源），Qt/SDK 供给发布即删归档，复用只看 marker/指纹；公共步骤封装为 `.github/actions/*` 五个复合 action。三平台条目约 2.2–3.3 GB，配额内恢复命中全部验证（run 35432248243 全绿）。pre-commit 钩子按维护者要求扩为全量 format/lint。
+已交付：CI 按变更路径拆分触发（纯 Markdown 不创建运行，其他文档按分类跳过质量 job；依赖审计按清单、machete/cmake/qmllint 按域，未知路径保守全量）；缓存收敛为 cargo-home 与 panta-cache 两键，仅 main push 的 check job 保存、其余 job 只恢复；瘦身下沉到供给代码——panta-build 安装归档发布即删并按白名单裁剪 LLVM（约 7.4 GB → 约 2 GB，本地与 CI 同源），Qt/SDK 供给发布即删归档，复用只看 marker/指纹；公共步骤封装为 `.github/actions/*` 五个复合 action。三平台条目约 2.2–3.3 GB，配额内恢复命中全部验证（run 35432248243 全绿）。pre-commit 钩子按维护者要求扩为全量 format/lint。
