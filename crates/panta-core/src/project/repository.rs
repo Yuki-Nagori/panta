@@ -148,12 +148,9 @@ impl Drop for Temporary {
 }
 
 #[cfg(test)]
-#[path = "../../../../tests/support/rust/temp_directory.rs"]
-mod temp_directory;
-
-#[cfg(test)]
 mod tests {
-    use super::{TEMPORARY_ATTEMPTS, Temporary, temp_directory};
+    use super::super::temp_directory;
+    use super::{TEMPORARY_ATTEMPTS, Temporary};
     use std::fs;
     use std::sync::atomic::AtomicU64;
 

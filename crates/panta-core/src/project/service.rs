@@ -31,6 +31,7 @@ pub struct ProjectService {
     pub(super) pending_metadata: Option<storage::PendingMetadataWrite>,
     pub(super) pending_preview: Option<preview::PendingPreview>,
     pub(super) preview_request: u64,
+    pub(super) execution: crate::execution::ProjectExecution,
 }
 
 impl ProjectService {
@@ -50,10 +51,9 @@ impl ProjectService {
 
     #[cfg(test)]
     pub(super) fn with_mesh_cache_budget(budget_bytes: usize) -> Self {
-        Self {
-            mesh_cache: SurfaceMeshCache::with_budget(budget_bytes),
-            ..Self::default()
-        }
+        let mut service = Self::default();
+        service.mesh_cache = SurfaceMeshCache::with_budget(budget_bytes);
+        service
     }
 
     /// 创建 `location/name/name.panta` 目录包和初始清单；目标已存在时拒绝覆盖。
@@ -231,10 +231,14 @@ impl ProjectService {
         let asset_path = resolve_asset_path(root, &record.asset)?;
         let import_id = record.id.clone();
         let units = record.units.clone();
-        let attempt = self.activation.begin(
-            &import_id,
-            crate::fsm::open_saved_stl::ActivationRequest { asset_path, units },
-        );
+        let attempt = self
+            .activation
+            .begin(
+                &import_id,
+                crate::fsm::open_saved_stl::ActivationRequest { asset_path, units },
+                Arc::clone(&self.execution.reads),
+            )
+            .map_err(|detail| ProjectError::CommandInvalid(detail.to_owned()))?;
         self.activation_attempts.insert(import_id, attempt.attempt);
         Ok(attempt)
     }
@@ -356,4 +360,13 @@ fn resolve_asset_path(root: &Path, relative: &str) -> Result<PathBuf, ProjectErr
         ));
     }
     Ok(root.join(relative_path))
+}
+
+impl Drop for ProjectService {
+    fn drop(&mut self) {
+        // 读取取消及过期结果释放不等待解析；已接受的写入由执行通道持有候选。
+        self.clear_stl_preview();
+        self.activation.advance_generation();
+        self.activation.drain();
+    }
 }

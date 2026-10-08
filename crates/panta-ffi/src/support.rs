@@ -2,6 +2,11 @@
 use crate::{FfiRequest, FfiResponse, MAX_LABEL_BYTES, MAX_REPEAT, bridge};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// 仅转发退出收尾；领域关闭和已接受写入的所有权由 core 管理。
+pub(super) fn finish_background_writes() {
+    panta_core::finish_background_writes();
+}
+
 /// 任务 047：错误以文本跨边界（C++ 侧 qWarning 呈现，不静默）。
 pub(super) fn install_crash_handler(log_dir: &str) -> Result<String, String> {
     panta_foundation::crash::install_crash_handler(log_dir)

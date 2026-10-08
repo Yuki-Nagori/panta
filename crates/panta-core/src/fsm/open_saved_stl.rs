@@ -16,6 +16,8 @@ use panta_mesh::SurfaceMesh;
 
 use super::generated as fsm;
 
+const OUTCOME_CAPACITY: usize = 256;
+
 /// begin 返回的运行期相关性句柄；generation 是会话级计数，非工程 revision。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActivationAttempt {
@@ -197,8 +199,15 @@ impl ActivationCoordinator {
         self: &Arc<Self>,
         import_id: &str,
         request: ActivationRequest,
-    ) -> ActivationAttempt {
-        self.begin_with(import_id, request, spawn_activation_worker)
+        executor: Arc<crate::execution::Executor>,
+    ) -> Result<ActivationAttempt, &'static str> {
+        self.begin_with(
+            import_id,
+            request,
+            move |coordinator, attempt, request, cancelled| {
+                spawn_activation_worker(executor, coordinator, attempt, request, cancelled)
+            },
+        )
     }
 
     /// begin 的可注入入口：spawner 可替换以覆盖 worker 启动失败。
@@ -207,19 +216,25 @@ impl ActivationCoordinator {
         import_id: &str,
         request: ActivationRequest,
         spawn: impl FnOnce(Arc<Self>, u64, ActivationRequest, Arc<AtomicBool>) -> std::io::Result<()>,
-    ) -> ActivationAttempt {
+    ) -> Result<ActivationAttempt, &'static str> {
         let mut state = self.lock();
         let generation = self.generation.load(Ordering::SeqCst);
         let existing = state.attempts.iter().find_map(|(attempt, entry)| {
             (entry.generation == generation && entry.import_id == import_id).then_some(*attempt)
         });
         if let Some(attempt) = existing {
-            return ActivationAttempt {
+            return Ok(ActivationAttempt {
                 attempt,
                 generation,
-            };
+            });
         }
-        state.next_attempt = state.next_attempt.wrapping_add(1);
+        if state.attempts.len() + state.outcomes.len() >= OUTCOME_CAPACITY {
+            return Err("asset activation backlog full");
+        }
+        state.next_attempt = state
+            .next_attempt
+            .checked_add(1)
+            .ok_or("activation attempt exhausted")?;
         let attempt = state.next_attempt;
         let cancel_requested = Arc::new(AtomicBool::new(false));
         state.attempts.insert(
@@ -249,10 +264,10 @@ impl ActivationCoordinator {
         if let Err(error) = spawn(Arc::clone(self), attempt, request, cancel_requested) {
             dispatch_admission_failure(&mut state, &self.generation, attempt, error.to_string());
         }
-        ActivationAttempt {
+        Ok(ActivationAttempt {
             attempt,
             generation,
-        }
+        })
     }
 
     /// 请求取消：只置位标志；`Cancelled` 终态由 worker 在安全检查点确认。
@@ -278,6 +293,9 @@ impl ActivationCoordinator {
             .map(|(attempt, _)| *attempt)
             .collect();
         for attempt in stale {
+            if let Some(entry) = state.attempts.get(&attempt) {
+                entry.cancel_requested.store(true, Ordering::SeqCst);
+            }
             dispatch(
                 &mut state,
                 &self.generation,
@@ -286,6 +304,9 @@ impl ActivationCoordinator {
                 false,
             );
         }
+        state
+            .outcomes
+            .retain(|outcome| outcome.generation == generation);
         generation
     }
 
@@ -455,17 +476,28 @@ fn run_attempt(
     }
 }
 
-/// 默认 spawner：worker 线程分离运行，JoinHandle 直接丢弃（不 join）。
+/// 共享读取通道限制并发；准入失败仍走已有 spawn-failed 状态边。
 fn spawn_activation_worker(
+    executor: Arc<crate::execution::Executor>,
     coordinator: Arc<ActivationCoordinator>,
     attempt: u64,
     request: ActivationRequest,
     cancel_requested: Arc<AtomicBool>,
 ) -> std::io::Result<()> {
-    std::thread::Builder::new()
-        .name(format!("panta-activation-{attempt}"))
-        .spawn(move || run_attempt(coordinator, attempt, request, cancel_requested))
-        .map(drop)
+    let failed = Arc::clone(&coordinator);
+    executor.submit_reported(
+        move || run_attempt(coordinator, attempt, request, cancel_requested),
+        move || {
+            failed.complete(
+                attempt,
+                Event::Fail {
+                    code: "project.activation_worker_failed",
+                    category: "internal",
+                    detail: "asset activation worker panicked".to_owned(),
+                },
+            )
+        },
+    )
 }
 
 fn activation_failure(error: &ImportError) -> (&'static str, &'static str, String) {
@@ -703,14 +735,16 @@ mod tests {
 
     fn coordinator_with_request() -> (Arc<ActivationCoordinator>, ActivationAttempt) {
         let coordinator = Arc::new(ActivationCoordinator::default());
-        let attempt = coordinator.begin_with(
-            "import-1",
-            ActivationRequest {
-                asset_path: PathBuf::from("unused.stl"),
-                units: "millimeters".to_owned(),
-            },
-            |_coordinator, _attempt, _request, _cancel| Ok(()),
-        );
+        let attempt = coordinator
+            .begin_with(
+                "import-1",
+                ActivationRequest {
+                    asset_path: PathBuf::from("unused.stl"),
+                    units: "millimeters".to_owned(),
+                },
+                |_coordinator, _attempt, _request, _cancel| Ok(()),
+            )
+            .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         (coordinator, attempt)
     }
 
@@ -795,6 +829,9 @@ mod tests {
         assert!(coordinator.drain().is_empty());
         assert_eq!(coordinator.advance_generation(), 2);
         assert!(coordinator.drain().is_empty());
+        let diagnostic = format!("{coordinator:?}");
+        assert!(diagnostic.contains("generation: 2"));
+        assert!(!diagnostic.contains("outcomes"));
     }
 
     #[test]
@@ -822,28 +859,36 @@ mod tests {
             asset_path: PathBuf::from("unused.stl"),
             units: "millimeters".to_owned(),
         };
-        let first = coordinator.begin_with("import-1", request(), |_c, _a, _r, _cancel| Ok(()));
-        let second = coordinator.begin_with("import-1", request(), |_c, _a, _r, _cancel| Ok(()));
+        let first = coordinator
+            .begin_with("import-1", request(), |_c, _a, _r, _cancel| Ok(()))
+            .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
+        let second = coordinator
+            .begin_with("import-1", request(), |_c, _a, _r, _cancel| Ok(()))
+            .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         assert_eq!(first.attempt, second.attempt);
         assert_eq!(first.generation, second.generation);
         // 不同记录仍创建独立 attempt。
-        let other = coordinator.begin_with("import-2", request(), |_c, _a, _r, _cancel| Ok(()));
+        let other = coordinator
+            .begin_with("import-2", request(), |_c, _a, _r, _cancel| Ok(()))
+            .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         assert_ne!(first.attempt, other.attempt);
     }
 
     #[test]
     fn spawn_failure_terminates_with_declared_edge() {
         let coordinator = Arc::new(ActivationCoordinator::default());
-        let attempt = coordinator.begin_with(
-            "import-1",
-            ActivationRequest {
-                asset_path: PathBuf::from("unused.stl"),
-                units: "millimeters".to_owned(),
-            },
-            |_coordinator, _attempt, _request, _cancel| {
-                Err(std::io::Error::other("thread pool exhausted"))
-            },
-        );
+        let attempt = coordinator
+            .begin_with(
+                "import-1",
+                ActivationRequest {
+                    asset_path: PathBuf::from("unused.stl"),
+                    units: "millimeters".to_owned(),
+                },
+                |_coordinator, _attempt, _request, _cancel| {
+                    Err(std::io::Error::other("thread pool exhausted"))
+                },
+            )
+            .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         let outcomes = coordinator.drain();
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
@@ -871,5 +916,75 @@ mod tests {
         assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
         assert_eq!(outcomes[0].code, "project.asset_parse_failed");
         assert_eq!(outcomes[0].category, "format");
+    }
+
+    #[test]
+    fn activation_backlog_and_identifiers_are_bounded_and_reclaimed() {
+        let coordinator = Arc::new(ActivationCoordinator::default());
+        let request = || ActivationRequest {
+            asset_path: PathBuf::from("unused.stl"),
+            units: "millimeters".into(),
+        };
+        for id in 0..OUTCOME_CAPACITY {
+            let attempt = coordinator
+                .begin_with(&format!("import-{id}"), request(), |_, _, _, _| Ok(()))
+                .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
+            coordinator.complete(
+                attempt.attempt,
+                Event::Fail {
+                    code: "test.failure",
+                    category: "internal",
+                    detail: String::new(),
+                },
+            );
+        }
+        assert_eq!(
+            coordinator
+                .begin_with("overflow", request(), |_, _, _, _| Ok(()))
+                .err(),
+            Some("asset activation backlog full")
+        );
+        assert_eq!(coordinator.drain().len(), OUTCOME_CAPACITY);
+        coordinator.lock().next_attempt = u64::MAX;
+        assert_eq!(
+            coordinator
+                .begin_with("exhausted", request(), |_, _, _, _| Ok(()))
+                .err(),
+            Some("activation attempt exhausted")
+        );
+        assert!(coordinator.lock().attempts.is_empty());
+    }
+
+    #[test]
+    fn generation_change_cancels_queued_reads_and_releases_old_outcomes() {
+        let coordinator = Arc::new(ActivationCoordinator::default());
+        let cancelled = Arc::new(Mutex::new(None));
+        let saved = Arc::clone(&cancelled);
+        coordinator
+            .begin_with(
+                "queued",
+                ActivationRequest {
+                    asset_path: PathBuf::from("unused.stl"),
+                    units: "millimeters".into(),
+                },
+                move |_, _, _, token| {
+                    *saved
+                        .lock()
+                        .unwrap_or_else(|error| panic!("token lock failed: {error}")) = Some(token);
+                    Ok(())
+                },
+            )
+            .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
+        coordinator.advance_generation();
+        assert!(
+            cancelled
+                .lock()
+                .unwrap_or_else(|error| panic!("token lock failed: {error}"))
+                .as_ref()
+                .unwrap_or_else(|| panic!("cancellation token missing"))
+                .load(Ordering::SeqCst)
+        );
+        assert!(coordinator.lock().attempts.is_empty());
+        assert!(coordinator.lock().outcomes.is_empty());
     }
 }

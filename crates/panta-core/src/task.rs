@@ -6,20 +6,22 @@
 //! 重复/迟到事件不得把任务拉回运行中。事件走拉取队列而非跨线程回调，
 //! 由调用方在自有线程/事件循环中消费；工作线程不直接触碰任何 UI 对象。
 //!
-//! 取消是协作式：工作线程按 `TICK` 粒度检查取消与关闭请求，因此取消
-//! 响应与销毁 join 的延迟上界是 `TICK` 加一次状态转换。
+//! 取消是协作式：模拟执行体每 10 ms 检查取消与关闭请求，因此取消
+//! 响应取决于排队和执行检查点；销毁先关闭领域状态，不在 UI 线程 join。
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+mod simulation;
+use simulation::run_task;
 
 /// 单个模拟阶段的最长执行时间；真实长任务应拆成多个可取消阶段，
 /// 不放宽此上限。
 pub const MAX_TASK_DURATION: Duration = Duration::from_secs(60);
-/// 工作线程检查取消/关闭请求的间隔。
-const TICK: Duration = Duration::from_millis(10);
+/// 未消费的任务记录上限；drain 回收终态记录后恢复准入。
+const TASK_RECORD_CAPACITY: usize = 256;
 /// 结构化日志环容量；超出后丢弃最旧记录。事件队列不受此限制。
 const LOG_RING_CAPACITY: usize = 256;
 
@@ -79,6 +81,8 @@ pub enum SubmitError {
     EmptyLabel,
     TooLongDuration(u64),
     SpawnFailed(String),
+    CapacityExceeded,
+    IdentifiersExhausted,
 }
 
 impl std::error::Error for SubmitError {}
@@ -91,6 +95,8 @@ impl std::fmt::Display for SubmitError {
                 write!(formatter, "duration {millis} ms exceeds the limit")
             }
             SubmitError::SpawnFailed(detail) => write!(formatter, "spawn failed: {detail}"),
+            SubmitError::CapacityExceeded => write!(formatter, "task capacity exhausted"),
+            SubmitError::IdentifiersExhausted => write!(formatter, "task identifiers exhausted"),
         }
     }
 }
@@ -150,12 +156,12 @@ impl Inner {
     }
 }
 
-/// 任务生命周期管理器。销毁时通知所有工作线程停止并 join，
-/// 之后不再存在可触达的工作线程或回调。
+/// 任务生命周期管理器。销毁时关闭领域状态并请求协作停止，不等待 UI 线程。
+/// 后台只持有 Rust 状态，不能回调已销毁的管理器或宿主。
 #[derive(Debug)]
 pub struct TaskManager {
     inner: Arc<Inner>,
-    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    executor: Arc<crate::execution::Executor>,
 }
 
 impl Default for TaskManager {
@@ -176,7 +182,7 @@ impl TaskManager {
                     logs: VecDeque::new(),
                 }),
             }),
-            handles: Arc::new(Mutex::new(Vec::new())),
+            executor: crate::execution::tasks(),
         }
     }
 
@@ -191,9 +197,16 @@ impl TaskManager {
             return Err(SubmitError::TooLongDuration(duration.as_millis() as u64));
         }
 
-        let task_id = self.inner.next_id.fetch_add(1, Ordering::Relaxed);
-        {
+        let task_id = {
             let mut state = self.inner.lock_state();
+            if state.tasks.len() >= TASK_RECORD_CAPACITY {
+                return Err(SubmitError::CapacityExceeded);
+            }
+            let task_id = self
+                .inner
+                .next_id
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+                .map_err(|_| SubmitError::IdentifiersExhausted)?;
             state.tasks.insert(
                 task_id,
                 TaskRecord {
@@ -202,20 +215,34 @@ impl TaskManager {
                 },
             );
             state.log(task_id, format!("submitted: {label}"));
-        }
+            task_id
+        };
 
         let inner = Arc::clone(&self.inner);
         let label_owned = label.to_owned();
-        let spawn = thread::Builder::new()
-            .name(format!("panta-task-{task_id}"))
-            .spawn(move || run_task(inner, task_id, label_owned, duration, fail));
-        match spawn {
-            Ok(handle) => {
-                self.lock_handles().push(handle);
-                Ok(task_id)
+        let failed = Arc::clone(&self.inner);
+        match self.executor.submit_reported(
+            move || run_task(inner, task_id, label_owned, duration, fail),
+            move || {
+                transition(
+                    &failed,
+                    task_id,
+                    TaskEventKind::Failed,
+                    "task.worker_panicked",
+                    0,
+                    "task worker panicked".into(),
+                )
+            },
+        ) {
+            Ok(()) => Ok(task_id),
+            Err(error) => {
+                let rolled_back = rollback_submission(&self.inner, task_id, &error);
+                if error.kind() == std::io::ErrorKind::WouldBlock {
+                    Err(SubmitError::CapacityExceeded)
+                } else {
+                    Err(rolled_back)
+                }
             }
-            // 工作线程未启动：回滚记录，任务从未进入生命周期。
-            Err(error) => Err(rollback_spawn(&self.inner, task_id, &error)),
         }
     }
 
@@ -235,7 +262,10 @@ impl TaskManager {
 
     /// 取走全部已积累事件；终态之后队列为空，重复拉取不产生内容。
     pub fn drain_events(&self) -> Vec<TaskEvent> {
-        self.inner.lock_state().events.drain(..).collect()
+        let mut state = self.inner.lock_state();
+        let events = state.events.drain(..).collect();
+        state.tasks.retain(|_, record| !record.phase.is_terminal());
+        events
     }
 
     /// 最近的结构化日志（容量 [`LOG_RING_CAPACITY`] 环）。
@@ -243,7 +273,7 @@ impl TaskManager {
         self.inner.lock_state().logs.iter().cloned().collect()
     }
 
-    /// 仍在运行的任务数；销毁前归零证明 join 完整。
+    /// 尚未进入领域终态的任务数，包含排队等待的任务。
     pub fn running_tasks(&self) -> usize {
         self.inner
             .lock_state()
@@ -252,95 +282,40 @@ impl TaskManager {
             .filter(|record| record.phase == Phase::Running)
             .count()
     }
-
-    fn lock_handles(&self) -> MutexGuard<'_, Vec<JoinHandle<()>>> {
-        self.handles
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
 }
 
 impl Drop for TaskManager {
     fn drop(&mut self) {
-        // 先置关闭位再 join：工作线程在下一检查点以 task.shutdown 取消
-        // 并退出；join 返回后不存在仍存活的工作线程。
         self.inner.shutdown.store(true, Ordering::Relaxed);
-        for handle in self.lock_handles().drain(..) {
-            let _ = handle.join();
-        }
-    }
-}
-
-fn run_task(inner: Arc<Inner>, task_id: u64, label: String, duration: Duration, fail: bool) {
-    let started = Instant::now();
-    transition(
-        &inner,
-        task_id,
-        TaskEventKind::Started,
-        "",
-        0,
-        label.clone(),
-    );
-
-    let mut last_percent: u32 = 0;
-    loop {
-        if inner.is_shutdown() {
+        let ids: Vec<_> = self
+            .inner
+            .lock_state()
+            .tasks
+            .iter()
+            .filter_map(|(id, record)| (!record.phase.is_terminal()).then_some(*id))
+            .collect();
+        for id in ids {
             transition(
-                &inner,
-                task_id,
+                &self.inner,
+                id,
                 TaskEventKind::Cancelled,
                 "task.shutdown",
                 0,
-                label,
+                String::new(),
             );
-            return;
         }
-        if cancel_requested(&inner, task_id) {
-            transition(
-                &inner,
-                task_id,
-                TaskEventKind::Cancelled,
-                "task.cancelled",
-                0,
-                label,
-            );
-            return;
-        }
-        if started.elapsed() >= duration {
-            break;
-        }
-        thread::sleep(TICK);
-        // 进度按 10% 步进发布，控制事件量；只增不减。
-        let percent =
-            u32::try_from(started.elapsed().as_millis() * 100 / duration.as_millis().max(1))
-                .unwrap_or(100)
-                .min(100);
-        if percent >= last_percent + 10 {
-            last_percent = percent;
-            publish_progress(&inner, task_id, percent);
-        }
-    }
-
-    if fail {
-        transition(
-            &inner,
-            task_id,
-            TaskEventKind::Failed,
-            "task.simulated_failure",
-            0,
-            format!("{label}: simulated failure"),
-        );
-    } else {
-        transition(&inner, task_id, TaskEventKind::Succeeded, "", 0, label);
     }
 }
 
-/// 工作线程未启动时的回滚：移除任务记录并写结构化日志。独立成函数，
-/// 使线程启动失败路径可不经真实 OS 故障即可测试（任务 032）。
-fn rollback_spawn(inner: &Arc<Inner>, task_id: u64, error: &std::io::Error) -> SubmitError {
+/// 准入失败时回滚任务记录；不依赖真实 OS 启动故障即可验证。
+fn rollback_submission(inner: &Arc<Inner>, task_id: u64, error: &std::io::Error) -> SubmitError {
     let mut state = inner.lock_state();
     state.tasks.remove(&task_id);
-    let message = format!("spawn failed: {error}");
+    let message = if error.kind() == std::io::ErrorKind::WouldBlock {
+        format!("admission failed: {error}")
+    } else {
+        format!("spawn failed: {error}")
+    };
     state.log(task_id, message);
     SubmitError::SpawnFailed(error.to_string())
 }
@@ -404,7 +379,7 @@ fn publish_progress(inner: &Arc<Inner>, task_id: u64, percent: u32) {
 mod tests {
     use super::{
         LOG_RING_CAPACITY, LogRecord, MAX_TASK_DURATION, SubmitError, TaskEvent, TaskEventKind,
-        TaskManager, cancel_requested, publish_progress, rollback_spawn, transition,
+        TaskManager, cancel_requested, publish_progress, rollback_submission, transition,
     };
     use std::time::{Duration, Instant};
 
@@ -594,7 +569,8 @@ mod tests {
     }
 
     #[test]
-    fn drop_joins_running_workers() -> Result<(), Box<dyn std::error::Error>> {
+    fn drop_closes_running_tasks_without_waiting_for_their_duration()
+    -> Result<(), Box<dyn std::error::Error>> {
         let started = Instant::now();
         {
             let manager = TaskManager::new();
@@ -604,7 +580,7 @@ mod tests {
         let elapsed = started.elapsed();
         assert!(
             elapsed < Duration::from_secs(30),
-            "drop 阻塞 {elapsed:?}：工作线程未被 join"
+            "drop 阻塞 {elapsed:?}：领域关闭未及时返回"
         );
         Ok(())
     }
@@ -664,6 +640,8 @@ mod tests {
         // 提交超过环容量的任务数：每条提交至少写一条日志，最旧者被淘汰。
         for _ in 0..(LOG_RING_CAPACITY + 16) {
             manager.submit("环容量", std::time::Duration::from_millis(1), false)?;
+            wait_until_running_zero(&manager);
+            manager.drain_events();
         }
         wait_until_running_zero(&manager);
         let logs = manager.recent_logs();
@@ -706,7 +684,7 @@ mod tests {
         let manager = TaskManager::new();
         let id = manager.submit("回滚", std::time::Duration::from_millis(50), false)?;
         let error = std::io::Error::other("boom");
-        let submit_error = rollback_spawn(&manager.inner, id, &error);
+        let submit_error = rollback_submission(&manager.inner, id, &error);
         assert!(matches!(
             submit_error,
             SubmitError::SpawnFailed(ref detail) if detail.contains("boom")
@@ -747,5 +725,96 @@ mod tests {
             || manager.running_tasks() == 0,
             std::time::Duration::from_millis(2_000)
         ));
+    }
+
+    #[test]
+    fn records_are_reclaimed_when_terminal_events_are_consumed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let manager = TaskManager::new();
+        let id = manager.submit("record", Duration::ZERO, false)?;
+        assert!(wait_for(
+            || manager.running_tasks() == 0,
+            Duration::from_secs(2)
+        ));
+        assert!(manager.inner.lock_state().tasks.contains_key(&id));
+        assert!(!manager.drain_events().is_empty());
+        assert!(manager.inner.lock_state().tasks.is_empty());
+        assert!(!manager.cancel(id));
+        Ok(())
+    }
+
+    #[test]
+    fn record_capacity_and_identifier_exhaustion_reject_without_new_state() {
+        let manager = TaskManager::new();
+        {
+            let mut state = manager.inner.lock_state();
+            for id in 0..super::TASK_RECORD_CAPACITY as u64 {
+                state.tasks.insert(
+                    id,
+                    super::TaskRecord {
+                        phase: super::Phase::Succeeded,
+                        cancel_requested: false,
+                    },
+                );
+            }
+        }
+        assert_eq!(
+            manager.submit("full", Duration::ZERO, false),
+            Err(SubmitError::CapacityExceeded)
+        );
+        assert_eq!(
+            manager
+                .inner
+                .next_id
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        manager.drain_events();
+        manager
+            .inner
+            .next_id
+            .store(u64::MAX, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            manager.submit("exhausted", Duration::ZERO, false),
+            Err(SubmitError::IdentifiersExhausted)
+        );
+        assert!(manager.inner.lock_state().tasks.is_empty());
+        assert_eq!(
+            SubmitError::CapacityExceeded.to_string(),
+            "task capacity exhausted"
+        );
+        assert_eq!(
+            SubmitError::IdentifiersExhausted.to_string(),
+            "task identifiers exhausted"
+        );
+    }
+
+    #[test]
+    fn drop_closes_queued_work_and_rejects_late_events() -> Result<(), Box<dyn std::error::Error>> {
+        let mut manager = TaskManager::new();
+        manager.executor = crate::execution::Executor::new("task-drop-test", 1, 4);
+        let inner = std::sync::Arc::clone(&manager.inner);
+        let first = manager.submit("running", Duration::from_secs(30), false)?;
+        let second = manager.submit("queued", Duration::from_secs(30), false)?;
+        drop(manager);
+        assert!(
+            inner
+                .lock_state()
+                .tasks
+                .values()
+                .all(|record| record.phase == super::Phase::Cancelled)
+        );
+        let count = inner.lock_state().events.len();
+        transition(
+            &inner,
+            first,
+            TaskEventKind::Succeeded,
+            "",
+            0,
+            String::new(),
+        );
+        publish_progress(&inner, second, 100);
+        assert_eq!(inner.lock_state().events.len(), count);
+        Ok(())
     }
 }

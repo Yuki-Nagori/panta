@@ -22,8 +22,8 @@ use project_response::{
 mod support;
 pub use support::Session;
 use support::{
-    install_crash_handler, panic_probe, process, session_close, session_create, session_label,
-    session_live_count,
+    finish_background_writes, install_crash_handler, panic_probe, process, session_close,
+    session_create, session_label, session_live_count,
 };
 mod task;
 pub use task::TaskService;
@@ -392,7 +392,7 @@ pub mod bridge {
         fn session_live_count() -> u32;
 
         /// 任务生命周期管理器（panta_core::task::TaskManager 的包装）：
-        /// 事件为拉取式队列，无跨语言回调；Box 析构即关闭并 join 工作线程。
+        /// 事件为拉取式队列，无跨语言回调；Box 析构关闭领域状态并请求协作停止，不在宿主线程 join。
         type TaskService;
 
         fn task_service_new() -> Box<TaskService>;
@@ -581,6 +581,9 @@ pub mod bridge {
             service: &mut ProjectService,
         ) -> Vec<ActivationOutcome>;
         fn mesh_validate_tet(data: TetMeshData) -> TetMeshValidation;
+
+        /// QML 服务销毁、事件循环退出后等待已接受写入；禁止在写入 worker 调用。
+        fn finish_background_writes();
 
         /// 崩溃信号处理器安装（任务 047，panta_foundation::crash 的 FFI 面）：
         /// 返回日志路径；log_dir 为空时用系统临时目录。

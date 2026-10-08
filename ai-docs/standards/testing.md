@@ -1,6 +1,6 @@
 # 测试目录与入口规范
 
-更新日期：2026-10-02。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
+更新日期：2026-10-08。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
 
 ## 目录职责
 
@@ -23,7 +23,7 @@ tests/
 - `tests/src/` 只放入口编排代码，不放领域测试断言。
 - `tests/integration/` 只放 `panta-tests` package 的 Cargo 集成测试；manifest 用显式 `[[test]]` 注册，不能依赖 Cargo 对 `tests/tests` 的默认猜测。
 - `tests/rust/` 放 Rust crate 公共 API 的黑盒测试；所属 crate 的 Cargo manifest 用 `[[test]]` 显式注册相对路径，故 `cargo test -p <crate>` 和 workspace 测试均会运行。
-- C++ / QML 功能测试归档于 `tests/cpp/` 和 `tests/qml/`，CMake target 在被测模块注册。手动性能源码归档于 `tests/performance/{cpu,gpu,support}`，统一由 `native/performance/CMakeLists.txt` 注册；测试二进制不安装、不导出。
+- C++ / QML 功能测试归档于 `tests/cpp/` 和 `tests/qml/`，CMake target 在被测模块注册。手动性能源码归档于 `tests/performance/{cpu,gpu,support}`；native 目标由 `native/performance/CMakeLists.txt` 注册，Rust 手动基准由所属 crate 显式注册 example 或 ignored 性能测试，并从 `cargo performance` 运行；测试二进制不安装、不导出。
 - 多种测试实际复用的辅助代码放 `tests/support/`；性能专用辅助代码放 `tests/performance/support/`。局部辅助函数保留在使用者中，不为目录分层制造单一调用的封装。
 - `native/cmake/tests/` 只保留 CMake 脚本和小型 configure fixture，不放 C++/QML 行为测试。
 - 生产 QML 仍在 `qml/`；`tests/qml/` 只存 QtTest 驱动的验证代码，不复制生产组件。

@@ -33,6 +33,11 @@ constexpr int kExitUsage = 64;
 /// UI 资源加载失败退出码（EX_UNAVAILABLE）。
 constexpr int kExitUnavailable = 69;
 
+/// 比 QML 引擎先构造、后销毁；等待 Rust 写入时事件循环与工程服务均已退出。
+struct BackgroundWriteDrain {
+    ~BackgroundWriteDrain() { panta::ffi::finish_background_writes(); }
+};
+
 void print_version() {
     const panta::foundation::Version version = panta::foundation::native_version();
     std::printf("panta-native %d.%d.%d\n", version.major, version.minor, version.patch);
@@ -72,6 +77,7 @@ int main(int argc, char* argv[]) {
     // 定制需 Basic/Fusion 等）；固定 Basic 保证三平台观感一致，测试同源。
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
+    const BackgroundWriteDrain write_drain;
     QQmlApplicationEngine engine;
     panta::install_icon_provider(engine);
     QObject::connect(

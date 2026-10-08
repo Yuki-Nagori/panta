@@ -1544,3 +1544,55 @@ fn project_write_lock_is_nonblocking_and_released_after_process_exit()
     assert_eq!(reopened.current()?.name, "Saved");
     Ok(())
 }
+
+#[test]
+#[cfg_attr(miri, ignore = "requires a separate OS process")]
+fn background_write_shutdown_child() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(root) = std::env::var_os("PANTA_TEST_WRITE_SHUTDOWN") else {
+        return Ok(());
+    };
+    let root = std::path::PathBuf::from(root);
+    let mut service = ProjectService::new();
+    let project = service.create(&root, "Shutdown")?;
+    let record =
+        service.import_stl(&root.join("shutdown.stl"), "solid-3d", "millimeters", false)?;
+    let revision = service.current()?.revision;
+    service.begin_material_confirmation(
+        &project.path,
+        revision,
+        &record.id,
+        &panta_core::project::default_material()?.id,
+    )?;
+    drop(service);
+    panta_core::finish_background_writes();
+    let mut reopened = ProjectService::new();
+    reopened.open(&project.path)?;
+    let plan = reopened.plan_settings(&record.id).ok_or("missing plan")?;
+    assert_eq!(plan.revision, revision + 1);
+    assert_eq!(
+        plan.material_id,
+        panta_core::project::default_material()?.id
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "requires a separate OS process")]
+fn application_shutdown_finishes_accepted_writes_after_service_teardown()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    fs::write(
+        fixture.root.join("shutdown.stl"),
+        "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n",
+    )?;
+    let result = std::process::Command::new(std::env::current_exe()?)
+        .args(["--exact", "background_write_shutdown_child", "--nocapture"])
+        .env("PANTA_TEST_WRITE_SHUTDOWN", &fixture.root)
+        .output()?;
+    assert!(
+        result.status.success(),
+        "shutdown child failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    Ok(())
+}

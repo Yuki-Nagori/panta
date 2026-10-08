@@ -1,4 +1,4 @@
-//! 跨工程集成测试共享的临时目录；仅清理本实例创建的目录，不删除已有路径。
+//! 工程功能 / 性能测试共享的临时目录；仅清理本实例创建的目录，不删除已有路径。
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};

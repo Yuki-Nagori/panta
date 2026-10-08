@@ -41,6 +41,10 @@ const MIN_SUPPORTED_PROJECT_SCHEMA_VERSION: u32 = 1;
 const PROJECT_FILE_EXTENSION: &str = "panta";
 
 #[cfg(test)]
+#[path = "../../../tests/support/rust/temp_directory.rs"]
+mod temp_directory;
+
+#[cfg(test)]
 mod tests {
     use super::model::validate_name;
     use super::{ProjectError, ProjectService, SurfaceMeshCache};

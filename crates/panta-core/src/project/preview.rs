@@ -32,9 +32,9 @@ impl ProjectService {
         let worker_cancelled = Arc::clone(&cancelled);
         let source = source.to_path_buf();
         let (sender, receiver) = mpsc::channel();
-        std::thread::Builder::new()
-            .name("panta-stl-preview".to_owned())
-            .spawn(move || {
+        self.execution
+            .reads
+            .submit(move || {
                 let mut session = StlImportSession::default();
                 let result =
                     session.preview_checked(&source, || worker_cancelled.load(Ordering::Acquire));
@@ -103,6 +103,7 @@ impl ProjectService {
 
 #[cfg(test)]
 mod tests {
+    use super::super::temp_directory;
     use super::{PendingPreview, ProjectService, StlImportPreview};
     use panta_import::StlImportSession;
     use std::{
@@ -174,5 +175,47 @@ mod tests {
                 .map(|error| error.code()),
             Some("project.command_invalid")
         );
+    }
+
+    #[test]
+    fn queued_replacement_cancels_old_work_and_preserves_the_latest_reply()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("queued.stl");
+        std::fs::write(&source, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+        let executor = crate::execution::Executor::new("preview-queue-test", 1, 4);
+        let (started, ready) = mpsc::channel();
+        let (release, gate) = mpsc::channel();
+        executor.submit(move || {
+            let _ = started.send(());
+            let _ = gate.recv();
+        })?;
+        ready.recv_timeout(std::time::Duration::from_secs(2))?;
+        let mut service = ProjectService::new();
+        service.execution.reads = executor;
+        let first = service.begin_stl_preview(&source)?;
+        let cancelled = Arc::clone(
+            &service
+                .pending_preview
+                .as_ref()
+                .ok_or("no preview")?
+                .cancelled,
+        );
+        let second = service.begin_stl_preview(&source)?;
+        assert!(cancelled.load(Ordering::Acquire));
+        assert!(service.finish_stl_preview(first).is_err());
+        release.send(())?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            if let Some(preview) = service.finish_stl_preview(second)? {
+                assert_eq!(preview.triangle_count, 1);
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err("latest reply missing".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        Ok(())
     }
 }

@@ -17,7 +17,9 @@ cargo performance all --project /path/to/model.panta --samples 31
 
 默认通过正式工程服务生成 10,000 / 20,000 个合成平面三角形的 STL 工程，保留在 `target/performance/fixture-*`；用于入口与生命周期重复验证，不代表生产模型。`--project` 可选择实际工程；Rust STL 单文件基准另可通过 `PANTA_BENCH_STL` 指定输入，未设置时使用合成 STL。`--samples` 只影响工程激活 / 页签切换基准，其他场景仍使用各自固定的预热 / 采样策略。
 
-native 基准采用当前 runner 配置（缺省 Debug），Rust 网格微基准显式使用 Release；输出和比较须区分配置。默认命令需要完整 bridge / VTK 构建；GPU 需要硬件图形会话，初始化失败不当作通过。Qt Quick 默认渲染到硬件纹理；VTK 默认使用隐藏的原生硬件 surface，仍需要平台图形会话。原生窗口模式保留独立指标。
+native 基准采用当前 runner 配置（缺省 Debug），Rust 网格微基准及后台执行容量基准显式使用 Release；输出和比较须区分配置。默认命令需要完整 bridge / VTK 构建；GPU 需要硬件图形会话，初始化失败不当作通过。Qt Quick 默认渲染到硬件纹理；VTK 默认使用隐藏的原生硬件 surface，仍需要平台图形会话。原生窗口模式保留独立指标。
+
+CPU 套件还运行 `panta-core` 的 `background_execution` example（源码 `tests/performance/cpu/background_execution.rs`）：合成 5 万 / 50 万三角面的 binary STL，分别提交 1 / 4 / 8 / 64 个预检请求，输出输入字节、整批耗时及请求完成延迟 p50 / p95。通过公开工程服务驱动，完成即释放来源快照；固定负载不受 `--samples` 或 `--project` 控制。可单独用 `cargo run --locked --release -p panta-core --example background_execution` 定位；不纳入功能测试或 CI 时间门禁。容量及峰值内存证据见 [109](../task/109-bounded-background-execution.md)。
 
 ## 定位与边界
 

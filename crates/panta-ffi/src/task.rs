@@ -2,7 +2,7 @@
 use crate::bridge;
 
 /// panta-core 任务管理器的 FFI 包装：与 `Box<TaskService>` 同生命周期，
-/// 析构即关闭并 join 全部工作线程（关闭后不存在可触达的执行体）。
+/// 析构关闭领域状态并请求协作停止，不等待宿主线程；后台不能回调已关闭的宿主。
 pub struct TaskService {
     manager: panta_core::task::TaskManager,
 }
@@ -26,15 +26,21 @@ pub(super) fn task_service_submit(
     service
         .manager
         .submit(&label, duration, fail)
-        .map_err(|error| match error {
-            panta_core::task::SubmitError::EmptyLabel => "task.empty_label".to_owned(),
-            panta_core::task::SubmitError::TooLongDuration(millis) => {
-                format!("task.invalid_duration: {millis}")
-            }
-            panta_core::task::SubmitError::SpawnFailed(detail) => {
-                format!("task.spawn_failed: {detail}")
-            }
-        })
+        .map_err(submit_error)
+}
+
+fn submit_error(error: panta_core::task::SubmitError) -> String {
+    match error {
+        panta_core::task::SubmitError::EmptyLabel => "task.empty_label".to_owned(),
+        panta_core::task::SubmitError::TooLongDuration(millis) => {
+            format!("task.invalid_duration: {millis}")
+        }
+        panta_core::task::SubmitError::CapacityExceeded => "task.capacity_exhausted".into(),
+        panta_core::task::SubmitError::IdentifiersExhausted => "task.identifiers_exhausted".into(),
+        panta_core::task::SubmitError::SpawnFailed(detail) => {
+            format!("task.spawn_failed: {detail}")
+        }
+    }
 }
 
 pub(super) fn task_service_cancel(service: &TaskService, task_id: u64) -> bool {
@@ -177,5 +183,31 @@ mod tests {
             "取消必须产生 Cancelled 事件"
         );
         Ok(())
+    }
+
+    #[test]
+    fn submission_diagnostics_distinguish_capacity_and_identifier_exhaustion() {
+        assert_eq!(
+            super::submit_error(panta_core::task::SubmitError::EmptyLabel),
+            "task.empty_label"
+        );
+        assert_eq!(
+            super::submit_error(panta_core::task::SubmitError::TooLongDuration(u64::MAX)),
+            format!("task.invalid_duration: {}", u64::MAX)
+        );
+        assert_eq!(
+            super::submit_error(panta_core::task::SubmitError::SpawnFailed(
+                "线程: denied".into()
+            )),
+            "task.spawn_failed: 线程: denied"
+        );
+        assert_eq!(
+            super::submit_error(panta_core::task::SubmitError::CapacityExceeded),
+            "task.capacity_exhausted"
+        );
+        assert_eq!(
+            super::submit_error(panta_core::task::SubmitError::IdentifiersExhausted),
+            "task.identifiers_exhausted"
+        );
     }
 }

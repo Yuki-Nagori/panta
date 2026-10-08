@@ -33,7 +33,7 @@
 
 - 2026-10-08：登记评审。保留已有 105 验收收尾文档改动；按当前源码给出结论，不修改运行时实现。
 
-评审源码基线为 `36bf598`，以下问题保留评审时的现状；第一批模块边界与修订策略修复已由 [107](107-rust-service-boundaries-and-revisions.md) 实施并完成本地验证；[108 写入协调](108-project-write-coordination.md) 已完成本地验证；剩余建议由 [109 执行基础](109-bounded-background-execution.md)、[110 DSL 模块](110-dsl-module-boundaries.md)、[111 构建 / 质量工具](111-build-and-quality-module-boundaries.md) 实施；确认导入后台化继续由 063 跟踪。
+评审源码基线为 `36bf598`，以下问题保留评审时的现状；第一批模块边界与修订策略修复已由 [107](107-rust-service-boundaries-and-revisions.md) 实施并完成本地验证；[108 写入协调](108-project-write-coordination.md) 已完成本地验证；[109 执行基础](109-bounded-background-execution.md) 已完成本地验证；剩余建议由 [110 DSL 模块](110-dsl-module-boundaries.md)、[111 构建 / 质量工具](111-build-and-quality-module-boundaries.md) 实施；确认导入后台化继续由 063 跟踪。
 
 ## 评审结论
 

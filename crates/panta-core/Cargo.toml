@@ -27,3 +27,8 @@ path = "../../tests/rust/project.rs"
 [[test]]
 name = "activation"
 path = "../../tests/rust/activation.rs"
+
+[[example]]
+name = "background_execution"
+path = "../../tests/performance/cpu/background_execution.rs"
+test = false

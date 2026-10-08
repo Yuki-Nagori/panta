@@ -183,6 +183,17 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             .join("Benchmark/Benchmark.panta"),
     };
     if cpu {
+        super::cargo(
+            "run",
+            [
+                "--locked",
+                "--release",
+                "-p",
+                "panta-core",
+                "--example",
+                "background_execution",
+            ],
+        )?;
         let stl = supplied_stl
             .or_else(|| {
                 fixture
