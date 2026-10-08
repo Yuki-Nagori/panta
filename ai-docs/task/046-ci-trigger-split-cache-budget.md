@@ -71,7 +71,7 @@
 
 ## 决策与工作记录
 
-- 2026-10-08：按用户要求优化纯 Markdown 的 CI 触发：push / pull_request 增加 `paths-ignore: ["**/*.md"]`，避免仅修改 Markdown 时仍分配 changes runner；混合变更保留当前分类与质量门禁。SDK 管线仅手动触发，无需修改。`actionlint .github/workflows/ci.yml` 与差异空白检查通过；Ruby glob 本地模型对 push / PR 共 14 个路径样例断言通过（根目录 / 嵌套 Markdown、混合代码 / workflow、HTML 草稿脚本与未知路径），不将本地模型当作 GitHub 服务端事件验收。独立 subagent review 通过，无阻断项；当前 ruleset 无必需状态检查，传统分支保护接口返回未保护。配置提交 `14996c8` 已推送，[CI 37792796430](https://github.com/Yuki-Nagori/panta/actions/runs/37792796430) 的全部 19 个作业通过，证明含 workflow 的混合提交正常触发。此验收记录为纯 Markdown，推送后检查对应 SHA 是否创建运行；PR 过滤经过语法与模型检查，未额外创建演示 PR。
+- 2026-10-08：按用户要求优化纯 Markdown 的 CI 触发：push / pull_request 增加 `paths-ignore: ["**/*.md"]`，避免仅修改 Markdown 时仍分配 changes runner；混合变更保留当前分类与质量门禁。SDK 管线仅手动触发，无需修改。`actionlint .github/workflows/ci.yml` 与差异空白检查通过；Ruby glob 本地模型对 push / PR 共 14 个路径样例断言通过（根目录 / 嵌套 Markdown、混合代码 / workflow、HTML 草稿脚本与未知路径），不将本地模型当作 GitHub 服务端事件验收。独立 subagent review 通过，无阻断项；当前 ruleset 无必需状态检查，传统分支保护接口返回未保护。配置提交 `14996c8` 已推送，[CI 37792796430](https://github.com/Yuki-Nagori/panta/actions/runs/37792796430) 的全部 19 个作业通过，证明含 workflow 的混合提交正常触发。纯 Markdown 验收记录提交 `10abbaa` 推送 30 秒后，`gh run list --commit 10abbaaa08851d4286a46116006f3499f20f181c` 返回空列表，确认未创建运行；PR 过滤经过语法与模型检查，未额外创建演示 PR。
 
 - 2026-09-19：创建任务。选 DIY diff 脚本而非第三方 paths-filter action（少一个供应链面，未知路径默认全量）。
 - 2026-09-19（撤销 test 拆分）：曾把 test 拆为独立 job 经 artifact 传递构建树，实测 upload-artifact 保留构建时 mtime、新 checkout 源码反而更新，cargo 全量重编（run 35429575198 macOS/Ubuntu test 失败于此），收益为负；按维护者决定回到 check/build/verify/test 单 job。
