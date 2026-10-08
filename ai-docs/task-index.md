@@ -170,7 +170,7 @@ ai-docs/
 | 105 | [CI 静态检查与模块文档修正](task/105-ci-and-module-documentation-fixes.md) | 验证基础 | 014, 021, 042 | done |
 | 106 | [Rust 代码结构与职责边界评审](task/106-rust-architecture-review.md) | 架构与文档准备 | 066, 067 | done |
 | 107 | [Rust 工程服务边界与修订耗尽修复](task/107-rust-service-boundaries-and-revisions.md) | 应用平台扩展 | 106 | done |
-| 108 | [工程包写入协调与磁盘修订复核](task/108-project-write-coordination.md) | Rust 架构整理 | 107 | planned |
+| 108 | [工程包写入协调与磁盘修订复核](task/108-project-write-coordination.md) | Rust 架构整理 | 107 | done |
 | 109 | [Rust 后台执行容量与生命周期收敛](task/109-bounded-background-execution.md) | Rust 架构整理 | 108 | planned |
 | 110 | [DSL AST、解析、校验与输出模块整理](task/110-dsl-module-boundaries.md) | Rust 架构整理 | 107 | planned |
 | 111 | [构建供给与质量命令模块整理](task/111-build-and-quality-module-boundaries.md) | Rust 架构整理 | 107 | planned |

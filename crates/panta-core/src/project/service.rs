@@ -90,10 +90,11 @@ impl ProjectService {
 
         let project_path = project_root.join(format!("{name}.{PROJECT_FILE_EXTENSION}"));
 
-        let state = ProjectState {
+        let mut state = ProjectState {
             path: project_path,
             name: name.to_owned(),
             revision: 0,
+            persisted_revision: None,
             dirty: false,
             imports: Vec::new(),
             analysis_sequences: BTreeMap::new(),
@@ -101,7 +102,7 @@ impl ProjectService {
             fill_settings: BTreeMap::new(),
             gate_location_settings: BTreeMap::new(),
         };
-        if let Err(error) = write_manifest(&state) {
+        if let Err(error) = write_manifest(&mut state) {
             if let Some(project_root) = state.path.parent() {
                 let _ = fs::remove_dir_all(project_root);
             }
@@ -152,6 +153,7 @@ impl ProjectService {
             path: path.to_path_buf(),
             name: manifest.name,
             revision: manifest.revision,
+            persisted_revision: Some(manifest.revision),
             dirty: false,
             imports: manifest.imports,
             analysis_sequences: manifest.analysis_sequences,

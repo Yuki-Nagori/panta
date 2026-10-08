@@ -1,6 +1,6 @@
 //! STL 导入的工程事务；读取、预览和解析由 panta-import 负责。
 use super::model::next_revision;
-use super::storage::write_manifest;
+use super::repository::WriteLease;
 use super::{ImportRecord, ProjectError, ProjectService, StlImportPreview};
 use panta_import::{ImportError, ImportOptions};
 use std::io::Write;
@@ -47,6 +47,7 @@ impl ProjectService {
         let record = prepared.record(import_number, options);
         prepared.scale_mesh_mm(options).map_err(map_import_error)?;
         let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
+        let lease = WriteLease::acquire(state)?;
         let project_root = state
             .path
             .parent()
@@ -81,7 +82,7 @@ impl ProjectService {
         state.imports.push(record.clone());
         state.revision = revision;
         state.dirty = false;
-        if let Err(error) = write_manifest(state) {
+        if let Err(error) = lease.commit(state) {
             state.imports.pop();
             state.revision = previous_revision;
             state.dirty = previous_dirty;

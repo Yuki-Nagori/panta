@@ -104,7 +104,7 @@ impl ProjectService {
         }
         candidate.revision = next_revision(candidate.revision)?;
         candidate.dirty = false;
-        write_manifest(&candidate)?;
+        write_manifest(&mut candidate)?;
         self.current = Some(candidate);
         self.snapshot()
     }

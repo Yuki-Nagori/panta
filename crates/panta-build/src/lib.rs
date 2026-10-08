@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use fs2::FileExt;
+use fs4::{FileExt, TryLockError};
 use sha2::{Digest, Sha256};
 
 pub mod database;
@@ -439,11 +439,14 @@ pub fn install_lock(target_root: &Path, name: &str) -> Result<fs::File, String> 
         .open(locks.join(format!("{name}.lock")))
         .map_err(|e| e.to_string())?;
     // 未竞争时不输出；只有真的发生等待才记录，避免例行日志刷屏。
-    if file.try_lock_exclusive().is_err() {
-        eprintln!("[panta-tools] {name}：等待安装锁");
-        file.lock_exclusive()
-            .map_err(|e| format!("获取 {name} 安装锁失败：{e}"))?;
-        eprintln!("[panta-tools] {name}：已获得安装锁");
+    match FileExt::try_lock(&file) {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => {
+            eprintln!("[panta-tools] {name}：等待安装锁");
+            FileExt::lock(&file).map_err(|error| format!("获取 {name} 安装锁失败：{error}"))?;
+            eprintln!("[panta-tools] {name}：已获得安装锁");
+        }
+        Err(TryLockError::Error(error)) => return Err(format!("获取 {name} 安装锁失败：{error}")),
     }
     Ok(file)
 }

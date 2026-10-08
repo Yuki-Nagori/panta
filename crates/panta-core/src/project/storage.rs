@@ -1,34 +1,8 @@
 //! 工程清单的单文件持久化。
-use super::{
-    PROJECT_SCHEMA_VERSION, ProjectError, ProjectManifest, ProjectService, ProjectState,
-    gate_location, process_settings,
-};
-use std::fs;
+use super::{ProjectError, ProjectService, ProjectState, gate_location, process_settings};
 
-pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
-    let manifest = ProjectManifest {
-        schema: PROJECT_SCHEMA_VERSION,
-        name: state.name.clone(),
-        revision: state.revision,
-        imports: state.imports.clone(),
-        analysis_sequences: state.analysis_sequences.clone(),
-        materials: state.materials.clone(),
-        fill_settings: state.fill_settings.clone(),
-        gate_location_settings: state.gate_location_settings.clone(),
-    };
-    let bytes = serde_json::to_vec_pretty(&manifest)
-        .map_err(|error| ProjectError::Io(format!("serialize manifest: {error}")))?;
-    let target = &state.path;
-    let temporary = target.with_extension("panta.tmp");
-    fs::write(&temporary, bytes)
-        .map_err(|error| ProjectError::Io(format!("{}: {error}", temporary.display())))?;
-
-    // rename 替换目标；失败时保留旧清单，不先删除已提交的工程文件。
-    if let Err(error) = fs::rename(&temporary, target) {
-        let _ = fs::remove_file(&temporary);
-        return Err(ProjectError::Io(format!("{}: {error}", target.display())));
-    }
-    Ok(())
+pub(super) fn write_manifest(state: &mut ProjectState) -> Result<(), ProjectError> {
+    super::repository::WriteLease::acquire(state)?.commit(state)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,7 +21,7 @@ pub(super) struct PendingMetadataWrite {
 impl ProjectService {
     pub(super) fn start_metadata_write(
         &mut self,
-        candidate: ProjectState,
+        mut candidate: ProjectState,
         kind: MetadataWriteKind,
     ) -> Result<bool, ProjectError> {
         let (sender, receiver) = std::sync::mpsc::channel();
@@ -67,7 +41,7 @@ impl ProjectService {
                             &candidate.gate_location_settings,
                         )?;
                     }
-                    write_manifest(&candidate)?;
+                    write_manifest(&mut candidate)?;
                     Ok(candidate)
                 })();
                 // 工作线程只拥有候选值；服务销毁后无需向 Qt 或旧接收端交付。

@@ -29,6 +29,7 @@ repository = "https://github.com/Yuki-Nagori/panta"
 
 [workspace.dependencies]
 libc = "0.2"
+fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 panta-build = { path = "crates/panta-build", version = "0.1.0" }
 panta-foundation = { path = "crates/panta-foundation", version = "0.1.0" }
 panta-mesh = { path = "crates/panta-mesh", version = "0.1.0" }

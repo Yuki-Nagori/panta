@@ -25,6 +25,8 @@ pub(super) struct ProjectState {
     pub(super) name: String,
     pub(super) revision: u64,
     pub(super) dirty: bool,
+    // 最近成功读取 / 提交的磁盘修订，与尚未保存的内存 revision 分开。
+    pub(super) persisted_revision: Option<u64>,
     pub(super) imports: Vec<ImportRecord>,
     pub(super) analysis_sequences: BTreeMap<String, String>,
     pub(super) materials: BTreeMap<String, String>,

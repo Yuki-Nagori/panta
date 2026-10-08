@@ -7,6 +7,7 @@ use panta_import::StlImportSession;
 mod error;
 mod mesh_cache;
 mod model;
+mod repository;
 mod service;
 pub use error::ProjectError;
 use mesh_cache::SurfaceMeshCache;

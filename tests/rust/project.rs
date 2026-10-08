@@ -379,7 +379,11 @@ fn failed_manifest_commit_preserves_previous_asset_and_mesh()
     let snapshot = service.current()?;
     let mesh = service.current_mesh().cloned();
     let manifest = fs::read(&created.path)?;
-    fs::create_dir(created.path.with_extension("panta.tmp"))?;
+    fs::remove_dir(created.path.with_extension("panta.write"))?;
+    fs::write(
+        created.path.with_extension("panta.write"),
+        b"blocked staging directory",
+    )?;
     assert!(
         service
             .import_stl(&source, "solid-3d", "millimeters", false)
@@ -611,8 +615,12 @@ fn plan_settings_are_per_record_and_transactional() -> Result<(), Box<dyn std::e
     let unchanged =
         service.set_analysis_sequence(&project.path, selected.revision, &first.id, "fill-pack")?;
     assert_eq!(unchanged.revision, selected.revision);
-    // 临时文件路径占用为目录，模拟元数据写入失败。
-    fs::create_dir(project.path.with_extension("panta.tmp"))?;
+    // 用普通文件阻塞 staging 目录，模拟清单提交失败。
+    fs::remove_dir(project.path.with_extension("panta.write"))?;
+    fs::write(
+        project.path.with_extension("panta.write"),
+        b"blocked staging directory",
+    )?;
     assert!(
         service
             .set_analysis_sequence(&project.path, selected.revision, &first.id, "cool")
@@ -688,8 +696,9 @@ fn material_confirmation_blocks_competing_writes_and_recovers_from_failure()
         assert_eq!(service.plan_settings(&first.id), Some(initial.clone()));
     }
 
-    let obstacle = project.path.with_extension("panta.tmp");
-    fs::create_dir(&obstacle)?;
+    let obstacle = project.path.with_extension("panta.write");
+    fs::remove_dir(&obstacle)?;
+    fs::write(&obstacle, b"blocked staging directory")?;
     assert!(service.begin_material_confirmation(
         &project.path,
         initial.revision,
@@ -740,7 +749,7 @@ fn material_confirmation_blocks_competing_writes_and_recovers_from_failure()
     );
     assert_eq!(service.plan_settings(&first.id), Some(initial.clone()));
     assert_eq!(fs::read(&project.path)?, original);
-    fs::remove_dir(&obstacle)?;
+    fs::remove_file(&obstacle)?;
     service.save()?;
 
     assert!(service.begin_material_confirmation(
@@ -950,7 +959,11 @@ fn fill_settings_invalid_candidates_and_io_failure_preserve_manifest_and_release
         assert_eq!(service.plan_settings(&record.id), Some(initial.clone()));
         assert_eq!(fs::read(&project.path)?, before);
     }
-    fs::create_dir(project.path.with_extension("panta.tmp"))?;
+    fs::remove_dir(project.path.with_extension("panta.write"))?;
+    fs::write(
+        project.path.with_extension("panta.write"),
+        b"blocked staging directory",
+    )?;
     assert!(service.begin_fill_settings_confirmation(
         &project.path,
         initial.revision,
@@ -966,7 +979,7 @@ fn fill_settings_invalid_candidates_and_io_failure_preserve_manifest_and_release
     );
     assert_eq!(service.plan_settings(&record.id), Some(initial.clone()));
     assert_eq!(fs::read(&project.path)?, before);
-    fs::remove_dir(project.path.with_extension("panta.tmp"))?;
+    fs::remove_file(project.path.with_extension("panta.write"))?;
     assert!(service.begin_material_confirmation(
         &project.path,
         initial.revision,
@@ -1110,7 +1123,11 @@ fn gate_location_confirmation_round_trips_and_rejects_invalid_candidates()
         assert_eq!(service.plan_settings(&imported.id), Some(saved.clone()));
         assert_eq!(fs::read(&project.path)?, manifest);
     }
-    fs::create_dir(project.path.with_extension("panta.tmp"))?;
+    fs::remove_dir(project.path.with_extension("panta.write"))?;
+    fs::write(
+        project.path.with_extension("panta.write"),
+        b"blocked staging directory",
+    )?;
     settings.number_of_gates = 4;
     assert!(service.begin_gate_location_settings_confirmation(
         &project.path,
@@ -1126,7 +1143,7 @@ fn gate_location_confirmation_round_trips_and_rejects_invalid_candidates()
         .is_err()
     );
     assert_eq!(service.plan_settings(&imported.id), Some(saved));
-    fs::remove_dir(project.path.with_extension("panta.tmp"))?;
+    fs::remove_file(project.path.with_extension("panta.write"))?;
     assert!(service.save().is_ok());
     Ok(())
 }
@@ -1394,5 +1411,136 @@ fn exhausted_revision_rejects_all_mutations_without_writing_assets_or_manifest()
         assert_eq!(service.current()?, before);
         assert_eq!(fs::read(&created.path)?, confirmed);
     }
+    Ok(())
+}
+
+#[test]
+fn stale_services_and_parallel_saves_cannot_overwrite_a_committed_revision()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let mut owner = ProjectService::new();
+    let project = owner.create(&fixture.root, "Concurrent")?;
+    let mut stale = ProjectService::new();
+    stale.open(&project.path)?;
+    owner.execute(ProjectCommand::Rename {
+        name: "Owner".into(),
+    })?;
+    owner.save()?;
+    let committed = fs::read(&project.path)?;
+    stale.execute(ProjectCommand::Rename {
+        name: "Stale".into(),
+    })?;
+    let before = stale.current()?;
+    let result = stale.save();
+    assert!(matches!(result, Err(ProjectError::CommandInvalid(_))));
+    assert_eq!(stale.current()?, before);
+    assert_eq!(fs::read(&project.path)?, committed);
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    assert!(matches!(
+        stale.import_stl(&source, "solid-3d", "millimeters", false),
+        Err(ProjectError::CommandInvalid(_))
+    ));
+    assert!(
+        !project
+            .path
+            .parent()
+            .ok_or("no package root")?
+            .join("assets")
+            .exists()
+    );
+
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let mut handles = Vec::new();
+    for name in ["First", "Second"] {
+        let mut service = ProjectService::new();
+        service.open(&project.path)?;
+        service.execute(ProjectCommand::Rename { name: name.into() })?;
+        let barrier = std::sync::Arc::clone(&barrier);
+        handles.push(std::thread::spawn(move || {
+            barrier.wait();
+            service.save()
+        }));
+    }
+    let mut successes = 0;
+    for handle in handles {
+        match handle.join().map_err(|_| "save worker panicked")? {
+            Ok(_) => successes += 1,
+            Err(ProjectError::CommandInvalid(_)) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    assert_eq!(successes, 1);
+    owner.open(&project.path)?;
+    assert_eq!(owner.current()?.revision, 2);
+    assert!(matches!(owner.current()?.name.as_str(), "First" | "Second"));
+    assert_eq!(
+        fs::read_dir(project.path.with_extension("panta.write"))?
+            .collect::<Result<Vec<_>, _>>()?
+            .len(),
+        0
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "requires a separate OS process")]
+fn project_lease_child() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(path) = std::env::var_os("PANTA_TEST_PROJECT_LEASE") else {
+        return Ok(());
+    };
+    let file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+    fs4::FileExt::try_lock(&file)?;
+    use std::io::Write;
+    println!("LEASE_HELD");
+    std::io::stdout().flush()?;
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    // 不运行 Rust 析构，验证操作系统在进程退出时释放锁。
+    std::process::exit(0);
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "requires a separate OS process")]
+fn project_write_lock_is_nonblocking_and_released_after_process_exit()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Command, Stdio};
+    let fixture = Fixture::new()?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Lease")?;
+    service.execute(ProjectCommand::Rename {
+        name: "Saved".into(),
+    })?;
+    let before = service.current()?;
+    let mut child = Command::new(std::env::current_exe()?)
+        .args(["--exact", "project_lease_child", "--nocapture"])
+        .env(
+            "PANTA_TEST_PROJECT_LEASE",
+            project.path.with_extension("panta.lock"),
+        )
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    let stdout = child.stdout.take().ok_or("missing child stdout")?;
+    let mut ready = false;
+    for line in BufReader::new(stdout).lines() {
+        if line? == "LEASE_HELD" {
+            ready = true;
+            break;
+        }
+    }
+    assert!(ready, "child did not acquire the lease");
+    match service.save() {
+        Err(error) => assert_eq!(error.detail(), "project write pending"),
+        Ok(_) => panic!("save succeeded while another process held the lease"),
+    }
+    assert_eq!(service.current()?, before);
+    drop(child.stdin.take());
+    assert!(child.wait()?.success());
+    service.save()?;
+    let mut reopened = ProjectService::new();
+    reopened.open(&project.path)?;
+    assert_eq!(reopened.current()?.name, "Saved");
     Ok(())
 }
