@@ -167,7 +167,8 @@ ai-docs/
 | 102 | [弹窗 GUI 与文档页签读屏验收](task/102-gui-and-screen-reader-acceptance.md) | 验证基础 | 091, 092, 094, 095, 096, 080 | done |
 | 103 | [macOS 工程文件选择器打开状态复查](task/103-macos-project-open-dialog.md) | 验证基础 | 063, 102 | done |
 | 104 | [Windows 工程选择器路径回归修复](task/104-ci-project-dialog-paths.md) | 验证基础 | 103 | done |
-| 105 | [CI 静态检查与模块文档修正](task/105-ci-and-module-documentation-fixes.md) | 验证基础 | 014, 021, 042 | in-progress |
+| 105 | [CI 静态检查与模块文档修正](task/105-ci-and-module-documentation-fixes.md) | 验证基础 | 014, 021, 042 | done |
+| 106 | [Rust 代码结构与职责边界评审](task/106-rust-architecture-review.md) | 架构与文档准备 | 066, 067 | done |
 
 ## 执行顺序与交付边界
 
