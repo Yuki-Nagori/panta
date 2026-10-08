@@ -1,7 +1,10 @@
 //! STL 导入的工程事务；读取、预览和解析由 panta-import 负责。
-use super::*;
+use super::model::next_revision;
+use super::storage::write_manifest;
+use super::{ImportRecord, ProjectError, ProjectService, StlImportPreview};
 use panta_import::{ImportError, ImportOptions};
 use std::io::Write;
+use std::{fs, path::Path};
 
 impl ProjectService {
     /// 校验、复制并持久化当前工程包中的一次 STL 导入。
@@ -22,6 +25,12 @@ impl ProjectService {
         if self.current.is_none() {
             return Err(ProjectError::NoProject);
         }
+        let revision = next_revision(
+            self.current
+                .as_ref()
+                .ok_or(ProjectError::NoProject)?
+                .revision,
+        )?;
         let mut prepared = self
             .import_session
             .prepare(source)
@@ -70,7 +79,7 @@ impl ProjectService {
         let previous_revision = state.revision;
         let previous_dirty = state.dirty;
         state.imports.push(record.clone());
-        state.revision = state.revision.saturating_add(1);
+        state.revision = revision;
         state.dirty = false;
         if let Err(error) = write_manifest(state) {
             state.imports.pop();
@@ -111,7 +120,9 @@ pub(super) fn map_import_error(error: ImportError) -> ProjectError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::map_import_error;
+    use crate::project::ProjectError;
+    use panta_import::ImportError;
 
     #[test]
     fn read_failures_become_parse_failures() {

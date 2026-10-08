@@ -1,5 +1,9 @@
 //! 工程清单的单文件持久化。
-use super::*;
+use super::{
+    PROJECT_SCHEMA_VERSION, ProjectError, ProjectManifest, ProjectService, ProjectState,
+    gate_location, process_settings,
+};
+use std::fs;
 
 pub(super) fn write_manifest(state: &ProjectState) -> Result<(), ProjectError> {
     let manifest = ProjectManifest {

@@ -1,8 +1,10 @@
 //! 只读 STL 预检：后台拥有字节 / 网格，服务只接收仍有效的请求结果。
-use super::*;
+use super::{ProjectError, ProjectService, StlImportPreview, import};
 use panta_import::CheckedReadError;
+use panta_import::StlImportSession;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::{path::Path, sync::Arc};
 
 #[derive(Debug)]
 pub(super) struct PendingPreview {
@@ -101,7 +103,16 @@ impl ProjectService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{PendingPreview, ProjectService, StlImportPreview};
+    use panta_import::StlImportSession;
+    use std::{
+        path::Path,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        },
+    };
 
     #[test]
     fn pending_poll_and_stale_request_do_not_consume_the_current_reply()

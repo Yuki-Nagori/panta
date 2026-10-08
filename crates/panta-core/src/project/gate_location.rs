@@ -1,5 +1,9 @@
 //! 浇口定位工艺配置；目录标识、默认值和校验由领域持有。
-use super::*;
+use super::model::next_revision;
+use super::{ImportRecord, ProjectError, ProjectService, analysis_sequence, storage};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::Path;
 
 /// 工程清单中的算法标识；执行引擎另行接入。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,7 +116,7 @@ impl ProjectService {
         candidate
             .gate_location_settings
             .insert(import_id.to_owned(), settings);
-        candidate.revision = candidate.revision.saturating_add(1);
+        candidate.revision = next_revision(candidate.revision)?;
         candidate.dirty = false;
         self.start_metadata_write(candidate, storage::MetadataWriteKind::GateLocationSettings)
     }

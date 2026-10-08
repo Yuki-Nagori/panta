@@ -441,7 +441,7 @@ fn handles_manifest_revision_limits_and_save_io_failures() -> Result<(), Box<dyn
         format!(
             r#"{{"schema":{},"name":"Max","revision":{}}}"#,
             PROJECT_SCHEMA_VERSION,
-            u64::MAX
+            u64::MAX - 1
         ),
     )?;
     let mut service = ProjectService::new();
@@ -450,6 +450,13 @@ fn handles_manifest_revision_limits_and_save_io_failures() -> Result<(), Box<dyn
         name: "MaxRenamed".to_owned(),
     })?;
     assert_eq!(snapshot.revision, u64::MAX);
+    assert!(matches!(
+        service.execute(ProjectCommand::Rename {
+            name: "Again".to_owned()
+        }),
+        Err(ProjectError::CommandInvalid(_))
+    ));
+    assert_eq!(service.current()?, snapshot);
 
     fs::remove_file(&project_file)?;
     fs::create_dir(&project_file)?;
@@ -1244,5 +1251,148 @@ fn asynchronous_preview_rejects_replaced_cancelled_and_old_project_requests()
     let next = service.begin_stl_preview(&path)?;
     assert_eq!(finish_preview(&mut service, next)?.triangle_count, 1);
     assert!(service.cancel_stl_preview(next));
+    Ok(())
+}
+
+#[test]
+fn exhausted_revision_rejects_all_mutations_without_writing_assets_or_manifest()
+-> Result<(), Box<dyn std::error::Error>> {
+    use panta_core::project::{FillSettings, GateLocationSettings, default_material};
+    fn exhausted<T>(result: Result<T, ProjectError>) {
+        match result {
+            Err(error) => {
+                assert_eq!(error.code(), "project.command_invalid");
+                assert_eq!(error.detail(), "project revision exhausted");
+            }
+            Ok(_) => panic!("exhausted revision accepted a mutation"),
+        }
+    }
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("sample.stl");
+    fs::write(&source, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    for sequence in ["fill", "gate-location"] {
+        let mut service = ProjectService::new();
+        let created = service.create(&fixture.root, sequence)?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let revision = service.current()?.revision;
+        service.set_analysis_sequence(&created.path, revision, &record.id, sequence)?;
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&created.path)?)?;
+        manifest["revision"] = serde_json::Value::from(u64::MAX);
+        fs::write(&created.path, serde_json::to_vec(&manifest)?)?;
+        service.open(&created.path)?;
+        let before = service.current()?;
+        let plan = service.plan_settings(&record.id);
+        let bytes = fs::read(&created.path)?;
+        let assets = created
+            .path
+            .parent()
+            .ok_or("missing package root")?
+            .join("assets/imports");
+        exhausted(service.execute(ProjectCommand::Rename {
+            name: "Changed".into(),
+        }));
+        exhausted(service.import_stl(&source, "solid-3d", "millimeters", false));
+        exhausted(service.set_analysis_sequence(
+            &created.path,
+            u64::MAX,
+            &record.id,
+            if sequence == "fill" {
+                "gate-location"
+            } else {
+                "fill"
+            },
+        ));
+        exhausted(service.begin_material_confirmation(
+            &created.path,
+            u64::MAX,
+            &record.id,
+            &default_material()?.id,
+        ));
+        if sequence == "fill" {
+            exhausted(service.begin_fill_settings_confirmation(
+                &created.path,
+                u64::MAX,
+                &record.id,
+                FillSettings::default(),
+            ));
+        } else {
+            exhausted(service.begin_gate_location_settings_confirmation(
+                &created.path,
+                u64::MAX,
+                &record.id,
+                GateLocationSettings::default(),
+            ));
+        }
+        // 没有变更的序列命令不需要新修订，仍能返回现有快照。
+        assert_eq!(
+            service.set_analysis_sequence(&created.path, u64::MAX, &record.id, sequence)?,
+            before
+        );
+        assert_eq!(service.current()?, before);
+        assert_eq!(service.plan_settings(&record.id), plan);
+        assert_eq!(fs::read(&created.path)?, bytes);
+        assert_eq!(service.imports()?.len(), 1);
+        assert_eq!(
+            fs::read_dir(assets)?
+                .collect::<Result<Vec<_>, std::io::Error>>()?
+                .len(),
+            1
+        );
+        // 已确认值的无操作请求在耗尽状态仍成功；实际变更必须拒绝。
+        manifest["materials"] = serde_json::json!({ record.id.clone(): default_material()?.id });
+        if sequence == "fill" {
+            manifest["fill_settings"] =
+                serde_json::json!({ record.id.clone(): FillSettings::default() });
+        } else {
+            manifest["gate_location_settings"] =
+                serde_json::json!({ record.id.clone(): GateLocationSettings::default() });
+        }
+        fs::write(&created.path, serde_json::to_vec(&manifest)?)?;
+        service.open(&created.path)?;
+        let confirmed = fs::read(&created.path)?;
+        assert!(!service.begin_material_confirmation(
+            &created.path,
+            u64::MAX,
+            &record.id,
+            &default_material()?.id
+        )?);
+        if sequence == "fill" {
+            assert!(!service.begin_fill_settings_confirmation(
+                &created.path,
+                u64::MAX,
+                &record.id,
+                FillSettings::default()
+            )?);
+            let changed = FillSettings {
+                flow_rate_cm3_per_second: 95.0,
+                ..FillSettings::default()
+            };
+            exhausted(service.begin_fill_settings_confirmation(
+                &created.path,
+                u64::MAX,
+                &record.id,
+                changed,
+            ));
+        } else {
+            assert!(!service.begin_gate_location_settings_confirmation(
+                &created.path,
+                u64::MAX,
+                &record.id,
+                GateLocationSettings::default()
+            )?);
+            let changed = GateLocationSettings {
+                number_of_gates: 2,
+                ..GateLocationSettings::default()
+            };
+            exhausted(service.begin_gate_location_settings_confirmation(
+                &created.path,
+                u64::MAX,
+                &record.id,
+                changed,
+            ));
+        }
+        assert_eq!(service.current()?, before);
+        assert_eq!(fs::read(&created.path)?, confirmed);
+    }
     Ok(())
 }

@@ -1,5 +1,8 @@
 //! 方案分析序列目录与持久化命令；当前方案快照见 plan_settings。
-use super::*;
+use super::model::next_revision;
+use super::storage::write_manifest;
+use super::{ProjectError, ProjectManifest, ProjectService, ProjectSnapshot};
+use std::path::Path;
 
 /// 稳定领域 ID 与英文源文案；翻译由 Qt 展示层处理。
 #[derive(Debug, Clone, Copy)]
@@ -99,7 +102,7 @@ impl ProjectService {
                 .analysis_sequences
                 .insert(import_id.to_owned(), sequence_id.to_owned());
         }
-        candidate.revision = candidate.revision.saturating_add(1);
+        candidate.revision = next_revision(candidate.revision)?;
         candidate.dirty = false;
         write_manifest(&candidate)?;
         self.current = Some(candidate);

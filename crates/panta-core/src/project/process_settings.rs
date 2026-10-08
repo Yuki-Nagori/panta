@@ -1,5 +1,9 @@
 //! Fill 工艺配置；默认值和校验由 Rust 持有，确认写盘复用工程后台事务。
-use super::*;
+use super::model::next_revision;
+use super::{ImportRecord, ProjectError, ProjectService, analysis_sequence, storage};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::Path;
 
 /// 分段持续时间（秒）和填充压力百分比；时间累计用于曲线横轴。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -124,7 +128,7 @@ impl ProjectService {
         candidate
             .fill_settings
             .insert(import_id.to_owned(), settings);
-        candidate.revision = candidate.revision.saturating_add(1);
+        candidate.revision = next_revision(candidate.revision)?;
         candidate.dirty = false;
         self.start_metadata_write(candidate, storage::MetadataWriteKind::FillSettings)
     }

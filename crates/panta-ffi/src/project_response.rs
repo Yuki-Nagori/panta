@@ -257,6 +257,36 @@ mod temp_directory;
 mod tests {
     use super::*;
 
+    #[test]
+    fn exhausted_revision_crosses_cxx_as_diagnostic_without_changing_the_project()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let path = fixture.root.join("Max.panta");
+        let bytes = format!(r#"{{"schema":2,"name":"Max","revision":{}}}"#, u64::MAX);
+        std::fs::write(&path, &bytes)?;
+        let mut service = crate::project_service_new();
+        let opened = project_service_open_response(&mut service, path.display().to_string());
+        assert!(opened.error.code.is_empty());
+        let result = project_service_execute_response(
+            &mut service,
+            bridge::ProjectCommand {
+                kind: bridge::ProjectCommandKind::Rename,
+                value: "Next".into(),
+            },
+        );
+        assert_eq!(result.error.code, "project.command_invalid");
+        assert_eq!(result.error.category, "validation");
+        assert_eq!(result.error.detail, "project revision exhausted");
+        assert!(result.value.path.is_empty());
+        let current = project_service_current_response(&service);
+        assert!(current.error.code.is_empty());
+        assert_eq!(current.value.name, "Max");
+        assert_eq!(current.value.revision, u64::MAX);
+        assert!(!current.value.dirty);
+        assert_eq!(std::fs::read_to_string(path)?, bytes);
+        Ok(())
+    }
+
     fn poll_preview(service: &mut ProjectService, request: u64) -> bridge::StlPreviewPoll {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {

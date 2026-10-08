@@ -1,5 +1,8 @@
 //! 内置材料的展示目录和按导入记录保存的选择；不执行材料本构计算。
-use super::*;
+use super::model::next_revision;
+use super::{ProjectError, ProjectManifest, ProjectService, storage};
+use serde::Deserialize;
+use std::path::Path;
 use std::sync::LazyLock;
 
 #[derive(Deserialize)]
@@ -135,7 +138,7 @@ impl ProjectService {
         candidate
             .materials
             .insert(import_id.to_owned(), material_id.to_owned());
-        candidate.revision = candidate.revision.saturating_add(1);
+        candidate.revision = next_revision(candidate.revision)?;
         candidate.dirty = false;
         self.start_metadata_write(candidate, storage::MetadataWriteKind::Material)
     }

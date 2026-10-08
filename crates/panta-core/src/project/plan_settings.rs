@@ -1,6 +1,10 @@
 //! 当前零件方案快照及配置命令的目标校验。
 use super::analysis_sequence::{DEFAULT_SEQUENCE_ID, definition};
-use super::*;
+use super::{
+    FillSettings, GateLocationSettings, ProjectError, ProjectService, ProjectState,
+    default_material,
+};
+use std::path::{Path, PathBuf};
 
 /// 当前任务面板关联零件的轻量快照；不读取或复制网格载荷。
 #[derive(Debug, Clone, PartialEq)]

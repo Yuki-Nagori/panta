@@ -169,6 +169,7 @@ ai-docs/
 | 104 | [Windows 工程选择器路径回归修复](task/104-ci-project-dialog-paths.md) | 验证基础 | 103 | done |
 | 105 | [CI 静态检查与模块文档修正](task/105-ci-and-module-documentation-fixes.md) | 验证基础 | 014, 021, 042 | done |
 | 106 | [Rust 代码结构与职责边界评审](task/106-rust-architecture-review.md) | 架构与文档准备 | 066, 067 | done |
+| 107 | [Rust 工程服务边界与修订耗尽修复](task/107-rust-service-boundaries-and-revisions.md) | 应用平台扩展 | 106 | done |
 
 ## 执行顺序与交付边界
 
