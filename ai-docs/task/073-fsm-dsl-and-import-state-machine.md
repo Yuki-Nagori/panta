@@ -5,11 +5,11 @@
 - 依赖：[008](008-tasks-errors-logging.md)、[034](034-rust-panta-artifact-parser.md)、[035](035-pa-formatter-and-validator.md)、[067](067-rust-mesh-domain-migration.md)、[072](072-flow-state-machine-planning.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-26
+- 创建 / 更新：2026-09-24 / 2026-10-09
 
 ## 目标与背景
 
-在首个真实多阶段异步视口资源激活流程中引入编译期 `.pa` FSM 元数据与手写 Rust 状态机。首个消费者为任务 [080](080-qml-viewport-document-tabs.md)：用户首次打开已保存在 `.panta` 内的 STL 时，Rust 按稳定 ImportRecord ID 读取并解析该资产，再将拥有明确所有权的网格快照交给视口层。加载不改写工程或提交记录；FSM 负责加载阶段、取消、工程代次校验与迟到结果丢弃。当前 `ProjectService` 只在内存持有最新导入网格，通用 task 生命周期也仍是模拟执行体；`kind: fsm`、代码生成和真实异步业务尚未实现。本任务不因规划文档完成而自动开始。
+在首个真实多阶段异步视口资源激活流程中引入编译期 `.pa` FSM 元数据与手写 Rust 状态机。首个消费者为任务 [080](080-qml-viewport-document-tabs.md)：用户首次打开已保存在 `.panta` 内的 STL 时，Rust 按稳定 ImportRecord ID 读取并解析该资产，再将拥有明确所有权的网格快照交给视口层。加载不改写工程或提交记录；FSM 负责加载阶段、取消、工程代次校验与迟到结果丢弃。登记时 `ProjectService` 只在内存持有最新导入网格，`kind: fsm`、代码生成和真实异步业务尚未实现。此后 DSL、只读激活及 080 联调已落地；当前未完成的验收范围见完成摘要。
 
 ## 必读
 
@@ -59,25 +59,26 @@
 
 ## 验证计划与结果
 
-下列均为计划，尚未执行。在仓库根目录、按 `rust-toolchain.toml` 与锁文件环境运行：
+表内注明结果的项目已执行，其余为待验收计划。在仓库根目录、按 `rust-toolchain.toml` 与锁文件环境运行：
 
-| 入口 / 场景 | 预期 |
-|---|---|
+| 日期 | 入口 / 场景 | 预期 | 结果 |
+|---|---|---|---|
 | 2026-09-26 | `cargo test --locked`（dsl-core / dslc / core / ffi / import 定向） | FSM schema 双向结构校验、激活竞态与 FFI 面回归 | 通过；15 个测试套件全绿（FSM schema 15、CLI 14、core 单元 38、激活集成 7、工程 15、FFI 15 等） |
 | 2026-09-26 | `cargo coverage` | 新增 FSM / 激活代码纳入函数 / 行门禁，边界完整 | 通过；函数 89.59%（门槛 89）、行 92.97%（门槛 92），退出码 0。边界补齐：状态 / 边数恰好达限（128 / 512）接受、超限拒绝，from / on / to 逐字段缺失，states 节内转移声明，1MiB 源上限，无 guard 生成物，checked 读取未登记扩展名，清单资产 `..` / 绝对路径穿越在激活提交边界拒绝，drain 旧代次过滤，空推进无操作；`fsm/mod.rs` 行覆盖 83.61%→95.51%、`generate.rs` 100% |
 | 2026-09-26 | `cargo format --check`、`cargo lint`（clippy + clang-tidy + cppcheck） | 质量门禁通过且不再被 windows.h 自动修复破坏 | 通过；`.clang-tidy` / comments.md 例外条款落地后 vtk_native_surface.cpp include-cleaner 全清 |
 | 2026-09-26 | `cargo test --locked --workspace`（聚合入口，含 native CTest 56 项） | 聚合门禁全绿；C++ ViewModel 侧与新 open 契约一致 | 通过；100% tests passed。顺带修正 `ProjectViewModelTest` 对已移除的同步网格重载断言（重开工程后快照为空，激活恢复由 FFI / Rust 集成测试覆盖） |
-| `cargo build --locked` | 构建期生成与实际消费者可编译；另测输入增删改、错误输入及独立构建目录 |
-| `cargo test --locked --workspace` | Rust 行为回归、native 和 QML 适用测试从统一入口通过 |
-| `cargo format --check`、`cargo lint` | 适用格式与静态检查通过 |
-| 新建 FSM 夹具后的 `panta-dslc check / format --check` | 由上述测试覆盖实际夹具，实施后记录完整文件参数；当前不伪造不存在的输入命令 |
-| 按 ImportRecord ID 只读读取 STL、取消与过期结果 | 验证资产内容正确、网格快照可释放，且 Manifest / revision / dirty 均不变 |
-| 关闭待加载标签、切换工程与同记录重复请求 | 用可控解析后端验证 session generation / attempt 过滤和资源释放；由 080 联调 |
-| 真实窗口验收及受影响平台 CI | 按仓库窗口规范验证异步完成后更新单一 VTK 视口；无头测试不能替代 |
+| 待验收 | `cargo build --locked` | 构建期生成与实际消费者可编译；另测输入增删改、错误输入及独立构建目录 | 待补充 |
+| 待验收 | `cargo test --locked --workspace` | Rust 行为回归、native 和 QML 适用测试从统一入口通过 | 待补充 |
+| 待验收 | `cargo format --check`、`cargo lint` | 适用格式与静态检查通过 | 待补充 |
+| 待验收 | 新建 FSM 夹具后的 `panta-dslc check / format --check` | 由上述测试覆盖实际夹具，实施后记录完整文件参数；当前不伪造不存在的输入命令 | 待补充 |
+| 待验收 | 按 ImportRecord ID 只读读取 STL、取消与过期结果 | 验证资产内容正确、网格快照可释放，且 Manifest / revision / dirty 均不变 | 待补充 |
+| 待验收 | 关闭待加载标签、切换工程与同记录重复请求 | 用可控解析后端验证 session generation / attempt 过滤和资源释放；由 080 联调 | 待补充 |
+| 待验收 | 真实窗口验收及受影响平台 CI | 按仓库窗口规范验证异步完成后更新单一 VTK 视口；无头测试不能替代 | 待补充 |
+
 
 ## 清理与兼容例外
 
-当前无代码变更、无兼容例外。接入真实任务时清理被替换的模拟执行路径及重复编排；仍服务独立测试的模拟后端须说明用途。FSM 未发布前不保留多版本 parser，持久化 schema 变化由业务任务单独评估。
+登记时尚无代码变更或兼容例外。后续接入应清理被替换的模拟执行路径及重复编排；仍服务独立测试的模拟后端须说明用途。FSM 未发布前不保留多版本 parser，持久化 schema 变化由业务任务单独评估。
 
 ## 风险与回退
 
@@ -92,4 +93,4 @@
 
 ## 完成摘要
 
-未完成。DSL 内核、只读激活 FSM 与 FFI 面已实现并有测试覆盖；剩余真实窗口 / 跨平台验证证据与 080 UI 联调收口后同步。
+未完成。DSL 内核、只读激活 FSM、FFI 与 080 联调已实现，现有失败 / 取消 / 过期及结构矩阵回归和三平台 CI 已通过；109 已收敛后台执行容量与回收。剩余消费者构建输入增删改、错误或必需输入删除、输出命名冲突等原验收场景的专门验证记录，当前名称限定为 canonical kebab-case，文件 stem 必须与名称一致，输出名称转换未发现碰撞；这不替代消费者构建增删改与失败路径的受控验证。2026-10-09 复查见 [101](101-active-task-ci-acceptance.md#2026-10-09-当前复查)，保持 in-progress。

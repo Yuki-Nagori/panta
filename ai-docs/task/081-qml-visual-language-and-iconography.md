@@ -5,7 +5,7 @@
 - 依赖：[029](029-qml-component-library.md)、[050](050-qml-html-page-replica.md)、[069](069-project-docks-review-and-ablation.md)、[078](078-qml-performance-benchmark-policy.md)、[080](080-qml-viewport-document-tabs.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-30
+- 创建 / 更新：2026-09-24 / 2026-10-09
 
 ## 目标与背景
 
@@ -145,4 +145,4 @@
 
 ## 完成摘要
 
-未实施。已登记视觉方向、资源出处审计、Theme/QML/HTML 迁移、与 053/080 的边界，以及必须记录的 QML 性能基准。
+已实施图标资源迁移 / 来源审计、引用及 Qt 加载一致性检查、旧 SVG 清理与图标 CPU 测量。剩余全局 Theme / HTML / QML 视觉对照、高对比与键盘 / 无障碍、1.0 / 1.5 / 2.0 DPR 和其余组件性能映射；不能仅凭 CI 或现有局部 GUI / 基准关闭。2026-10-09 复查见 [101](101-active-task-ci-acceptance.md#2026-10-09-当前复查)，保持 in-progress。

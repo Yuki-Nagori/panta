@@ -1,69 +1,51 @@
-# 101 — 进行中任务 CI 验收复查（2026-10-02）
+# 101 — 进行中任务 CI 验收复查
 
 - 状态：done
 - 阶段：文档维护
 - 依赖：无
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-10-02 / 2026-10-02
+- 创建 / 更新：2026-10-02 / 2026-10-09
 
 ## 目标与范围
 
-按用户要求复查索引全部进行中任务，通过 `gh` 核对最新 CI；只关闭剩余条件仅为 CI 且对应提交已通过的任务。产品实现、真实窗口、读屏、硬件及性能验收仍按各任务要求保留。
+对照任务索引、原验收标准、后续实施记录及最新 CI，关闭证据齐备的任务并同步索引。实施、窗口、读屏和性能验收遵循各任务原范围；本任务仅维护复查结论。
 
 ## 必读
 
 - [文档规范](../standards/documentation.md)
 - [验证与评审](../standards/validation-and-review.md)
-- [仓库文件规范](../standards/repository-hygiene.md)
 
 ## 验收标准
 
-- [x] 对照全部进行中任务的未完成条件及完成摘要。
-- [x] 核对最新 CI 提交与各 job，关闭符合条件的任务并同步索引。
-- [x] 记录剩余条件；文档链接、状态和差异检查通过。
+- [x] 核对全部进行中任务、最新 CI 提交及各作业结果。
+- [x] 同步符合关闭条件的任务与索引，记录其余任务的具体缺口。
+- [x] 独立 review、文档链接、状态一致性及差异检查通过。
+
+## 2026-10-09 当前复查
+
+当前 **10 项 in-progress，0 项可转 done**。代码提交 `011e129` 的 [CI 37910040544](https://github.com/Yuki-Nagori/panta/actions/runs/37910040544) 全部 19 作业成功，覆盖三平台构建 / 测试、sanitizer、coverage、Miri、QML、格式及静态检查；后续 `27a5fc7` 仅更新 Markdown，未触发 CI。现行门禁通过，各任务仍有以下原范围内条件。
+
+| 任务 | 已有证据 / 剩余条件 |
+|---|---|
+| [032](032-cross-language-quality-gates.md) | 当前 89% 函数 / 92% 行门禁及报告通过；Rust 100% 目标、C++ line/branch 与分模块防下降门禁未完成。 |
+| [034](034-rust-panta-artifact-parser.md)、[035](035-pa-formatter-and-validator.md) | parser / formatter / validator、CLI、110 固定输出与 AST 往返回归通过；原覆盖率目标和 022 / 025 / 030 消费方收敛未完成。 |
+| [042](042-unified-llvm-toolchain.md) | 111 编译器 / SDK 核验、三平台 Debug / sanitizer 通过；受控冷 / 增量、Debug / Release、SDK / ABI 完整矩阵缺记录，038 为 deferred。 |
+| [048（性能）](048-performance-testing.md) | 耗时表、CPU / GPU 手动入口及 100 测试目录整理完成；Criterion 可比较基线及 hyperfine / 火焰图 / QML Profiler / Massif 可复现流程未齐备。 |
+| [063](063-stl-import-and-mesh-workspace.md) | 后台预检、诊断、取消及窗口证据已有；确认导入仍同步调用，资产写入事务、取消 / 提交截止点及四档缩放未验收。109 未迁移这条导入路径。 |
+| [064](064-vtk-navigation-and-orientation.md) | 导航回归及 1280×720 窗口下限已确认；真实窗口 overlay / 六面点击 / 拖拽、DPR、隐藏恢复 / 重建、Windows / Wayland 输入验收未齐备。 |
+| [073](073-fsm-dsl-and-import-state-machine.md) | FSM / 激活回归、080 联调与 109 执行容量收敛完成；构建输入增删改、错误 / 必需输入删除及命名冲突的专门验收缺记录。合法名称转换未发现碰撞，静态核对不能替代受控构建验证。 |
+| [081](081-qml-visual-language-and-iconography.md) | 图标迁移 / 审计、加载一致性与 CPU 测量完成；全局 Theme / HTML / QML 视觉、高对比 / 键盘 / 无障碍、多 DPI 与其余组件性能映射未闭环。 |
+| [099](099-qml-components-and-dialog-consolidation.md) | 原子控件、尺寸 / 焦点回归及 macOS CPU / GPU 已验；102 部分页面补验、100 共享整理不补齐整应用逐弹窗及其他平台视觉验收。 |
+
+源码核对包括 `ProjectViewModel::importStl` → `ProjectService::import_stl` 调用链、`crates/panta-core/build.rs`、激活 FSM 及对应 Rust 测试。缺少验收记录不等于已发现产品失败。索引两个历史 048 分别为设置服务和性能体系，本次仅核对后者，未改号。
 
 ## 验证与工作记录
 
-- 2026-10-02：开始复查 25 个进行中任务；最新 CI 对应当前 HEAD `a0f0872061627a969d60e422a2c945e8fc22f7b7`。
-
-## 复查结果
-
-以下为本次 CI 复查时的快照；后续 GUI 与读屏补验及状态变更见 [102](102-gui-and-screen-reader-acceptance.md)。
-
-最新 [CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640) 对应当前 HEAD `a0f0872061627a969d60e422a2c945e8fc22f7b7`，19 个 job 全部 success，无 job 跳过。macOS / Linux / Windows build/test 与 sanitizer、Rust coverage / Miri、native coverage / QML tests、format、audit 和各 lint 均成功。Linux prerequisite 步骤在 macOS / Windows 按平台条件跳过，不是缺失平台测试。
-
-| 任务 | 本次结论 / 剩余条件 |
-|---|---|
-| 089 | done；Linux includes 修复版本验收通过。 |
-| 098 | done；Windows / Linux 构建、测试及 sanitizer 与 Rust coverage 验收通过。 |
-| 007 | 真实 Welcome / 空视口及 resize、DPR、隐藏恢复、重建生命周期仍待验收。 |
-| 031、038 | SDK 运行部署、manifest / Linux 基线及 SBOM / provenance 闭环仍缺证据。 |
-| 023 | Windows junction、UNC 行为仍需专门验证；普通三平台 CI 不代替这些场景。 |
-| 053 | 宽窄窗口字样、实际几何 / 渲染与清理验收未齐备。 |
-| 063 | 结构化错误 DTO 与真实视口生命周期验收仍未完成。 |
-| 064 | 原生导航、定位器及 DPR / 隐藏恢复 / 重建和平台输入验收仍缺。 |
-| 073 | DSL / FSM 完整失败与事件矩阵、激活生命周期及窗口联调验收仍有未勾项。 |
-| 080 | 唯一剩余条件是 VoiceOver 真读屏朗读检查。 |
-| 081 | 全局视觉、DPR / 无障碍、HTML / QML 一致性与完整组件性能映射尚未闭环。 |
-| 091 | 验收框已勾选，但正文明确真实应用窗口验收未完成，不能仅据勾选关闭。 |
-| 092、093、094 | 多零件选择、材料异步确认、Fill 布局与保存的最终真实窗口验收仍缺。 |
-| 095、096 | Gate Location 行为与真实窗口、Results 工具栏真实窗口验收尚未齐备。 |
-| 099 | 勾选标准之外，正文保留整应用逐弹窗视觉与其他平台窗口验收；硬件基准不能替代。 |
-| 032 | Rust 100% 函数覆盖、C++ / 分模块防回退门禁及受控失败目标仍缺。 |
-| 034、035 | 目标覆盖率与共享消费者收敛仍未完成，当前 coverage 绿灯只代表阶段下限。 |
-| 042 | cold / incremental、Debug / Release 与 SDK / ABI 完整组合矩阵仍缺。 |
-| 047 | POSIX stderr 断言、Windows SEH 子进程与默认 WER 验证仍缺。 |
-| 048 | Criterion 可比较基线及火焰图 / hyperfine / Profiler / Massif 流程仍未完成。 |
-
-保留历史验证记录；本次不将 CI 成功解释为真实图形、VoiceOver、性能或上游 SDK 发布验收，也不替未执行场景勾选验收项。
-
-- 2026-10-02：完成索引与任务状态、改动文件的本地链接及 `git diff HEAD --check` 检查；均通过。本次仅更新文档，不运行产品测试或性能基准。
-
-## 清理与兼容例外
-
-无代码改动或兼容例外；只更新任务状态与证据。
+- 2026-10-02：复查 25 项；[CI 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`）19 作业通过，089 / 098 转 done，其余 23 项保留。后续 GUI / 读屏补验见 [102](102-gui-and-screen-reader-acceptance.md)及各任务记录。
+- 2026-10-09：核对当前 10 项及后续 080 / 100 / 102 / 103 / 109 / 110 / 111 证据，均保留 in-progress；纠正 073 / 081 / 099 过时描述。独立 subagent review 支持结论，按评审修正 073 历史计划表述和表格。
+- 2026-10-09：按用户要求整合为最新结论表，历史仅保留关闭结果与 CI 链接；压缩后的独立 subagent review 通过，未发现必要证据丢失。文档链接、索引 / 任务状态及 `git diff HEAD --check` 通过。本轮仅核对文档、源码和 CI，未重新运行产品、性能或窗口测试。
 
 ## 完成摘要
 
-复查 25 个进行中任务：089、098 的剩余 CI 条件已通过，任务与索引同步为 done；其余 23 项仍有非 CI 条件，保留 in-progress。
+复查完成，任务保持 done；当前 10 个进行中项仍有非 CI 条件，详见上表和各任务。无产品代码改动或兼容例外。

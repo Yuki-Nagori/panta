@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。2026-10-09 的 [101 最新复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查) 核对 CI 37910040544（19 作业全部成功）和当前 10 个 in-progress 项：本次 0 项可关闭，均仍有非 CI 条件；详细剩余条件见该复查表及各任务记录。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -163,7 +163,7 @@ ai-docs/
 | 077 | [进行中任务状态盘点](task/077-active-task-status-audit.md) | 文档维护 | — | done |
 | 078 | [QML 性能基准登记规范](task/078-qml-performance-benchmark-policy.md) | 文档维护 | 069, 048 | done |
 | 084 | [进行中任务状态复查（2026-09-28）](task/084-active-task-status-followup.md) | 文档维护 | — | done |
-| 101 | [进行中任务 CI 验收复查（2026-10-02）](task/101-active-task-ci-acceptance.md) | 文档维护 | — | done |
+| 101 | [进行中任务 CI 验收复查](task/101-active-task-ci-acceptance.md) | 文档维护 | — | done |
 | 102 | [弹窗 GUI 与文档页签读屏验收](task/102-gui-and-screen-reader-acceptance.md) | 验证基础 | 091, 092, 094, 095, 096, 080 | done |
 | 103 | [macOS 工程文件选择器打开状态复查](task/103-macos-project-open-dialog.md) | 验证基础 | 063, 102 | done |
 | 104 | [Windows 工程选择器路径回归修复](task/104-ci-project-dialog-paths.md) | 验证基础 | 103 | done |
@@ -192,4 +192,4 @@ FSM 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [0
 
 Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
 
-后续新任务使用当前最大编号加一，不复用已有编号。主线里 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已暂时延后，恢复时再补跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口。[031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) 仍为 deferred。[038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 于 2026-10-02 暂时延后，恢复时再补运行时分发、Linux glibc 基线与 SBOM/provenance。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；最近一次复查见 [101 CI 验收复查](task/101-active-task-ci-acceptance.md)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+后续新任务使用当前最大编号加一，不复用已有编号。主线里 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已暂时延后，恢复时再补跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口。[031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) 仍为 deferred。[038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 于 2026-10-02 暂时延后，恢复时再补运行时分发、Linux glibc 基线与 SBOM/provenance。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；最近一次复查为 2026-10-09，见 [101 当前复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
