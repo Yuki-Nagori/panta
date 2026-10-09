@@ -361,3 +361,23 @@ fn quoted_escapes_round_trip_through_formatter() -> Result<(), Box<dyn std::erro
     assert_eq!(format_source(&formatted)?, formatted);
     Ok(())
 }
+
+#[test]
+fn diagnostic_order_and_text_match_the_pre_refactor_baseline() {
+    let source = "version: 2\nkind: language\nlanguage: en--US\n\n[App]\nx:\n  tr: Hi\n";
+    let Err(diagnostics) = parse(source) else {
+        panic!("invalid document unexpectedly accepted");
+    };
+    assert_eq!(
+        diagnostics.to_string(),
+        "pa.missing_src at 1:1: message 'x' requires src\n\
+pa.unsupported_version at 1:1: only version 1 is supported\n\
+pa.invalid_locale at 1:1: invalid language locale 'en--US'"
+    );
+    assert!(
+        diagnostics
+            .diagnostics
+            .iter()
+            .all(|item| { item.offset == 0 && item.line == 1 && item.column == 1 })
+    );
+}

@@ -12,9 +12,10 @@ pub use generate::generate_rust;
 use std::collections::{BTreeMap, BTreeSet};
 
 use pest::Parser as PestParser;
-use pest::error::{Error as PestError, InputLocation};
 
-use crate::{Diagnostic, Diagnostics, PaParser, Rule, push_diagnostic};
+use crate::diagnostic::push_diagnostic;
+use crate::syntax::{MAX_SOURCE_BYTES, PaParser, Rule, pest_diagnostic};
+use crate::{Diagnostic, Diagnostics};
 
 /// 状态与转移的资源上限：与 language 的声明上限同型，保证生成体积可测。
 pub const MAX_FSM_STATES: usize = 128;
@@ -60,10 +61,10 @@ pub struct FsmDocument {
 
 /// 解析 `.pa` 有限状态机（FSM）文档并做静态校验。
 pub fn parse(source: &str) -> Result<FsmDocument, Diagnostics> {
-    if source.len() > crate::MAX_SOURCE_BYTES {
+    if source.len() > MAX_SOURCE_BYTES {
         return Err(Diagnostics::one(
             "pa.source_too_large",
-            format!("source exceeds {} bytes", crate::MAX_SOURCE_BYTES),
+            format!("source exceeds {} bytes", MAX_SOURCE_BYTES),
             0,
             source,
         ));
@@ -78,7 +79,7 @@ pub fn parse(source: &str) -> Result<FsmDocument, Diagnostics> {
     }
 
     let document_pair = PaParser::parse(Rule::fsm_document, source)
-        .map_err(|error| pest_fsm_diagnostic(error, source))?
+        .map_err(|error| pest_diagnostic(error, source))?
         .next()
         .ok_or_else(|| Diagnostics::one("pa.syntax", "document is empty", 0, source))?;
 
@@ -856,12 +857,4 @@ fn find_text(body: pest::iterators::Pair<'_, Rule>, rule: Rule) -> Option<String
         return Some(body.as_str().to_owned());
     }
     body.into_inner().find_map(|pair| find_text(pair, rule))
-}
-
-fn pest_fsm_diagnostic(error: PestError<Rule>, source: &str) -> Diagnostics {
-    let offset = match error.location {
-        InputLocation::Pos(position) => position,
-        InputLocation::Span((start, _)) => start,
-    };
-    Diagnostics::one("pa.syntax", error.to_string(), offset, source)
 }

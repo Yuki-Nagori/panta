@@ -1,4 +1,4 @@
-# Panta DSL 解析与 Artifact 引擎（规划）
+# Panta DSL 解析与 Artifact 引擎
 
 [模块导航](README.md) · [变量 DSL](variable-dsl.md) · [国际化](internationalization.md) · [实施任务 034](../task/034-rust-panta-artifact-parser.md)
 
@@ -10,7 +10,20 @@
 
 ## 分层与技术选型
 
-规划 Rust workspace 成员 `panta-dsl-core`（可复用 library）和 `panta-dslc`（单文件 CLI）。核心层分为 `.pa` lexer/parser、领域 schema、Artifact 聚合器、TS XML 生成器、诊断和规范化快照；CLI 只编排这些纯函数并输出文件，不持有 Qt/QObject。
+已实现 workspace 成员 `panta-dsl-core`（可复用 library）和 `panta-dslc`（单文件 CLI）。[110](../task/110-dsl-module-boundaries.md) 将核心内部整理为私有模块，根 `lib.rs` 保留既有公共 API；CLI 只编排纯函数和文件输出，不持有 Qt/QObject。
+
+| 内部模块 | 职责 |
+|---|---|
+| `ast` | 数据文档及只读查询；serde 结构保持不变 |
+| `diagnostic` | 共享诊断、显示文本及源码位置 |
+| `syntax` | 唯一 Pest grammar、文档入口识别与语法诊断转换 |
+| `parser` | Pest 节点转换、字段与声明结构检查 |
+| `validation` | 文档种类、必需头部、locale、消息及占位符规则 |
+| `format` | 保留声明顺序与注释的规范源码输出 |
+| `ts` | Qt TS 输出及输出前的 locale / 占位符复核 |
+| `fsm` | 独立 FSM schema、校验、格式化与 Rust 生成；复用 syntax / diagnostic |
+
+Artifact 聚合器、完整来源信息与运行期快照接口仍按后续需求实施；本次模块拆分不代表这些规划接口已经落地。
 
 首选 `pest` 描述公共 `.pa` grammar：配置文件规模小，规则可审阅，`pest` 能稳定给出源码 span，适合错误定位和后续域扩展。暂不同时引入 `nom`；只有有可重复的吞吐或流式输入证据时才评估迁移，并保留同一 AST/诊断契约。`quick-xml` 负责从规范化翻译模型生成 Qt TS XML，必要时校验生成结果；不要求开发者阅读或编辑 XML。`serde` 映射领域 DTO 和机器可读诊断；依赖版本、许可证和 MSRV 进入 Cargo.lock。
 

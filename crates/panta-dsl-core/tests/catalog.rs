@@ -28,3 +28,18 @@ fn fixture_emits_locale_and_uses_longest_source() {
         Some("ok-pair")
     );
 }
+
+#[test]
+fn artifact_outputs_match_the_pre_refactor_baseline() -> Result<(), panta_dsl_core::Diagnostics> {
+    assert_eq!(format!("{:?}", panta_dsl_core::Rule::document), "document");
+    let source = include_str!("../../../tests/fixtures/dsl/artifacts.pa");
+    let canonical = include_str!("../../../tests/fixtures/dsl/artifacts.formatted.pa");
+    let expected_ts = include_str!("../../../tests/fixtures/dsl/artifacts.ts");
+    let document = parse(source)?;
+    assert_eq!(panta_dsl_core::format_document(&document), canonical);
+    assert_eq!(panta_dsl_core::format_source(canonical)?, canonical);
+    assert_eq!(parse(canonical)?, document);
+    assert_eq!(emit_ts(&document, "cn")?, expected_ts);
+    assert_eq!(emit_ts(&document, "zh_CN")?, expected_ts);
+    Ok(())
+}

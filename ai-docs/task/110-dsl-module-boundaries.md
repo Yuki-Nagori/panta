@@ -1,11 +1,11 @@
 # 110 — DSL AST、解析、校验与输出模块整理
 
-- 状态：planned
+- 状态：done
 - 阶段：Rust 架构整理
 - 依赖：[107](107-rust-service-boundaries-and-revisions.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-10-08 / 2026-10-08
+- 创建 / 更新：2026-10-08 / 2026-10-09
 
 ## 目标与范围
 
@@ -24,18 +24,38 @@
 
 ## 验收标准
 
-- [ ] AST / 诊断 / 格式化 / TS / FSM 既有回归通过，格式及生成输出保持一致，CLI 和编译期消费者通过。
-- [ ] 替换实现与失效引用已删除，无新增兼容分支。
-- [ ] Cargo 工作区聚合、构建、格式及完整 lint 通过；记录具体平台与未覆盖点。
+- [x] AST / 诊断 / 格式化 / TS / FSM 既有回归通过，格式及生成输出保持一致，CLI 和编译期消费者通过。
+- [x] 替换实现与失效引用已删除，无新增兼容分支。
+- [x] Cargo 工作区聚合、构建、格式及完整 lint 通过；记录具体平台与未覆盖点。
 
 ## 验证计划与结果
 
-先补定向回归定位，再执行 `cargo test --locked --workspace`、`cargo build --locked`、`cargo format --check`、`cargo lint --check`。涉及性能容量或真实窗口时按实际范围单独验证。本任务仍为规划，尚未执行实施验证。
+先补定向回归定位，再执行 `cargo test --locked --workspace`、`cargo build --locked`、`cargo format --check`、`cargo lint --check`。涉及性能容量或真实窗口时按实际范围单独验证。实施前保存既有公开 API 的格式化 / TS / 诊断输出基线，模块拆分后逐字节比较；既有公共及私有回归继续作为验证入口。
+
+## 本次验证结果
+
+2026-10-09，仓库根目录，macOS arm64 / Rust 1.98.1：
+
+| 检查 | 实际结果 |
+|---|---|
+| 拆分前后 CLI 快照 | 10 组源码的退出码、stdout / stderr、规范源码和 TS 字节一致；含现有语言字典、FSM 及多种错误输入 |
+| 新增稳定性回归 | 固定源码 / 格式 / TS 夹具与诊断顺序、文本、位置断言通过；保留 Rule 的根路径编译回归 |
+| `cargo test --locked --workspace` | 最终复验通过，含 13 个 DSL 单元、3 个 catalog、25 个 features、21 个 FSM、CLI 及编译期消费者，native / QML 72/72 通过 |
+| `cargo build --locked` | 通过；领域 FSM 和 i18n 编译期消费者正常构建 |
+| `cargo format --check` / `cargo lint --check` | 格式与完整 8 阶段 lint 通过 |
+| `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p panta-dsl-core --no-deps` | 通过；移动后的文档链接无警告 |
+| 独立 subagent review | 公共 API、serde、失败诊断、输出与文档检查通过；唯一发现的 ast 内 FSM 链接已修正并复验 |
+
+本轮未执行 Linux / Windows CI、Miri、性能基准或真实窗口验收；源码未修改 UI / 渲染路径，不以常规 QML 回归冒充窗口或性能证据。
 
 ## 工作记录
+
+- 2026-10-09：完成七个私有模块及根公共门面；保留类型、字段、serde 与函数 API（包括原先公开的 Pest Rule）。FSM 复用唯一 grammar / 语法诊断，删除根文件旧实现和重复错误转换。增加拆分前生成的输出夹具、公开入口及诊断顺序回归；整体 review 后修复文档链接，最终聚合、构建、格式、完整 lint、严格 rustdoc 与快照比较通过。任务及索引同步 done，无新增兼容分支。
+
+- 2026-10-09：开始实施。当前 lib.rs 共 1606 行，AST、Pest 解析、语义校验与两类输出混合；计划拆为私有 ast / diagnostic / syntax / parser / validation / format / ts 模块，根模块保持公共 API 重导出，FSM 复用唯一 grammar 与诊断。保持诊断顺序、输出字节及现有容量限制，不改变 UI、语言语法和依赖。
 
 - 2026-10-08：按用户要求一次登记剩余 Rust 架构任务，先提交规划后实施；避免把后续建议混入已完成的 107。
 
 ## 完成摘要
 
-未完成。
+已完成 DSL 内部职责拆分：模型、诊断、唯一 grammar、节点转换、语义校验、规范格式与 Qt TS 各归其模块。公共门面、CLI、FSM / i18n 编译期消费者、输出和既有容量限制保持；固定回归与独立 review 验证通过。
