@@ -27,12 +27,12 @@
 | cargo-deny | 0.20.2 | `cargo audit`；`target/panta-tools/cargo-deny/<version>` | RustSec、许可证、重复/通配依赖 |
 | cargo-machete | 0.9.2 | `cargo lint machete`；同类版本目录 | 扫描仓库根 workspace 的未使用 Rust 依赖 |
 | cargo-llvm-cov | 0.9.1 | `cargo coverage`；同类版本目录 | 使用 rustup 配套工具测量 Rust 业务代码 |
-| LLVM | 22.1.7 | 官方资产及 SHA256：`crates/panta-build/src/lib.rs` | clang/clang++/clang-cl 编译；clang-format 格式；clang-tidy 分析；llvm-cov/profdata 解析 native 覆盖率；sanitizer 编译开关与运行库（compiler-rt，随 `lib/clang` 资源目录保留） |
+| LLVM | 22.1.7 | 官方资产及 SHA256：`crates/panta-build/src/assets.rs` | clang/clang++/clang-cl 编译；clang-format 格式；clang-tidy 分析；llvm-cov/profdata 解析 native 覆盖率；sanitizer 编译开关与运行库（compiler-rt，随 `lib/clang` 资源目录保留） |
 | Miri | nightly-2026-09-15（rustc 1.100.0-nightly 574ff7d98） | `cargo ub-check`；rustup 组件，日期固定于 runner 常量，升级同步回填 032 | 解释执行纯 Rust crate 测试，检出越界、悬垂引用、数据竞争等 UB |
 | include-cleaner | 随 LLVM 22.1.7 | `cargo lint includes`，仅启用 `misc-include-cleaner` | 缺失/多余 include 建议变为错误；取代独立 IWYU |
 | Cppcheck | 2.17.1（wheel 1.5.1） | `cargo lint cppcheck`；`pyproject.toml`/`uv.lock` | 补充 `unusedFunction`，`--error-exitcode=1` 阻断 |
 | qmlformat / qmllint | Qt 6.11.2 | Cargo/CMake 供给 Qt | 应用及测试 QML 格式、类型检查 |
-| uv / CPython | 0.12.18 / 3.14.7 | `crates/panta-build/src/python.rs`；官方固定 uv 资产校验 SHA256 | 禁止选用系统 Python；解释器、venv、缓存均在 target |
+| uv / CPython | 0.12.18 / 3.14.7 | `assets.rs` 登记 uv 的官方资产 / SHA256，`python.rs` 配置解释器与环境 | 禁止选用系统 Python；解释器、venv、缓存均在 target |
 | cmake-format / cmake-lint | cmakelang 0.6.13 | `cargo format` / `cargo lint cmake` | `uv run --locked --managed-python --no-build`，仅消费锁定 wheels |
 
 LLVM、CMake、Ninja、uv 按版本与摘要隔离到 `target/panta-tools/<tool>/<version-sha256>/`；安装持有 OS 文件锁，下载到临时文件并校验，解包成功后才发布目录。进程中断释放锁，下次持锁重试清理未发布目录；旧版本不受失败升级影响。Cargo 扩展按版本隔离并沿用同一发布机制。Qt 供给也串行化，防止 build/format 同时解包。升级同步供给清单、CMake 版本检查、CI 缓存、文档与验收。
@@ -55,6 +55,7 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 - `cargo audit`、`cargo coverage`、`cargo coverage native` 分别负责依赖审计、Rust 门禁和 native 覆盖率报告。`cargo quality` 聚合格式、lint、审计、测试，不包含 coverage。
 - `cargo sanitize` 按平台固定 sanitizer 矩阵（Linux/macOS：ASan+UBSan 与 TSan 独立树；Windows：ASan），每组合一个 `target/native/debug-sanitizer-<组合>` 插桩树并完整执行 CTest；组合合法性在 configure 期校验，TSan 互斥与平台缺口按官方文档注明，矩阵与依据见任务 042。`cargo ub-check` 以固定 nightly 解释执行 panta-core、panta-dsl-core、panta-foundation 测试，产物在 `target/miri`；CXX FFI 与进程类 crate 不在其语义内。
 - `cargo run --locked -p panta-tests -- toolchain` 检查托管工具版本、Qt/GoogleTest 文件、CMakeCache 的 C/C++ 编译器/CMake/Ninja 路径，以及合并编译数据库中包括手写 CXX adapter 在内的实际编译器。系统旁路不能作为该检查的通过证据。
+- [111](../task/111-build-and-quality-module-boundaries.md) 整理模块边界：`panta-build` 的根门面重导出原 API，`assets / archive / install / paths / compiler / environment` 分别承接固定清单、归档处理、安装事务、文件定位、编译器与平台环境。`database / python` 的公共入口保持。质量 runner 的 `main.rs` 只分发并编排顶层命令，`command / paths / build / format / lint / toolchain / sanitize / miri / coverage / performance` 承接各自职责；模块不绕过 Cargo / CMake 或新增安装入口。私有回归内联于被测模块，性能 CLI 检查仍由手动性能入口运行。
 - runner、FFI 与 launcher 共用 `panta-build`，无需通过 `#[path]` 导入其他 crate 私有文件或整体关闭 dead-code 告警。质量数据库位于 `target/native/<profile>/quality/compile_commands.json`；只选自有翻译单元，头文件不单独伪造编译命令。
 - CI 三平台单 job 顺序执行 check、build、工具核验与完整测试套件；lint 按工具与变更路径域拆分触发（machete→rust、cmake→native、qmllint→qml/native），dependency-audit 仅随依赖清单触发，纯 Markdown 的 push / PR 由事件层路径过滤，不创建 CI run；含其他路径的变更进入 changes 分类，分类为文档的路径仍只运行 changes，其余 job 跳过。Cargo 工具缓存仅由 main push 的 check job 保存，其余 job 只恢复；缓存瘦身在供给代码完成——panta-build 安装归档发布即删并按白名单裁剪 LLVM，Qt/SDK CMake 供给发布即删归档，三平台条目合计控制在仓库 10 GB 配额内。CI 不单独安装非 Rust 质量工具。Cargo aliases 和内部 Cargo 调用默认 `--locked`，直接 `cargo build/test/check` 按原生 Cargo 语义由调用者选择 `--locked`。
 

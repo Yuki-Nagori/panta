@@ -70,13 +70,13 @@ impl Options {
 }
 
 fn build(targets: &[&str]) -> Result<(), Box<dyn Error>> {
-    let mut command = super::cmake_build_command()?;
+    let mut command = crate::build::cmake_build_command()?;
     command.arg("--target").args(targets);
-    super::run("构建性能目标", command)
+    crate::command::run("构建性能目标", command)
 }
 
 fn native_command(target: &str) -> Result<Command, Box<dyn Error>> {
-    let executable = super::native_build_dir()
+    let executable = crate::paths::native_build_dir()
         .join("performance")
         .join(panta_build::exe_name(target));
     if !executable.is_file() {
@@ -84,9 +84,9 @@ fn native_command(target: &str) -> Result<Command, Box<dyn Error>> {
     }
     let mut command = Command::new(executable);
     command
-        .current_dir(super::repository_root()?)
+        .current_dir(crate::paths::repository_root()?)
         .envs(panta_build::native_test_env(
-            super::target_root(),
+            crate::paths::target_root(),
             env!("PANTA_TEST_HOST"),
         )?);
     command.env("QT_QUICK_CONTROLS_STYLE", "Basic");
@@ -108,7 +108,7 @@ fn run_project(
         "PANTA_BENCHMARK_PRESENTATION",
         if presentation { "1" } else { "0" },
     );
-    super::run(target, command)
+    crate::command::run(target, command)
 }
 
 pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
@@ -120,9 +120,9 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
     }
     let options = Options::parse(arguments)?;
     // 性能二进制使用当前 runner 的构建配置，避免误用另一配置的旧产物。
-    super::cargo("build", ["--locked", "-p", "panta-launcher"])?;
+    crate::command::cargo("build", ["--locked", "-p", "panta-launcher"])?;
     build(&["panta_benchmark_support_test"])?;
-    super::cargo(
+    crate::command::cargo(
         "test",
         [
             "--locked",
@@ -135,7 +135,7 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             "--ignored",
         ],
     )?;
-    super::run(
+    crate::command::run(
         "性能辅助代码",
         native_command("panta_benchmark_support_test")?,
     )?;
@@ -165,12 +165,12 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
     let supplied_stl = std::env::var_os("PANTA_BENCH_STL").map(PathBuf::from);
     let fixture = if options.project.is_none() || (cpu && supplied_stl.is_none()) {
         let id = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-        let directory = super::target_root()
+        let directory = crate::paths::target_root()
             .join("performance")
             .join(format!("fixture-{}-{id}", std::process::id()));
         let mut command = native_command("panta_performance_fixture")?;
         command.arg(&directory);
-        super::run("生成合成 STL 工程", command)?;
+        crate::command::run("生成合成 STL 工程", command)?;
         Some(directory)
     } else {
         None
@@ -183,7 +183,7 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             .join("Benchmark/Benchmark.panta"),
     };
     if cpu {
-        super::cargo(
+        crate::command::cargo(
             "run",
             [
                 "--locked",
@@ -201,7 +201,7 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
                     .map(|path| path.join("triangles_20000.stl"))
             })
             .ok_or("missing STL benchmark input")?;
-        let (_, mut command) = super::cargo_command(
+        let (_, mut command) = crate::command::cargo_command(
             "test",
             [
                 "--locked",
@@ -217,7 +217,7 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             ],
         )?;
         command.env("PANTA_BENCH_STL", stl);
-        super::run("Rust mesh CPU benchmarks", command)?;
+        crate::command::run("Rust mesh CPU benchmarks", command)?;
         for target in [
             "panta_mesh_ir_benchmark",
             "panta_qml_cpu_benchmark",
@@ -225,7 +225,7 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         ] {
             let mut command = native_command(target)?;
             command.env("QT_QPA_PLATFORM", "offscreen");
-            super::run(target, command)?;
+            crate::command::run(target, command)?;
         }
         run_project(
             "panta_bridge_project_stl_activation_cpu_benchmark",
@@ -241,7 +241,7 @@ pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
                 "PANTA_BENCHMARK_PRESENTATION",
                 if options.presentation { "1" } else { "0" },
             );
-            super::run(target, command)?;
+            crate::command::run(target, command)?;
         }
         run_project(
             "panta_project_stl_viewport_gpu_benchmark",
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     #[ignore = "Performance CLI validation; cargo performance runs this before benchmarks"]
     fn preserves_cargo_argument_boundary() -> Result<(), Box<dyn std::error::Error>> {
-        let (_, command) = crate::cargo_command("test", ["--locked", "--", "--ignored"])?;
+        let (_, command) = crate::command::cargo_command("test", ["--locked", "--", "--ignored"])?;
         let arguments: Vec<_> = command.get_args().collect();
         let separator = arguments
             .iter()

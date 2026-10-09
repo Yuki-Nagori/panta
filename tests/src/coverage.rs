@@ -1,11 +1,17 @@
-//! Rust 覆盖率报告与阶段门禁；逐 crate 汇总用于审阅，不设分模块阈值。
+//! Rust 覆盖率报告与阶段门禁、native 覆盖率报告；逐 crate 汇总不设分模块阈值。
 
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use crate::build::run_ctest_in;
+use crate::command::{ensure_cargo_tool, run as run_command};
+use crate::paths::{repository_root, target_root};
+
+const CARGO_LLVM_COV_VERSION: &str = "0.9.1";
 
 const FUNCTIONS_MINIMUM: u64 = 89;
 const LINES_MINIMUM: u64 = 92;
@@ -13,9 +19,9 @@ const LINES_MINIMUM: u64 = 92;
 const EXCLUDED_PACKAGES: &[&str] = &["panta-launcher", "panta-tests", "panta-build"];
 
 pub(super) fn run() -> Result<(), Box<dyn Error>> {
-    let tool = super::ensure_cargo_tool("cargo-llvm-cov", super::CARGO_LLVM_COV_VERSION)?;
-    let root = super::repository_root()?;
-    let target = super::target_root();
+    let tool = ensure_cargo_tool("cargo-llvm-cov", CARGO_LLVM_COV_VERSION)?;
+    let root = repository_root()?;
+    let target = target_root();
     let directory = target.join("rust-coverage");
     // 失败时也不能把上次的报告上传成当前提交的结果。
     if directory.exists() {
@@ -50,7 +56,7 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
         .env("CARGO_TARGET_DIR", target)
         .env("PANTA_TOOL_CACHE_ROOT", target)
         .current_dir(root);
-    super::run("cargo llvm-cov", command)?;
+    run_command("cargo llvm-cov", command)?;
     let report = Report::parse(&fs::read(report_path)?, root)?;
     let summary = report.summary();
     fs::write(directory.join("summary.txt"), &summary)?;
@@ -220,6 +226,99 @@ impl Report {
         }
         Ok(())
     }
+}
+
+/// 覆盖率构建使用独立 CMake 树，与普通构建共享已校验的依赖缓存。
+pub(super) fn native_coverage() -> Result<(), Box<dyn Error>> {
+    let root = repository_root()?;
+    let target = target_root();
+    let report_dir = target.join("native-coverage");
+    let profiles = report_dir.join("raw");
+    if profiles.exists() {
+        fs::remove_dir_all(&profiles)?;
+    }
+    fs::create_dir_all(&profiles)?;
+    let profile_file = profiles.join("%m-%p.profraw");
+    let mut build = Command::new("cargo");
+    build
+        .current_dir(root)
+        .args(["build", "--locked", "-p", "panta-launcher", "--target-dir"])
+        .arg(target)
+        .env("PANTA_NATIVE_COVERAGE", "1");
+    run_command("native coverage build", build)?;
+    let native = target.join("native/debug-coverage");
+    let mut envs = panta_build::native_test_env(target, env!("PANTA_TEST_HOST"))?;
+    envs.push((
+        std::ffi::OsString::from("LLVM_PROFILE_FILE"),
+        profile_file.into_os_string(),
+    ));
+    run_ctest_in(&native, envs, "native coverage tests", None, None, None)?;
+    let llvm = panta_build::resolve_llvm_compilers(target)?;
+    let raw = fs::read_dir(&profiles)?
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "profraw"))
+        .collect::<Vec<_>>();
+    if raw.is_empty() {
+        return Err("native 测试未生成覆盖率数据".into());
+    }
+    let merged = report_dir.join("native.profdata");
+    let mut merge = Command::new(
+        llvm.root
+            .join("bin")
+            .join(panta_build::exe_name("llvm-profdata")),
+    );
+    merge
+        .args(["merge", "-sparse"])
+        .args(raw)
+        .arg("-o")
+        .arg(&merged);
+    run_command("native coverage merge", merge)?;
+    let mut binaries = Vec::new();
+    collect_test_binaries(&native, &mut binaries)?;
+    binaries.sort();
+    let first = binaries.first().ok_or("没有找到 native 覆盖率测试产物")?;
+    let mut report = Command::new(
+        llvm.root
+            .join("bin")
+            .join(panta_build::exe_name("llvm-cov")),
+    );
+    report
+        .arg("report")
+        .arg(first)
+        .arg(format!("-instr-profile={}", merged.display()));
+    for binary in binaries.iter().skip(1) {
+        report.arg("-object").arg(binary);
+    }
+    report.args([
+        "--ignore-filename-regex=(/target/|googletest|/usr/)",
+        "--show-region-summary=false",
+    ]);
+    let output = report.output()?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
+    }
+    fs::write(report_dir.join("summary.txt"), &output.stdout)?;
+    print!("{}", String::from_utf8_lossy(&output.stdout));
+    Ok(())
+}
+
+fn collect_test_binaries(directory: &Path, result: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type()?.is_dir() {
+            collect_test_binaries(&path, result)?;
+        } else if path
+            .file_stem()
+            .is_some_and(|name| name.to_string_lossy().ends_with("_test"))
+            && (path.extension().is_none() || path.extension().is_some_and(|ext| ext == "exe"))
+        {
+            result.push(path);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
