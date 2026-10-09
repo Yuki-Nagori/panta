@@ -46,9 +46,11 @@
 | `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p panta-dsl-core --no-deps` | 通过；移动后的文档链接无警告 |
 | 独立 subagent review | 公共 API、serde、失败诊断、输出与文档检查通过；唯一发现的 ast 内 FSM 链接已修正并复验 |
 
-本轮未执行 Linux / Windows CI、Miri、性能基准或真实窗口验收；源码未修改 UI / 渲染路径，不以常规 QML 回归冒充窗口或性能证据。
+上表为原实施阶段的本地验证，当时未执行 Linux / Windows CI、Miri、性能基准或真实窗口验收；源码未修改 UI / 渲染路径，不以常规 QML 回归冒充窗口或性能证据。
 
 ## 工作记录
+
+- 2026-10-09：CI 收尾完成：项目级 LF 提交 `011e129` 的 [CI 37910040544](https://github.com/Yuki-Nagori/panta/actions/runs/37910040544) 共 19 个作业全部通过，包括三平台 Cargo / sanitizer、Rust / native 覆盖率、Miri 和质量检查；Windows 严格输出夹具回归通过。根属性统一项目文本 LF，二进制自动识别保留内容，根属性变更触发全量检查。原局部修复 `d739969` 的 CI 37908774773 也已通过；最终验收以项目级规则提交为准，独立 subagent 对验收记录的复核通过。
 
 - 2026-10-09：按用户要求将换行属性移到根目录并统一项目文本为 LF，二进制按自动识别保持原始内容；根 .gitattributes 会影响检出字节，不再按文档路径跳过质量作业，进入保守全量分类。现有索引 / 工作区无 CRLF 或混合换行，不需批量改写。隔离检出在 core.autocrlf=true 下逐字节核对 600 个既有文件；新增 CRLF 文本在索引 / 检出中均为 LF，NUL 二进制样例保留 CRLF 字节。实际 changed-paths 脚本验证根属性变更五类输出均 true、纯 Markdown 均 false。Cargo 工作区聚合（72/72 native / QML）、格式、actionlint、差异及独立 subagent review 通过；推送后等待最新提交 CI。
 

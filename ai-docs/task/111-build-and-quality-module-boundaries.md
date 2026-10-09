@@ -48,9 +48,11 @@
 | `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p panta-build --no-deps` | 通过 |
 | 独立 subagent review | 公开 API、资产、平台路径、锁 / marker / 失败收尾、子进程参数及测试 / 文档检查通过，无可行动问题 |
 
-本轮没有执行冷下载、Linux / Windows CI、完整 coverage / sanitizer / Miri 套件、CPU / GPU 性能基准或真实窗口验收。sanitizer 的平台矩阵和构建参数有纯函数回归，不能代替实际插桩运行；Windows SDK / CRT 的实际进程环境仍需 Windows 验证。本次为模块整理，不修改这些行为与现有排除边界。
+上表为原实施阶段的本地验证，当时没有执行冷下载、Linux / Windows CI、完整 coverage / sanitizer / Miri 套件、CPU / GPU 性能基准或真实窗口验收。sanitizer 的平台矩阵和构建参数有纯函数回归，不能代替实际插桩运行；Windows SDK / CRT 的实际进程环境当时仍待 Windows 验证，后续结果见工作记录。本次为模块整理，不修改这些行为与现有排除边界。
 
 ## 工作记录
+
+- 2026-10-09：task110 的 Windows DSL 夹具换行修复及项目级 LF 规则收尾后，[CI 37910040544](https://github.com/Yuki-Nagori/panta/actions/runs/37910040544) 共 19 个作业全部通过，包括本任务的三平台 Cargo / 工具链核验与质量入口，同轮 sanitizer、Miri、两类覆盖率也成功。panta-build / runner 仍按既有边界不计入业务 Rust coverage / Miri，不将作业成功写成这两者已获对应计量。该 CI 不作为受控冷下载、手动性能或真实窗口验收；原本地验证范围保留为历史记录。
 
 - 2026-10-09：完成供给库公共门面及六个私有模块；uv 资产统一登记，python 的公开版本 / 命令路径保留。质量入口分离命令运行、目录、构建、格式、lint、工具链、sanitizer、Miri，native 覆盖率归入 coverage；既有性能入口直接引用对应模块。私有测试随源码内联迁移，子进程精确过滤名称同步；新增缓存失效、平台路径、Cargo 透传及进程失败回归。聚合、构建、格式、完整 lint、工具链核验、文档检查和独立 review 通过，task / 索引同步 done；无新增兼容分支。
 
