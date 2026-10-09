@@ -50,6 +50,8 @@
 
 ## 工作记录
 
+- 2026-10-09：按用户要求将换行属性移到根目录并统一项目文本为 LF，二进制按自动识别保持原始内容；根 .gitattributes 会影响检出字节，不再按文档路径跳过质量作业，进入保守全量分类。现有索引 / 工作区无 CRLF 或混合换行，不需批量改写。隔离检出在 core.autocrlf=true 下逐字节核对 600 个既有文件；新增 CRLF 文本在索引 / 检出中均为 LF，NUL 二进制样例保留 CRLF 字节。实际 changed-paths 脚本验证根属性变更五类输出均 true、纯 Markdown 均 false。Cargo 工作区聚合（72/72 native / QML）、格式、actionlint、差异及独立 subagent review 通过；推送后等待最新提交 CI。
+
 - 2026-10-09：CI 收尾：run37906982451 仅 Windows Cargo 聚合失败，task110 固定格式夹具检出为 CRLF，与格式化器的 LF 字节输出不一致；其余 18 个作业通过。补充仅限 tests/fixtures/dsl 的 Git 换行属性，保持生产输出和严格断言；隔离 Git 检出模拟 core.autocrlf=true：修复前三个夹具均为 CRLF，修复后字节等于 LF blob，目录外样例仍为 CRLF。本地 Cargo 工作区聚合（native / QML 72/72）、格式及差异检查通过，独立 subagent review 无可行动问题，确认属性文件仍触发 Windows CI。推送后等待实际 Windows 复验，不把隔离检出记为 Windows 测试通过。
 
 - 2026-10-09：完成七个私有模块及根公共门面；保留类型、字段、serde 与函数 API（包括原先公开的 Pest Rule）。FSM 复用唯一 grammar / 语法诊断，删除根文件旧实现和重复错误转换。增加拆分前生成的输出夹具、公开入口及诊断顺序回归；整体 review 后修复文档链接，最终聚合、构建、格式、完整 lint、严格 rustdoc 与快照比较通过。任务及索引同步 done，无新增兼容分支。

@@ -3,6 +3,7 @@
 #   cargo_deps —— Cargo 清单或 deny.toml 变更
 #   rust / native / qml —— 对应域是否有变更
 # 保守默认：未识别路径一律视为代码触发全量检查；纯文档是唯一可整场跳过的类别。
+# .gitattributes 影响检出字节，保留在全量检查类别。
 # 基线：PR 对 base 分支取 merge-base diff，push 对 event.before 取累计 diff；
 # 新分支/强推/空 diff 回退全量。调用方必须先 checkout 且 fetch-depth: 0
 #（本地 composite action 的解析本身依赖工作区已有仓库）。
@@ -48,7 +49,7 @@ runs:
         while IFS= read -r f; do
           [ -n "$f" ] || continue
           case "$f" in
-            *.md|ai-docs/*|LICENSE|.gitignore|.gitattributes) ;;
+            *.md|ai-docs/*|LICENSE|.gitignore) ;;
             deny.toml) cargo_deps=true ;;
             Cargo.lock|Cargo.toml|*/Cargo.toml) cargo_deps=true; rust=true ;;
             crates/*|tests/src/*|tests/integration/*|.cargo/*|rust-toolchain.toml|resources/*) rust=true ;;
