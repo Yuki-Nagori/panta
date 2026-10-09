@@ -1,0 +1,3 @@
+# 固定输出夹具逐字节比较，检出时保留 LF。
+*.pa text eol=lf
+*.ts text eol=lf

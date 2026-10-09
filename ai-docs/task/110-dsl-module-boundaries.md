@@ -50,6 +50,8 @@
 
 ## 工作记录
 
+- 2026-10-09：CI 收尾：run37906982451 仅 Windows Cargo 聚合失败，task110 固定格式夹具检出为 CRLF，与格式化器的 LF 字节输出不一致；其余 18 个作业通过。补充仅限 tests/fixtures/dsl 的 Git 换行属性，保持生产输出和严格断言；隔离 Git 检出模拟 core.autocrlf=true：修复前三个夹具均为 CRLF，修复后字节等于 LF blob，目录外样例仍为 CRLF。本地 Cargo 工作区聚合（native / QML 72/72）、格式及差异检查通过，独立 subagent review 无可行动问题，确认属性文件仍触发 Windows CI。推送后等待实际 Windows 复验，不把隔离检出记为 Windows 测试通过。
+
 - 2026-10-09：完成七个私有模块及根公共门面；保留类型、字段、serde 与函数 API（包括原先公开的 Pest Rule）。FSM 复用唯一 grammar / 语法诊断，删除根文件旧实现和重复错误转换。增加拆分前生成的输出夹具、公开入口及诊断顺序回归；整体 review 后修复文档链接，最终聚合、构建、格式、完整 lint、严格 rustdoc 与快照比较通过。任务及索引同步 done，无新增兼容分支。
 
 - 2026-10-09：开始实施。当前 lib.rs 共 1606 行，AST、Pest 解析、语义校验与两类输出混合；计划拆为私有 ast / diagnostic / syntax / parser / validation / format / ts 模块，根模块保持公共 API 重导出，FSM 复用唯一 grammar 与诊断。保持诊断顺序、输出字节及现有容量限制，不改变 UI、语言语法和依赖。
