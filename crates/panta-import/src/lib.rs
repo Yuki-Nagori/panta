@@ -621,6 +621,17 @@ mod tests {
             read_source_checked(&source, || true),
             Err(CheckedReadError::Cancelled(_))
         ));
+        let large_source = fixture.root.join("large.stl");
+        fs::write(&large_source, vec![b' '; READ_CHUNK_BYTES + 1])?;
+        let checkpoints = AtomicUsize::new(0);
+        assert!(matches!(
+            read_source_checked(&large_source, || {
+                checkpoints.fetch_add(1, Ordering::Relaxed) == 1
+            }),
+            Err(CheckedReadError::Cancelled(path)) if path == large_source.display().to_string()
+        ));
+        // 第二次检查发生在首个 256 KiB 数据块读取后。
+        assert_eq!(checkpoints.load(Ordering::Relaxed), 2);
         // 不存在的文件以 Failed(Missing) 表达，不冒充取消。
         assert!(matches!(
             read_source_checked(&fixture.root.join("absent.stl"), || false),

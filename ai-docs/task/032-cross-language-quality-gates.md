@@ -109,6 +109,8 @@ TS 输出原先在每个 XML 写入和 UTF-8 转换点各自创建错误映射�
 
 本轮验证：`cargo test --locked -p panta-core execution::tests --lib` 通过（6 项）；`cargo coverage` 通过，全局函数 768/825（93.09%）、行 8752/9183（95.31%），比本轮开始前记录的 769/829 少 3 个未覆盖函数；`panta-core` 为 357/393（90.84%），剩余 36 个函数缺口。Rust 函数 100% 目标仍未完成，任务继续 in-progress。
 
+按 crate 并行排查覆盖缺口后，复核发现不少零计数项在现有集成测试中已有行为验证，详细 LLVM 明细把不同 crate 编译实例和测试闭包分别列出；不据此重复调用 API。新增 `read_source_checked` 的中途取消行为验证：输入大于 256 KiB，首块读取后第二个检查点确定性取消，断言路径和检查次数。`cargo coverage` 通过，全局函数 769/826（93.10%）、行 8762/9193（95.31%）；panta-import 为 37/41（90.24%）。panta-core 的方案设置、分析序列、材料及工艺用例已存在；dsl-core 的主要零计数项也有解析和生成测试。Foundation 致命信号处理器的 profile 不能由退出子进程可靠刷盘，需与真实行为验收区分。该审查未发现可以直接宣称达成 100% 的依据，任务继续 in-progress。
+
 验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings` 和 `cargo format --check` 均通过。完整 `cargo lint` 因沙箱禁止绑定其锁管理 TCP listener，在 Clippy 阶段退出；因此其余 lint 阶段未运行。最终覆盖率为全局函数 769/829（92.76%）、行 8752/9190（95.23%）；`panta-core` 函数 358/397（90.18%），`panta-dsl-core` 函数 132/135（97.78%）、行 2001/2091（95.70%）。全局仍有 60 个 Rust 函数未覆盖，100% 目标尚未完成，本任务及索引保持 in-progress；其他 crate 与 DSL 的不可达/剩余路径留待继续按行为审查。
 
 ## 2026-10-02 优先级跟进：Rust 报告与门禁可审阅性
