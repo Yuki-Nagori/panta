@@ -164,3 +164,9 @@ FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pe
 `cargo coverage` 通过：全局函数 681/737（92.40%）、行 7855/8245（95.27%）。上一轮是 677/736（91.98%）和 7818/8237（94.91%）。`panta-dsl-core` 为函数 125/145（86.21%），`panta-import` 为函数 36/40（90.00%）。门槛仍是 89% / 92%。函数 100%、C++ line/branch 和逐模块防下降仍未完成。
 
 定向测试：`cargo test -p panta-dsl-core --locked --test fsm -- rejects_missing_headers`、`cargo test -p panta-import --locked --lib -- checked_read_supports_cancellation`、`cargo test -p panta-core --locked --lib -- read_failures_become_parse_failures` 均通过。三个 crate 的 `cargo clippy --locked --all-targets -- -D warnings` 通过。未跑完整 workspace 测试。
+
+## 2026-10-10 项目校验与缓存失败路径
+
+补充项目清单中分析序列与材料引用缺失/未知 ID 的拒绝行为；导入资产目标碰撞时，断言既有文件、工程清单、revision、导入记录和当前网格均保持不变；网格缓存未驻留时激活失败并保留当前活动网格。路径服务测试现在同时覆盖未配置 root 的诊断、注入后的 getter 和成功解析。
+
+验证（macOS arm64）：定向项目与路径测试通过；`cargo format --check`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`git diff --check` 通过。`cargo coverage` 通过，全局函数 778/832（93.51%）、行 8840/9245（95.62%）；`panta-core` 函数 366/399（91.73%）、行 3562/3685（96.66%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% 函数目标和 C++ line/branch 门禁尚未完成，任务保持 in-progress。

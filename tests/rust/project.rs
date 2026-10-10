@@ -230,6 +230,74 @@ fn opens_invalid_manifests_and_accepts_case_insensitive_extension()
 }
 
 #[test]
+fn rejects_analysis_sequences_with_missing_imports_or_unknown_ids()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("sequence.stl");
+    fs::write(
+        &source,
+        b"solid sequence\n facet normal 0 0 1\n  outer loop\n   vertex 0 0 0\n   vertex 1 0 0\n   vertex 0 1 0\n  endloop\n endfacet\nendsolid sequence\n",
+    )?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Invalid sequence")?;
+    let imported = service.import_stl(&source, "solid-3d", "millimeters", true)?;
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+
+    let mut manifest = original.clone();
+    manifest["analysis_sequences"] = serde_json::json!({"missing-import": "fill"});
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+    assert!(matches!(
+        service.open(&project.path),
+        Err(ProjectError::ManifestInvalid(_))
+    ));
+
+    let mut manifest = original;
+    manifest["analysis_sequences"] = serde_json::json!({imported.id: "unknown-sequence"});
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+    assert!(matches!(
+        service.open(&project.path),
+        Err(ProjectError::ManifestInvalid(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn rejects_materials_with_missing_imports_or_unknown_ids() -> Result<(), Box<dyn std::error::Error>>
+{
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("material.stl");
+    fs::write(
+        &source,
+        b"solid material\n facet normal 0 0 1\n  outer loop\n   vertex 0 0 0\n   vertex 1 0 0\n   vertex 0 1 0\n  endloop\n endfacet\nendsolid material\n",
+    )?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Invalid material")?;
+    let imported = service.import_stl(&source, "solid-3d", "millimeters", true)?;
+    let before = service.current()?;
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+    let default_material_id = panta_core::project::default_material()?.id.clone();
+
+    let mut manifest = original.clone();
+    manifest["materials"] = serde_json::json!({"missing-import": default_material_id});
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+    assert!(matches!(
+        service.open(&project.path),
+        Err(ProjectError::ManifestInvalid(_))
+    ));
+    assert_eq!(service.current()?, before);
+
+    let mut manifest = original;
+    manifest["materials"] = serde_json::json!({imported.id: "unknown-material"});
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+    assert!(matches!(
+        service.open(&project.path),
+        Err(ProjectError::ManifestInvalid(_))
+    ));
+    assert_eq!(service.current()?, before);
+    Ok(())
+}
+
+#[test]
 fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
     let source = fixture.root.join("Case.STL");
@@ -258,6 +326,33 @@ fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn st
     assert_eq!(reopened.imports()?, vec![record]);
     // 打开只读清单；已保存资产由只读激活按需恢复（见 activation.rs）。
     assert!(reopened.current_mesh().is_none());
+    Ok(())
+}
+
+#[test]
+fn import_asset_collision_does_not_overwrite_or_publish_import()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let created = service.create(&fixture.root, "Demo")?;
+    let asset_dir = fixture.root.join("Demo/assets/imports");
+    fs::create_dir_all(&asset_dir)?;
+    let occupied_asset = asset_dir.join("0001-part.stl");
+    fs::write(&occupied_asset, b"preserve this unrelated file")?;
+    let before = service.current()?;
+    let manifest_before = fs::read(&created.path)?;
+
+    assert!(matches!(
+        service.import_stl(&source, "solid-3d", "millimeters", false),
+        Err(ProjectError::ImportAssetCopyFailed(_))
+    ));
+    assert_eq!(fs::read(&occupied_asset)?, b"preserve this unrelated file");
+    assert_eq!(service.current()?, before);
+    assert!(service.imports()?.is_empty());
+    assert!(service.current_mesh().is_none());
+    assert_eq!(fs::read(&created.path)?, manifest_before);
     Ok(())
 }
 

@@ -495,6 +495,13 @@ mod tests {
             service.resolve(&reference("a")),
             Err(PathError::RootMissing(RootCategory::Project))
         ));
+        let fixture = FixtureRoot::new("roots")?;
+        service.set_root(RootCategory::Project, &fixture.root)?;
+        assert_eq!(
+            service.root(RootCategory::Project),
+            Some(fixture.root.as_path())
+        );
+        assert_eq!(service.resolve(&reference("a"))?, fixture.root.join("a"));
         Ok(())
     }
 

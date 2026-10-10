@@ -99,6 +99,19 @@ mod tests {
     }
 
     #[test]
+    fn activating_missing_mesh_keeps_the_current_mesh_unchanged() {
+        let mut service = ProjectService::new();
+        service.cache_activated_mesh("resident".to_owned(), mesh(1));
+
+        assert!(!service.activate_mesh_document("missing"));
+        assert_eq!(
+            service.current_mesh().map(|mesh| mesh.triangles.len()),
+            Some(1)
+        );
+        assert_eq!(service.resident_mesh_ids(), ["resident"]);
+    }
+
+    #[test]
     fn closing_mesh_document_releases_runtime_data_without_touching_imports() {
         let mut service = ProjectService::new();
         service
