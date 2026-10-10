@@ -34,6 +34,8 @@ Rust `panta-solver` 在线程中管理外部进程、取消、事件和成功产
 
 ## 验证记录
 
+2026-10-10：公共 `ActionButton` 统一判断 `clickAction`：已配置动作则执行，未配置则请求英文提示。`ThemedToolButton`、`RibbonTile` 和网格动作按钮共用该入口；菜单 / Ribbon / 任务按 key 分发的未实现分支同样请求提示。保留真实动作及运行前提禁用状态；本次验证待更新。
+
 - 独立真实求解：Mesh → Gate Location → Fill 全流程通过，充填时间 **1.9150767935 s**，峰值压力 **2.1465074803 MPa**。节点时间与最终压力字段数量和三角面节点映射已校验。
 - 自动浇口显示位置验证：真实 Mesh / Gate 推荐通过，确认选中的三个坐标分量来自推荐产物。
 - 用户 `Frame.stl` 重划回归：真实求解器产出 **15,744 个三角面**，Rust 读取并发布成功；输出保留在 `target/moldfill-lowercase-regression/`。

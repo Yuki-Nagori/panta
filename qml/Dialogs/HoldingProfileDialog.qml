@@ -187,7 +187,7 @@ DialogWindow {
                                         text: "×"
                                         accessibleName: qsTranslate("HoldingProfile", "Remove step")
                                         enabled: rows.count > 3
-                                        onClicked: {
+                                        clickAction: () => {
                                             rows.remove(row.index);
                                             dialog.editRevision++;
                                         }
@@ -204,7 +204,7 @@ DialogWindow {
                     contentPadding: Theme.spacingLarge
                     implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                     text: qsTranslate("HoldingProfile", "Add Step")
-                    onClicked: {
+                    clickAction: () => {
                         rows.append({
                             durationText: "",
                             pressureText: ""
@@ -216,7 +216,6 @@ DialogWindow {
                     contentPadding: Theme.spacingLarge
                     implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                     text: qsTranslate("HoldingProfile", "Import Profile…")
-                    enabled: false
                 }
                 Item {
                     Layout.fillWidth: true
@@ -226,7 +225,7 @@ DialogWindow {
                     implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                     text: qsTranslate("HoldingProfile", "Plot Profile")
                     enabled: dialog.points.length > 0
-                    onClicked: dialog.plotVisible = !dialog.plotVisible
+                    clickAction: () => dialog.plotVisible = !dialog.plotVisible
                 }
             }
             Canvas {
@@ -279,21 +278,20 @@ DialogWindow {
                     text: qsTranslate("DialogAction", "OK")
                     enabled: dialog.points.length > 0
                     primaryAction: true
-                    onClicked: dialog.acceptProfile()
+                    clickAction: () => dialog.acceptProfile()
                 }
                 ThemedButton {
                     contentPadding: Theme.spacingLarge
 
                     objectName: "holdingProfileCancel"
                     text: qsTranslate("DialogAction", "Cancel")
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
                 ThemedButton {
                     contentPadding: Theme.spacingLarge
                     implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
 
                     text: qsTranslate("UiCommonHelp", "Help")
-                    enabled: false
                 }
             }
         }

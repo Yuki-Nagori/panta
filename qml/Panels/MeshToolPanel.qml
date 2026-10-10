@@ -85,7 +85,7 @@ ScrollView {
                 text: qsTranslate("MeshTool", "Mesh")
                 primaryAction: true
                 enabled: meshTool.meshAvailable && !meshTool.busy
-                onClicked: meshTool.meshRequested(Number(edgeLength.text))
+                clickAction: () => meshTool.meshRequested(Number(edgeLength.text))
             }
             ThemedButton {
                 contentPadding: Theme.spacingLarge
@@ -106,7 +106,7 @@ ScrollView {
                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 objectName: "meshCancelAction"
                 enabled: meshTool.busy
-                onClicked: meshTool.cancelRequested()
+                clickAction: () => meshTool.cancelRequested()
                 Layout.fillWidth: true
                 text: qsTranslate("DialogAction", "Cancel")
             }

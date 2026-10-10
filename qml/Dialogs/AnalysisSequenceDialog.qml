@@ -69,7 +69,7 @@ DialogWindow {
                     primaryAction: true
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
-                    onClicked: dialog.acceptSelection()
+                    clickAction: () => dialog.acceptSelection()
                 }
                 ThemedButton {
                     objectName: "analysisSequenceCancel"
@@ -78,14 +78,13 @@ DialogWindow {
                     contentColor: Theme.colorText
                     borderColor: Theme.colorPanelLine
                     hoverColor: Theme.colorHover
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
                 Item {
                     Layout.fillHeight: true
                 }
                 ThemedButton {
                     text: qsTranslate("AnalysisSequenceDialog", "More...")
-                    enabled: false
                     contentColor: Theme.colorText
                     borderColor: Theme.colorPanelLine
                 }

@@ -21,5 +21,5 @@ ThemedToolButton {
     contentPadding: 0
     hoverColor: Theme.colorCloseHover
 
-    onClicked: closeButton.closeRequested()
+    clickAction: () => closeButton.closeRequested()
 }

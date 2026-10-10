@@ -55,7 +55,7 @@ ColumnLayout {
             text: qsTranslate("UiCommonResults", "Results")
             contentAlignLeft: true
             contentColor: Theme.colorText
-            onClicked: tree.expanded = !tree.expanded
+            clickAction: () => tree.expanded = !tree.expanded
         }
     }
     Repeater {
@@ -85,7 +85,7 @@ ColumnLayout {
                     preserveIconColors: true
                     contentAlignLeft: true
                     contentColor: Theme.colorText
-                    onClicked: group.expanded = !group.expanded
+                    clickAction: () => group.expanded = !group.expanded
                 }
             }
             Repeater {

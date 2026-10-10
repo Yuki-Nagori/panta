@@ -59,7 +59,6 @@ ScrollView {
             ThemedButton {
                 contentPadding: Theme.spacingMedium
                 text: qsTranslate("MaterialDialog", "Remove")
-                enabled: false
             }
         }
         RowLayout {
@@ -77,13 +76,11 @@ ScrollView {
                 contentPadding: Theme.spacingMedium
                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 text: qsTranslate("MaterialDialog", "Customize Material List...")
-                enabled: false
             }
             ThemedButton {
                 contentPadding: Theme.spacingMedium
                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                 text: qsTranslate("MaterialDialog", "Reset Material List")
-                enabled: false
             }
         }
         GridLayout {
@@ -104,7 +101,6 @@ ScrollView {
             ThemedButton {
                 contentPadding: Theme.spacingMedium
                 text: qsTranslate("MaterialDialog", "Import...")
-                enabled: false
             }
             ThemedLabel {
                 text: qsTranslate("MaterialDialog", "Material")
@@ -119,7 +115,6 @@ ScrollView {
             ThemedButton {
                 contentPadding: Theme.spacingMedium
                 text: qsTranslate("MaterialDialog", "Search...")
-                enabled: false
             }
         }
         Rectangle {
@@ -148,12 +143,11 @@ ScrollView {
                         contentPadding: Theme.spacingMedium
                         objectName: "materialDetailsAction"
                         text: qsTranslate("MaterialDialog", "Details...")
-                        onClicked: panel.detailsVisible = !panel.detailsVisible
+                        clickAction: () => panel.detailsVisible = !panel.detailsVisible
                     }
                     ThemedButton {
                         contentPadding: Theme.spacingMedium
                         text: qsTranslate("MaterialDialog", "Report...")
-                        enabled: false
                     }
                 }
                 Repeater {
@@ -178,7 +172,6 @@ ScrollView {
 
                     font.pixelSize: Theme.fontSmall
                     text: qsTranslate("MaterialDialog", "Add material to commonly used list after selecting")
-                    enabled: false
                 }
             }
         }

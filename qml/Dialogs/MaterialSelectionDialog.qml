@@ -69,7 +69,7 @@ DialogWindow {
                 enabled: dialog.canConfirm
                 primaryAction: true
                 contentColor: Theme.colorText
-                onClicked: dialog.acceptSelection()
+                clickAction: () => dialog.acceptSelection()
             }
             ThemedButton {
                 objectName: "materialCancel"
@@ -78,13 +78,12 @@ DialogWindow {
                 text: qsTranslate("DialogAction", "Cancel")
                 contentColor: Theme.colorText
                 borderColor: Theme.colorPanelLine
-                onClicked: dialog.close()
+                clickAction: () => dialog.close()
             }
             ThemedButton {
                 text: qsTranslate("UiCommonHelp", "Help")
                 contentColor: Theme.colorText
                 borderColor: Theme.colorPanelLine
-                enabled: false
             }
         }
     }

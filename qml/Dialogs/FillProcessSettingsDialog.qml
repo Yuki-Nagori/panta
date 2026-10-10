@@ -220,7 +220,7 @@ DialogWindow {
                                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                                 objectName: "editHoldingProfile"
                                 text: qsTranslate("FillSettings", "Edit Profile…")
-                                onClicked: profileDialog.open(dialog.profile)
+                                clickAction: () => profileDialog.open(dialog.profile)
                             }
                         }
                         ThemedLabel {
@@ -254,13 +254,11 @@ DialogWindow {
                                 contentPadding: Theme.spacingLarge
                                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                                 text: qsTranslate("FillSettings", "Advanced Options…")
-                                enabled: false
                             }
                             ThemedButton {
                                 contentPadding: Theme.spacingLarge
                                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                                 text: qsTranslate("FillSettings", "Fiber Solver Parameters…")
-                                enabled: false
                             }
                         }
                     }
@@ -278,7 +276,7 @@ DialogWindow {
                 text: qsTranslate("DialogAction", "OK")
                 enabled: dialog.canConfirm
                 primaryAction: true
-                onClicked: dialog.acceptSettings()
+                clickAction: () => dialog.acceptSettings()
             }
             ThemedButton {
                 contentPadding: Theme.spacingLarge
@@ -286,14 +284,13 @@ DialogWindow {
                 objectName: "fillSettingsCancel"
                 text: qsTranslate("DialogAction", "Cancel")
                 enabled: !dialog.saving
-                onClicked: dialog.close()
+                clickAction: () => dialog.close()
             }
             ThemedButton {
                 contentPadding: Theme.spacingLarge
                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
 
                 text: qsTranslate("UiCommonHelp", "Help")
-                enabled: false
             }
         }
     }

@@ -133,7 +133,7 @@ DialogWindow {
                         contentPadding: Theme.spacingSmall
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
-                        onClicked: folderDialog.open()
+                        clickAction: () => folderDialog.open()
                     }
                 }
             }
@@ -169,14 +169,14 @@ DialogWindow {
                     primaryAction: true
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
-                    onClicked: dialog.submit()
+                    clickAction: () => dialog.submit()
                 }
                 ThemedButton {
                     text: qsTranslate("DialogAction", "Cancel")
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     borderColor: Theme.colorPanelLine
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
             }
         }

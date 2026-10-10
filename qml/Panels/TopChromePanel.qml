@@ -272,7 +272,7 @@ Rectangle {
                                 objectName: "menu-" + modelData.key
                                 text: modelData.label
                                 highlighted: modelData.key === chrome.activeRibbonTab
-                                onClicked: chrome.menuRequested(modelData.key)
+                                clickAction: () => chrome.menuRequested(modelData.key)
                             }
                         }
                         ThemedToolButton {

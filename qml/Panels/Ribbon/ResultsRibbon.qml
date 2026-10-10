@@ -1,4 +1,4 @@
-// 已接入的充填动画控制由 AnalysisModel 驱动；其余结果工具保留布局。
+// 已接入的充填动画控制由 AnalysisModel 驱动；其余结果工具给出统一提示。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -15,7 +15,6 @@ Row {
         preserveIconColors: true
         contentColor: Theme.colorText
         font.pixelSize: Theme.fontRibbon
-        enabled: false
     }
 
     component ActionStack: Column {
@@ -44,8 +43,8 @@ Row {
                 width: Theme.ribbonCompactWidth
                 iconName: modelData.icon
                 accessibleName: modelData.label
-                enabled: modelData.key !== undefined && resultsRibbon.animationAvailable
-                onClicked: {
+                enabled: modelData.key === undefined || resultsRibbon.animationAvailable
+                clickAction: () => {
                     switch (modelData.key) {
                     case "play":
                         resultsRibbon.analysisModel.play();
@@ -61,6 +60,9 @@ Row {
                         break;
                     case "last":
                         resultsRibbon.analysisModel.playbackTime = resultsRibbon.analysisModel.duration;
+                        break;
+                    default:
+                        FeatureNotice.notify(Window.window);
                         break;
                     }
                 }
@@ -98,7 +100,7 @@ Row {
         RibbonTile {
             iconName: "results-new-plot"
             text: qsTr("New Plot")
-            enabled: false
+
             showCaret: true
         }
         ActionStack {
@@ -119,12 +121,11 @@ Row {
         RibbonTile {
             iconName: "results-plot-properties"
             text: qsTr("Plot\nProperties")
-            enabled: false
         }
         RibbonTile {
             iconName: "results-save-defaults"
             text: qsTr("Save\nDefaults")
-            enabled: false
+
             showCaret: true
         }
     }
@@ -199,12 +200,10 @@ Row {
         RibbonTile {
             iconName: "results-examine"
             text: qsTr("Examine")
-            enabled: false
         }
         RibbonTile {
             iconName: "results-min-max"
             text: qsTr("Show\nMin/Max")
-            enabled: false
         }
     }
     RibbonGroup {
@@ -212,7 +211,6 @@ Row {
         RibbonTile {
             iconName: "results-histogram"
             text: qsTr("Histogram")
-            enabled: false
         }
     }
     RibbonGroup {
@@ -279,12 +277,10 @@ Row {
         RibbonTile {
             iconName: "results-defect"
             text: qsTr("Defect\nVisualization")
-            enabled: false
         }
         RibbonTile {
             iconName: "results-export"
             text: qsTr("Export\nResults")
-            enabled: false
         }
         ActionStack {
             actions: [

@@ -94,7 +94,7 @@ PanelSurface {
                         iconName: modelData.icon
                         preserveIconColors: modelData.preserveIconColors === true
                         accessibleName: modelData.label
-                        onClicked: panel.toolRequested(modelData.action)
+                        clickAction: () => panel.toolRequested(modelData.action)
                     }
                 }
             }

@@ -122,7 +122,7 @@ DialogWindow {
                         contentPadding: Theme.spacingSmall
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
-                        onClicked: dialog.chooseFile()
+                        clickAction: () => dialog.chooseFile()
                     }
                 }
 
@@ -212,7 +212,7 @@ DialogWindow {
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     borderColor: Theme.colorPanelLine
-                    onClicked: helpText.visible = !helpText.visible
+                    clickAction: () => helpText.visible = !helpText.visible
                 }
 
                 Item {
@@ -226,14 +226,14 @@ DialogWindow {
                     enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady && !dialog.projectModel.importPending
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
-                    onClicked: dialog.submit()
+                    clickAction: () => dialog.submit()
                 }
                 ThemedButton {
                     text: qsTranslate("DialogAction", "Cancel")
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     borderColor: Theme.colorPanelLine
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
             }
         }

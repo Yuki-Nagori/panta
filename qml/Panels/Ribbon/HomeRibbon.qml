@@ -163,5 +163,7 @@ RibbonContent {
             homeRibbon.processSettingsRequested();
         else if (key === "logs")
             homeRibbon.logsRequested();
+        else
+            FeatureNotice.notify(Window.window);
     }
 }

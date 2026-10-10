@@ -26,7 +26,7 @@ Row {
                     iconName: modelData.icon
                     showCaret: modelData.caret === true
                     enabled: modelData.enabled !== false
-                    onClicked: content.actionRequested(modelData.key)
+                    clickAction: () => content.actionRequested(modelData.key)
                 }
             }
         }

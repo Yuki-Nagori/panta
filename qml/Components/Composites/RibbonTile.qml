@@ -1,8 +1,7 @@
 // 分组 Ribbon 工具：最小宽度统一，长文案按内容扩宽；保留焦点和禁用语义。
 import QtQuick
-import QtQuick.Controls
 
-ToolButton {
+ActionButton {
     id: tile
     hoverEnabled: true
 

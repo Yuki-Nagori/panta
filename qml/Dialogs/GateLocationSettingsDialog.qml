@@ -85,13 +85,11 @@ DialogWindow {
                             contentPadding: Theme.spacingLarge
                             implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                             text: qsTranslate("GateLocationSettings", "Edit…")
-                            enabled: false
                         }
                         ThemedButton {
                             contentPadding: Theme.spacingLarge
                             implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                             text: qsTranslate("GateLocationSettings", "Select…")
-                            enabled: false
                         }
                     }
                 }
@@ -198,7 +196,6 @@ DialogWindow {
                             contentPadding: Theme.spacingLarge
                             implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                             text: qsTranslate("FillSettings", "Advanced Options…")
-                            enabled: false
                         }
                     }
                 }
@@ -215,7 +212,7 @@ DialogWindow {
                 text: qsTranslate("DialogAction", "OK")
                 enabled: dialog.canConfirm
                 primaryAction: true
-                onClicked: dialog.acceptSettings()
+                clickAction: () => dialog.acceptSettings()
             }
             ThemedButton {
                 contentPadding: Theme.spacingLarge
@@ -223,14 +220,13 @@ DialogWindow {
 
                 text: qsTranslate("DialogAction", "Cancel")
                 enabled: !dialog.saving
-                onClicked: dialog.close()
+                clickAction: () => dialog.close()
             }
             ThemedButton {
                 contentPadding: Theme.spacingLarge
                 implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
 
                 text: qsTranslate("UiCommonHelp", "Help")
-                enabled: false
             }
         }
     }
