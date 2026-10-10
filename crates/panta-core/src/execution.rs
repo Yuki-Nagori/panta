@@ -185,6 +185,14 @@ mod tests {
     use std::sync::mpsc;
     use std::time::Duration;
 
+    fn no_op() {}
+
+    fn send_once(sender: mpsc::Sender<()>) -> impl FnOnce() {
+        move || {
+            let _ = sender.send(());
+        }
+    }
+
     #[test]
     fn debug_reports_executor_configuration() {
         let executor = Executor::new("debug-test", 3, 7);
@@ -208,12 +216,10 @@ mod tests {
         })?;
         ready.recv_timeout(Duration::from_secs(2))?;
         let (finished, done) = mpsc::channel();
-        executor.submit(move || {
-            let _ = finished.send(());
-        })?;
+        executor.submit(send_once(finished))?;
         assert_eq!(
             executor
-                .submit(|| {})
+                .submit(no_op)
                 .err()
                 .ok_or("capacity not enforced")?
                 .kind(),
@@ -231,7 +237,7 @@ mod tests {
         release.send(())?;
         done.recv_timeout(Duration::from_secs(2))?;
         wait_idle(&executor)?;
-        executor.submit(|| {})?;
+        executor.submit(no_op)?;
         wait_idle(&executor)?;
         Ok(())
     }
@@ -250,9 +256,7 @@ mod tests {
         failure.recv_timeout(Duration::from_secs(2))?;
         wait_idle(&executor)?;
         let (sent, received) = mpsc::channel();
-        executor.submit(move || {
-            let _ = sent.send(());
-        })?;
+        executor.submit(send_once(sent))?;
         received.recv_timeout(Duration::from_secs(2))?;
         wait_idle(&executor)?;
         Ok(())
@@ -277,7 +281,7 @@ mod tests {
         received.recv_timeout(Duration::from_secs(2))?;
         assert_eq!(
             executor
-                .submit(|| {})
+                .submit(no_op)
                 .err()
                 .ok_or("closed admission succeeded")?
                 .kind(),
@@ -295,9 +299,7 @@ mod tests {
         let error = executor
             .submit_with(
                 super::Job {
-                    work: Box::new(move || {
-                        let _ = sent.send(());
-                    }),
+                    work: Box::new(send_once(sent)),
                     failed: None,
                 },
                 |_| Err(std::io::Error::other("spawn probe")),
@@ -310,7 +312,7 @@ mod tests {
             Err(mpsc::TryRecvError::Disconnected)
         ));
         wait_idle(&executor)?;
-        executor.submit(|| {})?;
+        executor.submit(no_op)?;
         wait_idle(&executor)?;
         Ok(())
     }

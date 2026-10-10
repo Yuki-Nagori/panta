@@ -103,7 +103,11 @@ TS 输出原先在每个 XML 写入和 UTF-8 转换点各自创建错误映射�
 
 继续补测格式化器对手工 AST 的 locale 回退：文档语言没有对应翻译时，使用首个可用翻译；保持 formatter 的既有宽松 AST 契约。格式化器模块函数覆盖现为 23/23；DSL core 汇总仍为 132/135，新增测试自身计入分母，未覆盖项留在解析器/FSM 的防御路径。
 
-补测后台执行器的 `Debug` 输出，确保诊断文本包含执行器名称、worker 数和容量；被拒绝/启动失败作业的回调闭包仍按未执行语义保留为真实覆盖缺口。
+补测后台执行器的 `Debug` 输出，确保诊断文本包含执行器名称、worker 数和容量。执行器拒绝/启动失败时，回调不执行仍是测试必须保持的语义；10 月 10 日后续记录通过复用已覆盖回调来避免把测试辅助闭包计入未覆盖函数。
+
+覆盖口径复核发现，inline `#[cfg(test)]` 模块中的未调用闭包也进入函数分母，例如执行器拒绝/启动失败用例为了断言回调未运行而保留的闭包；这类记录不代表生产代码未测。本轮保留单元测试在源码内联模块中的归属，也不改覆盖过滤规则：拒绝/失败路径改为复用成功路径已执行的回调函数，并继续断言拒绝状态和未执行回调的 sender 断开。这样减少了三个测试辅助闭包的未覆盖函数计数，不改变执行器实现或行为。
+
+本轮验证：`cargo test --locked -p panta-core execution::tests --lib` 通过（6 项）；`cargo coverage` 通过，全局函数 768/825（93.09%）、行 8752/9183（95.31%），比本轮开始前记录的 769/829 少 3 个未覆盖函数；`panta-core` 为 357/393（90.84%），剩余 36 个函数缺口。Rust 函数 100% 目标仍未完成，任务继续 in-progress。
 
 验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings` 和 `cargo format --check` 均通过。完整 `cargo lint` 因沙箱禁止绑定其锁管理 TCP listener，在 Clippy 阶段退出；因此其余 lint 阶段未运行。最终覆盖率为全局函数 769/829（92.76%）、行 8752/9190（95.23%）；`panta-core` 函数 358/397（90.18%），`panta-dsl-core` 函数 132/135（97.78%）、行 2001/2091（95.70%）。全局仍有 60 个 Rust 函数未覆盖，100% 目标尚未完成，本任务及索引保持 in-progress；其他 crate 与 DSL 的不可达/剩余路径留待继续按行为审查。
 
