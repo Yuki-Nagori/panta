@@ -250,17 +250,13 @@ impl std::fmt::Display for bridge::ProjectDiagnostic {
 impl std::error::Error for bridge::ProjectDiagnostic {}
 
 #[cfg(test)]
-#[path = "../../../tests/support/rust/temp_directory.rs"]
-mod temp_directory;
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn exhausted_revision_crosses_cxx_as_diagnostic_without_changing_the_project()
     -> Result<(), Box<dyn std::error::Error>> {
-        let fixture = temp_directory::Fixture::new()?;
+        let fixture = crate::temp_directory::Fixture::new()?;
         let path = fixture.root.join("Max.panta");
         let bytes = format!(r#"{{"schema":2,"name":"Max","revision":{}}}"#, u64::MAX);
         std::fs::write(&path, &bytes)?;
@@ -305,7 +301,7 @@ mod tests {
     #[test]
     fn preview_bridge_distinguishes_pending_success_failure_and_cancelled_requests()
     -> Result<(), Box<dyn std::error::Error>> {
-        let fixture = temp_directory::Fixture::new()?;
+        let fixture = crate::temp_directory::Fixture::new()?;
         let source = fixture.root.join("preview.stl");
         std::fs::write(&source, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
         let mut service = crate::project_service_new();

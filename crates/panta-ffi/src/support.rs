@@ -80,11 +80,14 @@ pub(super) fn session_live_count() -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use super::finish_background_writes;
+    use crate::temp_directory::Fixture;
     use crate::{
         FfiRequest, FfiResponse, MAX_LABEL_BYTES, install_crash_handler, panic_probe, process,
         session_close, session_create, session_label, session_live_count,
     };
     use std::sync::{Mutex, MutexGuard};
+
     /// 存活计数是进程级共享状态；触碰它的测试先取锁串行化，避免并行互扰。
     fn session_lock() -> MutexGuard<'static, ()> {
         static LOCK: Mutex<()> = Mutex::new(());
@@ -203,6 +206,57 @@ mod tests {
             .ok_or_else(|| std::io::Error::other("文件路径不应成为日志目录"))?;
         assert!(!error.is_empty());
         std::fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn shutdown_bridge_finishes_an_accepted_project_write() -> Result<(), Box<dyn std::error::Error>>
+    {
+        const ROOT_ENV: &str = "PANTA_FFI_TEST_WRITE_SHUTDOWN";
+
+        if let Some(root) = std::env::var_os(ROOT_ENV) {
+            let root = std::path::PathBuf::from(root);
+            let source = root.join("shutdown.stl");
+            std::fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+            let mut service = panta_core::project::ProjectService::new();
+            let project = service.create(&root, "Shutdown")?;
+            let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+            let revision = service.current()?.revision;
+            let material = panta_core::project::default_material()?;
+            service.begin_material_confirmation(
+                &project.path,
+                revision,
+                &record.id,
+                &material.id,
+            )?;
+            drop(service);
+
+            finish_background_writes();
+
+            let mut reopened = panta_core::project::ProjectService::new();
+            reopened.open(&project.path)?;
+            let plan = reopened
+                .plan_settings(&record.id)
+                .ok_or("accepted material write was not persisted")?;
+            assert_eq!(plan.revision, revision + 1);
+            assert_eq!(plan.material_id, material.id);
+            return Ok(());
+        }
+
+        let fixture = Fixture::new()?;
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args([
+                "--exact",
+                "support::tests::shutdown_bridge_finishes_an_accepted_project_write",
+                "--nocapture",
+            ])
+            .env(ROOT_ENV, &fixture.root)
+            .output()?;
+        assert!(
+            output.status.success(),
+            "shutdown child failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         Ok(())
     }
 }

@@ -4,6 +4,10 @@
 
 mod project_response;
 
+#[cfg(test)]
+#[path = "../../../tests/support/rust/temp_directory.rs"]
+mod temp_directory;
+
 use project_response::{
     default_material_response, project_service_begin_asset_activation_response,
     project_service_begin_fill_settings_confirmation_response,
