@@ -31,6 +31,13 @@ elseif(WIN32)
 endif()
 
 if(BUILD_TESTING)
+  add_executable(panta_qt_adapter_standard_paths_test
+                 ../../tests/cpp/qt-adapter/standard_paths_test.cpp)
+  panta_native_defaults(panta_qt_adapter_standard_paths_test)
+  target_link_libraries(panta_qt_adapter_standard_paths_test PRIVATE panta::qt_adapter
+                                                                     GTest::gtest_main)
+  gtest_discover_tests(panta_qt_adapter_standard_paths_test DISCOVERY_MODE POST_BUILD)
+
   add_executable(panta_qt_adapter_translation_test
                  ../../tests/cpp/qt-adapter/translation_catalog_test.cpp)
   panta_native_defaults(panta_qt_adapter_translation_test)
