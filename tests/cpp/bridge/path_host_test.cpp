@@ -221,6 +221,10 @@ TEST(PathHostTest, NonRoundTrippableTextIsRejected) {
     error.clear();
     auto host = standardRoots.create(&error);
     ASSERT_NE(host, nullptr) << error.toStdString();
+    EXPECT_FALSE(host->setProjectRoot(surrogate, &error));
+    EXPECT_EQ(error, QStringLiteral("path.non_unicode"));
+
+    error.clear();
     const QString resolved =
         host->resolve(QStringLiteral("project:/") + surrogate + QStringLiteral(".pa"), &error);
     EXPECT_TRUE(resolved.isEmpty());

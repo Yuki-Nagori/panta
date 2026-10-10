@@ -46,6 +46,7 @@
 | 2026-10-10：材料与工程失败路径覆盖 | 材料解析新增 malformed JSON / 不支持 schema 测试；新增锁文件不可打开、任务状态锁中毒恢复测试。`cargo coverage` 函数 813/850（95.65%）、行 9357/9748（95.99%）；core 393/418（94.02%）。`cargo test --locked --workspace`（72/72 native / QML CTest）、`cargo lint --check`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 批准。审计剩余缺口后，多数零计数为重复实例、崩溃子进程和手动性能基准，尚需继续逐项审查可稳定触达的生产行为。 |
 | 2026-10-10：native 报告与图标尺寸回退 | 增加有效图标请求尺寸为空时回退 SVG 固有尺寸的行为断言；`cargo coverage native` 72/72 CTest 通过。报告新增排除 `tests/` 的产品汇总和逐行文件，并由 CI 上传；产品 native 行/分支为 74.84% / 55.99%（macOS arm64 本机诊断）。`cargo lint --check`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；两轮独立 `gpt-6.1-sol` medium review 均未发现问题。C++ 阈值门禁仍未启用。 |
 | 2026-10-10：标准目录映射覆盖 | 新增 Qt 标准目录五种映射的行为测试；`cargo coverage native` 73/73 CTest 通过。产品 native 行/分支升至 75.10% / 56.45%（macOS arm64 本机诊断）；`cargo lint --check`、clang-format、`cargo fmt --all -- --check` 和 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 未发现问题。C++ 覆盖门禁尚未启用。 |
+| 2026-10-10：工程根 Unicode 错误路径 | `PathHost::setProjectRoot` 新增不可往返 UTF-8 的错误行为断言；`cargo coverage native` 73/73 CTest 通过，`path_host.cpp` 行覆盖 69.03%→70.32%、分支 57.69%→59.62%，产品汇总行覆盖为 75.13%。`cargo format --check` 与 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 未发现问题。 |
 
 ## 重要边界
 
