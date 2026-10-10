@@ -131,8 +131,7 @@ std::array<unsigned char, 3> arrival_color(double fraction) {
 } // namespace
 
 vtkSmartPointer<vtkPolyData> make_filling_poly_data(const SurfaceMeshSnapshot& mesh, double time) {
-    if (mesh.fill_times.size() != mesh.vertices.size() || mesh.fill_duration <= 0 ||
-        !mesh.fields_visible) {
+    if (!mesh.fields_visible) {
         return make_surface_poly_data(mesh);
     }
     if (mesh.pressure_visible && mesh.pressures.size() == mesh.vertices.size()) {
@@ -152,6 +151,9 @@ vtkSmartPointer<vtkPolyData> make_filling_poly_data(const SurfaceMeshSnapshot& m
         }
         data->GetPointData()->SetScalars(colors);
         return data;
+    }
+    if (mesh.fill_times.size() != mesh.vertices.size() || mesh.fill_duration <= 0) {
+        return make_surface_poly_data(mesh);
     }
     SurfaceMeshSnapshot display;
     auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();

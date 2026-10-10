@@ -13,7 +13,8 @@ struct SurfaceMeshSnapshot;
 /// GUI 线程调用；actor 非空；window 可空（仅 CPU 场景）。有窗口时先释放旧 mapper 的图形资源；空
 /// mesh 使用欢迎字样。
 void replace_primitive_geometry(vtkActor* actor, vtkRenderWindow* window,
-                                const std::shared_ptr<const SurfaceMeshSnapshot>& mesh);
+                                const std::shared_ptr<const SurfaceMeshSnapshot>& mesh,
+                                double playback_time);
 /// 使用 actor 的有效包围盒配置透视相机；aspect 和 fit_margin 必须为正。
 void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect,
                               double fit_margin);

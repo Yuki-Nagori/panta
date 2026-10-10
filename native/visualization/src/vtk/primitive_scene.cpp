@@ -8,6 +8,7 @@
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkNew.h>
+#include <vtkPointData.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkPolyDataNormals.h>
@@ -41,16 +42,23 @@ void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, doub
 }
 
 void replace_primitive_geometry(vtkActor* actor, vtkRenderWindow* window,
-                                const std::shared_ptr<const SurfaceMeshSnapshot>& mesh) {
+                                const std::shared_ptr<const SurfaceMeshSnapshot>& mesh,
+                                double playback_time) {
     vtkSmartPointer<vtkPolyData> geometry;
     const bool imported_mesh = mesh != nullptr;
-    geometry = imported_mesh ? make_surface_poly_data(*mesh) : create_welcome_wordmark();
+    geometry =
+        imported_mesh ? make_filling_poly_data(*mesh, playback_time) : create_welcome_wordmark();
 
     vtkNew<vtkPolyDataMapper> mapper;
     if (imported_mesh) {
         mapper->SetInputData(geometry);
-        mapper->SetColorModeToDefault();
-        mapper->SetScalarModeToDefault();
+        if (geometry->GetPointData()->GetScalars() != nullptr) {
+            mapper->SetColorModeToDirectScalars();
+            mapper->SetScalarModeToUsePointData();
+        } else {
+            mapper->SetColorModeToDefault();
+            mapper->SetScalarModeToDefault();
+        }
     } else {
         vtkNew<vtkPolyDataNormals> normals;
         normals->SetInputData(geometry);
@@ -81,6 +89,8 @@ void replace_primitive_geometry(vtkActor* actor, vtkRenderWindow* window,
     material->SetSpecularPower(28.0);
     if (imported_mesh) {
         material->SetColor(0.72, 0.82, 0.94);
+        material->SetEdgeVisibility(mesh->show_edges);
+        material->SetEdgeColor(0.12, 0.17, 0.24);
     }
 }
 

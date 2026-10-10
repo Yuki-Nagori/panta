@@ -128,6 +128,7 @@ PanelSurface {
                 iconSize: Theme.iconSizeSmall
                 contentColor: Theme.colorText
                 accessibleName: qsTranslate("LayerPanelTitle", "Layers")
+                clickAction: () => FeatureNotice.notify(Window.window)
             }
         }
 

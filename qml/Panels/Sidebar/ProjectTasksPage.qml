@@ -206,6 +206,7 @@ ColumnLayout {
                 contentColor: Theme.colorText
                 contentPadding: Theme.spacingLarge
                 hoverColor: Theme.colorHover
+                clickAction: () => FeatureNotice.notify(Window.window)
                 contentItem: RowLayout {
                     spacing: Theme.spacingMedium
                     ThemedIcon {

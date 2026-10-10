@@ -70,40 +70,48 @@ Rectangle {
                         Layout.minimumWidth: implicitWidth
                         ChromeToolButton {
                             iconName: "new"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             preserveIconColors: true
                             accessibleName: qsTranslate("IconActionNewDocument", "New document")
                             showCaret: true
                         }
                         ChromeToolButton {
                             iconName: "open"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             preserveIconColors: true
                             accessibleName: qsTranslate("IconActionOpenDocument", "Open document")
                         }
                         ChromeToolButton {
                             iconName: "save"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             preserveIconColors: true
                             accessibleName: qsTranslate("IconActionSaveDocument", "Save document")
                             showCaret: true
                         }
                         ChromeToolButton {
                             iconName: "undo"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             accessibleName: qsTranslate("IconActionUndo", "Undo")
                         }
                         ChromeToolButton {
                             iconName: "redo"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             accessibleName: qsTranslate("IconActionRedo", "Redo")
                         }
                         ChromeToolButton {
                             iconName: "print"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             accessibleName: qsTranslate("IconActionPrint", "Print")
                         }
                         ChromeToolButton {
                             iconName: "preview"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             accessibleName: qsTranslate("IconActionPreviewAnimation", "Preview animation")
                             showCaret: true
                         }
                         ChromeToolButton {
                             text: qsTr("Activate Animation (A)")
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             showCaret: true
                             contentColor: Theme.colorText
                             contentPadding: Theme.spacingSmall
@@ -167,20 +175,24 @@ Rectangle {
                             ChromeToolButton {
                                 objectName: "searchButton"
                                 iconName: "search"
+                                clickAction: () => FeatureNotice.notify(Window.window)
                                 accessibleName: qsTranslate("IconActionSearch", "Search")
                             }
                         }
                         ChromeToolButton {
                             text: qsTr("Sign in")
                             iconName: "account"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             showCaret: true
                         }
                         ChromeToolButton {
                             iconName: "cart"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             accessibleName: qsTranslate("IconActionShoppingCart", "Shopping cart")
                         }
                         ChromeToolButton {
                             iconName: "help"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             accessibleName: qsTranslate("UiCommonHelp", "Help")
                             showCaret: true
                         }
@@ -278,6 +290,7 @@ Rectangle {
                         ThemedToolButton {
                             objectName: "languageButton"
                             iconName: "globe"
+                            clickAction: () => FeatureNotice.notify(Window.window)
                             showCaret: true
                             accessibleName: qsTranslate("IconActionLanguage", "Language")
                             controlHeight: Theme.menubarHeight

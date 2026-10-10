@@ -4,10 +4,6 @@ import QtQuick.Controls
 
 ToolButton {
     property var clickAction: null
-    onClicked: {
-        if (clickAction)
-            clickAction();
-        else
-            FeatureNotice.notify(Window.window);
-    }
+    onClicked: if (clickAction)
+        clickAction()
 }

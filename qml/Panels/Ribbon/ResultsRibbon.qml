@@ -28,6 +28,7 @@ Row {
                 text: modelData.label
                 iconName: modelData.icon
                 contentAlignLeft: true
+                clickAction: () => FeatureNotice.notify(Window.window)
             }
         }
     }
@@ -100,6 +101,7 @@ Row {
         RibbonTile {
             iconName: "results-new-plot"
             text: qsTr("New Plot")
+            clickAction: () => FeatureNotice.notify(Window.window)
 
             showCaret: true
         }
@@ -121,10 +123,12 @@ Row {
         RibbonTile {
             iconName: "results-plot-properties"
             text: qsTr("Plot\nProperties")
+            clickAction: () => FeatureNotice.notify(Window.window)
         }
         RibbonTile {
             iconName: "results-save-defaults"
             text: qsTr("Save\nDefaults")
+            clickAction: () => FeatureNotice.notify(Window.window)
 
             showCaret: true
         }
@@ -200,10 +204,12 @@ Row {
         RibbonTile {
             iconName: "results-examine"
             text: qsTr("Examine")
+            clickAction: () => FeatureNotice.notify(Window.window)
         }
         RibbonTile {
             iconName: "results-min-max"
             text: qsTr("Show\nMin/Max")
+            clickAction: () => FeatureNotice.notify(Window.window)
         }
     }
     RibbonGroup {
@@ -211,6 +217,7 @@ Row {
         RibbonTile {
             iconName: "results-histogram"
             text: qsTr("Histogram")
+            clickAction: () => FeatureNotice.notify(Window.window)
         }
     }
     RibbonGroup {
@@ -277,10 +284,12 @@ Row {
         RibbonTile {
             iconName: "results-defect"
             text: qsTr("Defect\nVisualization")
+            clickAction: () => FeatureNotice.notify(Window.window)
         }
         RibbonTile {
             iconName: "results-export"
             text: qsTr("Export\nResults")
+            clickAction: () => FeatureNotice.notify(Window.window)
         }
         ActionStack {
             actions: [
