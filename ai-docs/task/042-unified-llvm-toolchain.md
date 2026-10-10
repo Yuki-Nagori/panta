@@ -26,6 +26,10 @@
 - **Windows ASan × 未插桩 Qt DLL**：clang ASan 在 Windows 用自有分配器，未插桩 Qt DLL 走 ucrt/RTL 堆，QML 引擎跨模块对象生命周期释放到错误堆触发 bad-free（abort，非报告，不可抑制）。Windows asan 组合经 runner 排除 `Qml.*`；纯自有 C++ 与 FFI 测试不受影响。
 - **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。tsan 组合经 runner 排除 `TaskHost.*`/`Ffi.*`（FFI 驱动 Rust 线程）、`Qml.*`（第三方栈噪声），以及 `ProjectViewModelTest` 中经 FFI 拉取 Rust 异步激活结果的两个用例和 Fill 后台确认用例（补登记见任务 098）。这些用例在普通 CTest 和 ASan/UBSan 中运行，Rust 协调器另由 Miri 检查；其余不涉及 Rust 后台结果交付的 `ProjectViewModelTest` 仍由 TSan 执行。`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。升级为 Rust/C++ 双侧 TSan 插桩后复查排除项。
 
+### macOS dyld TLS 抑制（2026-10-10）
+
+GitHub Actions macOS 26 arm64 的 `Ffi.TaskServiceLifecycle` 在销毁仍有运行中任务的服务时报告 368 字节，分配栈落于 dyld `ThreadLocalVariables` 的 TLS 注册 / 实例化元数据及 Rust std spawn hook；该测试请求协作取消但不 join worker。抑制仅匹配 dyld TLS 管理符号，不匹配通用分配器，自有代码的其他泄漏仍受检查。普通 macOS / Linux 文件名测试也揭示 macOS 临时文件系统创建非 UTF-8 名称返回 EILSEQ；063 的测试现在将此类平台拒绝与 `PermissionDenied`、`InvalidInput` 同样处理，并验证路径校验仍拒绝该名称。修复后本机 `cargo sanitize` 的 ASan/UBSan 72/72、TSan 51/51 通过；CI 复跑待提交。
+
 ### STL 预检排除补登记（2026-10-02，任务 063）
 
 CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/37005793824) 的 Linux TSan 报告均位于未插桩 Rust std mpsc 的结果读写、快照复制或释放栈。063 后台预检使以下四个用例进入同一工具边界，runner 按精确名称补入 TSan 排除：`StructuredImportFailuresPreserveTheCommittedProjectAndViewport`、`PreviewsImportsAndPersistsLatestRecord`、`PreviewCancellationReplacementAndProjectSwitchIgnoreOldResults`、`PreviewNotificationsCanReplaceOrCancelTheCompletedRequest`。普通 Cargo 聚合及 ASan/UBSan 仍执行这些用例；本次 CI 的 Miri 与三平台普通测试、ASan/UBSan 已通过。未扩大为整个 ViewModel 排除，也未添加运行时抑制；Rust/C++ 双侧插桩后复查这些排除。

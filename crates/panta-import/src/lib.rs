@@ -697,8 +697,12 @@ mod tests {
                     ));
                     fs::remove_file(non_utf8)?;
                 }
-                // Some sandboxed filesystems reject non-UTF-8 names before they can be read.
-                Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                // Some filesystems reject non-UTF-8 names before they can be read.
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::PermissionDenied
+                        || error.kind() == std::io::ErrorKind::InvalidInput
+                        || (cfg!(target_os = "macos") && error.raw_os_error() == Some(92)) =>
+                {
                     assert!(matches!(
                         source_name(&non_utf8),
                         Err(ImportError::UnsupportedFormat(_))

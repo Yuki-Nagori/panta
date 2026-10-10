@@ -105,6 +105,8 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 - 2026-10-02：CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/37005793824) 的 Linux TSan 在四个新接入后台预检的 ViewModel 用例中报告 Rust std mpsc 交付 / 释放竞态。当前 sanitizer 仅插桩自有 C++，Rust std 同步不可见，属于 042 已登记的工具边界；本轮按精确用例名补齐 TSan 组合排除，普通聚合及 ASan/UBSan 继续执行全部预检回归，Rust 并发正确性由既有 Miri 入口覆盖。不改业务同步实现或新增运行时抑制；修复后 macOS `cargo test --locked --workspace` 通过 Rust 测试及 72/72 个 native / QML CTest；`cargo sanitize` 通过 ASan/UBSan 72/72、TSan 51/51，`cargo format --check` 通过。用 CTest `--show-only=json-v1 -E` 对比实际清单，确认相对原名单仅减少这四个用例。`cargo lint --check` 全部通过；Linux 最终结果待新 CI 验证。
 
+- 2026-10-10：GitHub Actions run [38037921716](https://github.com/Yuki-Nagori/panta/actions/runs/38037921716) 的 macOS workspace 测试中，非 UTF-8 文件名夹具在临时文件系统创建阶段返回 EILSEQ；验证继续检查该路径被拒绝。测试现识别 macOS 文件系统对此名称的拒绝；定向测试及 `cargo test --locked --workspace` 通过，与 sanitizer 运行时边界见任务 042。CI 复跑待提交。
+
 - 2026-10-02：异步迁移按可验证边界分批实施。首批将 STL 预检迁入 Rust 后台；请求拥有独立编号、取消标志和字节 / 网格快照，GUI 线程只发起、取消和拉取结果。替换文件选择、关闭弹窗及成功切换工程均废弃旧请求，旧结果不得重新启用 OK 或污染新表单；预检成功后保留同一来源快照供确认时检查源文件变化。补充 Rust / CXX / Qt 的失败、取消、迟到结果与工程不变回归。确认导入的写入事务及取消截止点留在下一批，当前不标异步导入验收完成。
 
 - 2026-10-02：经 gh 核实提交 `2f6260c` 的 CI 运行 36994873700 成功，补齐三平台测试、sanitizer、覆盖率及质量检查证据；移除已完成的 CI 待验收描述。异步导入迁移与四档缩放仍未完成，任务及索引保持 in-progress。

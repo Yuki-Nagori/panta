@@ -20,3 +20,6 @@ leak:CoreText
 leak:libFontParser
 leak:libFontRegistry
 leak:libCGInterfaces
+# macOS dyld 未释放 Rust std 线程 TLS 注册表的少量元数据；限定到 dyld
+# TLS 管理符号，线程 worker 与自有代码的其他泄漏仍由 LSan 检测。
+leak:dyld::ThreadLocalVariables
