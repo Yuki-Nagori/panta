@@ -221,3 +221,39 @@ fn value_type_name(value_type: &ValueType) -> &'static str {
         ValueType::Resource => "resource",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::format_document;
+    use crate::{Document, Kind, Message, Translation};
+
+    #[test]
+    fn empty_non_numerus_translation_formats_as_empty_scalar() {
+        let message = Message {
+            context: "App".to_owned(),
+            id: "empty".to_owned(),
+            source: "Source".to_owned(),
+            old_source: None,
+            translations: BTreeMap::from([("en".to_owned(), Translation { forms: vec![] })]),
+            status: None,
+            comment: None,
+            extra: None,
+            numerus: false,
+        };
+        let document = Document {
+            version: 1,
+            kind: Kind::Language,
+            catalog: None,
+            language: Some("en".to_owned()),
+            source_language: "en".to_owned(),
+            messages: BTreeMap::from([("App\u{1f}empty".to_owned(), message)]),
+            message_order: vec!["App\u{1f}empty".to_owned()],
+            comments: vec![],
+            values: vec![],
+        };
+
+        assert!(format_document(&document).contains("  tr: \"\"\n"));
+    }
+}

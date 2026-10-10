@@ -363,6 +363,16 @@ fn quoted_escapes_round_trip_through_formatter() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
+fn quoted_message_ids_are_decoded() -> Result<(), Box<dyn Error>> {
+    let document = parse(
+        "version: 1\nkind: language\nlanguage: en\n\n[App]\n\"menu open\":\n  src: Open\n  tr: Open\n",
+    )?;
+
+    assert!(document.messages.contains_key("App\u{1f}menu open"));
+    Ok(())
+}
+
+#[test]
 fn diagnostic_order_and_text_match_the_pre_refactor_baseline() {
     let source = "version: 2\nkind: language\nlanguage: en--US\n\n[App]\nx:\n  tr: Hi\n";
     let Err(diagnostics) = parse(source) else {

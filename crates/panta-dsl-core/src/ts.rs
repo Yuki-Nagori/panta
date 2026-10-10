@@ -1,12 +1,21 @@
 //! 确定性 Qt TS 输出；公共 AST 可手工修改，输出前复核目标 locale 与占位符。
 
 use std::collections::BTreeMap;
+use std::string::FromUtf8Error;
 
 use quick_xml::Writer;
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 
 use crate::validation::{normalize_locale, placeholders, valid_locale};
 use crate::{Diagnostic, Diagnostics, Document, Kind, Message, Status};
+
+fn writer_error(error: std::io::Error) -> Diagnostics {
+    Diagnostics::one("pa.ts_write", error.to_string(), 0, "")
+}
+
+fn output_encoding_error(error: FromUtf8Error) -> Diagnostics {
+    Diagnostics::one("pa.ts_write", error.to_string(), 0, "")
+}
 
 /// 为 language 文档生成目标 locale 的 TS；拒绝非法 locale 与占位符不一致。
 pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics> {
@@ -57,14 +66,12 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
             Some("UTF-8"),
             Some("yes"),
         )))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     let mut ts = BytesStart::new("TS");
     ts.push_attribute(("version", "2.1"));
     ts.push_attribute(("language", locale.replace('-', "_").as_str()));
     ts.push_attribute(("sourcelanguage", document.source_language.as_str()));
-    writer
-        .write_event(Event::Start(ts))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+    writer.write_event(Event::Start(ts)).map_err(writer_error)?;
     let mut contexts: BTreeMap<&str, Vec<&Message>> = BTreeMap::new();
     for message in document.messages.values() {
         contexts
@@ -75,20 +82,19 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
     for (context, messages) in contexts {
         writer
             .write_event(Event::Start(BytesStart::new("context")))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+            .map_err(writer_error)?;
         write_text_element(&mut writer, "name", context)?;
         for message in messages {
             emit_message(&mut writer, message, &locale)?;
         }
         writer
             .write_event(Event::End(BytesEnd::new("context")))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+            .map_err(writer_error)?;
     }
     writer
         .write_event(Event::End(BytesEnd::new("TS")))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
-    String::from_utf8(writer.into_inner())
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))
+        .map_err(writer_error)?;
+    String::from_utf8(writer.into_inner()).map_err(output_encoding_error)
 }
 
 fn emit_message(
@@ -106,7 +112,7 @@ fn emit_message(
     }
     writer
         .write_event(Event::Start(node))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     if let Some(comment) = &message.comment {
         write_text_element(writer, "comment", comment)?;
     }
@@ -126,7 +132,7 @@ fn emit_message(
     }
     writer
         .write_event(Event::Start(translation_node))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     let forms = translation
         .map(|value| value.forms.as_slice())
         .unwrap_or(&[]);
@@ -142,14 +148,14 @@ fn emit_message(
             .write_event(Event::Text(BytesText::new(
                 forms.first().unwrap_or(&message.source),
             )))
-            .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+            .map_err(writer_error)?;
     }
     writer
         .write_event(Event::End(BytesEnd::new("translation")))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     writer
         .write_event(Event::End(BytesEnd::new("message")))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     Ok(())
 }
 
@@ -160,12 +166,36 @@ fn write_text_element(
 ) -> Result<(), Diagnostics> {
     writer
         .write_event(Event::Start(BytesStart::new(name)))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     writer
         .write_event(Event::Text(BytesText::new(value)))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     writer
         .write_event(Event::End(BytesEnd::new(name)))
-        .map_err(|error| Diagnostics::one("pa.ts_write", error.to_string(), 0, ""))?;
+        .map_err(writer_error)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{output_encoding_error, writer_error};
+
+    #[test]
+    fn output_failures_keep_the_ts_diagnostic_code() -> Result<(), std::io::Error> {
+        let writer_diagnostic = writer_error(std::io::Error::other("writer failed"));
+        assert_eq!(writer_diagnostic.diagnostics[0].code, "pa.ts_write");
+        assert!(
+            writer_diagnostic.diagnostics[0]
+                .message
+                .contains("writer failed")
+        );
+
+        let invalid_utf8 = String::from_utf8(vec![0xff])
+            .err()
+            .ok_or(std::io::Error::other("invalid byte decoded as UTF-8"))?;
+        let encoding_diagnostic = output_encoding_error(invalid_utf8);
+        assert_eq!(encoding_diagnostic.diagnostics[0].code, "pa.ts_write");
+        assert!(!encoding_diagnostic.diagnostics[0].message.is_empty());
+        Ok(())
+    }
 }

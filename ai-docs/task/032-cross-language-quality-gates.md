@@ -5,7 +5,7 @@
 - 依赖：[011](011-test-quality-entrypoints.md)、[018](018-cross-platform-ci.md)、[019](019-gtest-native-testing.md)
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-16 / 2026-10-02
+- 创建 / 更新：2026-09-16 / 2026-10-10
 
 ## 目标与背景
 
@@ -94,6 +94,14 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 ## 完成摘要
 
 未完成：011 统一入口、语言级 format/lint/test、Rust 89%/92% 覆盖率门槛和 Miri job 已落地；run 36001859191 确认聚合格式与当前覆盖率门槛通过。任务目标仍包括 Rust 100% 函数覆盖率、C++ line/branch 覆盖与分模块防回退门禁、跨平台可下载报告及完整受控失败验收。
+
+## 2026-10-10 Rust 函数覆盖率跟进
+
+本轮先处理 Rust 函数覆盖率 100% 目标：以 `cargo coverage` 报告为依据定位未覆盖函数，优先补充能验证行为的测试或清理确实无用实现；不降低阶段门槛、不增加未证明的排除项，也不为覆盖数字重复调用 API。C++ line/branch 门禁和按模块防回退留待后续单独推进。
+
+TS 输出原先在每个 XML 写入和 UTF-8 转换点各自创建错误映射闭包；`Writer<Vec<u8>>` 的写入失败无法从正常导出路径稳定触发，造成大量重复、不可达的闭包函数计数。本轮将其合并为两个具名诊断映射函数，新增直接错误映射断言，诊断码仍为 `pa.ts_write`，不改变成功输出。另为带引号的消息 ID 与手工构造 AST 中空的非复数翻译补上行为断言，覆盖解析器和格式化器可达的边界。
+
+验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage`、`cargo clippy --locked --workspace --all-targets -- -D warnings` 和 `cargo format --check` 均通过。完整 `cargo lint` 因沙箱禁止绑定其锁管理 TCP listener，在 Clippy 阶段退出；因此其余 lint 阶段未运行。最终覆盖率为全局函数 768/828（92.75%）、行 8744/9182（95.23%）；`panta-dsl-core` 函数 132/135（97.78%）、行 2001/2091（95.70%）。全局仍有 60 个 Rust 函数未覆盖，100% 目标尚未完成，本任务及索引保持 in-progress；其他 crate 与 DSL 的不可达/剩余路径留待继续按行为审查。
 
 ## 2026-10-02 优先级跟进：Rust 报告与门禁可审阅性
 
