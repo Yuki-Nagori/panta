@@ -41,8 +41,9 @@
 | 2026-09-18 至 21：质量入口、工具门禁、Miri | Rust/C++/QML/CMake 适用工具和聚合入口逐步接入；空测试、失败测试与阈值夹具曾验证非零退出。Miri 仅跑适用的纯 Rust crate；Pest 容量压力用例因解释执行成本在 Miri 忽略，常规测试仍覆盖。 |
 | 2026-09-24：macOS gate、[CI run 36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191) | 修复后函数 402/445（90.34%）、行 4270/4545（93.95%）；三平台当前 89% / 92% gate 全绿，不代表 100% 或 C++ line/branch 已达成。 |
 | 2026-10-02：coverage artifact、[CI run 37010051058](https://github.com/Yuki-Nagori/panta/actions/runs/37010051058) | `rust-coverage` 与 `native-coverage` 上传成功；证明 artifact 路径可用，不表示逐模块门禁已存在。 |
-| 2026-10-10：Rust crate 行为覆盖跟进 | 对 core、DSL、import、FFI 等可确定的业务行为补测试；逐项审阅剩余 LLVM 缺口，区分测试实例/泛型计数、不可达防御路径与不安全故障注入。`panta-dsl-core`、`panta-import` 等 crate 曾达到函数 100%，全局尚未达到。 |
-| 2026-10-10：coverage 报告优化（macOS arm64） | `cargo coverage` 通过：全局函数 803/842（95.37%）、行 9296/9687（95.96%）；crate 汇总、完整 JSON、`uncovered-lines.txt` 与 `html/index.html` 已生成。`cargo coverage native` 的 CTest 72/72 通过，生成 `summary.txt`、`line-coverage.txt` 与 HTML；实跑发现 LLVM 22 `llvm-cov report` 不支持 missing-lines 选项，改用 `llvm-cov show` 输出逐行执行计数。coverage runner 单测 3/3、Clippy、格式检查与 diff 检查通过。独立 subagent review 批准；CI 上传可读 native 报告，不包含 raw profiles。 |
+| 2026-10-10：Rust crate 行为覆盖跟进 | 对 core、DSL、import、FFI 等可确定的业务行为补测试；逐项审阅剩余 LLVM 缺口，区分测试实例/泛型计数、不可达防御路径与不安全故障注入。内置材料解析抽为纯函数并覆盖 malformed JSON 和不支持 schema；独立 `gpt-6.1-sol` medium review 通过。`panta-dsl-core`、`panta-import` 等 crate 函数覆盖 100%，全局尚未达到。 |
+| 2026-10-10：coverage 报告优化（macOS arm64） | 首次 `cargo coverage`：函数 803/842（95.37%）、行 9296/9687（95.96%）；生成 crate 汇总、完整 JSON、`uncovered-lines.txt` 与 HTML。`cargo coverage native` 的 CTest 72/72 通过，生成 summary、逐行计数与 HTML；LLVM 22 `llvm-cov report` 不支持 missing-lines 选项，改用 `llvm-cov show`。 |
+| 2026-10-10：材料错误路径覆盖复核 | 新增两项 core 测试后，`cargo coverage` 函数 807/845（95.50%）、行 9316/9708（95.96%）；crate 汇总中 core 387/413（93.70%）。`cargo test --locked --workspace`、`cargo lint --check`、格式检查和独立 subagent review 通过；覆盖率增量用于定位，业务行为测试仍是验收依据。 |
 
 ## 重要边界
 

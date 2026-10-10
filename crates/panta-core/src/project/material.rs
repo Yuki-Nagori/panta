@@ -45,10 +45,14 @@ pub struct MaterialProperty {
 
 static MATERIAL: LazyLock<Result<MaterialDefinition, String>> = LazyLock::new(|| {
     // 仅解析随程序编译的受控资源；新增资源时须核对结构和单位。
-    let data: MaterialData = serde_json::from_str(include_str!(
+    parse_material(include_str!(
         "../../../../resources/materials/pp-mineral-25.json"
     ))
-    .map_err(|error| format!("invalid built-in material: {error}"))?;
+});
+
+fn parse_material(source: &str) -> Result<MaterialDefinition, String> {
+    let data: MaterialData = serde_json::from_str(source)
+        .map_err(|error| format!("invalid built-in material: {error}"))?;
     if data.schema != "panta.material-preview/v1" {
         return Err("unsupported built-in material schema".to_owned());
     }
@@ -88,7 +92,7 @@ static MATERIAL: LazyLock<Result<MaterialDefinition, String>> = LazyLock::new(||
             },
         ],
     })
-});
+}
 
 /// 返回随程序内置的默认材料，资源解析只发生一次。
 /// 资源格式错误时返回可恢复错误，不向界面发布部分摘要。
@@ -147,5 +151,33 @@ impl ProjectService {
     /// 写盘或工作线程失败时解除写入锁并保留旧状态；结果只消费一次。
     pub fn finish_material_confirmation(&mut self) -> Result<bool, ProjectError> {
         self.finish_metadata_write(storage::MetadataWriteKind::Material)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_material;
+
+    #[test]
+    fn malformed_material_reports_a_parse_error() -> Result<(), Box<dyn std::error::Error>> {
+        let error = parse_material("{")
+            .err()
+            .ok_or("malformed material should be rejected")?;
+        assert!(error.starts_with("invalid built-in material:"));
+        Ok(())
+    }
+
+    #[test]
+    fn unsupported_material_schema_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
+        let mut source: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../resources/materials/pp-mineral-25.json"
+        ))?;
+        source["schema"] = serde_json::Value::String("panta.material-preview/v2".to_owned());
+
+        assert_eq!(
+            parse_material(&source.to_string()).err().as_deref(),
+            Some("unsupported built-in material schema")
+        );
+        Ok(())
     }
 }
