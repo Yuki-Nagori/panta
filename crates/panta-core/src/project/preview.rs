@@ -178,6 +178,33 @@ mod tests {
     }
 
     #[test]
+    fn full_read_executor_rejects_preview_without_publishing_pending_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let executor = crate::execution::Executor::new("preview-capacity-test", 1, 1);
+        let (started, ready) = mpsc::channel();
+        let (release, gate) = mpsc::channel();
+        executor.submit(move || {
+            let _ = started.send(());
+            let _ = gate.recv();
+        })?;
+        ready.recv_timeout(std::time::Duration::from_secs(2))?;
+
+        let mut service = ProjectService::new();
+        service.execution.reads = Arc::clone(&executor);
+        let error = service
+            .begin_stl_preview(Path::new("unused.stl"))
+            .err()
+            .ok_or("preview unexpectedly entered a full executor")?;
+        assert_eq!(error.code(), "project.io");
+        assert_eq!(service.preview_request, 0);
+        assert!(service.pending_preview.is_none());
+
+        release.send(())?;
+        executor.close_and_wait();
+        Ok(())
+    }
+
+    #[test]
     fn queued_replacement_cancels_old_work_and_preserves_the_latest_reply()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
