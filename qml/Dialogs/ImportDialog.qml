@@ -133,7 +133,7 @@ Window {
                             contentPadding: Theme.spacingSmall
                             hoverColor: Theme.colorHover
                             borderColor: Theme.colorPanelLine
-                            onClicked: dialog.chooseFile()
+                            clickAction: () => dialog.chooseFile()
                         }
                     }
 
@@ -212,7 +212,7 @@ Window {
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
-                        onClicked: helpText.visible = !helpText.visible
+                        clickAction: () => helpText.visible = !helpText.visible
                     }
 
                     Item {
@@ -228,7 +228,7 @@ Window {
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorDialogPrimaryBorder
-                        onClicked: dialog.submit()
+                        clickAction: () => dialog.submit()
                     }
                     ThemedToolButton {
                         Layout.preferredWidth: 92
@@ -237,7 +237,7 @@ Window {
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
-                        onClicked: dialog.close()
+                        clickAction: () => dialog.close()
                     }
                 }
             }

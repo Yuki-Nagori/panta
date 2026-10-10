@@ -415,6 +415,29 @@ class ShellModuleLoadTest final : public QObject {
         window->showNormal();
         window->resize(windowWidth, 900);
         QTest::qWait(50);
+        const auto dismissNotice = [window, keyboard] {
+            auto* notice =
+                window->findChild<QQuickWindow*>(QStringLiteral("featureUnavailableDialog"));
+            QVERIFY(notice != nullptr);
+            QTRY_VERIFY(notice->isVisible());
+            QCOMPARE(notice->transientParent(), window);
+            auto* message =
+                visual_item(notice->contentItem(), QStringLiteral("featureUnavailableMessage"));
+            QVERIFY(message != nullptr);
+            QCOMPARE(message->property("text").toString(),
+                     QStringLiteral("This feature is not available yet. Stay tuned."));
+            if (keyboard) {
+                QTest::keyClick(notice, Qt::Key_Escape);
+            } else {
+                auto* accept =
+                    visual_item(notice->contentItem(), QStringLiteral("featureUnavailableAccept"));
+                QVERIFY(accept != nullptr);
+                QVERIFY(QMetaObject::invokeMethod(accept, "clicked"));
+            }
+            QTRY_VERIFY(!notice->isVisible());
+            window->requestActivate();
+            QTRY_COMPARE(QGuiApplication::focusWindow(), window);
+        };
         verify_ribbon_tab(window, "start-learn", 7);
         QVERIFY(visual_item(window->contentItem(), QStringLiteral("menu-home")) == nullptr);
         QVERIFY(QMetaObject::invokeMethod(window, "selectRibbonTab",
@@ -422,6 +445,7 @@ class ShellModuleLoadTest final : public QObject {
         verify_ribbon_tab(window, "start-learn", 7);
         activate_menu(window, "start-learn", keyboard);
         activate_menu(window, "tools", keyboard);
+        dismissNotice();
         verify_ribbon_tab(window, "start-learn", 7);
         QVERIFY(project->currentPath().isEmpty());
 
@@ -455,6 +479,7 @@ class ShellModuleLoadTest final : public QObject {
         QCOMPARE(projectChanged.count(), 0);
         activate_menu(window, "start-learn", keyboard);
         activate_menu(window, "community", keyboard);
+        dismissNotice();
         verify_ribbon_tab(window, "start-learn", 7);
         QVERIFY(!project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
         QVERIFY(!project->createProject(QStringLiteral("Navigation"), fixture.path()));

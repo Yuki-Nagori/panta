@@ -249,7 +249,7 @@ Window {
                                 ProcessSettingsControls.Action {
                                     objectName: "editHoldingProfile"
                                     text: qsTranslate("FillSettings", "Edit Profile…")
-                                    onClicked: profileDialog.open(dialog.profile)
+                                    clickAction: () => profileDialog.open(dialog.profile)
                                 }
                             }
                             ThemedLabel {
@@ -279,11 +279,9 @@ Window {
                             RowLayout {
                                 ProcessSettingsControls.Action {
                                     text: qsTranslate("FillSettings", "Advanced Options…")
-                                    enabled: false
                                 }
                                 ProcessSettingsControls.Action {
                                     text: qsTranslate("FillSettings", "Fiber Solver Parameters…")
-                                    enabled: false
                                 }
                             }
                         }
@@ -304,7 +302,7 @@ Window {
                     enabled: dialog.canConfirm
                     primaryAction: true
                     borderColor: Theme.colorDialogPrimaryBorder
-                    onClicked: dialog.acceptSettings()
+                    clickAction: () => dialog.acceptSettings()
                 }
                 ProcessSettingsControls.Action {
                     Layout.preferredWidth: Theme.tabSegmentWidth
@@ -312,13 +310,12 @@ Window {
                     objectName: "fillSettingsCancel"
                     text: qsTranslate("DialogAction", "Cancel")
                     enabled: !dialog.saving
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
                 ProcessSettingsControls.Action {
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     controlHeight: Theme.controlHeight
                     text: qsTranslate("UiCommonHelp", "Help")
-                    enabled: false
                 }
             }
         }

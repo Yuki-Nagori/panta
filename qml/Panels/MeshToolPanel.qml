@@ -19,7 +19,7 @@ ScrollView {
     contentWidth: availableWidth
     ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-    component MeshActionButton: Button {
+    component MeshActionButton: ActionButton {
         id: action
 
         property bool primaryAction: false
@@ -158,7 +158,7 @@ ScrollView {
                 text: qsTranslate("MeshTool", "Mesh")
                 primaryAction: true
                 enabled: meshTool.meshAvailable && !meshTool.busy
-                onClicked: meshTool.meshRequested(Number(edgeLength.text))
+                clickAction: () => meshTool.meshRequested(Number(edgeLength.text))
             }
             MeshActionButton {
                 objectName: "meshHelpAction"
@@ -173,7 +173,7 @@ ScrollView {
             MeshActionButton {
                 objectName: "meshCancelAction"
                 enabled: meshTool.busy
-                onClicked: meshTool.cancelRequested()
+                clickAction: () => meshTool.cancelRequested()
                 Layout.fillWidth: true
                 text: qsTranslate("DialogAction", "Cancel")
             }

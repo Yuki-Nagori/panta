@@ -154,7 +154,7 @@ Window {
                             contentPadding: Theme.spacingSmall
                             hoverColor: Theme.colorHover
                             borderColor: Theme.colorPanelLine
-                            onClicked: folderDialog.open()
+                            clickAction: () => folderDialog.open()
                         }
                     }
                 }
@@ -197,7 +197,7 @@ Window {
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorDialogPrimaryBorder
-                        onClicked: dialog.submit()
+                        clickAction: () => dialog.submit()
                     }
                     ThemedToolButton {
                         Layout.preferredWidth: 92
@@ -206,7 +206,7 @@ Window {
                         contentColor: Theme.colorText
                         hoverColor: Theme.colorHover
                         borderColor: Theme.colorPanelLine
-                        onClicked: dialog.close()
+                        clickAction: () => dialog.close()
                     }
                 }
             }

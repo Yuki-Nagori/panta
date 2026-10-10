@@ -133,6 +133,8 @@ PanelSurface {
             materialRequested();
         } else if (taskId === "logs") {
             logsRequested();
+        } else {
+            FeatureNotice.notify(Window.window);
         }
     }
 
@@ -202,7 +204,7 @@ PanelSurface {
                                 contentColor: Theme.colorText
                                 contentPadding: Theme.spacingLarge
                                 hoverColor: Theme.colorHover
-                                onClicked: panel.openProjectRequested()
+                                clickAction: () => panel.openProjectRequested()
                             }
                             ThemedToolButton {
                                 objectName: "newProjectTaskAction"
@@ -216,12 +218,13 @@ PanelSurface {
                                 contentColor: Theme.colorText
                                 contentPadding: Theme.spacingLarge
                                 hoverColor: Theme.colorHover
-                                onClicked: panel.newProjectRequested()
+                                clickAction: () => panel.newProjectRequested()
                             }
                         }
 
                         ThemedToolButton {
                             id: projectEntry
+
                             objectName: "projectTaskItem"
                             Layout.fillWidth: true
                             visible: panel.projectOpen
@@ -293,7 +296,7 @@ PanelSurface {
                                     contentPadding: Theme.spacingLarge * 3
                                     contentColor: Theme.colorText
                                     hoverColor: Theme.colorDocumentHover
-                                    onClicked: panel.studyRequested(modelData.id)
+                                    clickAction: () => panel.studyRequested(modelData.id)
                                 }
                             }
                         }
@@ -425,7 +428,7 @@ PanelSurface {
                                     contentColor: Theme.colorText
                                     contentPadding: Theme.spacingSmall
                                     hoverColor: Theme.colorHover
-                                    onClicked: panel.openPlanTask(taskRow.modelData.id)
+                                    clickAction: () => panel.openPlanTask(taskRow.modelData.id)
                                 }
                             }
                         }

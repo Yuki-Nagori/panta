@@ -89,7 +89,7 @@ Window {
                     primaryAction: true
                     contentColor: Theme.colorText
                     borderColor: Theme.colorDialogPrimaryBorder
-                    onClicked: dialog.acceptSelection()
+                    clickAction: () => dialog.acceptSelection()
                 }
                 ThemedToolButton {
                     objectName: "materialCancel"
@@ -98,14 +98,13 @@ Window {
                     text: qsTranslate("DialogAction", "Cancel")
                     contentColor: Theme.colorText
                     borderColor: Theme.colorPanelLine
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
                 ThemedToolButton {
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     text: qsTranslate("UiCommonHelp", "Help")
                     contentColor: Theme.colorText
                     borderColor: Theme.colorPanelLine
-                    enabled: false
                 }
             }
         }

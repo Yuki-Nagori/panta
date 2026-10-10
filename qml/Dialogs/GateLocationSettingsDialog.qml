@@ -96,11 +96,9 @@ Window {
                             }
                             ProcessSettingsControls.Action {
                                 text: qsTranslate("GateLocationSettings", "Edit…")
-                                enabled: false
                             }
                             ProcessSettingsControls.Action {
                                 text: qsTranslate("GateLocationSettings", "Select…")
-                                enabled: false
                             }
                         }
                     }
@@ -199,7 +197,6 @@ Window {
                             }
                             ProcessSettingsControls.Action {
                                 text: qsTranslate("FillSettings", "Advanced Options…")
-                                enabled: false
                             }
                         }
                     }
@@ -219,7 +216,7 @@ Window {
                     enabled: dialog.canConfirm
                     primaryAction: true
                     borderColor: Theme.colorDialogPrimaryBorder
-                    onClicked: dialog.acceptSettings()
+                    clickAction: () => dialog.acceptSettings()
                 }
                 ProcessSettingsControls.Action {
                     objectName: "gateLocationSettingsCancel"
@@ -227,13 +224,12 @@ Window {
                     controlHeight: Theme.controlHeight
                     text: qsTranslate("DialogAction", "Cancel")
                     enabled: !dialog.saving
-                    onClicked: dialog.close()
+                    clickAction: () => dialog.close()
                 }
                 ProcessSettingsControls.Action {
                     Layout.preferredWidth: Theme.tabSegmentWidth
                     controlHeight: Theme.controlHeight
                     text: qsTranslate("UiCommonHelp", "Help")
-                    enabled: false
                 }
             }
         }

@@ -272,7 +272,7 @@ Rectangle {
                                 hoverColor: Theme.colorMenubarHover
                                 contentPadding: Theme.spacingLarge
                                 font.weight: highlighted ? Font.DemiBold : Font.Normal
-                                onClicked: chrome.menuRequested(modelData.key)
+                                clickAction: () => chrome.menuRequested(modelData.key)
                             }
                         }
                         ThemedToolButton {

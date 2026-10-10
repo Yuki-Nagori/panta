@@ -201,7 +201,7 @@ Window {
                                             text: "×"
                                             accessibleName: qsTranslate("HoldingProfile", "Remove step")
                                             enabled: rows.count > 3
-                                            onClicked: {
+                                            clickAction: () => {
                                                 rows.remove(row.index);
                                                 dialog.editRevision++;
                                             }
@@ -216,7 +216,7 @@ Window {
                     Layout.fillWidth: true
                     ProcessSettingsControls.Action {
                         text: qsTranslate("HoldingProfile", "Add Step")
-                        onClicked: {
+                        clickAction: () => {
                             rows.append({
                                 durationText: "",
                                 pressureText: ""
@@ -226,7 +226,6 @@ Window {
                     }
                     ProcessSettingsControls.Action {
                         text: qsTranslate("HoldingProfile", "Import Profile…")
-                        enabled: false
                     }
                     Item {
                         Layout.fillWidth: true
@@ -234,7 +233,7 @@ Window {
                     ProcessSettingsControls.Action {
                         text: qsTranslate("HoldingProfile", "Plot Profile")
                         enabled: dialog.points.length > 0
-                        onClicked: dialog.plotVisible = !dialog.plotVisible
+                        clickAction: () => dialog.plotVisible = !dialog.plotVisible
                     }
                 }
                 Canvas {
@@ -290,20 +289,19 @@ Window {
                         enabled: dialog.points.length > 0
                         primaryAction: true
                         borderColor: Theme.colorDialogPrimaryBorder
-                        onClicked: dialog.acceptProfile()
+                        clickAction: () => dialog.acceptProfile()
                     }
                     ProcessSettingsControls.Action {
                         Layout.preferredWidth: Theme.tabSegmentWidth
                         controlHeight: Theme.controlHeight
                         objectName: "holdingProfileCancel"
                         text: qsTranslate("DialogAction", "Cancel")
-                        onClicked: dialog.close()
+                        clickAction: () => dialog.close()
                     }
                     ProcessSettingsControls.Action {
                         Layout.preferredWidth: Theme.tabSegmentWidth
                         controlHeight: Theme.controlHeight
                         text: qsTranslate("UiCommonHelp", "Help")
-                        enabled: false
                     }
                 }
             }

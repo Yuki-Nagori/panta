@@ -50,7 +50,7 @@ ColumnLayout {
                 background: Rectangle {
                     color: sequenceRow.index === panel.selectedIndex ? Theme.colorSelected : sequenceRow.hovered ? Theme.colorHover : Theme.colorTransparent
                 }
-                onClicked: {
+                clickAction: () => {
                     panel.selectedIndex = index;
                     panel.focusSelection();
                 }

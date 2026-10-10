@@ -2,7 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 
-ToolButton {
+ActionButton {
     id: button
     hoverEnabled: true
 

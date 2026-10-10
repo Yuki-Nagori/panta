@@ -1,8 +1,9 @@
 # UI 模块（qml.md）：qt_add_qml_module 与 qml/ 目录布局一致，由 native 顶层纳入构建。
 # URI Panta.Shell；资源前缀由 QTP0001(NEW) 统一为 /qt/qml。
 
-# 主题单例声明必须先于 qt_add_qml_module（qmldir 的 singleton 标记在调用时读取）。
-set_source_files_properties(Themes/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+# QML 单例声明必须先于 qt_add_qml_module（qmldir 的 singleton 标记在调用时读取）。
+set_source_files_properties(Themes/Theme.qml Components/Composites/FeatureNotice.qml
+                            PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 # 输出根目录需在创建模块前设定；Qt 会在其下追加 URI 的 Panta/Shell
 # 路径，便于 qmllint、qmltestrunner 和 IDE 通过标准 import 解析模块。
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
@@ -10,6 +11,7 @@ set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/..")
 set(PANTA_SHELL_QML_FILES
     App.qml
     Themes/Theme.qml
+    Components/Atoms/ActionButton.qml
     Components/Atoms/ThemedLabel.qml
     Components/Atoms/ThemedToolButton.qml
     Components/Atoms/ThemedTextField.qml
@@ -25,6 +27,7 @@ set(PANTA_SHELL_QML_FILES
     Components/Composites/InformationPanel.qml
     Components/Composites/PaneCloseButton.qml
     Components/Composites/DialogTitleBar.qml
+    Components/Composites/FeatureNotice.qml
     Components/Composites/ProcessSettingsControls.qml
     Panels/TopChromePanel.qml
     Panels/RibbonPanel.qml
@@ -46,7 +49,8 @@ set(PANTA_SHELL_QML_FILES
     Dialogs/MaterialSelectionDialog.qml
     Dialogs/FillProcessSettingsDialog.qml
     Dialogs/GateLocationSettingsDialog.qml
-    Dialogs/HoldingProfileDialog.qml)
+    Dialogs/HoldingProfileDialog.qml
+    Dialogs/FeatureUnavailableDialog.qml)
 set(PANTA_SHELL_QML_DEPENDENCIES)
 if(PANTA_ENABLE_BRIDGE_MODULE)
   list(APPEND PANTA_SHELL_QML_DEPENDENCIES DEPENDENCIES TARGET panta_bridge panta_visualization)

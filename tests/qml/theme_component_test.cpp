@@ -267,6 +267,17 @@ class ThemeComponentTest final : public QObject {
         QSignalSpy newRequested(ribbon, SIGNAL(newProjectRequested()));
         QSignalSpy openRequested(ribbon, SIGNAL(openProjectRequested()));
         QVERIFY(newRequested.isValid() && openRequested.isValid());
+        QQmlComponent noticeComponent(&engine);
+        noticeComponent.setData("import QtQuick\nimport Panta.Shell\n"
+                                "QtObject { property QtObject notice: FeatureNotice }",
+                                QUrl());
+        auto* noticeHost = noticeComponent.create();
+        QVERIFY2(noticeHost != nullptr, qPrintable(noticeComponent.errorString()));
+        noticeHost->setParent(&owner);
+        auto* notice = noticeHost->property("notice").value<QObject*>();
+        QVERIFY(notice != nullptr);
+        QSignalSpy unavailable(notice, SIGNAL(requested(QVariant)));
+        QVERIFY(unavailable.isValid());
         auto* ribbonItem = qobject_cast<QQuickItem*>(ribbon);
         auto* loader = visual_item(ribbonItem, QStringLiteral("ribbonLoader"));
         QVERIFY(loader != nullptr);
@@ -283,6 +294,12 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
         QCOMPARE(newRequested.count(), 1);
         QCOMPARE(openRequested.count(), 1);
+        QCOMPARE(unavailable.count(), 0);
+        auto* helpButton = visual_item(ribbonItem, QStringLiteral("ribbon-help"));
+        QVERIFY(helpButton != nullptr && helpButton->isEnabled());
+        QVERIFY(QMetaObject::invokeMethod(helpButton, "clicked"));
+        QCOMPARE(unavailable.count(), 1);
+        QCOMPARE(unavailable.constLast().constFirst().value<QObject*>(), &window);
         newButton->forceActiveFocus(Qt::TabFocusReason);
         QTRY_COMPARE(window.activeFocusItem(), newButton);
         ribbon->setProperty("activeRibbonTab", QStringLiteral("home"));
@@ -294,6 +311,11 @@ class ThemeComponentTest final : public QObject {
         auto* importButton = visual_item(ribbonItem, QStringLiteral("ribbon-import"));
         QVERIFY(importButton != nullptr);
         QVERIFY(QMetaObject::invokeMethod(importButton, "clicked"));
+        QCOMPARE(unavailable.count(), 1);
+        auto* addButton = visual_item(ribbonItem, QStringLiteral("ribbon-add"));
+        QVERIFY(addButton != nullptr && addButton->isEnabled());
+        QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
+        QCOMPARE(unavailable.count(), 2);
         QCOMPARE(newRequested.count(), 1);
         QCOMPARE(openRequested.count(), 1);
         ribbon->setProperty("activeRibbonTab", QStringLiteral("start-learn"));

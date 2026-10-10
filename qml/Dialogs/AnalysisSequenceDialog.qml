@@ -86,7 +86,7 @@ Window {
                         contentColor: Theme.colorText
                         borderColor: Theme.colorDialogPrimaryBorder
                         hoverColor: Theme.colorHover
-                        onClicked: dialog.acceptSelection()
+                        clickAction: () => dialog.acceptSelection()
                     }
                     ThemedToolButton {
                         objectName: "analysisSequenceCancel"
@@ -95,7 +95,7 @@ Window {
                         contentColor: Theme.colorText
                         borderColor: Theme.colorPanelLine
                         hoverColor: Theme.colorHover
-                        onClicked: dialog.close()
+                        clickAction: () => dialog.close()
                     }
                     Item {
                         Layout.fillHeight: true
@@ -103,7 +103,7 @@ Window {
                     ThemedToolButton {
                         Layout.preferredWidth: Theme.tabSegmentWidth
                         text: qsTranslate("AnalysisSequenceDialog", "More...")
-                        enabled: false
+
                         contentColor: Theme.colorText
                         borderColor: Theme.colorPanelLine
                     }

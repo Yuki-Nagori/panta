@@ -42,7 +42,7 @@ Rectangle {
             accessibleName: qsTranslate("IconActionCloseDialog", "Close dialog")
             contentColor: hovered || visualFocus ? Theme.colorPanel : Theme.colorTextMuted
             hoverColor: Theme.colorCloseHover
-            onClicked: titleBar.closeRequested()
+            clickAction: () => titleBar.closeRequested()
         }
     }
 

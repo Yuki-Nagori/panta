@@ -133,6 +133,7 @@ ScrollView {
                 radius: Theme.radiusSmall
                 MaterialAction {
                     id: commonMaterial
+
                     objectName: "defaultMaterialChoice"
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -151,7 +152,6 @@ ScrollView {
             }
             MaterialAction {
                 text: qsTranslate("MaterialDialog", "Remove")
-                enabled: false
             }
         }
         RowLayout {
@@ -166,11 +166,9 @@ ScrollView {
             }
             MaterialAction {
                 text: qsTranslate("MaterialDialog", "Customize Material List...")
-                enabled: false
             }
             MaterialAction {
                 text: qsTranslate("MaterialDialog", "Reset Material List")
-                enabled: false
             }
         }
         GridLayout {
@@ -189,7 +187,6 @@ ScrollView {
             }
             MaterialAction {
                 text: qsTranslate("MaterialDialog", "Import...")
-                enabled: false
             }
             ThemedLabel {
                 text: qsTranslate("MaterialDialog", "Material")
@@ -202,7 +199,6 @@ ScrollView {
             }
             MaterialAction {
                 text: qsTranslate("MaterialDialog", "Search...")
-                enabled: false
             }
         }
         Rectangle {
@@ -230,11 +226,10 @@ ScrollView {
                     MaterialAction {
                         objectName: "materialDetailsAction"
                         text: qsTranslate("MaterialDialog", "Details...")
-                        onClicked: panel.detailsVisible = !panel.detailsVisible
+                        clickAction: () => panel.detailsVisible = !panel.detailsVisible
                     }
                     MaterialAction {
                         text: qsTranslate("MaterialDialog", "Report...")
-                        enabled: false
                     }
                 }
                 Repeater {

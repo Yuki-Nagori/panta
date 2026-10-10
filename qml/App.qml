@@ -28,6 +28,19 @@ ApplicationWindow {
         // 工程工具仅在打开工程后可达，开始页始终可达。
         if (tab === "start-learn" || ((tab === "home" || tab === "results") && projectOpen))
             activeRibbonTab = tab;
+        else if (tab !== "home" && tab !== "results")
+            FeatureNotice.notify(shellWindow);
+    }
+
+    FeatureUnavailableDialog {
+        id: featureUnavailableDialog
+    }
+    Connections {
+        target: FeatureNotice
+        function onRequested(ownerWindow) {
+            featureUnavailableDialog.ownerWindow = ownerWindow || shellWindow;
+            featureUnavailableDialog.open();
+        }
     }
 
     ShellViewModel {
@@ -263,6 +276,7 @@ ApplicationWindow {
                     Layout.fillHeight: shellWindow.layersDockShown
                     Layout.preferredHeight: shellWindow.layersDockShown ? leftColumn.panelContentHeight * Theme.layersPanelRatio : 0
                     importedPartNames: projectModel.importedPartNames
+                    onToolRequested: FeatureNotice.notify(shellWindow)
                     onCloseRequested: dockOpen = false
                 }
             }

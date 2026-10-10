@@ -68,5 +68,7 @@ RibbonContent {
             startLearn.newProjectRequested();
         else if (key === "open-project")
             startLearn.openProjectRequested();
+        else
+            FeatureNotice.notify(Window.window);
     }
 }
