@@ -163,7 +163,7 @@ impl Drop for Temporary {
 
 #[cfg(test)]
 mod tests {
-    use super::super::temp_directory;
+    use super::super::{ProjectError, ProjectService, temp_directory};
     use super::{TEMPORARY_ATTEMPTS, Temporary};
     use std::fs;
     use std::sync::atomic::AtomicU64;
@@ -291,6 +291,40 @@ mod tests {
         reopened.open(&project.path)?;
         assert_eq!(reopened.current()?.name, "Committed");
         assert_eq!(reopened.current()?.revision, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn lease_acquisition_rejects_a_target_created_after_project_creation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "Raced create")?;
+        let mut state = service.current.as_ref().ok_or("missing project")?.clone();
+        state.persisted_revision = None;
+
+        let error = super::WriteLease::acquire(&state)
+            .err()
+            .ok_or("existing project target unexpectedly acquired a create lease")?;
+
+        assert!(matches!(error, ProjectError::AlreadyExists(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn lease_acquisition_rejects_a_corrupted_project_manifest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Corrupted manifest")?;
+        let state = service.current.as_ref().ok_or("missing project")?.clone();
+        fs::write(&project.path, b"not a project manifest")?;
+
+        let error = super::WriteLease::acquire(&state)
+            .err()
+            .ok_or("corrupted project manifest unexpectedly acquired a lease")?;
+
+        assert!(matches!(error, ProjectError::ManifestInvalid(_)));
         Ok(())
     }
 }

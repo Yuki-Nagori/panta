@@ -487,17 +487,19 @@ fn spawn_activation_worker(
     let failed = Arc::clone(&coordinator);
     executor.submit_reported(
         move || run_attempt(coordinator, attempt, request, cancel_requested),
-        move || {
-            failed.complete(
-                attempt,
-                Event::Fail {
-                    code: "project.activation_worker_failed",
-                    category: "internal",
-                    detail: "asset activation worker panicked".to_owned(),
-                },
-            )
-        },
+        move || worker_panicked(&failed, attempt),
     )
+}
+
+fn worker_panicked(coordinator: &ActivationCoordinator, attempt: u64) {
+    coordinator.complete(
+        attempt,
+        Event::Fail {
+            code: "project.activation_worker_failed",
+            category: "internal",
+            detail: "asset activation worker panicked".to_owned(),
+        },
+    );
 }
 
 fn activation_failure(error: &ImportError) -> (&'static str, &'static str, String) {
@@ -894,6 +896,21 @@ mod tests {
         assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
         assert_eq!(outcomes[0].code, "project.activation_spawn_failed");
         assert_eq!(outcomes[0].category, "resource");
+        assert_eq!(outcomes[0].attempt, attempt.attempt);
+    }
+
+    #[test]
+    fn worker_panic_publishes_a_structured_failure() {
+        let (coordinator, attempt) = coordinator_with_request();
+
+        worker_panicked(&coordinator, attempt.attempt);
+
+        let outcomes = coordinator.drain();
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].kind, OutcomeKind::Failed);
+        assert_eq!(outcomes[0].code, "project.activation_worker_failed");
+        assert_eq!(outcomes[0].category, "internal");
+        assert_eq!(outcomes[0].detail, "asset activation worker panicked");
         assert_eq!(outcomes[0].attempt, attempt.attempt);
     }
 

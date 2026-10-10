@@ -113,6 +113,8 @@ TS 输出原先在每个 XML 写入和 UTF-8 转换点各自创建错误映射�
 
 验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings` 和 `cargo format --check` 均通过。完整 `cargo lint` 因沙箱禁止绑定其锁管理 TCP listener，在 Clippy 阶段退出；因此其余 lint 阶段未运行。最终覆盖率为全局函数 769/829（92.76%）、行 8752/9190（95.23%）；`panta-core` 函数 358/397（90.18%），`panta-dsl-core` 函数 132/135（97.78%）、行 2001/2091（95.70%）。全局仍有 60 个 Rust 函数未覆盖，100% 目标尚未完成，本任务及索引保持 in-progress；其他 crate 与 DSL 的不可达/剩余路径留待继续按行为审查。
 
+进一步复核 `open_saved_stl` 与仓储租约的 LLVM 明细：准入失败处理已由 worker 启动失败行为测试覆盖；仓储租约有两条可由真实磁盘状态触发、此前未直接断言的拒绝路径。新增目标文件在创建租约前已出现、以及已打开工程清单被外部破坏的测试，分别断言 `AlreadyExists` 与 `ManifestInvalid`。另将 worker panic 的终态映射提取为具名函数并断言失败码、分类、详情和 attempt，执行器 panic 回调行为由既有执行器测试覆盖。定向仓储测试 6/6、panic 映射测试、panta-core Clippy、格式与 diff 检查通过；完整 `cargo coverage` 通过，全局函数 774/830（93.25%）、行 8812/9230（95.47%），panta-core 函数 362/397（91.18%）、行 3534/3670（96.29%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。仍有 56 个全局函数计数未覆盖，继续逐项区分真实行为缺口与测试构建实例/不可触发的诊断路径。
+
 ## 2026-10-02 优先级跟进：Rust 报告与门禁可审阅性
 
 本批先为现有 Rust coverage 命令保存 LLVM JSON、逐 crate 函数/行汇总及提交/工具元数据，CI 在成功或门禁失败时均上传报告。保持既有三个 crate 排除和全局函数 89% / 行 92% 下限；新增报告校验与受控空数据/损坏输入/阈值失败回归，不将逐 crate 报告冒充逐模块门禁或防下降。原始统计口径仍包含内联测试，C++ 门禁、100% 目标和基线比较留待后续批次。
