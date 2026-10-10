@@ -12,7 +12,8 @@ use crate::{
     Diagnostic, Diagnostics, Document, Kind, Message, Status, Translation, ValueType, Variable,
 };
 
-/// 解析并校验 language / theme / variables；语法、容量或语义错误返回诊断。
+/// 解析并校验 language / theme / variables；FSM 文档应使用专用解析入口。
+/// 语法、容量或语义错误返回诊断。
 pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     if source.len() > MAX_SOURCE_BYTES {
         return Err(Diagnostics::one(
@@ -105,12 +106,18 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 } else {
                     seen_kind = true;
                     if let Some(kind) = find_text(body, Rule::kind_name) {
-                        result.kind = match kind.as_str() {
-                            "language" => Kind::Language,
-                            "theme" => Kind::Theme,
-                            "variables" => Kind::Variables,
-                            _ => Kind::Variables,
-                        };
+                        match kind.as_str() {
+                            "language" => result.kind = Kind::Language,
+                            "theme" => result.kind = Kind::Theme,
+                            "variables" => result.kind = Kind::Variables,
+                            _ => push_diagnostic(
+                                &mut diagnostics,
+                                "pa.unsupported_kind",
+                                format!("kind '{kind}' is not supported by this parser"),
+                                body_offset,
+                                source,
+                            ),
+                        }
                     }
                 }
             }

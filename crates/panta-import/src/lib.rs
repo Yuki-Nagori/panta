@@ -556,6 +556,12 @@ mod tests {
             parse_stl_snapshot(&non_stl),
             Err(ImportError::UnsupportedFormat(_))
         ));
+        let non_stl_path = fixture.root.join("part.step");
+        fs::write(&non_stl_path, original)?;
+        assert!(matches!(
+            StlImportSession::default().prepare(&non_stl_path),
+            Err(ImportError::UnsupportedFormat(_))
+        ));
 
         let mut session = StlImportSession::default();
         session.preview(&source)?;
@@ -603,6 +609,15 @@ mod tests {
         let scaled_snapshot = read_source(&source)?;
         assert!(matches!(
             parse_stl_asset(&scaled_snapshot, "inches"),
+            Err(ImportError::CoordinateOverflow)
+        ));
+
+        // 有限坐标本身仍可能让包围盒的 max - min 溢出。
+        let mut wide_mesh = SurfaceMesh {
+            triangles: vec![[[-f64::MAX, 0.0, 0.0], [f64::MAX, 0.0, 0.0], [0.0, 1.0, 0.0]]],
+        };
+        assert!(matches!(
+            scale_mesh_mm(&mut wide_mesh, LengthUnit::Millimeters),
             Err(ImportError::CoordinateOverflow)
         ));
         Ok(())

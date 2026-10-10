@@ -172,3 +172,9 @@ FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pe
 验证（macOS arm64）：定向项目与路径测试通过；`cargo format --check`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`git diff --check` 通过。`cargo coverage` 通过，全局函数 778/832（93.51%）、行 8840/9245（95.62%）；`panta-core` 函数 366/399（91.73%）、行 3562/3685（96.66%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% 函数目标和 C++ line/branch 门禁尚未完成，任务保持 in-progress。
 
 补充验证 FFI 的应用退出转发：子进程先接受材料写入、销毁 service，再调用 FFI 收尾包装，随后重开工程确认 revision 与材料确已持久化。用子进程隔离会关闭进程级写入执行器的 API，避免污染并行单测；并将临时目录测试夹具提升为 crate 共享测试模块，消除重复加载。`cargo test --locked -p panta-ffi --lib` 28 项通过，FFI Clippy 与格式检查通过。复跑 `cargo coverage`：全局函数 780/833（93.64%）、行 8882/9286（95.65%）；`panta-ffi` 函数 156/164（95.12%）、行 1986/2100（94.57%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。剩余未覆盖计数仍需逐项审阅，100% 函数和 C++ 门禁未达成。
+
+## 2026-10-10 DSL 与导入边界跟进
+
+独立审查 DSL、FSM 与导入缺口后，只补可观察的接口行为：通用 DSL `parse` 不再把 `kind: fsm` 静默解释为 variables，而是返回 `pa.unsupported_kind`，FSM 文档应走专用解析入口；补空消息 ID 和孤立元数据字段诊断断言；补 `StlImportSession::prepare` 对非 STL 文件的拒绝，以及有限坐标导致包围盒尺寸溢出的保护测试。FSM 读取中途与读后解析前的取消仍缺确定性注入点，不增加竞速测试或测试专用生产钩子；其他未命中项主要是 grammar 不可达、防御分支或泛型实例化计数。
+
+验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage` 通过，全局函数 782/835（93.65%）、行 8914/9321（95.63%），`panta-dsl-core` 函数 134/137、`panta-import` 函数 37/41；`cargo fmt --check`、相关 crate Clippy 与 `git diff --check` 通过。Rust 100% 函数覆盖与 C++ line/branch 门禁仍未完成，任务保持 in-progress。

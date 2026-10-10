@@ -216,6 +216,33 @@ mod tests {
                 .any(|item| item.code == "pa.field_without_message")
         );
 
+        let orphan_fields = parse(
+            "version: 1\nkind: language\nlanguage: en\n\n  oldsrc: Old\n  tr: Uno\n  st: finished\n  comment: note\n  extra: extra\n  numerus: true\n",
+        )
+        .expect_err("orphan metadata");
+        assert_eq!(
+            orphan_fields
+                .diagnostics
+                .iter()
+                .filter(|item| item.code == "pa.field_without_message")
+                .count(),
+            6
+        );
+
+        let empty_id = parse(
+            "version: 1\nkind: language\nlanguage: en\n\n[Menu]\n\"\":\n  src: Empty key\n  tr: Empty key\n",
+        )
+        .expect_err("empty message id");
+        assert!(
+            empty_id
+                .diagnostics
+                .iter()
+                .any(|item| item.code == "pa.empty_id")
+        );
+
+        let fsm = parse("version: 1\nkind: fsm\n").expect_err("FSM parser required");
+        assert_eq!(fsm.diagnostics[0].code, "pa.unsupported_kind");
+
         let huge = "a".repeat(1_048_577);
         let too_large = parse(&huge).expect_err("source limit");
         assert_eq!(too_large.diagnostics[0].code, "pa.source_too_large");
