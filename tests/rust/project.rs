@@ -1,7 +1,7 @@
 //! 工程服务和 STL 导入的行为回归。
 use panta_core::project::{
-    IMPORT_RECORD_VERSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError, ProjectService,
-    STL_IMPORT_PARSER_VERSION,
+    FillSettings, IMPORT_RECORD_VERSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError,
+    ProjectService, STL_IMPORT_PARSER_VERSION,
 };
 use std::fs;
 use std::path::Path;
@@ -258,6 +258,34 @@ fn rejects_analysis_sequences_with_missing_imports_or_unknown_ids()
         service.open(&project.path),
         Err(ProjectError::ManifestInvalid(_))
     ));
+    Ok(())
+}
+
+#[test]
+fn rejects_fill_settings_for_missing_import_without_replacing_current_project()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let mut service = ProjectService::new();
+    let project = service.create(&fixture.root, "Invalid fill settings")?;
+    let before = service.current()?;
+    let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+    manifest["fill_settings"] = serde_json::json!({
+        "missing-import": FillSettings::default()
+    });
+    fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+
+    let error = service
+        .open(&project.path)
+        .err()
+        .ok_or("fill settings for a missing import were accepted")?;
+
+    assert!(matches!(error, ProjectError::ManifestInvalid(_)));
+    assert!(
+        error
+            .detail()
+            .contains("fill settings reference missing import missing-import")
+    );
+    assert_eq!(service.current()?, before);
     Ok(())
 }
 

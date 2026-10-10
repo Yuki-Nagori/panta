@@ -210,6 +210,61 @@ mod tests {
     }
 
     #[test]
+    fn crash_handler_returns_log_path_on_success() -> Result<(), Box<dyn std::error::Error>> {
+        const ROOT_ENV: &str = "PANTA_FFI_TEST_CRASH_HANDLER";
+        const CHILD_ENV: &str = "PANTA_FFI_TEST_CRASH_HANDLER_CHILD";
+
+        if std::env::var_os(CHILD_ENV).is_some() {
+            let root = match std::env::var_os(ROOT_ENV) {
+                Some(root) => root,
+                None => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "child fixture path is missing",
+                    )
+                    .into());
+                }
+            };
+            let root = std::path::PathBuf::from(root);
+            let directory = match root.to_str() {
+                Some(directory) => directory,
+                None => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "fixture path should be UTF-8",
+                    )
+                    .into());
+                }
+            };
+            let returned = install_crash_handler(directory).map_err(std::io::Error::other)?;
+            let returned = std::path::PathBuf::from(returned);
+            assert_eq!(
+                panta_foundation::crash::crash_log_path().as_deref(),
+                Some(returned.as_path())
+            );
+            assert!(returned.is_file(), "{}", returned.display());
+            return Ok(());
+        }
+
+        let fixture = Fixture::new()?;
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args([
+                "--exact",
+                "support::tests::crash_handler_returns_log_path_on_success",
+                "--nocapture",
+            ])
+            .env(ROOT_ENV, &fixture.root)
+            .env(CHILD_ENV, "1")
+            .output()?;
+        assert!(
+            output.status.success(),
+            "crash handler child failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn shutdown_bridge_finishes_an_accepted_project_write() -> Result<(), Box<dyn std::error::Error>>
     {
         const ROOT_ENV: &str = "PANTA_FFI_TEST_WRITE_SHUTDOWN";

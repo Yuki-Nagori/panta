@@ -155,16 +155,18 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                 } else {
                     seen_source_language = true;
-                    result.source_language = find_text(body, Rule::locale_name)
-                        .map(|value| normalize_locale(&value))
-                        .unwrap_or_else(|| "en".to_owned());
+                    result.source_language = match find_text(body, Rule::locale_name) {
+                        Some(value) => normalize_locale(&value),
+                        None => "en".to_owned(),
+                    };
                 }
             }
             Rule::context => {
                 flush_message(&mut current_message, &mut result, &mut diagnostics, source);
-                current_context = find_text(body, Rule::context_name)
-                    .map(|value| value.trim().to_owned())
-                    .unwrap_or_else(|| "Panta".to_owned());
+                current_context = match find_text(body, Rule::context_name) {
+                    Some(value) => value.trim().to_owned(),
+                    None => "Panta".to_owned(),
+                };
                 section = None;
             }
             Rule::section => {

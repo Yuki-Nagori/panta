@@ -231,7 +231,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-coverage
-          path: target/native-coverage/summary.txt
+          path: |
+            target/native-coverage/summary.txt
+            target/native-coverage/line-coverage.txt
+            target/native-coverage/html/
           if-no-files-found: error
 
   # sanitizer 矩阵（任务 042）：runner 按平台固定组合——Linux/macOS 跑

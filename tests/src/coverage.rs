@@ -15,6 +15,7 @@ const CARGO_LLVM_COV_VERSION: &str = "0.9.1";
 
 const FUNCTIONS_MINIMUM: u64 = 89;
 const LINES_MINIMUM: u64 = 92;
+const IGNORED_SOURCE_REGEX: &str = r"[/\\](panta-launcher|panta-tests|panta-build)[/\\]";
 // 保持既有业务统计边界；这些构建/调度代码的覆盖缺口登记于任务 032。
 const EXCLUDED_PACKAGES: &[&str] = &["panta-launcher", "panta-tests", "panta-build"];
 
@@ -38,20 +39,21 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
         "excluded_packages": EXCLUDED_PACKAGES,
         "minimum_percent": {"functions": FUNCTIONS_MINIMUM, "lines": LINES_MINIMUM},
         "branch_coverage": "not measured",
-        "scope": "cargo-llvm-cov default filters; inline tests remain included"
+        "scope": "cargo-llvm-cov default filters; inline tests remain included",
+        "detailed_reports": ["uncovered-lines.txt", "html/index.html"]
     });
     fs::write(
         directory.join("metadata.json"),
         serde_json::to_vec_pretty(&metadata)?,
     )?;
     let report_path = directory.join("coverage.json");
-    let mut command = Command::new(tool);
+    let mut command = Command::new(&tool);
     command.arg("llvm-cov").args(["--locked", "--workspace"]);
     for package in EXCLUDED_PACKAGES {
         command.args(["--exclude", package]);
     }
     command
-        .args(["--json", "--summary-only", "--output-path"])
+        .args(["--json", "--output-path"])
         .arg(&report_path)
         .env("CARGO_TARGET_DIR", target)
         .env("PANTA_TOOL_CACHE_ROOT", target)
@@ -61,7 +63,54 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
     let summary = report.summary();
     fs::write(directory.join("summary.txt"), &summary)?;
     print!("{summary}");
+    write_rust_details(&tool, root, target, &directory)?;
     report.check_gate()
+}
+
+/// Generate actionable line and source views from the profiles collected by the gate run.
+fn write_rust_details(
+    tool: &Path,
+    root: &Path,
+    target: &Path,
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let mut missing = Command::new(tool);
+    missing
+        .args([
+            "llvm-cov",
+            "report",
+            "--text",
+            "--show-missing-lines",
+            "--show-instantiations",
+            "--ignore-filename-regex",
+            IGNORED_SOURCE_REGEX,
+            "--output-path",
+        ])
+        .arg(directory.join("uncovered-lines.txt"));
+    configure_report_command(&mut missing, root, target);
+    run_command("Rust uncovered-line report", missing)?;
+
+    let mut html = Command::new(tool);
+    html.args([
+        "llvm-cov",
+        "report",
+        "--html",
+        "--show-instantiations",
+        "--ignore-filename-regex",
+        IGNORED_SOURCE_REGEX,
+        "--output-dir",
+    ])
+    .arg(directory);
+    configure_report_command(&mut html, root, target);
+    run_command("Rust HTML coverage report", html)?;
+    Ok(())
+}
+
+fn configure_report_command(command: &mut Command, root: &Path, target: &Path) {
+    command
+        .env("CARGO_TARGET_DIR", target)
+        .env("PANTA_TOOL_CACHE_ROOT", target)
+        .current_dir(root);
 }
 
 fn command_text(
@@ -233,10 +282,10 @@ pub(super) fn native_coverage() -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
     let target = target_root();
     let report_dir = target.join("native-coverage");
-    let profiles = report_dir.join("raw");
-    if profiles.exists() {
-        fs::remove_dir_all(&profiles)?;
+    if report_dir.exists() {
+        fs::remove_dir_all(&report_dir)?;
     }
+    let profiles = report_dir.join("raw");
     fs::create_dir_all(&profiles)?;
     let profile_file = profiles.join("%m-%p.profraw");
     let mut build = Command::new("cargo");
@@ -279,18 +328,11 @@ pub(super) fn native_coverage() -> Result<(), Box<dyn Error>> {
     collect_test_binaries(&native, &mut binaries)?;
     binaries.sort();
     let first = binaries.first().ok_or("没有找到 native 覆盖率测试产物")?;
-    let mut report = Command::new(
-        llvm.root
-            .join("bin")
-            .join(panta_build::exe_name("llvm-cov")),
-    );
-    report
-        .arg("report")
-        .arg(first)
-        .arg(format!("-instr-profile={}", merged.display()));
-    for binary in binaries.iter().skip(1) {
-        report.arg("-object").arg(binary);
-    }
+    let llvm_cov = llvm
+        .root
+        .join("bin")
+        .join(panta_build::exe_name("llvm-cov"));
+    let mut report = native_llvm_cov_command(&llvm_cov, "report", first, &binaries, &merged);
     report.args([
         "--ignore-filename-regex=(/target/|googletest|/usr/)",
         "--show-region-summary=false",
@@ -301,7 +343,46 @@ pub(super) fn native_coverage() -> Result<(), Box<dyn Error>> {
     }
     fs::write(report_dir.join("summary.txt"), &output.stdout)?;
     print!("{}", String::from_utf8_lossy(&output.stdout));
+
+    let mut lines = native_llvm_cov_command(&llvm_cov, "show", first, &binaries, &merged);
+    lines.args([
+        "-format=text",
+        "-show-line-counts-or-regions",
+        "-ignore-filename-regex=(/target/|googletest|/usr/)",
+    ]);
+    let output = lines.output()?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
+    }
+    fs::write(report_dir.join("line-coverage.txt"), &output.stdout)?;
+
+    let mut html = native_llvm_cov_command(&llvm_cov, "show", first, &binaries, &merged);
+    html.args([
+        "-format=html",
+        "-show-instantiations",
+        "-ignore-filename-regex=(/target/|googletest|/usr/)",
+    ])
+    .arg(format!("-output-dir={}", report_dir.join("html").display()));
+    run_command("native HTML coverage report", html)?;
     Ok(())
+}
+
+fn native_llvm_cov_command(
+    llvm_cov: &Path,
+    subcommand: &str,
+    first: &Path,
+    binaries: &[PathBuf],
+    profile: &Path,
+) -> Command {
+    let mut command = Command::new(llvm_cov);
+    command
+        .arg(subcommand)
+        .arg(first)
+        .arg(format!("-instr-profile={}", profile.display()));
+    for binary in binaries.iter().skip(1) {
+        command.arg("-object").arg(binary);
+    }
+    command
 }
 
 fn collect_test_binaries(directory: &Path, result: &mut Vec<PathBuf>) -> std::io::Result<()> {

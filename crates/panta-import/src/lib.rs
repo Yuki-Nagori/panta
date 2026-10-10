@@ -194,40 +194,36 @@ pub fn read_source_checked(
     path: &Path,
     is_cancelled: impl Fn() -> bool,
 ) -> Result<SourceSnapshot, CheckedReadError> {
-    let read_failed = |error: std::io::Error| {
-        CheckedReadError::Failed(ImportError::Read(format!("{}: {error}", path.display())))
-    };
     if !path.is_absolute() || !path.is_file() {
         return Err(CheckedReadError::Failed(ImportError::Missing(
             path.display().to_string(),
         )));
     }
     let format = detect_format(path).map_err(CheckedReadError::Failed)?;
-    let source_name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            CheckedReadError::Failed(ImportError::UnsupportedFormat(path.display().to_string()))
-        })?
-        .to_owned();
-    let mut file = fs::File::open(path).map_err(read_failed)?;
-    let expected = file.metadata().map_err(read_failed)?.len();
+    let source_name = source_name(path).map_err(CheckedReadError::Failed)?;
+    let mut file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => return Err(read_error(path, error)),
+    };
+    let expected = match file.metadata() {
+        Ok(metadata) => metadata.len(),
+        Err(error) => return Err(read_error(path, error)),
+    };
     let mut bytes = Vec::new();
-    bytes
-        .try_reserve_exact(usize::try_from(expected).unwrap_or(usize::MAX))
-        .map_err(|error| {
-            CheckedReadError::Failed(ImportError::Read(format!(
-                "{}: allocation failed: {error}",
-                path.display()
-            )))
-        })?;
+    reserve_source_bytes(
+        path,
+        &mut bytes,
+        usize::try_from(expected).unwrap_or(usize::MAX),
+    )?;
     let mut chunk = vec![0u8; READ_CHUNK_BYTES];
     loop {
         if is_cancelled() {
             return Err(CheckedReadError::Cancelled(path.display().to_string()));
         }
-        let read = std::io::Read::read(&mut file, &mut chunk).map_err(read_failed)?;
+        let read = match std::io::Read::read(&mut file, &mut chunk) {
+            Ok(read) => read,
+            Err(error) => return Err(read_error(path, error)),
+        };
         if read == 0 {
             break;
         }
@@ -239,6 +235,32 @@ pub fn read_source_checked(
         format,
         bytes,
     })
+}
+
+fn source_name(path: &Path) -> Result<String, ImportError> {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| ImportError::UnsupportedFormat(path.display().to_string()))
+}
+
+fn read_error(path: &Path, error: std::io::Error) -> CheckedReadError {
+    CheckedReadError::Failed(ImportError::Read(format!("{}: {error}", path.display())))
+}
+
+fn reserve_source_bytes(
+    path: &Path,
+    bytes: &mut Vec<u8>,
+    capacity: usize,
+) -> Result<(), CheckedReadError> {
+    match bytes.try_reserve_exact(capacity) {
+        Ok(()) => Ok(()),
+        Err(error) => Err(CheckedReadError::Failed(ImportError::Read(format!(
+            "{}: allocation failed: {error}",
+            path.display()
+        )))),
+    }
 }
 
 /// 已提交工程资产的解析入口：STL 解析 + 记录单位换算到毫米。
@@ -629,7 +651,7 @@ mod tests {
         let source = fixture.root.join("part.stl");
         let payload = b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n";
         fs::write(&source, payload)?;
-        let snapshot = read_source_checked(&source, || false).map_err(|error| error.to_string())?;
+        let snapshot = read_source_checked(&source, || false)?;
         assert_eq!(snapshot.bytes.len(), payload.len());
 
         assert!(matches!(
@@ -660,6 +682,44 @@ mod tests {
             read_source_checked(&unknown, || false),
             Err(CheckedReadError::Failed(ImportError::UnsupportedFormat(_)))
         ));
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStringExt;
+
+            let non_utf8_name = std::ffi::OsString::from_vec(b"part-\xff.stl".to_vec());
+            let non_utf8 = fixture.root.join(non_utf8_name);
+            match fs::write(&non_utf8, payload) {
+                Ok(()) => {
+                    assert!(matches!(
+                        read_source_checked(&non_utf8, || false),
+                        Err(CheckedReadError::Failed(ImportError::UnsupportedFormat(_)))
+                    ));
+                    fs::remove_file(non_utf8)?;
+                }
+                // Some sandboxed filesystems reject non-UTF-8 names before they can be read.
+                Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                    assert!(matches!(
+                        source_name(&non_utf8),
+                        Err(ImportError::UnsupportedFormat(_))
+                    ));
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+
+        assert!(matches!(
+            read_error(&source, std::io::Error::other("fixture error")),
+            CheckedReadError::Failed(ImportError::Read(message))
+                if message.contains("part.stl") && message.contains("fixture error")
+        ));
+        let mut unreserved = Vec::new();
+        assert!(matches!(
+            reserve_source_bytes(&source, &mut unreserved, usize::MAX),
+            Err(CheckedReadError::Failed(ImportError::Read(message)))
+                if message.contains("part.stl") && message.contains("allocation failed")
+        ));
+
         let cancelled = CheckedReadError::Cancelled(source.display().to_string());
         assert!(cancelled.to_string().contains("Cancelled"));
         let failed = CheckedReadError::Failed(ImportError::Missing(source.display().to_string()));

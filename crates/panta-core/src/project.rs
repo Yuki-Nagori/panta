@@ -47,8 +47,12 @@ mod temp_directory;
 #[cfg(test)]
 mod tests {
     use super::model::validate_name;
-    use super::{ProjectError, ProjectService, SurfaceMeshCache};
+    use super::{ProjectError, ProjectService, SurfaceMeshCache, temp_directory};
+    use crate::fsm::open_saved_stl::{ActivationCoordinator, ActivationRequest, OUTCOME_CAPACITY};
+    use panta_import::ImportRecord;
     use panta_mesh::SurfaceMesh;
+    use std::path::PathBuf;
+    use std::sync::Arc;
 
     fn mesh(triangle_count: usize) -> SurfaceMesh {
         SurfaceMesh {
@@ -146,6 +150,63 @@ mod tests {
             Some(2)
         );
         assert!(!service.is_current_activation_attempt("import-1", 2));
+    }
+
+    #[test]
+    fn activation_admission_failure_is_mapped_without_recording_an_attempt()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "Activation backlog")?;
+        service
+            .current
+            .as_mut()
+            .ok_or("created project state missing")?
+            .imports
+            .push(ImportRecord {
+                record_version: 1,
+                parser_version: 1,
+                id: "import-overflow".to_owned(),
+                source_name: "part.stl".to_owned(),
+                asset: "assets/part.stl".to_owned(),
+                format: "stl".to_owned(),
+                mesh_type: "midplane".to_owned(),
+                units: "millimeters".to_owned(),
+                show_import_log: false,
+                triangle_count: 1,
+                dimensions: [1.0, 1.0, 0.0],
+            });
+
+        let coordinator = Arc::new(ActivationCoordinator::default());
+        for index in 0..OUTCOME_CAPACITY {
+            let import_id = format!("queued-{index}");
+            assert!(
+                coordinator
+                    .begin_with(
+                        &import_id,
+                        ActivationRequest {
+                            asset_path: PathBuf::from("unused.stl"),
+                            units: "millimeters".to_owned(),
+                        },
+                        |_, _, _, _| Ok(()),
+                    )
+                    .is_ok(),
+                "coordinator rejected before reaching its configured capacity"
+            );
+        }
+        service.activation = coordinator;
+
+        let error = service
+            .begin_asset_activation("import-overflow")
+            .err()
+            .ok_or("full activation coordinator unexpectedly admitted a request")?;
+
+        assert!(matches!(
+            error,
+            ProjectError::CommandInvalid(detail) if detail == "asset activation backlog full"
+        ));
+        assert!(service.activation_attempts.is_empty());
+        Ok(())
     }
 
     #[test]

@@ -78,10 +78,17 @@ pub fn parse(source: &str) -> Result<FsmDocument, Diagnostics> {
         ));
     }
 
-    let document_pair = PaParser::parse(Rule::fsm_document, source)
+    let Some(document_pair) = PaParser::parse(Rule::fsm_document, source)
         .map_err(|error| pest_diagnostic(error, source))?
         .next()
-        .ok_or_else(|| Diagnostics::one("pa.syntax", "document is empty", 0, source))?;
+    else {
+        return Err(Diagnostics::one(
+            "pa.syntax",
+            "document is empty",
+            0,
+            source,
+        ));
+    };
 
     let mut version: Option<u32> = None;
     let mut kind: Option<String> = None;

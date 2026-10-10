@@ -84,6 +84,7 @@ impl ProjectService {
 
 #[cfg(test)]
 mod tests {
+    use super::super::ProjectCommand;
     use super::super::temp_directory;
     use super::{MetadataWriteKind, PendingMetadataWrite, ProjectService};
     use crate::execution::Executor;
@@ -197,6 +198,35 @@ mod tests {
         assert_eq!(error.detail(), "metadata confirmation worker disconnected");
         assert!(service.pending_metadata.is_none());
         assert_eq!(service.current()?, before);
+        Ok(())
+    }
+
+    #[test]
+    fn pending_metadata_confirmation_rejects_commands_without_changing_project()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Pending metadata")?;
+        let before = service.current()?;
+        let manifest = std::fs::read(&project.path)?;
+        let (_sender, receiver) = mpsc::channel();
+        service.pending_metadata = Some(PendingMetadataWrite {
+            kind: MetadataWriteKind::Material,
+            receiver,
+        });
+
+        let error = service
+            .execute(ProjectCommand::Rename {
+                name: "Rejected rename".to_owned(),
+            })
+            .err()
+            .ok_or("command was accepted while metadata confirmation was pending")?;
+
+        assert_eq!(error.code(), "project.command_invalid");
+        assert_eq!(error.detail(), "metadata confirmation pending");
+        assert!(service.pending_metadata.is_some());
+        assert_eq!(service.current()?, before);
+        assert_eq!(std::fs::read(&project.path)?, manifest);
         Ok(())
     }
 }

@@ -269,6 +269,36 @@ mod tests {
     }
 
     #[test]
+    fn commit_rejects_a_manifest_revision_changed_during_lease()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        let snapshot = service.create(&fixture.root, "Changed revision")?;
+        let mut state = service
+            .current
+            .take()
+            .ok_or("created project state missing")?;
+        let lease = super::WriteLease::acquire(&state)?;
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&snapshot.path)?)?;
+        manifest["revision"] = serde_json::Value::from(state.revision + 1);
+        let external_update = serde_json::to_vec_pretty(&manifest)?;
+        fs::write(&snapshot.path, &external_update)?;
+        state.name = "Must not overwrite disk".into();
+        state.revision += 1;
+
+        let error = lease
+            .commit(&mut state)
+            .err()
+            .ok_or("stale write lease unexpectedly committed")?;
+
+        assert!(matches!(error, ProjectError::CommandInvalid(_)));
+        assert_eq!(error.code(), "project.command_invalid");
+        assert_eq!(error.detail(), "project changed on disk");
+        assert_eq!(fs::read(snapshot.path)?, external_update);
+        Ok(())
+    }
+
+    #[test]
     fn temporary_creation_bounds_collisions_and_identifier_exhaustion()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;

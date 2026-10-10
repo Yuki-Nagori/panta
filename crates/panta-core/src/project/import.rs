@@ -122,12 +122,67 @@ pub(super) fn map_import_error(error: ImportError) -> ProjectError {
 #[cfg(test)]
 mod tests {
     use super::map_import_error;
-    use crate::project::ProjectError;
     use panta_import::ImportError;
+    use panta_mesh::StlError;
 
     #[test]
-    fn read_failures_become_parse_failures() {
-        let error = map_import_error(ImportError::Read("disk full".into()));
-        assert!(matches!(error, ProjectError::ImportParseFailed(detail) if detail == "disk full"));
+    fn import_failures_map_to_stable_project_diagnostics() {
+        let cases = [
+            (
+                ImportError::Missing("part.stl".into()),
+                "project.import_file_missing",
+                "missing",
+                "part.stl",
+            ),
+            (
+                ImportError::UnsupportedFormat("part.step".into()),
+                "project.import_invalid_file",
+                "format",
+                "part.step",
+            ),
+            (
+                ImportError::Read("disk full".into()),
+                "project.import_parse_failed",
+                "format",
+                "disk full",
+            ),
+            (
+                ImportError::Parse(StlError::InvalidData),
+                "project.import_parse_failed",
+                "format",
+                "InvalidData",
+            ),
+            (
+                ImportError::SourceChanged("part.stl".into()),
+                "project.import_source_changed",
+                "conflict",
+                "part.stl",
+            ),
+            (
+                ImportError::UnsupportedMeshType("unknown".into()),
+                "project.import_unsupported_mesh_type",
+                "format",
+                "unknown",
+            ),
+            (
+                ImportError::UnsupportedUnits("yards".into()),
+                "project.import_unsupported_units",
+                "format",
+                "yards",
+            ),
+            (
+                ImportError::CoordinateOverflow,
+                "project.import_parse_failed",
+                "format",
+                "millimeter coordinate overflow",
+            ),
+        ];
+
+        for (error, code, category, detail) in cases {
+            let mapped = map_import_error(error);
+            assert_eq!(mapped.code(), code);
+            assert_eq!(mapped.category(), category);
+            assert_eq!(mapped.detail(), detail);
+        }
     }
 }

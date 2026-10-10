@@ -16,7 +16,7 @@ use panta_mesh::SurfaceMesh;
 
 use super::generated as fsm;
 
-const OUTCOME_CAPACITY: usize = 256;
+pub(crate) const OUTCOME_CAPACITY: usize = 256;
 
 /// begin 返回的运行期相关性句柄；generation 是会话级计数，非工程 revision。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -533,6 +533,15 @@ fn activation_failure(error: &ImportError) -> (&'static str, &'static str, Strin
 mod tests {
     use super::*;
 
+    fn accept_activation_request(
+        _: Arc<ActivationCoordinator>,
+        _: u64,
+        _: ActivationRequest,
+        _: Arc<AtomicBool>,
+    ) -> std::io::Result<()> {
+        Ok(())
+    }
+
     #[test]
     fn activation_diagnostics_preserve_typed_categories_and_context() {
         let context = "参数: 中文 / C:\\零件.stl";
@@ -744,7 +753,7 @@ mod tests {
                     asset_path: PathBuf::from("unused.stl"),
                     units: "millimeters".to_owned(),
                 },
-                |_coordinator, _attempt, _request, _cancel| Ok(()),
+                accept_activation_request,
             )
             .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         (coordinator, attempt)
@@ -862,16 +871,16 @@ mod tests {
             units: "millimeters".to_owned(),
         };
         let first = coordinator
-            .begin_with("import-1", request(), |_c, _a, _r, _cancel| Ok(()))
+            .begin_with("import-1", request(), accept_activation_request)
             .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         let second = coordinator
-            .begin_with("import-1", request(), |_c, _a, _r, _cancel| Ok(()))
+            .begin_with("import-1", request(), accept_activation_request)
             .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         assert_eq!(first.attempt, second.attempt);
         assert_eq!(first.generation, second.generation);
         // 不同记录仍创建独立 attempt。
         let other = coordinator
-            .begin_with("import-2", request(), |_c, _a, _r, _cancel| Ok(()))
+            .begin_with("import-2", request(), accept_activation_request)
             .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         assert_ne!(first.attempt, other.attempt);
     }
@@ -944,7 +953,11 @@ mod tests {
         };
         for id in 0..OUTCOME_CAPACITY {
             let attempt = coordinator
-                .begin_with(&format!("import-{id}"), request(), |_, _, _, _| Ok(()))
+                .begin_with(
+                    &format!("import-{id}"),
+                    request(),
+                    accept_activation_request,
+                )
                 .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
             coordinator.complete(
                 attempt.attempt,
@@ -957,7 +970,7 @@ mod tests {
         }
         assert_eq!(
             coordinator
-                .begin_with("overflow", request(), |_, _, _, _| Ok(()))
+                .begin_with("overflow", request(), accept_activation_request)
                 .err(),
             Some("asset activation backlog full")
         );
@@ -965,7 +978,7 @@ mod tests {
         coordinator.lock().next_attempt = u64::MAX;
         assert_eq!(
             coordinator
-                .begin_with("exhausted", request(), |_, _, _, _| Ok(()))
+                .begin_with("exhausted", request(), accept_activation_request)
                 .err(),
             Some("activation attempt exhausted")
         );
