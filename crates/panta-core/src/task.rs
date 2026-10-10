@@ -569,6 +569,43 @@ mod tests {
     }
 
     #[test]
+    fn executor_capacity_rejection_rolls_back_the_task_record()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut manager = TaskManager::new();
+        manager.executor = crate::execution::Executor::new("task-admission-test", 1, 1);
+        let accepted = submit(&manager, "accepted", 30_000, false)?;
+        assert!(wait_for(
+            || manager
+                .recent_logs()
+                .iter()
+                .any(|log| log.task_id == accepted && log.message.starts_with("started:")),
+            Duration::from_secs(2)
+        ));
+
+        assert_eq!(
+            manager.submit("rejected", Duration::ZERO, false),
+            Err(SubmitError::CapacityExceeded)
+        );
+        assert_eq!(manager.running_tasks(), 1);
+        assert!(manager.recent_logs().iter().any(|log| {
+            log.task_id == accepted + 1 && log.message.starts_with("admission failed:")
+        }));
+        assert!(
+            manager
+                .drain_events()
+                .iter()
+                .all(|event| event.task_id != accepted + 1)
+        );
+
+        assert!(manager.cancel(accepted));
+        assert!(wait_for(
+            || manager.running_tasks() == 0,
+            Duration::from_secs(2)
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn drop_closes_running_tasks_without_waiting_for_their_duration()
     -> Result<(), Box<dyn std::error::Error>> {
         let started = Instant::now();

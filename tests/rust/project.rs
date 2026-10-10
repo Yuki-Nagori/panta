@@ -357,6 +357,30 @@ fn import_asset_collision_does_not_overwrite_or_publish_import()
 }
 
 #[test]
+fn import_directory_failure_preserves_the_project() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let created = service.create(&fixture.root, "Demo")?;
+    let blocking_file = fixture.root.join("Demo/assets");
+    fs::write(&blocking_file, b"preserve this file")?;
+    let before = service.current()?;
+    let manifest_before = fs::read(&created.path)?;
+
+    assert!(matches!(
+        service.import_stl(&source, "solid-3d", "millimeters", false),
+        Err(ProjectError::ImportAssetCopyFailed(_))
+    ));
+    assert_eq!(fs::read(&blocking_file)?, b"preserve this file");
+    assert_eq!(service.current()?, before);
+    assert!(service.imports()?.is_empty());
+    assert!(service.current_mesh().is_none());
+    assert_eq!(fs::read(&created.path)?, manifest_before);
+    Ok(())
+}
+
+#[test]
 fn changed_preview_requires_review_and_failed_import_preserves_mesh()
 -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;

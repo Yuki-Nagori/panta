@@ -210,6 +210,21 @@ mod tests {
     }
 
     #[test]
+    fn temporary_creation_reports_a_non_directory_parent_without_overwriting()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let blocked_directory = fixture.root.join("staging");
+        fs::write(&blocked_directory, "preserve")?;
+        let error = Temporary::create(blocked_directory.clone(), &AtomicU64::new(0))
+            .err()
+            .ok_or("file unexpectedly accepted as a staging directory")?;
+
+        assert!(matches!(error, ProjectError::Io(_)));
+        assert_eq!(fs::read_to_string(blocked_directory)?, "preserve");
+        Ok(())
+    }
+
+    #[test]
     fn temporary_creation_bounds_collisions_and_identifier_exhaustion()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;

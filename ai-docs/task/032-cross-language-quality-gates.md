@@ -178,3 +178,9 @@ FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pe
 独立审查 DSL、FSM 与导入缺口后，只补可观察的接口行为：通用 DSL `parse` 不再把 `kind: fsm` 静默解释为 variables，而是返回 `pa.unsupported_kind`，FSM 文档应走专用解析入口；补空消息 ID 和孤立元数据字段诊断断言；补 `StlImportSession::prepare` 对非 STL 文件的拒绝，以及有限坐标导致包围盒尺寸溢出的保护测试。FSM 读取中途与读后解析前的取消仍缺确定性注入点，不增加竞速测试或测试专用生产钩子；其他未命中项主要是 grammar 不可达、防御分支或泛型实例化计数。
 
 验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage` 通过，全局函数 782/835（93.65%）、行 8914/9321（95.63%），`panta-dsl-core` 函数 134/137、`panta-import` 函数 37/41；`cargo fmt --check`、相关 crate Clippy 与 `git diff --check` 通过。Rust 100% 函数覆盖与 C++ line/branch 门禁仍未完成，任务保持 in-progress。
+
+## 2026-10-10 核心准入与文件系统失败路径
+
+补充三个可确定复现的边界：任务执行器容量耗尽时，提交返回 `CapacityExceeded`、回滚任务记录并保留准入失败日志；导入工程的 `assets` 被普通文件占用时，导入失败且项目清单、导入状态和当前网格保持不变；临时创建路径被普通文件占用时，返回 I/O 错误且不覆盖原文件。使用容量为 1 的专用执行器，并等待首个任务启动后再提交第二个，避免依赖调度时序。独立 review 确认断言稳定，没有明显竞态或假阳性。
+
+验证（macOS arm64）：三个定向测试与 `cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`cargo fmt --check`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 790/842（93.82%）、行 8966/9364（95.75%），`panta-core` 函数 374/406（92.12%）、行 3614/3728（96.94%）。完整 `cargo test --locked --workspace` 通过，native / QML CTest 72/72。Rust 100% 函数覆盖与 C++ line/branch 门禁仍未完成，任务保持 in-progress。
