@@ -344,6 +344,18 @@ pub(super) fn native_coverage() -> Result<(), Box<dyn Error>> {
     fs::write(report_dir.join("summary.txt"), &output.stdout)?;
     print!("{}", String::from_utf8_lossy(&output.stdout));
 
+    let mut product_report =
+        native_llvm_cov_command(&llvm_cov, "report", first, &binaries, &merged);
+    product_report.args([
+        "--ignore-filename-regex=(/target/|googletest|/usr/|/tests/)",
+        "--show-region-summary=false",
+    ]);
+    let output = product_report.output()?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
+    }
+    fs::write(report_dir.join("product-summary.txt"), &output.stdout)?;
+
     let mut lines = native_llvm_cov_command(&llvm_cov, "show", first, &binaries, &merged);
     lines.args([
         "-format=text",
@@ -355,6 +367,18 @@ pub(super) fn native_coverage() -> Result<(), Box<dyn Error>> {
         return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
     }
     fs::write(report_dir.join("line-coverage.txt"), &output.stdout)?;
+
+    let mut product_lines = native_llvm_cov_command(&llvm_cov, "show", first, &binaries, &merged);
+    product_lines.args([
+        "-format=text",
+        "-show-line-counts-or-regions",
+        "-ignore-filename-regex=(/target/|googletest|/usr/|/tests/)",
+    ]);
+    let output = product_lines.output()?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
+    }
+    fs::write(report_dir.join("product-line-coverage.txt"), &output.stdout)?;
 
     let mut html = native_llvm_cov_command(&llvm_cov, "show", first, &binaries, &merged);
     html.args([

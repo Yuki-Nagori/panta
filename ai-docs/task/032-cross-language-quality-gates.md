@@ -31,7 +31,7 @@
 
 - 统一质量入口及 Rust 89% / 92% gate 已运行；Rust 覆盖率报告包含 JSON、crate 汇总、元数据和 CI artifact。
 - `cargo coverage` 生成函数/行完整 JSON、可搜索的未覆盖行文本及 HTML 源码视图；报告使用 gate 收集的同一批 profile。
-- `cargo coverage native` 合并 CTest profile 并生成汇总、逐行执行计数文本和 HTML 报告。LLVM 22 的 `llvm-cov report` 不提供 missing-lines 选项，因此 native 文本报告保留所有源码行计数；CI 上传这些可读报告，不上传 raw profiles。
+- `cargo coverage native` 合并 CTest profile 并生成汇总、逐行执行计数文本和 HTML 报告；额外生成排除 `tests/` 的产品源码汇总与逐行报告，CI 上传全部报告 artifact。2026-10-10 macOS arm64 最新报告的行覆盖为 84.51%、分支 46.10%，该汇总包含测试源码；产品 native 源码报告为行 74.84%、分支 55.99%，仅作为本机诊断基线。LLVM 22 的 `llvm-cov report` 不提供 missing-lines 选项，因此 native 文本报告保留所有源码行计数。当前 native job 只生成 artifact，尚无覆盖率阈值门禁；跨平台稳定口径与基线仍待确认。
 - 尚待完成：Rust 100% 函数目标、C++ line/branch 门禁、逐模块防回退/差异覆盖率、完整跨平台 artifact 验证及所有受控失败验收。不要仅凭当前 89% / 92% gate 判定任务完成。
 
 ## 验证与证据
@@ -44,6 +44,7 @@
 | 2026-10-10：Rust crate 行为覆盖跟进 | 对 core、DSL、import、FFI 等可确定的业务行为补测试；逐项审阅剩余 LLVM 缺口，区分测试实例/泛型计数、不可达防御路径与不安全故障注入。内置材料解析抽为纯函数并覆盖 malformed JSON 和不支持 schema；独立 `gpt-6.1-sol` medium review 通过。`panta-dsl-core`、`panta-import` 等 crate 函数覆盖 100%，全局尚未达到。 |
 | 2026-10-10：coverage 报告优化（macOS arm64） | 首次 `cargo coverage`：函数 803/842（95.37%）、行 9296/9687（95.96%）；生成 crate 汇总、完整 JSON、`uncovered-lines.txt` 与 HTML。`cargo coverage native` 的 CTest 72/72 通过，生成 summary、逐行计数与 HTML；LLVM 22 `llvm-cov report` 不支持 missing-lines 选项，改用 `llvm-cov show`。 |
 | 2026-10-10：材料与工程失败路径覆盖 | 材料解析新增 malformed JSON / 不支持 schema 测试；新增锁文件不可打开、任务状态锁中毒恢复测试。`cargo coverage` 函数 813/850（95.65%）、行 9357/9748（95.99%）；core 393/418（94.02%）。`cargo test --locked --workspace`（72/72 native / QML CTest）、`cargo lint --check`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 批准。审计剩余缺口后，多数零计数为重复实例、崩溃子进程和手动性能基准，尚需继续逐项审查可稳定触达的生产行为。 |
+| 2026-10-10：native 报告与图标尺寸回退 | 增加有效图标请求尺寸为空时回退 SVG 固有尺寸的行为断言；`cargo coverage native` 72/72 CTest 通过。报告新增排除 `tests/` 的产品汇总和逐行文件，并由 CI 上传；产品 native 行/分支为 74.84% / 55.99%（macOS arm64 本机诊断）。`cargo lint --check`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；两轮独立 `gpt-6.1-sol` medium review 均未发现问题。C++ 阈值门禁仍未启用。 |
 
 ## 重要边界
 

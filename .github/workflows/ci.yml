@@ -234,6 +234,8 @@ jobs:
           path: |
             target/native-coverage/summary.txt
             target/native-coverage/line-coverage.txt
+            target/native-coverage/product-summary.txt
+            target/native-coverage/product-line-coverage.txt
             target/native-coverage/html/
           if-no-files-found: error
 

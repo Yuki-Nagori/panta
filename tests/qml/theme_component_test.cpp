@@ -1079,6 +1079,14 @@ class ThemeComponentTest final : public QObject {
         const QImage transparent =
             provider->requestImage(QStringLiteral("close/00ffffff"), nullptr, QSize(24, 24));
         QCOMPARE(transparent.pixelColor(6, 6).alpha(), 0);
+        const QSize fallback_size =
+            QImageReader(resource_root + QStringLiteral("close.svg")).size();
+        QSize fallback_original;
+        const QImage fallback =
+            provider->requestImage(QStringLiteral("close/ff2878b8"), &fallback_original, {});
+        QVERIFY(!fallback.isNull());
+        QCOMPARE(fallback_original, fallback_size);
+        QCOMPARE(fallback.size(), fallback_size);
         QVERIFY(provider->requestImage(QStringLiteral("../new/ffffffff"), nullptr, {}).isNull());
         QVERIFY(provider->requestImage(QStringLiteral("ribbon-project/ffffffff"), nullptr, {})
                     .isNull());
