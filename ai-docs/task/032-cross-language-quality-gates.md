@@ -205,4 +205,10 @@ FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pe
 
 验证（macOS arm64）：定向测试、`cargo fmt --check`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 796/847（93.98%）、行 9048/9443（95.82%），`panta-core` 函数 380/411（92.46%）、行 3696/3807（97.08%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% Rust 函数目标与 C++ line/branch 门禁尚未完成，任务保持 in-progress。
 
-下一批评估 metadata worker 断连时的失败回执与状态保留，使用现有状态构造确定性验证，不增加测试专用生产 seam。
+## 2026-10-10 Metadata 结果通道断连
+
+直接构造已断开的 metadata 结果通道，验证消费确认返回 `project.io`、清除 pending 并保留当前已提交状态；没有启动后台 worker，因此该用例限定在消费端对断连 receiver 的失败处理。独立 review 确认状态与错误断言准确，并建议测试名明确使用 channel，避免扩大验收含义。
+
+验证（macOS arm64）：定向测试、`cargo fmt --check`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 797/848（93.99%）、行 9070/9465（95.83%），`panta-core` 函数 381/412（92.48%）、行 3718/3829（97.10%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% Rust 函数目标与 C++ line/branch 门禁尚未完成，任务保持 in-progress。
+
+下一批继续检查 `panta-core`、`panta-ffi` 与 `panta-import` 的剩余候选；平台专属的非 UTF-8 路径和简单 FFI 成功映射暂不优先。

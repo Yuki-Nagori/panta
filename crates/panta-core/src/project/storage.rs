@@ -85,7 +85,7 @@ impl ProjectService {
 #[cfg(test)]
 mod tests {
     use super::super::temp_directory;
-    use super::{MetadataWriteKind, ProjectService};
+    use super::{MetadataWriteKind, PendingMetadataWrite, ProjectService};
     use crate::execution::Executor;
     use std::sync::{Arc, mpsc};
     use std::time::Duration;
@@ -171,6 +171,32 @@ mod tests {
         assert_eq!(std::fs::read(&project.path)?, manifest);
         release.send(())?;
         executor.close_and_wait();
+        Ok(())
+    }
+
+    #[test]
+    fn disconnected_metadata_channel_clears_pending_and_preserves_current()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "Disconnected worker")?;
+        let before = service.current()?;
+        let (sender, receiver) = mpsc::channel();
+        drop(sender);
+        service.pending_metadata = Some(PendingMetadataWrite {
+            kind: MetadataWriteKind::Material,
+            receiver,
+        });
+
+        let error = service
+            .finish_material_confirmation()
+            .err()
+            .ok_or("disconnected metadata worker unexpectedly succeeded")?;
+
+        assert_eq!(error.code(), "project.io");
+        assert_eq!(error.detail(), "metadata confirmation worker disconnected");
+        assert!(service.pending_metadata.is_none());
+        assert_eq!(service.current()?, before);
         Ok(())
     }
 }
