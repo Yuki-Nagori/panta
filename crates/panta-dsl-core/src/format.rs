@@ -230,7 +230,7 @@ mod tests {
     use crate::{Document, Kind, Message, Translation};
 
     #[test]
-    fn empty_non_numerus_translation_formats_as_empty_scalar() {
+    fn unmatched_locale_uses_first_translation_and_formats_empty_scalar() {
         let message = Message {
             context: "App".to_owned(),
             id: "empty".to_owned(),
@@ -246,7 +246,7 @@ mod tests {
             version: 1,
             kind: Kind::Language,
             catalog: None,
-            language: Some("en".to_owned()),
+            language: Some("fr".to_owned()),
             source_language: "en".to_owned(),
             messages: BTreeMap::from([("App\u{1f}empty".to_owned(), message)]),
             message_order: vec!["App\u{1f}empty".to_owned()],

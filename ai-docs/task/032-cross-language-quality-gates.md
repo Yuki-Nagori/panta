@@ -101,7 +101,11 @@ Cargo/CMake/CI 配置、质量脚本、coverage 配置、工具版本清单、�
 
 TS 输出原先在每个 XML 写入和 UTF-8 转换点各自创建错误映射闭包；`Writer<Vec<u8>>` 的写入失败无法从正常导出路径稳定触发，造成大量重复、不可达的闭包函数计数。本轮将其合并为两个具名诊断映射函数，新增直接错误映射断言，诊断码仍为 `pa.ts_write`，不改变成功输出。另为带引号的消息 ID 与手工构造 AST 中空的非复数翻译补上行为断言，覆盖解析器和格式化器可达的边界。
 
-验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage`、`cargo clippy --locked --workspace --all-targets -- -D warnings` 和 `cargo format --check` 均通过。完整 `cargo lint` 因沙箱禁止绑定其锁管理 TCP listener，在 Clippy 阶段退出；因此其余 lint 阶段未运行。最终覆盖率为全局函数 768/828（92.75%）、行 8744/9182（95.23%）；`panta-dsl-core` 函数 132/135（97.78%）、行 2001/2091（95.70%）。全局仍有 60 个 Rust 函数未覆盖，100% 目标尚未完成，本任务及索引保持 in-progress；其他 crate 与 DSL 的不可达/剩余路径留待继续按行为审查。
+继续补测格式化器对手工 AST 的 locale 回退：文档语言没有对应翻译时，使用首个可用翻译；保持 formatter 的既有宽松 AST 契约。格式化器模块函数覆盖现为 23/23；DSL core 汇总仍为 132/135，新增测试自身计入分母，未覆盖项留在解析器/FSM 的防御路径。
+
+补测后台执行器的 `Debug` 输出，确保诊断文本包含执行器名称、worker 数和容量；被拒绝/启动失败作业的回调闭包仍按未执行语义保留为真实覆盖缺口。
+
+验证（macOS arm64）：`cargo test --locked --workspace` 通过，native / QML CTest 72/72；`cargo coverage`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings` 和 `cargo format --check` 均通过。完整 `cargo lint` 因沙箱禁止绑定其锁管理 TCP listener，在 Clippy 阶段退出；因此其余 lint 阶段未运行。最终覆盖率为全局函数 769/829（92.76%）、行 8752/9190（95.23%）；`panta-core` 函数 358/397（90.18%），`panta-dsl-core` 函数 132/135（97.78%）、行 2001/2091（95.70%）。全局仍有 60 个 Rust 函数未覆盖，100% 目标尚未完成，本任务及索引保持 in-progress；其他 crate 与 DSL 的不可达/剩余路径留待继续按行为审查。
 
 ## 2026-10-02 优先级跟进：Rust 报告与门禁可审阅性
 

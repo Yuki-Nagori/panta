@@ -186,6 +186,17 @@ mod tests {
     use std::time::Duration;
 
     #[test]
+    fn debug_reports_executor_configuration() {
+        let executor = Executor::new("debug-test", 3, 7);
+        let rendered = format!("{executor:?}");
+
+        assert!(rendered.contains("name: \"debug-test\""));
+        assert!(rendered.contains("workers: 3"));
+        assert!(rendered.contains("capacity: 7"));
+        assert!(rendered.contains(".."));
+    }
+
+    #[test]
     fn capacity_includes_running_and_queued_work_and_recovers()
     -> Result<(), Box<dyn std::error::Error>> {
         let executor = Executor::new("bounded-test", 1, 2);
