@@ -43,7 +43,7 @@
 | 2026-10-02：coverage artifact、[CI run 37010051058](https://github.com/Yuki-Nagori/panta/actions/runs/37010051058) | `rust-coverage` 与 `native-coverage` 上传成功；证明 artifact 路径可用，不表示逐模块门禁已存在。 |
 | 2026-10-10：Rust crate 行为覆盖跟进 | 对 core、DSL、import、FFI 等可确定的业务行为补测试；逐项审阅剩余 LLVM 缺口，区分测试实例/泛型计数、不可达防御路径与不安全故障注入。内置材料解析抽为纯函数并覆盖 malformed JSON 和不支持 schema；独立 `gpt-6.1-sol` medium review 通过。`panta-dsl-core`、`panta-import` 等 crate 函数覆盖 100%，全局尚未达到。 |
 | 2026-10-10：coverage 报告优化（macOS arm64） | 首次 `cargo coverage`：函数 803/842（95.37%）、行 9296/9687（95.96%）；生成 crate 汇总、完整 JSON、`uncovered-lines.txt` 与 HTML。`cargo coverage native` 的 CTest 72/72 通过，生成 summary、逐行计数与 HTML；LLVM 22 `llvm-cov report` 不支持 missing-lines 选项，改用 `llvm-cov show`。 |
-| 2026-10-10：材料错误路径覆盖复核 | 新增两项 core 测试后，`cargo coverage` 函数 807/845（95.50%）、行 9316/9708（95.96%）；crate 汇总中 core 387/413（93.70%）。`cargo test --locked --workspace`、`cargo lint --check`、格式检查和独立 subagent review 通过；覆盖率增量用于定位，业务行为测试仍是验收依据。 |
+| 2026-10-10：材料与工程失败路径覆盖 | 材料解析新增 malformed JSON / 不支持 schema 测试；新增锁文件不可打开、任务状态锁中毒恢复测试。`cargo coverage` 函数 813/850（95.65%）、行 9357/9748（95.99%）；core 393/418（94.02%）。`cargo test --locked --workspace`（72/72 native / QML CTest）、`cargo lint --check`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 批准。审计剩余缺口后，多数零计数为重复实例、崩溃子进程和手动性能基准，尚需继续逐项审查可稳定触达的生产行为。 |
 
 ## 重要边界
 

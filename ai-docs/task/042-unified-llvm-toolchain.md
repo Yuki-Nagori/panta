@@ -28,7 +28,7 @@
 
 ### macOS dyld TLS 抑制（2026-10-10）
 
-GitHub Actions macOS 26 arm64 的 `Ffi.TaskServiceLifecycle` 在销毁仍有运行中任务的服务时报告 368 字节，分配栈落于 dyld `ThreadLocalVariables` 的 TLS 注册 / 实例化元数据及 Rust std spawn hook；该测试请求协作取消但不 join worker。抑制仅匹配 dyld TLS 管理符号，不匹配通用分配器，自有代码的其他泄漏仍受检查。普通 macOS / Linux 文件名测试也揭示 macOS 临时文件系统创建非 UTF-8 名称返回 EILSEQ；063 的测试现在将此类平台拒绝与 `PermissionDenied`、`InvalidInput` 同样处理，并验证路径校验仍拒绝该名称。修复后本机 `cargo sanitize` 的 ASan/UBSan 72/72、TSan 51/51 通过；CI 复跑待提交。
+GitHub Actions macOS 26 arm64 的 `Ffi.TaskServiceLifecycle` 在销毁仍有运行中任务的服务时报告 368 字节，分配栈落于 dyld `ThreadLocalVariables` 的 TLS 注册 / 实例化元数据及 Rust std spawn hook；该测试请求协作取消但不 join worker。抑制仅匹配 dyld TLS 管理符号，不匹配通用分配器，自有代码的其他泄漏仍受检查。普通 macOS / Linux 文件名测试也揭示 macOS 临时文件系统创建非 UTF-8 名称返回 EILSEQ；063 的测试现在将此类平台拒绝与 `PermissionDenied`、`InvalidInput` 同样处理，并验证路径校验仍拒绝该名称。本机 `cargo sanitize` 的 ASan/UBSan 72/72、TSan 51/51 通过；GitHub Actions [run 38039422235](https://github.com/Yuki-Nagori/panta/actions/runs/38039422235)（`afba765`）全平台 CI 成功。
 
 ### STL 预检排除补登记（2026-10-02，任务 063）
 

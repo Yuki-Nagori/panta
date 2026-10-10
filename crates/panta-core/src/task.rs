@@ -569,6 +569,32 @@ mod tests {
     }
 
     #[test]
+    fn poisoned_state_lock_is_recovered_for_subsequent_work()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let manager = TaskManager::new();
+        let inner = std::sync::Arc::clone(&manager.inner);
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _state = inner
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            panic!("poison task state lock without mutating state");
+        }));
+        assert!(panic.is_err());
+        assert!(inner.state.is_poisoned());
+
+        let id = manager.submit("恢复中毒锁", Duration::from_millis(1), false)?;
+        wait_until_running_zero(&manager);
+        assert!(
+            manager
+                .drain_events()
+                .iter()
+                .any(|event| { event.task_id == id && event.kind == TaskEventKind::Succeeded })
+        );
+        Ok(())
+    }
+
+    #[test]
     fn executor_capacity_rejection_rolls_back_the_task_record()
     -> Result<(), Box<dyn std::error::Error>> {
         let mut manager = TaskManager::new();

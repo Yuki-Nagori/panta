@@ -416,4 +416,25 @@ mod tests {
         assert!(matches!(error, ProjectError::ManifestInvalid(_)));
         Ok(())
     }
+
+    #[test]
+    fn lease_acquisition_reports_an_unopenable_lock_path() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Blocked lock")?;
+        let state = service.current.as_ref().ok_or("missing project")?.clone();
+        let lock_path = project.path.with_extension("panta.lock");
+
+        fs::remove_file(&lock_path)?;
+        fs::create_dir(&lock_path)?;
+        let error = super::WriteLease::acquire(&state)
+            .err()
+            .ok_or("directory unexpectedly opened as a lock file")?;
+
+        assert!(matches!(error, ProjectError::Io(_)));
+        assert!(error.detail().contains(&lock_path.display().to_string()));
+        assert!(project.path.is_file());
+        Ok(())
+    }
 }
