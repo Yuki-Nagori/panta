@@ -621,6 +621,32 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn symlink_root_allows_existing_and_missing_targets_inside_the_root()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::symlink;
+
+        let fixture = FixtureRoot::new("symlink-root")?;
+        let actual_root = fixture.root.join("actual");
+        fs::create_dir(&actual_root)?;
+        fs::write(actual_root.join("part.stl"), b"mesh")?;
+        let linked_root = fixture.root.join("linked-root");
+        symlink(&actual_root, &linked_root)?;
+
+        let mut service = PathService::new();
+        service.set_root(RootCategory::Project, &linked_root)?;
+        assert_eq!(
+            service.resolve_existing(&reference("part.stl"))?,
+            fs::canonicalize(actual_root.join("part.stl"))?
+        );
+        assert_eq!(
+            service.resolve_write_target(&reference("new/result.pa"))?,
+            linked_root.join("new/result.pa")
+        );
+        Ok(())
+    }
+
     #[test]
     fn error_code_and_detail_cover_every_variant() -> Result<(), Box<dyn std::error::Error>> {
         // 全变体遍历：code()/detail() 的每个 match 臂都真实执行（032 门禁）。

@@ -184,3 +184,11 @@ FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pe
 补充三个可确定复现的边界：任务执行器容量耗尽时，提交返回 `CapacityExceeded`、回滚任务记录并保留准入失败日志；导入工程的 `assets` 被普通文件占用时，导入失败且项目清单、导入状态和当前网格保持不变；临时创建路径被普通文件占用时，返回 I/O 错误且不覆盖原文件。使用容量为 1 的专用执行器，并等待首个任务启动后再提交第二个，避免依赖调度时序。独立 review 确认断言稳定，没有明显竞态或假阳性。
 
 验证（macOS arm64）：三个定向测试与 `cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`cargo fmt --check`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 790/842（93.82%）、行 8966/9364（95.75%），`panta-core` 函数 374/406（92.12%）、行 3614/3728（96.94%）。完整 `cargo test --locked --workspace` 通过，native / QML CTest 72/72。Rust 100% 函数覆盖与 C++ line/branch 门禁仍未完成，任务保持 in-progress。
+
+## 2026-10-10 租约一致性与符号链接根
+
+新增租约提交测试：获取 lease 后篡改内存态 `persisted_revision`，提交以稳定错误拒绝，磁盘清单字节不变。新增 Unix 路径测试：将项目根注入为目录符号链接后，根内现有目标可解析，缺失写目标也通过包含性校验并保留注入路径。独立 review 确认测试覆盖真实行为、断言和夹具清理可靠；符号链接测试明确限定 Unix。
+
+同轮其余覆盖审查发现，DSL FSM 的一个空文档 Pair 防御分支由 Pest 外层语法保证不可达；FFI allocation failure、内部不变量哨兵与 crash handler 信号重发均不适合通过测试专用注入或同进程执行追逐覆盖数字。未覆盖函数摘要与直接测试调用之间还存在重复 crate / test 编译实例和泛型实例化计数差异；目前不改变覆盖口径或门槛。
+
+验证（macOS arm64）：两个新增定向测试、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`cargo fmt --check`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 792/844（93.84%）、行 9006/9401（95.80%），`panta-core` 函数 376/408（92.16%）、行 3654/3765（97.05%）。完整 `cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% 函数目标与 C++ line/branch 门禁尚未完成，任务保持 in-progress。

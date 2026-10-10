@@ -225,6 +225,29 @@ mod tests {
     }
 
     #[test]
+    fn commit_rejects_state_that_no_longer_matches_its_lease()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        let snapshot = service.create(&fixture.root, "Demo")?;
+        let manifest_before = fs::read(&snapshot.path)?;
+        let mut state = service
+            .current
+            .take()
+            .ok_or("created project state missing")?;
+        let lease = super::WriteLease::acquire(&state)?;
+        state.persisted_revision = Some(state.revision + 1);
+
+        assert!(matches!(
+            lease.commit(&mut state),
+            Err(ProjectError::CommandInvalid(message))
+                if message == "project write lease changed"
+        ));
+        assert_eq!(fs::read(&snapshot.path)?, manifest_before);
+        Ok(())
+    }
+
+    #[test]
     fn temporary_creation_bounds_collisions_and_identifier_exhaustion()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
