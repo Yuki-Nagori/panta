@@ -248,6 +248,27 @@ mod tests {
     }
 
     #[test]
+    fn commit_does_not_recreate_a_manifest_removed_during_lease()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        let snapshot = service.create(&fixture.root, "Removed manifest")?;
+        let mut state = service
+            .current
+            .take()
+            .ok_or("created project state missing")?;
+        let lease = super::WriteLease::acquire(&state)?;
+        fs::remove_file(&snapshot.path)?;
+        state.name = "Must not be written".into();
+        state.revision += 1;
+
+        assert!(matches!(lease.commit(&mut state), Err(ProjectError::Io(_))));
+        assert!(!snapshot.path.exists());
+
+        Ok(())
+    }
+
+    #[test]
     fn temporary_creation_bounds_collisions_and_identifier_exhaustion()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;

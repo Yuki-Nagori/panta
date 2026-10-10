@@ -198,3 +198,11 @@ FSM 缺 version、缺 kind、重复 initial、重复 transitions 节，以及 Pe
 补充读取执行器容量耗尽时的预览行为：注入容量为 1 的执行器，等待已有任务确定启动后提交预览，断言返回 `project.io`，且不递增请求编号、不遗留 pending 状态；随后释放 worker 并关闭执行器。该测试不依赖调度竞速。独立 review 确认触发和清理确定、断言覆盖实际失败行为，没有发现明显竞态或死锁风险。
 
 验证（macOS arm64）：定向测试、`cargo fmt --check`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 795/846（93.97%）、行 9031/9426（95.81%），`panta-core` 函数 379/410（92.44%）、行 3679/3790（97.07%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% Rust 函数目标与 C++ line/branch 门禁尚未完成，任务保持 in-progress。
+
+## 2026-10-10 租约期间清单消失
+
+补充租约获取后工程清单被删除的提交失败路径：修改候选状态并提交时返回 I/O 错误，原清单保持不存在，避免从旧快照重建已删除文件。独立 review 确认触发稳定、资源由作用域清理，跨平台逻辑一致。
+
+验证（macOS arm64）：定向测试、`cargo fmt --check`、`cargo clippy --locked -p panta-core --all-targets -- -D warnings`、`git diff --check` 通过；`cargo coverage` 通过，全局函数 796/847（93.98%）、行 9048/9443（95.82%），`panta-core` 函数 380/411（92.46%）、行 3696/3807（97.08%）。`cargo test --locked --workspace` 通过，native / QML CTest 72/72。100% Rust 函数目标与 C++ line/branch 门禁尚未完成，任务保持 in-progress。
+
+下一批评估 metadata worker 断连时的失败回执与状态保留，使用现有状态构造确定性验证，不增加测试专用生产 seam。
