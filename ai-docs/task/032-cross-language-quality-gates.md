@@ -5,7 +5,7 @@
 - 依赖：[011](011-test-quality-entrypoints.md)、[018](018-cross-platform-ci.md)、[019](019-gtest-native-testing.md)
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-16 / 2026-10-10
+- 创建 / 更新：2026-09-16 / 2026-10-13
 
 ## 目标
 
@@ -33,6 +33,7 @@
 - `cargo coverage` 生成函数/行完整 JSON、可搜索的未覆盖行文本及 HTML 源码视图；报告使用 gate 收集的同一批 profile。
 - `cargo coverage native` 合并 CTest profile 并生成汇总、逐行执行计数文本和 HTML 报告；额外生成排除 `tests/` 的产品源码汇总与逐行报告，CI 上传全部报告 artifact。2026-10-10 macOS arm64 最新报告的行覆盖为 84.51%、分支 46.10%，该汇总包含测试源码；产品 native 源码报告为行 74.84%、分支 55.99%，仅作为本机诊断基线。LLVM 22 的 `llvm-cov report` 不提供 missing-lines 选项，因此 native 文本报告保留所有源码行计数。当前 native job 只生成 artifact，尚无覆盖率阈值门禁；跨平台稳定口径与基线仍待确认。
 - 尚待完成：Rust 100% 函数目标、C++ line/branch 门禁、逐模块防回退/差异覆盖率、完整跨平台 artifact 验证及所有受控失败验收。不要仅凭当前 89% / 92% gate 判定任务完成。
+- 本轮范围：重新生成 Rust coverage 报告，逐项审计稳定可达的未覆盖生产行为，并只为有清晰契约的缺口补充测试或小幅重构；完成后独立 review、复验并按行为切分本地提交，不 push。若缺口只来自重复实例、不可稳定观察的崩溃路径或手动性能基准，记录证据并保留待办，不为追求数字改变生产行为。
 
 ## 验证与证据
 
@@ -47,6 +48,12 @@
 | 2026-10-10：native 报告与图标尺寸回退 | 增加有效图标请求尺寸为空时回退 SVG 固有尺寸的行为断言；`cargo coverage native` 72/72 CTest 通过。报告新增排除 `tests/` 的产品汇总和逐行文件，并由 CI 上传；产品 native 行/分支为 74.84% / 55.99%（macOS arm64 本机诊断）。`cargo lint --check`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；两轮独立 `gpt-6.1-sol` medium review 均未发现问题。C++ 阈值门禁仍未启用。 |
 | 2026-10-10：标准目录映射覆盖 | 新增 Qt 标准目录五种映射的行为测试；`cargo coverage native` 73/73 CTest 通过。产品 native 行/分支升至 75.10% / 56.45%（macOS arm64 本机诊断）；`cargo lint --check`、clang-format、`cargo fmt --all -- --check` 和 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 未发现问题。C++ 覆盖门禁尚未启用。 |
 | 2026-10-10：工程根 Unicode 错误路径 | `PathHost::setProjectRoot` 新增不可往返 UTF-8 的错误行为断言；`cargo coverage native` 73/73 CTest 通过，`path_host.cpp` 行覆盖 69.03%→70.32%、分支 57.69%→59.62%，产品汇总行覆盖为 75.13%。`cargo format --check` 与 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 未发现问题。 |
+| 2026-10-13：崩溃日志文件打开失败 | 新增 Unix integration test：目标日志路径被目录占用时，公开安装 API 返回 `IsADirectory`，失败发生在安装处理器或修改全局状态前。`cargo test --locked -p panta-foundation` 与 `cargo coverage` 通过；Rust 汇总仍为函数 813/850（95.65%）、行 9357/9748（95.99%），integration test 不进入 crate 覆盖率分母。独立 review 未发现问题。 |
+| 2026-10-13：工程网格激活成功桥接 | 新增完整成功场景，先释放导入时已驻留的 Mesh，再验证激活返回的 attempt/generation/import 标识、桥接坐标和缓存快照，确保成功结果实际提交进缓存。`cargo test --locked -p panta-ffi project_activation_success_commits_mesh_and_coordinates` 与 `cargo coverage` 通过；汇总为函数 814/851（95.65%）、行 9408/9794（96.06%）；`panta-ffi` 为函数 159/166（95.78%）、行 2067/2186（94.56%）。`gpt-6.1-sol` medium 独立 review 通过。 |
+| 2026-10-13：QRC 路径桥接 | 增加 `qrc:/icons/panta.svg` 的 CXX 引用解析、枚举映射及逻辑路径往返断言；`cargo test --locked -p panta-ffi path_service_covers_existing_write_target_and_all_kinds` 与 `cargo coverage` 通过。汇总为函数 814/851（95.65%）、行 9413/9798（96.07%）；`panta-ffi` 为函数 159/166（95.78%）、行 2072/2190（94.61%）。`gpt-6.1-sol` medium 独立 review 未发现问题。 |
+| 2026-10-13：DSL TS 文档种类拒绝 | 对可解析的 `variables` 文档调用 TS emitter，断言返回 `pa.ts_kind`，覆盖错误输入被拒绝的公开行为。定向 `panta-dsl-core` integration test、`cargo coverage`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；汇总为函数 814/851（95.65%）、行 9421/9798（96.15%）；`panta-dsl-core` 行覆盖 2023/2117（95.56%），函数 132/132。`gpt-6.1-sol` medium 独立 review 未发现问题。 |
+| 2026-10-13：DSL 手工 AST 消息顺序回退 | 验证 `format_document` 先按公开 AST 中的声明顺序输出，再按 map key 补齐遗漏项；重复与无效顺序项只会被忽略，各消息只输出一次。定向测试、全量 `cargo coverage`、格式与 diff 检查通过；汇总为函数 816/853（95.66%）、行 9475/9852（96.17%）；`panta-dsl-core` 函数 134/134、行 2079/2171（95.76%）。`gpt-6.1-sol` medium 独立 review 指出初版用例未区分声明顺序与 map 顺序；修订用例后复查通过。 |
+| 2026-10-13：本地质量复验与 Clippy 修正 | `cargo test --locked --workspace` 通过，native/QML CTest 73/73；本批新增与调整的 crash handler、FFI activation、DSL formatter 定向测试及 `cargo fmt --all -- --check`、`git diff --check` 均通过。`cargo lint --check` 暴露测试中的 `expect`/不必要 clone，已修正；随后 Rust Clippy 阶段通过。因重复启动 lint 导致 native/QML 构建重跑并中断，未取得完整八阶段 lint 的最终结果，不记为通过。 |
 
 ## 重要边界
 

@@ -896,6 +896,65 @@ endsolid
     }
 
     #[test]
+    fn project_activation_success_commits_mesh_and_coordinates()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = crate::temp_directory::Fixture::new()?;
+        let source = fixture.root.join("part.stl");
+        fs::write(
+            &source,
+            b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 2 0\nendsolid\n",
+        )?;
+
+        let mut service = project_service_new();
+        project_service_create(
+            &mut service,
+            fixture.root.display().to_string(),
+            "Demo".to_owned(),
+        )?;
+        let imported = crate::project_service_import_stl(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".to_owned(),
+            "millimeters".to_owned(),
+            false,
+        )?;
+        crate::project_service_release_mesh_document(&mut service, &imported.id);
+        assert!(crate::project_service_resident_mesh_ids(&service).is_empty());
+        let attempt = crate::project_service_begin_asset_activation(&mut service, &imported.id)?;
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let outcome = loop {
+            if let Some(outcome) = crate::project_service_drain_asset_activations(&mut service)
+                .into_iter()
+                .next()
+            {
+                break outcome;
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err("successful activation outcome did not arrive".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+
+        assert!(outcome.kind == bridge::ActivationOutcomeKind::Succeeded);
+        assert_eq!(outcome.attempt, attempt.attempt);
+        assert_eq!(outcome.generation, attempt.generation);
+        assert_eq!(outcome.import_id, imported.id);
+        assert!(outcome.error.code.is_empty());
+        assert_eq!(
+            outcome.coordinates,
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0, 0.0]
+        );
+        assert_eq!(
+            crate::project_service_resident_mesh_ids(&service).as_slice(),
+            std::slice::from_ref(&imported.id)
+        );
+        let snapshot = project_service_mesh_snapshot_for_import(&service, &imported.id)?;
+        assert_eq!(snapshot.coordinates, outcome.coordinates);
+        Ok(())
+    }
+
+    #[test]
     fn project_stl_bridge_preserves_preview_commit_and_snapshot_state()
     -> Result<(), Box<dyn std::error::Error>> {
         let root = std::env::temp_dir().join(format!("panta-ffi-stl-{}", std::process::id()));
