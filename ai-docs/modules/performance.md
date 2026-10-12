@@ -23,7 +23,7 @@ CPU 套件还运行 `panta-core` 的 `background_execution` example（源码 `te
 
 ## 定位与边界
 
-性能工具是**开发侧工作台，不配置进 CI 门禁**（维护者决策，2026-09-21）：CI 只承担格式、lint、审计、测试、覆盖率与 sanitizer 矩阵等正确性门禁；性能基线、剖析和回归对比由本模块登记的命令与任务记录承载。测量优先于修改——没有测量支撑的"优化"不保留；对比必须固定同一机器、同一命令与同一构建配置，波动显著才立项修复。
+性能阈值不作为 CI 门禁。维护者于 2026-10-13 确认，每日定时 CI 可运行 `cargo performance cpu` 并保留日志 artifact，用于观察趋势；共享 runner 的波动不阻断变更。GPU 基准要求可识别的硬件设备或真实图形会话，仍由开发侧手动运行，直到有稳定的专用 runner。测量优先于修改——没有测量支撑的"优化"不保留；对比必须固定同一机器、同一命令与同一构建配置，波动显著才立项修复。
 
 ## 工具矩阵
 
@@ -42,7 +42,7 @@ CPU 套件还运行 `panta-core` 的 `background_execution` example（源码 `te
 
 ## 当前 QML / 原生视口诊断
 
-QML CPU 构造与资源加载基准由任务 [069](../task/069-project-docks-review-and-ablation.md) 的手动入口承载；图标场景比较空 source、单色 image provider 和保留 SVG 原色的 qrc 路径，测 1 / 8 / 24 个图标从创建到 `Image.Ready` 的耗时，并报告首轮样本与缓存后 31 次采样的 p50 / p95。首轮样本包含该进程和当前路径的初始化成本，计时不包括 GPU 帧呈现。基准不注册为 CTest 或 CI 门禁，任务 081 记录此次环境和结果。
+QML CPU 构造与资源加载基准由任务 [069](../task/069-project-docks-review-and-ablation.md) 的手动入口承载；图标场景比较空 source、单色 image provider 和保留 SVG 原色的 qrc 路径，测 1 / 8 / 24 个图标从创建到 `Image.Ready` 的耗时，并报告首轮样本与缓存后 31 次采样的 p50 / p95。首轮样本包含该进程和当前路径的初始化成本，计时不包括 GPU 帧呈现。基准不注册为 CTest；每日 CPU 性能套件可通过 `cargo performance cpu` 运行并上传日志 artifact，任务 081 记录手动基线。
 
 ```sh
 cmake --build target/native/debug --config Debug --target panta_qml_cpu_benchmark --parallel 4
@@ -93,7 +93,7 @@ target/native/debug/performance/panta_viewport_gpu_benchmark
 
 单立方体场景，32 个循环变化的姿态；每项预热 1000 次，再采样 31 批、每批 1000 次。输出批次平均耗时的 p50 / p95，分解相机插值、变化姿态下的方向标记同步、无标记消融、稳定姿态同步、六面命中和裁剪范围重置，并比较无标记与完整 CPU 过渡。结果不包括 Qt 调度、GPU 渲染和提交延迟。该 executable 不注册到 CTest，无绝对性能门槛；机器、Debug 配置及数字见任务记录。
 
-`cargo quality` / CI 不运行本模块任何工具；`cargo sanitize`（内存错误）与覆盖率（执行面）回答"对不对、测没测到"，本模块回答"快不快、内存峰值在哪"。启动耗时的构建侧测量（入口耗时表）登记在任务 048 验证表，不进入 CI。
+`cargo quality` 不运行本模块工具。每日定时 CI 运行 CPU 性能套件，仅保留日志 artifact，不设性能阈值；GPU 性能基准继续手动运行。`cargo sanitize`（内存错误）与覆盖率（执行面）回答"对不对、测没测到"，本模块回答"快不快、内存峰值在哪"。启动耗时的构建侧测量（入口耗时表）登记在任务 048 验证表。
 
 ### GPU 基准共享约定（任务 100）
 

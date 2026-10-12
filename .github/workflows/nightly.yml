@@ -1,0 +1,88 @@
+# 长时动态检查与非门禁性能采样（任务 032/048）。
+name: Nightly diagnostics
+
+on:
+  schedule:
+    - cron: "0 18 * * *" # 每天 UTC 18:00 / 上海 02:00
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  miri:
+    name: rust miri UB checks (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - name: Run Miri on pure Rust crates
+        shell: bash
+        run: cargo ub-check
+
+  sanitize:
+    name: sanitizer matrix (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Build and test with sanitizers
+        shell: bash
+        run: cargo sanitize
+
+  cpu-performance:
+    name: CPU performance sample (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Run CPU performance suite
+        shell: bash
+        run: |
+          mkdir -p target/performance-ci
+          {
+            printf 'commit=%s\n' "$GITHUB_SHA"
+            printf 'runner_os=%s\n' "$RUNNER_OS"
+            printf 'runner_arch=%s\n' "$RUNNER_ARCH"
+            printf 'started_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            cargo performance cpu --samples 31
+          } 2>&1 | tee target/performance-ci/cpu.log
+
+      - name: Upload CPU performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/performance-ci/cpu.log
+          if-no-files-found: warn
+          retention-days: 30

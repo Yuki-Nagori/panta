@@ -18,7 +18,7 @@
 | Rust 动态检测 | Miri（固定日期 nightly）解释纯 Rust crate 测试：`cargo ub-check`；关闭隔离放行文件系统夹具 | CXX FFI 与进程/构建类 crate 不可解释；crash 模块进程测试在 Miri 下跳过，真实平台照常执行 |
 | QML / CMake | qmlformat、qmllint、行为测试、cmake-format/lint | QML 源码级覆盖率未实现 |
 | 工具供给 | 固定 LLVM/CMake/Ninja/uv/Python/Cargo 工具；锁文件固定 Python wheels | 工具缓存加锁、版本隔离、临时安装后发布；平台 SDK 仍是开发者前置 |
-| CI | 三平台 Ninja check/build/test 与实际编译器核验；Ubuntu 独立 lint/format/audit/coverage；三平台 sanitizer 与 Ubuntu Miri 按路径域触发 | 本机验证不能代替当前提交的 Linux/Windows CI |
+| CI | 每次变更运行三平台 Ninja check/build/test 与实际编译器核验、Ubuntu lint/format/audit/coverage；高成本三平台 sanitizer 与 Ubuntu Miri 由每日 workflow 运行 | 本机验证不能代替当前提交的 Linux/Windows CI；每日动态检查不会阻断 PR |
 
 ## 工具版本与来源（任务 032/042/043）
 
@@ -114,6 +114,6 @@ Cargo 统一用户入口、CMake 管理 native 图、CXX 管理 Rust/C++ 边界�
 
 本轮已实现共享安装互斥、原子发布、按命令准备工具、Windows Ninja/SDK 环境、CXX 数据库合并和实际工具路径核验。043 的三平台证据已由 run 35425146629 补齐并关闭；sanitizer 矩阵（`cargo sanitize`）与 Rust Miri 入口（`cargo ub-check`）已接线并完成 macOS 本机实证与受控失败验证，042 保持 in-progress 等待三平台 CI 的 sanitizer 证据（Windows 仅 ASan），032 继续补按模块覆盖率、CXX/QML 测量缺口与 native 百分比基线。每个排除与工具限制须可追溯，实际验证结果以任务记录为准。
 
-性能测试（Criterion、火焰图、QML Profiler、Massif 等）按维护者决策不纳入本工具链的 CI 门禁，属于开发侧工作台；工具矩阵与命令见[性能测试与剖析](performance.md)与任务 048。
+性能测试（Criterion、火焰图、QML Profiler、Massif 等）不纳入本工具链的阻断门禁；每日 workflow 另运行稳定的 CPU 性能套件并上传日志 artifact，GPU 测量保留手动入口。工具矩阵与命令见[性能测试与剖析](performance.md)与任务 048。
 
 任务 100 将性能源码集中到 `tests/performance`，共享辅助代码归 `tests/support`；两者均进入 C++ 格式和自有编译数据库检查清单。性能辅助正确性测试由 `cargo performance` 执行，常规 Cargo/CTest 只运行功能回归。
