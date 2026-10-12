@@ -205,6 +205,13 @@ fn emit_ts_carries_status_comment_and_numerus_features() -> Result<(), Box<dyn E
 
 #[test]
 fn emit_ts_rejects_placeholder_mismatch_and_invalid_locale() -> Result<(), Box<dyn Error>> {
+    // TS 输出只接受 language 文档；theme / variables 仍可解析和格式化。
+    let variables = parse("version: 1\nkind: variables\n\nvalues:\n  spacing-small: int = 8\n")?;
+    assert!(matches!(
+        emit_ts(&variables, "en"),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.ts_kind")
+    ));
+
     // 占位符一致性在 parse 阶段校验(validate_messages)。
     assert!(matches!(
         parse("version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision\n"),
