@@ -1,6 +1,6 @@
 # 032 — 跨语言质量工具链与覆盖率门禁
 
-- 状态：in-progress
+- 状态：deferred
 - 阶段：验证基础
 - 依赖：[011](011-test-quality-entrypoints.md)、[018](018-cross-platform-ci.md)、[019](019-gtest-native-testing.md)
 - 优先级：P0
