@@ -22,6 +22,7 @@ set(PANTA_SHELL_QML_FILES
     Components/Atoms/ThemedTextField.qml
     Components/Atoms/ThemedIcon.qml
     Components/Atoms/PanelSurface.qml
+    Components/Atoms/RibbonComboBox.qml
     Components/Composites/ToolGroup.qml
     Components/Composites/RibbonTile.qml
     Components/Composites/RibbonGroup.qml
@@ -41,6 +42,7 @@ set(PANTA_SHELL_QML_FILES
     Panels/Ribbon/HomeRibbon.qml
     Panels/Ribbon/ResultsRibbon.qml
     Panels/Ribbon/ToolsRibbon.qml
+    Panels/Ribbon/ViewRibbon.qml
     Panels/Ribbon/StartLearnRibbon.qml
     Panels/SidebarPanel.qml
     Panels/Sidebar/ProjectTasksPage.qml

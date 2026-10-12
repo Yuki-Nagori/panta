@@ -228,6 +228,53 @@ button:disabled { opacity: var(--disabled-opacity); }
   grid-auto-rows: var(--tools-macro-slot-size);
   gap: var(--tools-macro-slot-gap);
 }
+.view-ribbon .ribbon-group { min-width: 0; }
+.view-appearance { width: 244px; }
+.view-appearance-tools, .view-window-tools, .view-browse-tools, .view-controls-tools { gap: 4px; }
+.view-appearance-main, .view-window-primary { display: flex; align-items: center; gap: 3px; }
+.view-appearance-side { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 3px; }
+.view-large-button { flex: none; display: flex; width: 48px; height: 68px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 2px; border-radius: var(--radius); font-size: var(--font-small); line-height: 12px; text-align: center; }
+.view-large-button > .icon { width: 26px; height: 26px; }
+.view-large-button.is-selected { background: var(--color-selected); outline: 1px solid var(--color-focus); outline-offset: -1px; }
+.view-large-button.is-selected:disabled { opacity: 1; }
+.view-compact-button { display: flex; min-width: 0; min-height: 22px; align-items: center; gap: 4px; padding: 1px 3px; border-radius: var(--radius); font-size: var(--font-small); line-height: 13px; text-align: left; white-space: nowrap; }
+.view-compact-button > .icon { width: 18px; height: 18px; }
+.view-compact-button > .caret { width: 7px; height: 5px; margin-left: auto; }
+.view-dropdown { display: flex; min-width: 0; height: 22px; align-items: center; justify-content: space-between; gap: 5px; padding: 0 5px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: #fff; font-size: var(--font-small); text-align: left; white-space: nowrap; }
+.view-dropdown:disabled { opacity: 1; color: var(--color-text-muted); }
+.view-dropdown > .icon { width: 7px; height: 5px; }
+.view-window { width: 337px; }
+.view-window-primary { flex: none; }
+.view-window-primary .view-large-button { width: 48px; }
+.view-window-actions { display: flex; align-items: center; gap: 4px; }
+.view-window-actions > .view-window-switch { width: 48px; height: 68px; gap: 2px; }
+.view-window-actions > .view-window-switch > .icon { width: 26px; height: 26px; }
+.view-window-actions > .view-window-switch > .caret { width: 7px; height: 5px; }
+.view-window-grid { display: grid; grid-template-columns: repeat(2, 88px); gap: 1px 2px; }
+.view-window-action { display: flex; width: 88px; height: 21px; min-width: 0; align-items: center; gap: 2px; padding: 0 1px; border-radius: var(--radius); font-size: var(--font-small); text-align: left; white-space: nowrap; }
+.view-window-action > .icon { width: 18px; height: 18px; }
+.view-window-action > .caret { width: 6px; height: 5px; margin-left: auto; }
+.view-locking { width: 122px; }
+.view-locking-tools, .view-small-stack { flex-direction: column; align-items: stretch; gap: 1px; }
+.view-locking-tools .view-compact-button { height: 21px; }
+.view-browse { width: 408px; }
+.view-browse-tools { justify-content: flex-start; }
+.view-browse-tools > .view-large-button { width: 67px; }
+.view-browse-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 21px; gap: 1px 2px; }
+.view-browse-grid .view-compact-button { min-width: 0; gap: 2px; padding: 0 2px; font-size: 9px; }
+.view-browse-grid .icon { width: 15px; height: 15px; }
+.view-cutting-plane { width: 70px; }
+.view-small-stack .view-compact-button { min-height: 24px; }
+.view-controls { width: 260px; }
+.view-controls-tools { justify-content: flex-start; }
+.view-controls-stack { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.view-angle { display: flex; min-width: 0; height: 22px; align-items: center; justify-content: space-between; gap: 5px; font-size: var(--font-small); white-space: nowrap; }
+.view-angle input, .view-field { flex: 0 0 120px; min-width: 0; width: 120px; height: 22px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: #fff; padding: 1px 4px; }
+.view-angle input { text-align: left; }
+.view-field { display: flex; align-items: center; justify-content: space-between; }
+.view-field > .icon { width: 7px; height: 5px; }
+.view-control-actions { display: flex; gap: 5px; }
+.view-control-actions .view-compact-button { flex: 1; justify-content: center; }
 .tools-macro-grid button {
   display: grid;
   place-items: center;

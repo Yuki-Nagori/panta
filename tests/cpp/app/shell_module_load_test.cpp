@@ -453,6 +453,21 @@ class ShellModuleLoadTest final : public QObject {
         QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),
                  projectItem.data());
         QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("caeViewport")), viewport.data());
+        activate_menu(window, "view", keyboard);
+        verify_ribbon_tab(window, "view", 7);
+        auto* solidView = visual_item(ribbon, QStringLiteral("ribbon-view-solid"));
+        auto* newViewWindow = visual_item(ribbon, QStringLiteral("ribbon-view-window-new"));
+        auto* unitsCombo = visual_item(ribbon, QStringLiteral("ribbon-units-combo"));
+        auto* viewNameCombo = visual_item(ribbon, QStringLiteral("ribbon-view-name-combo"));
+        QVERIFY(solidView && newViewWindow && unitsCombo && viewNameCombo);
+        QVERIFY(!solidView->isEnabled());
+        QVERIFY(!newViewWindow->isEnabled());
+        QVERIFY(!unitsCombo->isEnabled());
+        QVERIFY(!viewNameCombo->isEnabled());
+        QCOMPARE(unitsCombo->height(), viewNameCombo->height());
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),
+                 projectItem.data());
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("caeViewport")), viewport.data());
         activate_menu(window, "tools", keyboard);
         verify_ribbon_tab(window, "tools", 11);
         QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),

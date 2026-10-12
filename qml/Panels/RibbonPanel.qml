@@ -47,6 +47,8 @@ Rectangle {
                     return resultsComponent;
                 case "tools":
                     return toolsComponent;
+                case "view":
+                    return viewComponent;
                 default:
                     return startLearnComponent;
                 }
@@ -71,6 +73,11 @@ Rectangle {
     Component {
         id: toolsComponent
         ToolsRibbon {}
+    }
+
+    Component {
+        id: viewComponent
+        ViewRibbon {}
     }
 
     Component {

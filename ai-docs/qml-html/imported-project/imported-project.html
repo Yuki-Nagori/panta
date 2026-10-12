@@ -12,7 +12,7 @@
 <template id="page-menu">
   <button type="button" data-ribbon-tab="home" aria-current="page">Home</button>
   <button type="button" data-ribbon-tab="tools">Tools</button>
-  <button type="button">View</button>
+  <button type="button" data-ribbon-tab="view">View</button>
   <button type="button">Geometry</button>
   <button type="button">Mesh</button>
   <button type="button">Boundary Conditions</button>
@@ -121,6 +121,90 @@
     <div class="ribbon-group">
       <div class="ribbon-tools"><div class="results-lock-grid"><button type="button" class="tool-button" aria-label="Lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-mesh"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-mesh"/></svg></button><button type="button" class="tool-button" aria-label="Release lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Release lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Release lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-mesh"/></svg></button></div></div>
       <span class="ribbon-label">Locking</span>
+    </div>
+  </section>
+</template>
+
+<template id="page-ribbon-view">
+  <section class="ribbon view-ribbon" data-ribbon-page="view" aria-label="View tools" hidden>
+    <div class="ribbon-group view-appearance">
+      <div class="ribbon-tools view-appearance-tools">
+        <div class="view-appearance-main">
+          <button type="button" disabled class="view-large-button" aria-label="Solid"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-solid"/></svg><span>Solid</span></button>
+          <button type="button" disabled class="view-large-button is-selected" aria-label="Model Display" aria-pressed="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-model-display"/></svg><span>Model<br>Display</span></button>
+        </div>
+        <div class="view-appearance-side">
+          <button type="button" disabled class="view-compact-button" aria-label="Perspective"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-perspective"/></svg><span>Perspective</span></button>
+          <button type="button" disabled class="view-dropdown" aria-label="Units: Metric"><span>Metric Units</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+        </div>
+      </div>
+      <span class="ribbon-label">Appearance</span>
+    </div>
+    <div class="ribbon-group view-window">
+      <div class="ribbon-tools view-window-tools">
+        <div class="view-window-primary">
+          <button type="button" disabled class="view-large-button" aria-label="User Interface"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-interface"/></svg><span>User<br>Interface</span></button>
+          <button type="button" disabled class="view-large-button" aria-label="Clean Screen"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-clean-screen"/></svg><span>Clean<br>Screen</span></button>
+        </div>
+        <div class="view-window-actions">
+          <button type="button" disabled class="view-large-button view-window-switch" aria-label="Switch Windows"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-switch"/></svg><span>Switch</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+          <div class="view-window-grid">
+            <button type="button" disabled class="view-window-action" aria-label="Tile Windows"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-tile"/></svg><span>Tile</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+            <button type="button" disabled class="view-window-action" aria-label="New Window"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-new-window"/></svg><span>New</span></button>
+            <button type="button" disabled class="view-window-action" aria-label="Split Window"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-split"/></svg><span>Split</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+            <button type="button" disabled class="view-window-action" aria-label="Close Window"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-close-window"/></svg><span>Close</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+            <button type="button" disabled class="view-window-action" aria-label="Cascade Windows"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-cascade"/></svg><span>Cascade</span></button>
+            <button type="button" disabled class="view-window-action" aria-label="Arrange Windows"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-arrange"/></svg><span>Arrange</span></button>
+          </div>
+        </div>
+      </div>
+      <span class="ribbon-label">Window</span>
+    </div>
+    <div class="ribbon-group view-locking">
+      <div class="ribbon-tools view-locking-tools">
+        <button type="button" disabled class="view-compact-button" aria-label="Lock View"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-lock"/></svg><span>Lock View</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+        <button type="button" disabled class="view-compact-button" aria-label="Lock Point"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-lock-point"/></svg><span>Lock Point</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+        <button type="button" disabled class="view-compact-button" aria-label="Lock Animation"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-lock-animation"/></svg><span>Lock Animation</span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+      </div>
+      <span class="ribbon-label">Locking</span>
+    </div>
+    <div class="ribbon-group view-browse">
+      <div class="ribbon-tools view-browse-tools">
+        <button type="button" disabled class="view-large-button" aria-label="Global Navigation Control"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-navigation"/></svg><span>Global<br>Navigation<br>Control</span></button>
+        <div class="view-browse-grid">
+          <button type="button" disabled class="view-compact-button" aria-label="Select"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-select"/></svg><span>Select</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Dynamic Orbit"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-orbit"/></svg><span>Dynamic Orbit</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Previous View"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-previous"/></svg><span>Previous View</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Pan"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-pan"/></svg><span>Pan</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Center"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-center"/></svg><span>Center</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Front View"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-front"/></svg><span>Front View</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Zoom All"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-zoom"/></svg><span>Zoom All</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="Measure"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-measure"/></svg><span>Measure</span></button>
+          <button type="button" disabled class="view-compact-button" aria-label="View Cube"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-cube"/></svg><span>View Cube</span></button>
+        </div>
+      </div>
+      <span class="ribbon-label">Browse</span>
+    </div>
+    <div class="ribbon-group view-cutting-plane">
+      <div class="ribbon-tools view-small-stack">
+        <button type="button" disabled class="view-compact-button" aria-label="Edit Cutting Plane"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-edit"/></svg><span>Edit</span></button>
+        <button type="button" disabled class="view-compact-button" aria-label="Move Cutting Plane"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-move"/></svg><span>Move</span></button>
+      </div>
+      <span class="ribbon-label">Cutting Plane</span>
+    </div>
+    <div class="ribbon-group view-controls">
+      <div class="ribbon-tools view-controls-tools">
+        <button type="button" disabled class="view-large-button" aria-label="Edit View"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-edit"/></svg><span>Edit</span></button>
+        <div class="view-controls-stack">
+          <label class="view-angle">Rotation Angle <input type="text" value="0 0 0" readonly aria-label="Rotation Angle"></label>
+          <label class="view-angle">View Name <span class="view-field"><span></span><svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></span></label>
+          <div class="view-control-actions">
+            <button type="button" disabled class="view-compact-button" aria-label="Save View"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-save"/></svg><span>Save</span></button>
+            <button type="button" disabled class="view-compact-button" aria-label="Delete View"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-view-delete"/></svg><span>Delete</span></button>
+          </div>
+        </div>
+      </div>
+      <span class="ribbon-label">View</span>
     </div>
   </section>
 </template>

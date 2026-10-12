@@ -102,6 +102,20 @@ QtObject {
     readonly property int ribbonResultsControlWidth: 210
     readonly property int ribbonTimeDisplayWidth: 44
     readonly property int ribbonScaleValueWidth: 28
+    readonly property int ribbonComboBoxHeight: 22
+    readonly property int viewAppearanceGroupWidth: 244
+    readonly property int viewWindowGroupWidth: 337
+    readonly property int viewLockingGroupWidth: 122
+    readonly property int viewBrowseGroupWidth: 408
+    readonly property int viewCuttingPlaneGroupWidth: 70
+    readonly property int viewControlsGroupWidth: 260
+    readonly property int viewCompactActionWidth: 88
+    readonly property int viewWindowTileWidth: 48
+    readonly property int viewBrowseActionWidth: 108
+    readonly property int viewLockActionWidth: 116
+    readonly property int viewAppearanceControlWidth: 136
+    readonly property int viewUnitsComboWidth: 112
+    readonly property int viewControlFieldWidth: 120
 
     // 侧栏布局（尺寸为逻辑像素，比例无量纲）
     readonly property int panelToolbarHeight: 32

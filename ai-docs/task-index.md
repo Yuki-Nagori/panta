@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。2026-10-09 的 [101 最新复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查) 核对 CI 37910040544（19 作业全部成功）和当前 10 个 in-progress 项：本次 0 项可关闭，均仍有非 CI 条件；详细剩余条件见该复查表及各任务记录。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046、114 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。2026-10-09 的 [101 最新复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查) 核对 CI 37910040544（19 作业全部成功）和当前 10 个 in-progress 项：本次 0 项可关闭，均仍有非 CI 条件；详细剩余条件见该复查表及各任务记录。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -123,6 +123,7 @@ ai-docs/
 | 099 | [QML 组件与弹窗整理](task/099-qml-components-and-dialog-consolidation.md) | 应用平台扩展 | 029, 094, 095, 097 | in-progress |
 | 100 | [tests 整体整理与性能入口统一](task/100-tests-consolidation.md) | 验证基础 | 048, 099 | done |
 | 113 | [Tools 工具栏内容](task/113-tools-ribbon.md) | 应用平台扩展 | 050, 062, 096 | done |
+| 114 | [View 工具栏内容](task/114-view-ribbon.md) | 应用平台扩展 | 060, 062, 064, 080 | done |
 
 ## 验证与质量扩展队列
 
