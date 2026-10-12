@@ -296,15 +296,15 @@ mod tests {
         };
 
         let formatted = format_document(&document);
-        let declared = formatted
-            .find("  src: Declared\n")
-            .expect("declared source emitted");
-        let first_fallback = formatted
-            .find("  src: Fallback A\n")
-            .expect("first fallback source emitted");
-        let second_fallback = formatted
-            .find("  src: Fallback M\n")
-            .expect("second fallback source emitted");
+        let Some(declared) = formatted.find("  src: Declared\n") else {
+            panic!("declared source was not emitted: {formatted}");
+        };
+        let Some(first_fallback) = formatted.find("  src: Fallback A\n") else {
+            panic!("first fallback source was not emitted: {formatted}");
+        };
+        let Some(second_fallback) = formatted.find("  src: Fallback M\n") else {
+            panic!("second fallback source was not emitted: {formatted}");
+        };
         assert!(
             declared < first_fallback && first_fallback < second_fallback,
             "{formatted}"

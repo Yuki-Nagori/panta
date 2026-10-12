@@ -22,11 +22,15 @@ fn install_reports_log_file_open_failure() -> std::io::Result<()> {
     let result = panta_foundation::crash::install_crash_handler(root_text);
     std::fs::remove_dir_all(root)?;
 
-    assert_eq!(
-        result
-            .expect_err("directory at log path must fail to open")
-            .kind(),
-        std::io::ErrorKind::IsADirectory
-    );
+    let error = match result {
+        Ok(path) => {
+            return Err(std::io::Error::other(format!(
+                "directory at log path was accepted: {}",
+                path.display()
+            )));
+        }
+        Err(error) => error,
+    };
+    assert_eq!(error.kind(), std::io::ErrorKind::IsADirectory);
     Ok(())
 }

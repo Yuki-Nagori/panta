@@ -946,8 +946,8 @@ endsolid
             [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0, 0.0]
         );
         assert_eq!(
-            crate::project_service_resident_mesh_ids(&service),
-            [imported.id.clone()]
+            crate::project_service_resident_mesh_ids(&service).as_slice(),
+            std::slice::from_ref(&imported.id)
         );
         let snapshot = project_service_mesh_snapshot_for_import(&service, &imported.id)?;
         assert_eq!(snapshot.coordinates, outcome.coordinates);
