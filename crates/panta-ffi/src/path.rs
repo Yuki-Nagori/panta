@@ -114,7 +114,7 @@ fn bridge_kind(category: panta_core::path::RootCategory) -> bridge::PathRootKind
 #[cfg(test)]
 mod tests {
     use crate::{
-        bridge, path_ref_parse, path_service_new, path_service_resolve,
+        bridge, path_ref_parse, path_ref_to_logical, path_service_new, path_service_resolve,
         path_service_resolve_existing, path_service_resolve_write_target, path_service_set_root,
     };
     #[test]
@@ -223,6 +223,10 @@ mod tests {
         assert!(invalid_root.starts_with("path.root_not_absolute:"));
 
         // 每个类别都可纯逻辑解析,且 scheme 往返经 bridge_kind 全分支。
+        let qrc = path_ref_parse("qrc:/icons/panta.svg".to_owned())?;
+        assert!(matches!(qrc.kind, bridge::PathRootKind::Qrc));
+        assert_eq!(qrc.relative, "icons/panta.svg");
+        assert_eq!(path_ref_to_logical(&qrc)?, "qrc:/icons/panta.svg");
         for scheme in ["user-config", "app-data", "cache", "session"] {
             let parsed = path_ref_parse(format!("{scheme}:/配置/x.pa"))?;
             let resolved = path_service_resolve(&service, &parsed)?;

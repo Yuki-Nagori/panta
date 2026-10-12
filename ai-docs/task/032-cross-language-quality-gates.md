@@ -50,6 +50,7 @@
 | 2026-10-10：工程根 Unicode 错误路径 | `PathHost::setProjectRoot` 新增不可往返 UTF-8 的错误行为断言；`cargo coverage native` 73/73 CTest 通过，`path_host.cpp` 行覆盖 69.03%→70.32%、分支 57.69%→59.62%，产品汇总行覆盖为 75.13%。`cargo format --check` 与 `git diff --check` 通过；`gpt-6.1-sol` medium 独立 review 未发现问题。 |
 | 2026-10-13：崩溃日志文件打开失败 | 新增 Unix integration test：目标日志路径被目录占用时，公开安装 API 返回 `IsADirectory`，失败发生在安装处理器或修改全局状态前。`cargo test --locked -p panta-foundation` 与 `cargo coverage` 通过；Rust 汇总仍为函数 813/850（95.65%）、行 9357/9748（95.99%），integration test 不进入 crate 覆盖率分母。独立 review 未发现问题。 |
 | 2026-10-13：工程网格激活成功桥接 | 新增完整成功场景，先释放导入时已驻留的 Mesh，再验证激活返回的 attempt/generation/import 标识、桥接坐标和缓存快照，确保成功结果实际提交进缓存。`cargo test --locked -p panta-ffi project_activation_success_commits_mesh_and_coordinates` 与 `cargo coverage` 通过；汇总为函数 814/851（95.65%）、行 9408/9794（96.06%）；`panta-ffi` 为函数 159/166（95.78%）、行 2067/2186（94.56%）。`gpt-6.1-sol` medium 独立 review 通过。 |
+| 2026-10-13：QRC 路径桥接 | 增加 `qrc:/icons/panta.svg` 的 CXX 引用解析、枚举映射及逻辑路径往返断言；`cargo test --locked -p panta-ffi path_service_covers_existing_write_target_and_all_kinds` 与 `cargo coverage` 通过。汇总为函数 814/851（95.65%）、行 9413/9798（96.07%）；`panta-ffi` 为函数 159/166（95.78%）、行 2072/2190（94.61%）。`gpt-6.1-sol` medium 独立 review 未发现问题。 |
 
 ## 重要边界
 
