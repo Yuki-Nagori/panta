@@ -256,4 +256,64 @@ mod tests {
 
         assert!(format_document(&document).contains("  tr: \"\"\n"));
     }
+
+    #[test]
+    fn missing_message_order_entries_are_appended_once_in_key_order() {
+        let message = |id: &str, source: &str| Message {
+            context: "App".to_owned(),
+            id: id.to_owned(),
+            source: source.to_owned(),
+            old_source: None,
+            translations: BTreeMap::new(),
+            status: None,
+            comment: None,
+            extra: None,
+            numerus: false,
+        };
+        let declared_key = "App\u{1f}z-declared".to_owned();
+        let first_fallback_key = "App\u{1f}a-fallback".to_owned();
+        let second_fallback_key = "App\u{1f}m-fallback".to_owned();
+        let document = Document {
+            version: 1,
+            kind: Kind::Language,
+            catalog: Some("app".to_owned()),
+            language: Some("en".to_owned()),
+            source_language: "en".to_owned(),
+            messages: BTreeMap::from([
+                (
+                    second_fallback_key.clone(),
+                    message("m-fallback", "Fallback M"),
+                ),
+                (declared_key.clone(), message("z-declared", "Declared")),
+                (
+                    first_fallback_key.clone(),
+                    message("a-fallback", "Fallback A"),
+                ),
+            ]),
+            message_order: vec![declared_key.clone(), declared_key, "missing".to_owned()],
+            comments: vec!["// generated".to_owned()],
+            values: vec![],
+        };
+
+        let formatted = format_document(&document);
+        let declared = formatted
+            .find("  src: Declared\n")
+            .expect("declared source emitted");
+        let first_fallback = formatted
+            .find("  src: Fallback A\n")
+            .expect("first fallback source emitted");
+        let second_fallback = formatted
+            .find("  src: Fallback M\n")
+            .expect("second fallback source emitted");
+        assert!(
+            declared < first_fallback && first_fallback < second_fallback,
+            "{formatted}"
+        );
+        assert_eq!(formatted.matches("z-declared:\n").count(), 1);
+        assert_eq!(formatted.matches("a-fallback:\n").count(), 1);
+        assert_eq!(formatted.matches("m-fallback:\n").count(), 1);
+        assert!(formatted.starts_with(
+            "version: 1\nkind: language\ncatalog: app\nlanguage: en\nsourcelanguage: en\n\n// generated\n"
+        ));
+    }
 }

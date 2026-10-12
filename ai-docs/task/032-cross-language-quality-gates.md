@@ -52,6 +52,7 @@
 | 2026-10-13：工程网格激活成功桥接 | 新增完整成功场景，先释放导入时已驻留的 Mesh，再验证激活返回的 attempt/generation/import 标识、桥接坐标和缓存快照，确保成功结果实际提交进缓存。`cargo test --locked -p panta-ffi project_activation_success_commits_mesh_and_coordinates` 与 `cargo coverage` 通过；汇总为函数 814/851（95.65%）、行 9408/9794（96.06%）；`panta-ffi` 为函数 159/166（95.78%）、行 2067/2186（94.56%）。`gpt-6.1-sol` medium 独立 review 通过。 |
 | 2026-10-13：QRC 路径桥接 | 增加 `qrc:/icons/panta.svg` 的 CXX 引用解析、枚举映射及逻辑路径往返断言；`cargo test --locked -p panta-ffi path_service_covers_existing_write_target_and_all_kinds` 与 `cargo coverage` 通过。汇总为函数 814/851（95.65%）、行 9413/9798（96.07%）；`panta-ffi` 为函数 159/166（95.78%）、行 2072/2190（94.61%）。`gpt-6.1-sol` medium 独立 review 未发现问题。 |
 | 2026-10-13：DSL TS 文档种类拒绝 | 对可解析的 `variables` 文档调用 TS emitter，断言返回 `pa.ts_kind`，覆盖错误输入被拒绝的公开行为。定向 `panta-dsl-core` integration test、`cargo coverage`、`cargo fmt --all -- --check` 与 `git diff --check` 通过；汇总为函数 814/851（95.65%）、行 9421/9798（96.15%）；`panta-dsl-core` 行覆盖 2023/2117（95.56%），函数 132/132。`gpt-6.1-sol` medium 独立 review 未发现问题。 |
+| 2026-10-13：DSL 手工 AST 消息顺序回退 | 验证 `format_document` 先按公开 AST 中的声明顺序输出，再按 map key 补齐遗漏项；重复与无效顺序项只会被忽略，各消息只输出一次。定向测试、全量 `cargo coverage`、格式与 diff 检查通过；汇总为函数 816/853（95.66%）、行 9475/9852（96.17%）；`panta-dsl-core` 函数 134/134、行 2079/2171（95.76%）。`gpt-6.1-sol` medium 独立 review 指出初版用例未区分声明顺序与 map 顺序；修订用例后复查通过。 |
 
 ## 重要边界
 
