@@ -51,6 +51,7 @@
 | 2026-10-12 | QML 迁移与回归 | View Ribbon 六组结构与 HTML 一致，切换保留工程及视口对象；未接服务操作禁用 | 新增 `ViewRibbon.qml`、Atom `RibbonComboBox.qml`、29 个匹配 QML SVG、双语文案和导航回归。按反馈修正下拉框禁用态样式并调整 HTML/QML 组宽度；旋转角度/视图名称字段统一高度，Metric Units 下拉框收窄，真实窗口中确认分组边界正常。 |
 | 2026-10-12 | 最终验证与 GUI 复核 | 所有验收项通过，确认尺寸与边界符合截图调整 | `cargo build --locked`、`cargo test --locked --workspace`（Rust 与 73/73 native/QML 测试）、`cargo lint --check`、`cargo format --check`、`qmlformat`、`git diff --check` 通过。真实 macOS 窗口中确认 Rotation Angle 输入框与 View Name 下拉框等高（22px），Metric Units 下拉宽112px，Browse 组408px可容纳内容且无溢出；临时预览工程、app wrapper 已关闭并清理。独立 subagent 复核发现并促成 Browse 组扩宽，最终复核无遗留问题。 |
 | 2026-10-12 | Ribbon 布局微调 | 内容未铺满视口时隐藏滚动条；Appearance 下拉居中；View Name 下拉与角度输入框右对齐 | `ViewRibbon.qml` 原有的 64px `ribbonTrailingWidth` 占位计入了 Flickable 内容宽度，移除后内容宽度回到六组宽度之和；恢复 `HorizontalToolStrip` 原有 `ScrollBar.AsNeeded` 策略。Appearance 下拉在列中水平居中；View 表单标签共用动态列宽，使两个控件右边缘对齐。`cargo build --locked`、`cargo format --check`、`qmlformat`、`git diff --check` 通过；本轮修改前 `cargo test --locked --workspace`（73/73 native/QML）和 `cargo lint --check` 通过。维护者人工确认 UI 无异常；独立 subagent 复核未发现布局宽度或焦点滚动风险。 |
+| 2026-10-12 | issue #8 文档复核 | View 迁移完成后 README 描述准确，图标和索引无重复或遗漏 | README 将“View HTML 原型”改为“View 内容”；共享图标表删除重复 Results 行，任务索引完成摘要列出 113、114。`git diff --check` 通过。 |
 
 ## 清理与兼容例外
 
