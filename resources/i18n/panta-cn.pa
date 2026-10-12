@@ -504,6 +504,96 @@ label:
   src: "Shared\nViews"
   tr: "共享\n视图"
 
+[RibbonActionDatabaseSearch]
+label:
+  src: Search
+  tr: 搜索
+
+[RibbonActionDatabaseNew]
+label:
+  src: New
+  tr: 新建
+
+[RibbonActionDatabaseEdit]
+label:
+  src: Edit
+  tr: 编辑
+
+[RibbonActionRecordMacro]
+label:
+  src: Record
+  tr: 录制
+
+[RibbonActionStopRecording]
+label:
+  src: "Stop\nRecording"
+  tr: "停止\n录制"
+
+[RibbonActionPlayMacro]
+label:
+  src: "Play\nMacro"
+  tr: "播放\n宏"
+
+[RibbonActionCommandLine]
+label:
+  src: "Command\nLine"
+  tr: "命令\n行"
+
+[RibbonActionSpecifyMacro]
+label:
+  src: "Specify\nMacro"
+  tr: "指定\n宏"
+
+[RibbonActionMacroSlot]
+label:
+  src: "Macro %1"
+  tr: "宏 %1"
+
+[RibbonActionApplicationOptions]
+label:
+  src: "Application\nOptions"
+  tr: "应用程序\n选项"
+
+[RibbonActionKeyManager]
+label:
+  src: Key Manager
+  tr: 密钥管理器
+
+[RibbonActionRotaryPerformance]
+label:
+  src: "Rotary\nPerformance Tool"
+  tr: "旋转\n性能工具"
+
+[RibbonGroupToolsDatabase]
+label:
+  src: Database
+  tr: 数据库
+
+[RibbonGroupToolsAutomation]
+label:
+  src: Automation
+  tr: 自动化
+
+[RibbonGroupToolsMacro]
+label:
+  src: Specify Macro
+  tr: 指定宏
+
+[RibbonGroupToolsOptions]
+label:
+  src: Options
+  tr: 选项
+
+[RibbonGroupTaskKeyManager]
+label:
+  src: Task Key Manager
+  tr: 任务密钥管理器
+
+[RibbonGroupToolsPerformance]
+label:
+  src: Performance
+  tr: 性能
+
 [RibbonGroupStart]
 label:
   src: Start

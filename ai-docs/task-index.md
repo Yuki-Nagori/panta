@@ -122,6 +122,7 @@ ai-docs/
 | 098 | [工艺确认跨平台 CI 修复](task/098-ci-metadata-confirmation.md) | 质量与构建 | 094, 095, 097 | done |
 | 099 | [QML 组件与弹窗整理](task/099-qml-components-and-dialog-consolidation.md) | 应用平台扩展 | 029, 094, 095, 097 | in-progress |
 | 100 | [tests 整体整理与性能入口统一](task/100-tests-consolidation.md) | 验证基础 | 048, 099 | done |
+| 113 | [Tools 工具栏内容](task/113-tools-ribbon.md) | 应用平台扩展 | 050, 062, 096 | done |
 
 ## 验证与质量扩展队列
 

@@ -53,6 +53,17 @@ shellTemplate.innerHTML = `
     <symbol id="i-ribbon-results" viewBox="0 0 26 26" fill="none"><path d="M5 21V5M5 21h16" stroke="#4a4a4a" stroke-width="1.1"/><path d="M8 17v-4M13 17V8M18 17v-7" stroke="#2e7ce0" stroke-width="2"/></symbol>
     <symbol id="i-ribbon-reports" viewBox="0 0 26 26" fill="none"><path d="M6 3h10l4 4v16H6z" fill="#f2f2f2" stroke="#666" stroke-width="1.1"/><path d="M16 3v5h4M9 13h8M9 17h6" stroke="#4a4a4a" stroke-width="1.1"/></symbol>
     <symbol id="i-ribbon-shared-views" viewBox="0 0 26 26" fill="none"><path d="m13 3 8 4.5v9L13 21l-8-4.5v-9z" fill="#dce9f7" stroke="#3e6996" stroke-width="1.2"/><path d="m5 7.5 8 4.5 8-4.5M13 12v9" stroke="#3e6996" stroke-width="1.1"/></symbol>
+    <symbol id="i-tools-database-search" viewBox="0 0 26 26" fill="none"><ellipse cx="10" cy="6" rx="7" ry="3" fill="#dce9f7" stroke="#4a6f9f" stroke-width="1.2"/><path d="M3 6v11c0 1.7 3.1 3 7 3 1.3 0 2.5-.2 3.5-.5M17 6v3" stroke="#4a6f9f" stroke-width="1.2"/><path d="M3 11c0 1.7 3.1 3 7 3 1.1 0 2.1-.1 3-.3" stroke="#4a6f9f" stroke-width="1.2"/><circle cx="18" cy="17" r="4.5" fill="#fff" stroke="#2e7ce0" stroke-width="1.5"/><path d="m21.5 20.5 3 3" stroke="#2e7ce0" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-tools-database-new" viewBox="0 0 26 26" fill="none"><ellipse cx="11" cy="6" rx="7" ry="3" fill="#dce9f7" stroke="#4a6f9f" stroke-width="1.2"/><path d="M4 6v12c0 1.7 3.1 3 7 3 1.3 0 2.5-.2 3.5-.5M18 6v6M4 11c0 1.7 3.1 3 7 3 1.1 0 2.1-.1 3-.3" stroke="#4a6f9f" stroke-width="1.2"/><circle cx="19" cy="19" r="5" fill="#e8f3fd" stroke="#5d9fc7" stroke-width="1.2"/><path d="M19 16v6m-3-3h6" stroke="#2e7ce0" stroke-width="1.4"/></symbol>
+    <symbol id="i-tools-database-edit" viewBox="0 0 26 26" fill="none"><ellipse cx="11" cy="6" rx="7" ry="3" fill="#dce9f7" stroke="#4a6f9f" stroke-width="1.2"/><path d="M4 6v12c0 1.7 3.1 3 7 3 1.3 0 2.5-.2 3.5-.5M18 6v6M4 11c0 1.7 3.1 3 7 3 1.1 0 2.1-.1 3-.3" stroke="#4a6f9f" stroke-width="1.2"/><path d="m16 20 5-5 2 2-5 5-3 1z" fill="#f5d97d" stroke="#8a6d2f" stroke-width="1.1"/></symbol>
+    <symbol id="i-tools-record" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="9" fill="#c8322b"/><circle cx="13" cy="13" r="5" fill="#fff"/></symbol>
+    <symbol id="i-tools-stop" viewBox="0 0 26 26" fill="none"><rect x="5" y="5" width="16" height="16" rx="2" fill="#c8322b" stroke="#8e241f" stroke-width="1.2"/></symbol>
+    <symbol id="i-tools-play" viewBox="0 0 26 26" fill="none"><path d="M7 4v18l15-9z" fill="#4a6f9f" stroke="#345675" stroke-width="1.2"/></symbol>
+    <symbol id="i-tools-command-line" viewBox="0 0 26 26" fill="none"><rect x="3" y="4" width="20" height="18" rx="1.5" fill="#f2f2f2" stroke="#4a4a4a" stroke-width="1.2"/><path d="m7 9 3 3-3 3m6 0h5" stroke="#2e7ce0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tools-specify-macro" viewBox="0 0 30 30" fill="none"><rect x="3" y="5" width="22" height="19" rx="1.5" fill="#e9eff5" stroke="#657480" stroke-width="1.2"/><path d="M7 10h14M7 14h14M7 18h8" stroke="#8ba0af" stroke-width="1.1"/><circle cx="23" cy="22" r="6" fill="#fff" stroke="#5d9b54" stroke-width="1.2"/><path d="M23 19v6m-3-3h6" stroke="#5d9b54" stroke-width="1.4"/></symbol>
+    <symbol id="i-tools-options" viewBox="0 0 26 26" fill="none"><rect x="4" y="3" width="18" height="20" rx="1.5" fill="#e9eff5" stroke="#4a6f9f" stroke-width="1.2"/><path d="M8 8h10M8 12h10M8 16h6" stroke="#2e7ce0" stroke-width="1.2" stroke-linecap="round"/><circle cx="18" cy="18" r="3" fill="#f5d97d" stroke="#8a6d2f" stroke-width="1"/></symbol>
+    <symbol id="i-tools-key-manager" viewBox="0 0 26 26" fill="none"><path d="M14.5 5.5a6 6 0 1 0 0 8.5L22 21.5h2v-3h-2v-2h-2l-3.2-3.2" fill="#dce9f7" stroke="#657480" stroke-width="1.4" stroke-linejoin="round"/><circle cx="10" cy="10" r="1.7" fill="#657480"/></symbol>
+    <symbol id="i-tools-rotary-performance" viewBox="0 0 26 26" fill="none"><path d="M21 10a9 9 0 1 0 1 5" stroke="#4a6f9f" stroke-width="2" stroke-linecap="round"/><path d="m18 5 4 5-6 1" fill="#2e7ce0"/><path d="M13 8v5l4 2" stroke="#c8322b" stroke-width="1.6" stroke-linecap="round"/><circle cx="13" cy="13" r="1.5" fill="#c8322b"/></symbol>
     <symbol id="i-project-file" viewBox="0 0 16 16" fill="none"><path d="M4 1h7l3 3v11H4z" fill="#fff" stroke="#7b858a"/><path d="M11 1v3h3M6 6h6M9 8h3M9 10h3" stroke="#a9b5bc"/><path d="M1 6h4l3 3v4H4l-3-3z" fill="#b9d89b" stroke="#65854c"/><path d="M1 6l3 3h4M4 9v4" stroke="#7d9c61"/></symbol>
     <symbol id="i-project-folder" viewBox="0 0 16 16" fill="none"><path d="M1.5 4h5l1.5 1.7h6.5v8.8h-13z" fill="#e2c47b" stroke="#8a6d2f"/><path d="M1.5 5.7h13" stroke="#8a6d2f"/></symbol>
     <symbol id="i-plan-tasks" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h7l3 3v11H3z" fill="#fff" stroke="#7b858a"/><path d="M10 1.5v3h3M5 7h6M5 9.5h6M5 12h4" stroke="#6d8ba8"/></symbol>
@@ -252,12 +263,20 @@ shell.querySelectorAll("[data-slot]").forEach((slot) => {
 });
 document.body.append(shell);
 
-// 页签只切换工具栏，两份 DOM 保持存活，工程与视口交互状态不随之重建。
-const resultsRibbonTemplate = document.getElementById("page-ribbon-results");
-if (resultsRibbonTemplate) {
+// 页签只切换工具栏，各份 DOM 保持存活，工程与视口交互状态不随之重建。
+const ribbonTemplates = ["results", "tools"];
+if (ribbonTemplates.some(name => document.getElementById(`page-ribbon-${name}`))) {
   const homeRibbon = document.querySelector(".ribbon");
   homeRibbon.dataset.ribbonPage = "home";
-  homeRibbon.after(resultsRibbonTemplate.content.cloneNode(true));
+  let previousRibbon = homeRibbon;
+  ribbonTemplates.forEach(name => {
+    const template = document.getElementById(`page-ribbon-${name}`);
+    if (template) {
+      const ribbon = template.content.cloneNode(true);
+      previousRibbon.after(ribbon);
+      previousRibbon = document.querySelector(`.ribbon[data-ribbon-page="${name}"]`);
+    }
+  });
   document.addEventListener("click", event => {
     const trigger = event.target.closest("[data-ribbon-tab]");
     if (!trigger) return;

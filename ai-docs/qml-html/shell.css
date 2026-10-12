@@ -40,6 +40,9 @@
   --ribbon-text-lines: 2;
   --ribbon-content-spacing: 3px;
   --ribbon-caret-height: 5px;
+  --tools-macro-slot-size: 19px;
+  --tools-macro-slot-gap: 3px;
+  --tools-macro-slot-font: 9px;
   --analysis-log-height: 220px;
   --results-control-width: 210px;
   --results-time-width: 44px;
@@ -213,6 +216,31 @@ button:disabled { opacity: var(--disabled-opacity); }
   font-size: var(--font-ribbon);
   white-space: nowrap;
 }
+.tools-ribbon .ribbon-group { min-width: 0; }
+.tools-automation .ribbon-button { min-width: calc(var(--ribbon-tool-width) - 4px); }
+.tools-macro-group { min-width: 172px; }
+.tools-macro-group .ribbon-tools { gap: 4px; }
+.tools-macro-select { min-width: 50px; }
+.tools-macro-select > .icon { width: 30px; height: 30px; }
+.tools-macro-grid {
+  display: grid;
+  grid-template-columns: repeat(5, var(--tools-macro-slot-size));
+  grid-auto-rows: var(--tools-macro-slot-size);
+  gap: var(--tools-macro-slot-gap);
+}
+.tools-macro-grid button {
+  display: grid;
+  place-items: center;
+  width: var(--tools-macro-slot-size);
+  height: var(--tools-macro-slot-size);
+  border: 1px solid var(--color-panel-line);
+  border-radius: 50%;
+  background: var(--color-chrome);
+  color: var(--color-muted);
+  font-size: var(--tools-macro-slot-font);
+  line-height: 1;
+}
+.tools-macro-grid button:disabled { opacity: .55; }
 
 .workspace { flex: 1; display: flex; min-height: 0; }
 .left-column {

@@ -23,6 +23,8 @@
 | Ribbon：工程与开始 | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help` |
 | Ribbon：CAE 工具 | `ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` |
 | Ribbon：Results | `results-new-plot`、`results-notes`、`results-xy-curve`、`results-plot-properties`、`results-save-defaults`、`results-examine`、`results-min-max`、`results-histogram`、`results-scale`、`results-reset-scale`、`results-scale-range`、`results-warpage`、`results-defect`、`results-export`、`results-mark`、`results-unmark`、`results-cutting-plane`、`results-first`、`results-last`、`results-play`、`results-pause`、`results-stop`、`results-loop`、`results-ping-pong`、`results-tile-horizontal`、`results-tile-vertical`、`results-window-grid`、`results-window-horizontal`、`results-window-vertical`、`results-window-sync`、`results-lock-window`、`results-lock-legend`、`results-lock-mesh`、`results-sync-lock-window`、`results-sync-lock-legend`、`results-sync-lock-mesh`、`results-release-lock-window`、`results-release-lock-legend`、`results-release-lock-mesh` |
+| Ribbon：Results | `results-new-plot`、`results-notes`、`results-xy-curve`、`results-plot-properties`、`results-save-defaults`、`results-examine`、`results-min-max`、`results-histogram`、`results-scale`、`results-reset-scale`、`results-scale-range`、`results-warpage`、`results-defect`、`results-export`、`results-mark`、`results-unmark`、`results-cutting-plane`、`results-first`、`results-last`、`results-play`、`results-pause`、`results-stop`、`results-loop`、`results-ping-pong`、`results-tile-horizontal`、`results-tile-vertical`、`results-window-grid`、`results-window-horizontal`、`results-window-vertical`、`results-window-sync`、`results-lock-window`、`results-lock-legend`、`results-lock-mesh`、`results-sync-lock-window`、`results-sync-lock-legend`、`results-sync-lock-mesh`、`results-release-lock-window`、`results-release-lock-legend`、`results-release-lock-mesh` |
+| Ribbon：Tools | `tools-database-search`、`tools-database-new`、`tools-database-edit`、`tools-record`、`tools-stop`、`tools-play`、`tools-command-line`、`tools-specify-macro`、`tools-options`、`tools-key-manager`、`tools-rotary-performance` |
 | Plan tasks | `task-analysis`、`task-analysis-sequence`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings` |
 | 输出操作 | `check`、`copy`、`delete`、`export`、`image`、`log`、`wizard` |
 
@@ -30,7 +32,7 @@
 
 ## QML 资源与调用清单
 
-`qml/icons/` 当前包含 102 个正式 QML symbol 资源，与上表的 102 个 symbol ID 一一对应；文件名固定为 `<symbol-id>.svg`，资源内部记录对应的 `shell.js` symbol 来源。除下表说明的 caret 缩小外，其余资源保留源 viewBox、路径、比例和填色。它们均由本项目绘制，没有外部图标包、第三方许可证或外部资源依赖。消费者切换后已通过独立 cleanup commit 删除迁移前的旧 SVG。
+`qml/icons/` 当前包含 113 个正式 QML symbol 资源，与上表的 113 个 symbol ID 一一对应；文件名固定为 `<symbol-id>.svg`，资源内部记录对应的 `shell.js` symbol 来源。除下表说明的 caret 缩小外，其余资源保留源 viewBox、路径、比例和填色。它们均由本项目绘制，没有外部图标包、第三方许可证或外部资源依赖。消费者切换后已通过独立 cleanup commit 删除迁移前的旧 SVG。
 
 | QML 资源组 | symbol ID / 文件名（逐项同名） | 当前调用位置 |
 |---|---|---|
@@ -38,6 +40,7 @@
 | 页签与工具状态 | `layers` | Layers 工具条与页签 |
 | Ribbon | `ribbon-project`、`ribbon-open-project`、`ribbon-new-features`、`ribbon-start-here`、`ribbon-tutorials`、`ribbon-videos`、`ribbon-help`、`ribbon-import`、`ribbon-add`、`ribbon-dual-domain`、`ribbon-geometry`、`ribbon-mesh`、`ribbon-thermoplastics-injection-molding`、`ribbon-analysis-sequence`、`ribbon-select-material`、`ribbon-injection-locations`、`ribbon-process-settings`、`ribbon-optimization`、`ribbon-boundary-conditions`、`ribbon-analyze`、`ribbon-job-manager`、`ribbon-results`、`ribbon-reports`、`ribbon-shared-views`、`ribbon-logs` | Start & Learn 与 Home Ribbon |
 | Results | `results-*`（上表逐项同名） | Results Ribbon 的图文工具、动画控制、布局与锁定按钮 |
+| Tools | `tools-*`（上表逐项同名） | Tools Ribbon 的数据库、宏、选项、密钥管理与性能图标 |
 | 工程与任务 | `project-file`、`project-folder`、`stl-file`、`plan-tasks`、`status-ok`、`task-analysis`、`task-analysis-sequence`、`task-injection`、`task-material`、`task-mesh`、`task-optimization`、`task-settings`、`log` | Tasks 工程项、导入零件与任务列表；`project-folder` 和 `status-ok` 已打包，目前没有对应 QML 模型状态 |
 | Layers 操作 | `check`、`copy`、`delete`、`export`、`image`、`wizard` | Layers 输出操作按钮 |
 

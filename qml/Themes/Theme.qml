@@ -88,6 +88,9 @@ QtObject {
     readonly property int ribbonToolMinimumWidth: 56
     readonly property int ribbonToolHeight: 68
     readonly property int ribbonLabelHeight: 22
+    readonly property int ribbonMacroSlotSize: 19
+    readonly property int ribbonMacroSlotSpacing: 3
+    readonly property int ribbonMacroGroupWidth: 176
     readonly property int ribbonContentSpacing: 3
     readonly property int ribbonTextLineHeight: 12
     readonly property int ribbonTextLines: 2

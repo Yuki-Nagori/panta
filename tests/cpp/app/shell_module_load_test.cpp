@@ -437,6 +437,29 @@ class ShellModuleLoadTest final : public QObject {
 
         QVERIFY(project->createProject(QStringLiteral("Navigation"), fixture.path()));
         verify_ribbon_tab(window, "home", 18);
+        activate_menu(window, "tools", keyboard);
+        verify_ribbon_tab(window, "tools", 11);
+        auto* databaseSearch = visual_item(ribbon, QStringLiteral("ribbon-database-search"));
+        auto* macroSlot = visual_item(ribbon, QStringLiteral("ribbon-macro-10"));
+        QVERIFY(databaseSearch && macroSlot);
+        QVERIFY(!databaseSearch->isEnabled());
+        QVERIFY(!macroSlot->isEnabled());
+        QVERIFY(projectItem && viewport);
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),
+                 projectItem.data());
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("caeViewport")), viewport.data());
+        activate_menu(window, "results", keyboard);
+        verify_ribbon_tab(window, "results", 8);
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),
+                 projectItem.data());
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("caeViewport")), viewport.data());
+        activate_menu(window, "tools", keyboard);
+        verify_ribbon_tab(window, "tools", 11);
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("projectTaskItem")),
+                 projectItem.data());
+        QCOMPARE(window->findChild<QQuickItem*>(QStringLiteral("caeViewport")), viewport.data());
+        activate_menu(window, "home", keyboard);
+        verify_ribbon_tab(window, "home", 18);
         QVERIFY(project->renameProject(QStringLiteral("Unsaved navigation project")));
         const QString path = project->currentPath();
         const QString name = project->currentName();

@@ -504,6 +504,96 @@ label:
   src: "Shared\nViews"
   tr: "Shared\nViews"
 
+[RibbonActionDatabaseSearch]
+label:
+  src: Search
+  tr: Search
+
+[RibbonActionDatabaseNew]
+label:
+  src: New
+  tr: New
+
+[RibbonActionDatabaseEdit]
+label:
+  src: Edit
+  tr: Edit
+
+[RibbonActionRecordMacro]
+label:
+  src: Record
+  tr: Record
+
+[RibbonActionStopRecording]
+label:
+  src: "Stop\nRecording"
+  tr: "Stop\nRecording"
+
+[RibbonActionPlayMacro]
+label:
+  src: "Play\nMacro"
+  tr: "Play\nMacro"
+
+[RibbonActionCommandLine]
+label:
+  src: "Command\nLine"
+  tr: "Command\nLine"
+
+[RibbonActionSpecifyMacro]
+label:
+  src: "Specify\nMacro"
+  tr: "Specify\nMacro"
+
+[RibbonActionMacroSlot]
+label:
+  src: "Macro %1"
+  tr: "Macro %1"
+
+[RibbonActionApplicationOptions]
+label:
+  src: "Application\nOptions"
+  tr: "Application\nOptions"
+
+[RibbonActionKeyManager]
+label:
+  src: Key Manager
+  tr: Key Manager
+
+[RibbonActionRotaryPerformance]
+label:
+  src: "Rotary\nPerformance Tool"
+  tr: "Rotary\nPerformance Tool"
+
+[RibbonGroupToolsDatabase]
+label:
+  src: Database
+  tr: Database
+
+[RibbonGroupToolsAutomation]
+label:
+  src: Automation
+  tr: Automation
+
+[RibbonGroupToolsMacro]
+label:
+  src: Specify Macro
+  tr: Specify Macro
+
+[RibbonGroupToolsOptions]
+label:
+  src: Options
+  tr: Options
+
+[RibbonGroupTaskKeyManager]
+label:
+  src: Task Key Manager
+  tr: Task Key Manager
+
+[RibbonGroupToolsPerformance]
+label:
+  src: Performance
+  tr: Performance
+
 [RibbonGroupStart]
 label:
   src: Start

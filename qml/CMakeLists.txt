@@ -40,6 +40,7 @@ set(PANTA_SHELL_QML_FILES
     Panels/RibbonPanel.qml
     Panels/Ribbon/HomeRibbon.qml
     Panels/Ribbon/ResultsRibbon.qml
+    Panels/Ribbon/ToolsRibbon.qml
     Panels/Ribbon/StartLearnRibbon.qml
     Panels/SidebarPanel.qml
     Panels/Sidebar/ProjectTasksPage.qml

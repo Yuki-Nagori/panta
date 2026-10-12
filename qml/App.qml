@@ -26,7 +26,7 @@ ApplicationWindow {
 
     function selectRibbonTab(tab) {
         // 工程工具仅在打开工程后可达，开始页始终可达。
-        if (tab === "start-learn" || ((tab === "home" || tab === "results") && projectOpen))
+        if (tab === "start-learn" || ((tab === "home" || tab === "results" || tab === "tools") && projectOpen))
             activeRibbonTab = tab;
     }
 

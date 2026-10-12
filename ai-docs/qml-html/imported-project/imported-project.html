@@ -11,7 +11,7 @@
 <body class="project-workspace imported-project-workspace">
 <template id="page-menu">
   <button type="button" data-ribbon-tab="home" aria-current="page">Home</button>
-  <button type="button">Tools</button>
+  <button type="button" data-ribbon-tab="tools">Tools</button>
   <button type="button">View</button>
   <button type="button">Geometry</button>
   <button type="button">Mesh</button>
@@ -121,6 +121,56 @@
     <div class="ribbon-group">
       <div class="ribbon-tools"><div class="results-lock-grid"><button type="button" class="tool-button" aria-label="Lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-lock-mesh"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Synchronize lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-sync-lock-mesh"/></svg></button><button type="button" class="tool-button" aria-label="Release lock window" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-window"/></svg></button><button type="button" class="tool-button" aria-label="Release lock legend" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-legend"/></svg></button><button type="button" class="tool-button" aria-label="Release lock mesh" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-results-release-lock-mesh"/></svg></button></div></div>
       <span class="ribbon-label">Locking</span>
+    </div>
+  </section>
+</template>
+
+<template id="page-ribbon-tools">
+  <section class="ribbon tools-ribbon" data-ribbon-page="tools" aria-label="Tools" hidden>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Search database" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-database-search"/></svg><span class="label">Search</span></button>
+        <button type="button" class="ribbon-button" aria-label="Create database" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-database-new"/></svg><span class="label">New</span></button>
+        <button type="button" class="ribbon-button" aria-label="Edit database" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-database-edit"/></svg><span class="label">Edit</span></button>
+      </div>
+      <span class="ribbon-label">Database</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools tools-automation">
+        <button type="button" class="ribbon-button" aria-label="Record macro" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-record"/></svg><span class="label">Record</span></button>
+        <button type="button" class="ribbon-button" aria-label="Stop recording" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-stop"/></svg><span class="label">Stop<br>Recording</span></button>
+        <button type="button" class="ribbon-button" aria-label="Play macro" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-play"/></svg><span class="label">Play<br>Macro</span></button>
+        <button type="button" class="ribbon-button" aria-label="Open command line" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-command-line"/></svg><span class="label">Command<br>Line</span></button>
+      </div>
+      <span class="ribbon-label">Automation</span>
+    </div>
+    <div class="ribbon-group tools-macro-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button tools-macro-select" aria-label="Specify macro" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-specify-macro"/></svg><span class="label">Specify<br>Macro</span></button>
+        <div class="tools-macro-grid" role="group" aria-label="Macro slots">
+          <button type="button" aria-label="Macro 1" disabled>1</button><button type="button" aria-label="Macro 3" disabled>3</button><button type="button" aria-label="Macro 5" disabled>5</button><button type="button" aria-label="Macro 7" disabled>7</button><button type="button" aria-label="Macro 9" disabled>9</button>
+          <button type="button" aria-label="Macro 2" disabled>2</button><button type="button" aria-label="Macro 4" disabled>4</button><button type="button" aria-label="Macro 6" disabled>6</button><button type="button" aria-label="Macro 8" disabled>8</button><button type="button" aria-label="Macro 10" disabled>10</button>
+        </div>
+      </div>
+      <span class="ribbon-label">Specify Macro</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Application options" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-options"/></svg><span class="label">Application<br>Options</span></button>
+      </div>
+      <span class="ribbon-label">Options</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Key manager" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-key-manager"/></svg><span class="label">Key Manager</span></button>
+      </div>
+      <span class="ribbon-label">Task Key Manager</span>
+    </div>
+    <div class="ribbon-group">
+      <div class="ribbon-tools">
+        <button type="button" class="ribbon-button" aria-label="Rotary performance tool" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tools-rotary-performance"/></svg><span class="label">Rotary<br>Performance Tool</span></button>
+      </div>
+      <span class="ribbon-label">Performance</span>
     </div>
   </section>
 </template>

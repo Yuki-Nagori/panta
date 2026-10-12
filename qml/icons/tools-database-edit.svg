@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
+  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-tools-database-edit；内部绘制，保留原始几何与颜色。 -->
+  <ellipse cx="11" cy="6" rx="7" ry="3" fill="#dce9f7" stroke="#4a6f9f" stroke-width="1.2"/>
+  <path d="M4 6v12c0 1.7 3.1 3 7 3 1.3 0 2.5-.2 3.5-.5M18 6v6M4 11c0 1.7 3.1 3 7 3 1.1 0 2.1-.1 3-.3" stroke="#4a6f9f" stroke-width="1.2"/>
+  <path d="m16 20 5-5 2 2-5 5-3 1z" fill="#f5d97d" stroke="#8a6d2f" stroke-width="1.1"/>
+</svg>
