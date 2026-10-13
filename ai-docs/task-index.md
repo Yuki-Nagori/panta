@@ -1,6 +1,6 @@
 # Task 索引
 
-采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046、113、114 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛，但任务 032 要求的 100% 目标、C++ 覆盖门禁及分模块回归门禁仍未完成。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。2026-10-09 的 [101 最新复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查) 核对 CI 37910040544（19 作业全部成功）和当前 10 个 in-progress 项：本次 0 项可关闭，均仍有非 CI 条件；详细剩余条件见该复查表及各任务记录。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
+采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046、113、114 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当前 89% / 92% 门槛。Issue #11 更新了任务 032 的后续计划，取消追求 100% 与逐文件阈值，拟保留适度全局下限并转向行为 / 契约测试；任务保持 deferred，现行门禁尚未调整。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。2026-10-09 的 [101 最新复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查) 核对 CI 37910040544（19 作业全部成功）和当前 10 个 in-progress 项：本次 0 项可关闭，均仍有非 CI 条件；详细剩余条件见该复查表及各任务记录。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
 ## 目录与使用方式
 
@@ -129,7 +129,7 @@ ai-docs/
 
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
-| 032 | [跨语言质量工具链与 100% 覆盖率门禁](task/032-cross-language-quality-gates.md) | 验证基础 | 011, 018, 019 | deferred |
+| 032 | [跨语言测试质量门禁与行为契约](task/032-cross-language-quality-gates.md) | 验证基础 | 011, 018, 019 | deferred |
 | 033 | [高 DPI 缩放与多显示屏基础](task/033-display-scaling-and-multi-monitor.md) | 应用平台扩展 | 005, 007 | planned |
 | 034 | [Rust Panta Artifact 解析与 TS/QM 编译入口](task/034-rust-panta-artifact-parser.md) | 应用平台扩展 | 001 | in-progress |
 | 035 | [`.pa` 格式化器与格式校验器选型](task/035-pa-formatter-and-validator.md) | 应用平台扩展 | 034 | in-progress |
@@ -186,7 +186,7 @@ ai-docs/
 
 主题分支：005 → 029；025 + 029 → 030。先迁移组件及尺寸参数，再接主题 DSL；主题切换不依赖工程打开或引擎重载。
 
-新增分支：001 → 034；005 + 034 → 022；005 → 026；005 + 006 → 023；008 + 023 → 024，024 + 034 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；当上游没有完整资产时由 038 生产可缓存制品；032 在 011 统一入口上补齐跨语言质量工具与 100% 覆盖率门禁。
+新增分支：001 → 034；005 + 034 → 022；005 → 026；005 + 006 → 023；008 + 023 → 024，024 + 034 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；当上游没有完整资产时由 038 生产可缓存制品；032 在 011 统一入口上补齐跨语言质量工具，并转向行为 / 契约测试与适度覆盖率底线（当前 deferred）。
 
 014 已完成最小 Python/uv 质量工具环境：仅锁定 cmakelang 并供 `cargo format` 调用，不接入 Python 运行时/API，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
 

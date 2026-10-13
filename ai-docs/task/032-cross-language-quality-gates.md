@@ -1,4 +1,4 @@
-# 032 — 跨语言质量工具链与覆盖率门禁
+# 032 — 跨语言测试质量门禁与行为契约
 
 - 状态：deferred
 - 阶段：验证基础
@@ -9,19 +9,25 @@
 
 ## 目标
 
-为仓库实际使用的语言和构建描述建立可复现的格式、静态检查、测试、覆盖率、依赖与死代码检查，并纳入 CI。目标是门禁统计范围内的自有可执行代码达到 100% 覆盖率；未测业务逻辑不能靠排除项隐藏。
+为仓库实际使用的语言和构建描述建立可复现的格式、静态检查、测试、覆盖率、依赖与死代码检查，并纳入 CI。测试首先描述公开行为、错误契约、不变量和可观察副作用；覆盖率用于发现测试盲区，不作为逐函数填满数字的交付目标。
 
 ## 范围
 
 - 当前范围：Rust/Cargo、C++/CMake/GTest、QML/Qt 与 CMake 脚本。Python/Node 工具仅在仓库实际引入对应工具链后纳入，不预建空配置。
-- Rust 当前阶段门槛为函数 89%、行 92%；最终目标为函数 100%。C++ line/branch 100%、逐模块防回退及差异覆盖率尚未落地。QML 以绑定与关键状态行为测试为准；stable Rust branch coverage 未采集。
-- 当前 Rust 统计保留内联测试，排除 `panta-launcher`、`panta-tests`、`panta-build`；排除理由和口径记录在 [质量工具链](../modules/quality-tooling.md)。固定全局阈值不能替代逐模块门禁或父提交比较。
+- Rust 目标为函数 / 行各 85% 的全局下限；取消 100% 目标、逐文件阈值和差异覆盖率门禁。当前 Rust 统计保留内联测试，排除 `panta-launcher`、`panta-tests`、`panta-build`；排除理由和口径记录在 [质量工具链](../modules/quality-tooling.md)。
+- C++ 与 QML 后续评估函数 / 行 85% 全局下限；先确认产品源码统计范围、工具支持和结果稳定性，不把现有 native 报告或 QML 行为测试写成源码覆盖率门禁。
+- nightly 对 `panta-core`、`panta-dsl-core` 运行 `cargo-mutants` 并归档报告，仅用于诊断，不阻断常规 CI。
+- 对 DSL parse/format 往返与路径规范化使用 `proptest` 验证公开行为和不变量。
+- 全局下限只作质量护栏；新增或修改逻辑仍需评审其行为测试。Stable Rust branch coverage 未采集，作为未测指标记录。
 - 不把硬件冒烟当作单元覆盖，不检查第三方/生成源码，不因追求数字增加不稳定故障注入或无依据排除。
 
 ## 验收标准
 
 - [ ] Cargo 统一入口运行 Rust、C++、QML 与 CMake 的适用格式、静态检查和测试；缺工具、失败测试或报告生成失败时返回非零。
-- [ ] Rust 函数覆盖达到 100% 并保留行门槛；C++ line/branch 门禁与按模块防回退落地；未测指标清楚标记。
+- [ ] Rust 仅保留函数 / 行 85% 全局下限；不设置 100% 目标、逐文件阈值或差异覆盖率门禁；C++ / QML 覆盖下限基于可靠统计口径决定。
+- [ ] 测试以行为 / 契约命名；清理覆盖率导向的全变体遍历、非契约 Display 文案断言、视口内部状态探针和手拼 DSL 私有 key，保留公开 API 与可观察失败语义测试。
+- [ ] `panta-core`、`panta-dsl-core` 的 nightly `cargo-mutants` 报告可生成并归档，且不阻断常规 CI。
+- [ ] DSL parse/format 往返和路径规范化通过 `proptest` 检验公开不变量。
 - [ ] Rust、C++、QML 的关键错误路径、状态/绑定、线程/所有权和生命周期有行为测试；真实窗口/图形冒烟单独记录。
 - [ ] 依赖与未使用代码/资源检查在实际目录运行；工具缺失、空测试、意外跳过和受控阈值失败均不能误报通过。
 - [ ] macOS/Linux/Windows CI 上传带 commit、工具版本和排除口径的覆盖率报告；跨平台差异有验证记录。
@@ -32,14 +38,15 @@
 - 统一质量入口及 Rust 89% / 92% gate 已运行；Rust 覆盖率报告包含 JSON、crate 汇总、元数据和 CI artifact。
 - `cargo coverage` 生成函数/行完整 JSON、可搜索的未覆盖行文本及 HTML 源码视图；报告使用 gate 收集的同一批 profile。
 - `cargo coverage native` 合并 CTest profile 并生成汇总、逐行执行计数文本和 HTML 报告；额外生成排除 `tests/` 的产品源码汇总与逐行报告，CI 上传全部报告 artifact。2026-10-10 macOS arm64 最新报告的行覆盖为 84.51%、分支 46.10%，该汇总包含测试源码；产品 native 源码报告为行 74.84%、分支 55.99%，仅作为本机诊断基线。LLVM 22 的 `llvm-cov report` 不提供 missing-lines 选项，因此 native 文本报告保留所有源码行计数。当前 native job 只生成 artifact，尚无覆盖率阈值门禁；跨平台稳定口径与基线仍待确认。
-- 尚待完成：Rust 100% 函数目标、C++ line/branch 门禁、逐模块防回退/差异覆盖率、完整跨平台 artifact 验证及所有受控失败验收。不要仅凭当前 89% / 92% gate 判定任务完成。
-- 本轮范围：重新生成 Rust coverage 报告，逐项审计稳定可达的未覆盖生产行为，并只为有清晰契约的缺口补充测试或小幅重构；完成后独立 review、复验并按行为切分本地提交，不 push。若缺口只来自重复实例、不可稳定观察的崩溃路径或手动性能基准，记录证据并保留待办，不为追求数字改变生产行为。
+- 尚待完成：Issue #11 提出的 Rust 门槛调整、测试命名与行为断言整理、属性测试、nightly mutation 报告，以及 C++ / QML 覆盖统计口径评估。当前配置仍为 Rust 函数 89%、行 92%；本 task 保持 deferred，未因本次规划更新声称配置或测试已改变。
+- 实施时逐项审计稳定可达的生产行为，只为有清晰契约的缺口补测试或小幅重构；若缺口只来自重复实例、不可稳定观察的崩溃路径或手动性能基准，记录证据并保留待办，不为覆盖率数字改变生产行为。
 - CI 调度优化（2026-10-13）：保留每次变更的构建、功能测试、覆盖率与 lint；Miri 和三平台 sanitizer 改由每日 workflow 执行。性能任务 048 的 CPU 套件每日运行并上传日志 artifact，不设浮动阈值；GPU 基准仍需可识别硬件/图形会话，暂不放入通用 runner。
 
 ## 验证与证据
 
 | 日期 / 证据 | 结果 |
 |---|---|
+| 2026-10-13：GitHub Issue #11 规划更新 | [Issue #11](https://github.com/Yuki-Nagori/panta/issues/11) 的建议已并入本 task：Rust 全局函数 / 行 85%、取消 100% 与逐文件目标、行为测试清理、属性测试及 nightly mutation 报告。本次仅更新规划；状态保持 `deferred`，未实施代码或修改现行质量门禁。 |
 | 2026-10-13：CI 动态检查定时化 | `actionlint .github/workflows/ci.yml .github/workflows/nightly.yml` 与 `git diff --check` 通过。Miri、sanitizer 和 CPU 性能采样已拆到每日 workflow；实际 workflow/artifact 结果待 CI 验收，不把静态检查记为运行通过。 |
 | 2026-09-18 至 21：质量入口、工具门禁、Miri | Rust/C++/QML/CMake 适用工具和聚合入口逐步接入；空测试、失败测试与阈值夹具曾验证非零退出。Miri 仅跑适用的纯 Rust crate；Pest 容量压力用例因解释执行成本在 Miri 忽略，常规测试仍覆盖。 |
 | 2026-09-24：macOS gate、[CI run 36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191) | 修复后函数 402/445（90.34%）、行 4270/4545（93.95%）；三平台当前 89% / 92% gate 全绿，不代表 100% 或 C++ line/branch 已达成。 |
