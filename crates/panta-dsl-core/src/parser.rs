@@ -7,7 +7,7 @@ use pest::iterators::Pair;
 
 use crate::diagnostic::push_diagnostic;
 use crate::syntax::{MAX_DECLARATIONS, MAX_SOURCE_BYTES, PaParser, Rule, pest_diagnostic};
-use crate::validation::{normalize_locale, validate_document};
+use crate::validation::{DocumentLocations, MessageLocations, normalize_locale, validate_document};
 use crate::{
     Diagnostic, Diagnostics, Document, Kind, Message, Status, Translation, ValueType, Variable,
 };
@@ -61,12 +61,13 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     let mut seen_source_language = false;
     let mut section: Option<String> = None;
     let mut current_context = "Panta".to_owned();
-    let mut current_message: Option<(String, Message)> = None;
+    let mut current_message: Option<(String, Message, usize)> = None;
     let mut current_message_numerus_seen = false;
     let mut declaration_count = 0usize;
     let mut seen_contexts = HashSet::new();
     let mut declaration_limit_exceeded = false;
     let mut diagnostics = Vec::new();
+    let mut locations = DocumentLocations::default();
 
     for line in document_pair.into_inner() {
         let Some(body) = line.into_inner().next() else {
@@ -95,6 +96,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                 } else {
                     seen_version = true;
+                    locations.version = Some(body_offset);
                     result.version = find_text(body, Rule::integer)
                         .and_then(|value| value.parse::<u32>().ok())
                         .unwrap_or_default();
@@ -127,14 +129,17 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     }
                 }
             }
-            Rule::catalog => set_header(
-                &mut result.catalog,
-                body,
-                "catalog",
-                source,
-                &mut diagnostics,
-                Rule::catalog_name,
-            ),
+            Rule::catalog => {
+                locations.catalog = Some(body_offset);
+                set_header(
+                    &mut result.catalog,
+                    body,
+                    "catalog",
+                    source,
+                    &mut diagnostics,
+                    Rule::catalog_name,
+                );
+            }
             Rule::language => {
                 if seen_language {
                     push_diagnostic(
@@ -146,6 +151,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                 } else {
                     seen_language = true;
+                    locations.language = Some(body_offset);
                     result.language =
                         find_text(body, Rule::locale_name).map(|value| normalize_locale(&value));
                 }
@@ -161,6 +167,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                 } else {
                     seen_source_language = true;
+                    locations.source_language = Some(body_offset);
                     result.source_language = match find_text(body, Rule::locale_name) {
                         Some(value) => normalize_locale(&value),
                         None => "en".to_owned(),
@@ -210,8 +217,16 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                     continue;
                 }
+                let key = message_key(&current_context, &id);
+                locations.messages.insert(
+                    key.clone(),
+                    MessageLocations {
+                        declaration: body_offset,
+                        ..MessageLocations::default()
+                    },
+                );
                 current_message = Some((
-                    message_key(&current_context, &id),
+                    key,
                     Message {
                         context: current_context.clone(),
                         id,
@@ -223,11 +238,12 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                         extra: None,
                         numerus: false,
                     },
+                    body_offset,
                 ));
                 current_message_numerus_seen = false;
             }
             Rule::src => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((_, message, _)) = current_message.as_mut() {
                     let value = field_value(body, source, &mut diagnostics);
                     if message.source.is_empty() {
                         message.source = value;
@@ -245,7 +261,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::oldsrc => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((_, message, _)) = current_message.as_mut() {
                     let value = field_value(body, source, &mut diagnostics);
                     if message.old_source.is_none() {
                         message.old_source = Some(value);
@@ -263,7 +279,12 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::translation => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((key, message, _)) = current_message.as_mut() {
+                    locations
+                        .messages
+                        .entry(key.clone())
+                        .or_default()
+                        .translation = Some(body_offset);
                     let forms = translation_value(body, source, &mut diagnostics);
                     let locale = result
                         .language
@@ -287,7 +308,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::status => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((_, message, _)) = current_message.as_mut() {
                     if message.status.is_some() {
                         duplicate_field(&mut diagnostics, "st", body_offset, source);
                     }
@@ -310,7 +331,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::comment_field => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((_, message, _)) = current_message.as_mut() {
                     if message.comment.is_some() {
                         duplicate_field(&mut diagnostics, "comment", body_offset, source);
                     }
@@ -326,7 +347,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::extra_field => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((_, message, _)) = current_message.as_mut() {
                     if message.extra.is_some() {
                         duplicate_field(&mut diagnostics, "extra", body_offset, source);
                     }
@@ -342,7 +363,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::numerus => {
-                if let Some((_, message)) = current_message.as_mut() {
+                if let Some((_, message, _)) = current_message.as_mut() {
                     if current_message_numerus_seen {
                         duplicate_field(&mut diagnostics, "numerus", body_offset, source);
                     } else if let Some(value) = find_text(body, Rule::boolean) {
@@ -418,7 +439,14 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     }
     flush_message(&mut current_message, &mut result, &mut diagnostics, source);
 
-    validate_document(&result, seen_version, seen_kind, source, &mut diagnostics);
+    validate_document(
+        &result,
+        seen_version,
+        seen_kind,
+        source,
+        &locations,
+        &mut diagnostics,
+    );
     if diagnostics.is_empty() {
         Ok(result)
     } else {
@@ -479,12 +507,12 @@ fn set_header(
 }
 
 fn flush_message(
-    current: &mut Option<(String, Message)>,
+    current: &mut Option<(String, Message, usize)>,
     result: &mut Document,
     diagnostics: &mut Vec<Diagnostic>,
     source: &str,
 ) {
-    let Some((key, message)) = current.take() else {
+    let Some((key, message, message_offset)) = current.take() else {
         return;
     };
     if message.source.is_empty() {
@@ -492,7 +520,7 @@ fn flush_message(
             diagnostics,
             "pa.missing_src",
             format!("message '{}' requires src", message.id),
-            0,
+            message_offset,
             source,
         );
     }
@@ -501,7 +529,7 @@ fn flush_message(
             diagnostics,
             "pa.duplicate_message",
             "context and id are repeated",
-            0,
+            message_offset,
             source,
         );
     } else {

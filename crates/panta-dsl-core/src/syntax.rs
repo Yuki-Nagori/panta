@@ -32,13 +32,14 @@ pub fn source_kind(source: &str) -> Option<SourceKind> {
     None
 }
 
-pub(crate) const MAX_SOURCE_BYTES: usize = 1_048_576;
+/// `.pa` 单个来源允许的最大 UTF-8 字节数。
+pub const MAX_SOURCE_BYTES: usize = 1_048_576;
 pub(crate) const MAX_DECLARATIONS: usize = 16_384;
 
 pub(crate) fn pest_diagnostic(error: PestError<Rule>, source: &str) -> Diagnostics {
-    let offset = match error.location {
-        InputLocation::Pos(position) => position,
-        InputLocation::Span((start, _)) => start,
+    let (start, end) = match error.location {
+        InputLocation::Pos(position) => (position, position),
+        InputLocation::Span((start, end)) => (start, end),
     };
-    Diagnostics::one("pa.syntax", error.to_string(), offset, source)
+    Diagnostics::one_span("pa.syntax", error.to_string(), start, end, source)
 }

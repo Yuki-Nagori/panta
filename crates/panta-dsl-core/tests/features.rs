@@ -54,6 +54,19 @@ fn theme_rejects_language_fields_and_values_reject_messages() -> Result<(), Box<
         parse("version: 1\nkind: language\nlanguage: en\n\nvalues:\n  scale: real = 0.5\n"),
         Err(ref diagnostics) if diagnostics.to_string().contains("pa.unexpected_values")
     ));
+    let source = "version: 1\nkind: variables\ncatalog: panta\n\nvalues:\n  scale: real = 0.5\n";
+    let error = match parse(source) {
+        Err(error) => error,
+        Ok(_) => panic!("catalog is a language-only header"),
+    };
+    let diagnostic = error
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "pa.unexpected_language_field");
+    assert_eq!(
+        diagnostic.map(|item| item.start_offset),
+        Some(source.find("catalog:").unwrap_or(usize::MAX))
+    );
     Ok(())
 }
 
@@ -231,11 +244,20 @@ fn emit_ts_rejects_placeholder_mismatch_and_invalid_locale() -> Result<(), Box<d
         Err(ref diagnostics) if diagnostics.to_string().contains("pa.ts_kind")
     ));
 
-    // 占位符一致性在 parse 阶段校验(validate_messages)。
-    assert!(matches!(
-        parse("version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision\n"),
-        Err(ref diagnostics) if diagnostics.to_string().contains("pa.placeholder_mismatch")
-    ));
+    // 占位符不匹配指向错误翻译字段，方便编辑器定位。
+    let source = "version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision\n";
+    let error = match parse(source) {
+        Err(error) => error,
+        Ok(_) => panic!("占位符不匹配意外通过"),
+    };
+    let diagnostic = error
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "pa.placeholder_mismatch");
+    assert_eq!(
+        diagnostic.map(|item| item.start_offset),
+        Some(source.find("  tr: Revision").unwrap_or(usize::MAX))
+    );
     // emit_ts 对请求 locale 复核:合法文档 + 非法输出 locale → pa.ts_locale。
     let document = parse(
         "version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision %1\n",
@@ -388,11 +410,21 @@ fn trailing_escape_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn pest_syntax_errors_render_with_position() {
-    let Err(error) = parse("%%%\n") else {
+    let source = "version: nope\n";
+    let Err(error) = parse(source) else {
         panic!("语法错误文档意外通过")
     };
     let rendered = error.to_string();
     assert!(rendered.contains("pa.syntax"), "{rendered}");
+    let diagnostic = &error.diagnostics[0];
+    // Pest may report a zero-width position where a required token should begin.
+    assert_eq!(
+        diagnostic.start_offset,
+        source.find("nope").unwrap_or(usize::MAX)
+    );
+    assert_eq!(diagnostic.start_offset, diagnostic.end_offset);
+    assert!(diagnostic.end_offset <= source.len());
+    assert_eq!(&source[diagnostic.start_offset..diagnostic.end_offset], "");
 }
 
 #[test]
@@ -424,14 +456,17 @@ fn diagnostic_order_and_text_match_the_pre_refactor_baseline() {
     };
     assert_eq!(
         diagnostics.to_string(),
-        "pa.missing_src at 1:1: message 'x' requires src\n\
+        "pa.missing_src at 6:1: message 'x' requires src\n\
 pa.unsupported_version at 1:1: only version 1 is supported\n\
-pa.invalid_locale at 1:1: invalid language locale 'en--US'"
+pa.invalid_locale at 3:1: invalid language locale 'en--US'"
     );
-    assert!(
-        diagnostics
-            .diagnostics
-            .iter()
-            .all(|item| { item.offset == 0 && item.line == 1 && item.column == 1 })
+    assert_eq!(
+        diagnostics.diagnostics[0].start_offset,
+        source.find("x:").unwrap_or(usize::MAX)
+    );
+    assert_eq!(diagnostics.diagnostics[1].start_offset, 0);
+    assert_eq!(
+        diagnostics.diagnostics[2].start_offset,
+        source.find("language:").unwrap_or(usize::MAX)
     );
 }

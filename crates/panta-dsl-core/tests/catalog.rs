@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used)]
 
-use panta_dsl_core::{emit_ts, parse, source_prefix};
+use panta_dsl_core::{ArtifactSource, emit_ts, parse, parse_artifacts, source_prefix};
 
 const CATALOG: &str = include_str!("fixtures/panta-cn.pa");
 
@@ -42,4 +42,128 @@ fn artifact_outputs_match_the_pre_refactor_baseline() -> Result<(), panta_dsl_co
     assert_eq!(emit_ts(&document, "cn")?, expected_ts);
     assert_eq!(emit_ts(&document, "zh_CN")?, expected_ts);
     Ok(())
+}
+
+#[test]
+fn artifact_snapshot_has_a_stable_cross_platform_encoding() {
+    let input = ArtifactSource {
+        source_id: "tests/fixtures/dsl/artifacts.pa",
+        source: include_str!("../../../tests/fixtures/dsl/artifacts.pa"),
+    };
+    let snapshot = parse_artifacts([input]).expect("fixture should aggregate");
+    let encoded = snapshot.canonical_json().expect("snapshot serializes");
+    assert_eq!(
+        encoded,
+        include_str!("fixtures/artifact-snapshot.json").trim()
+    );
+}
+
+#[test]
+fn snapshot_emits_one_deterministic_ts_per_locale() {
+    let snapshot = parse_artifacts([ArtifactSource {
+        source_id: "panta-cn.pa",
+        source: CATALOG,
+    }])
+    .expect("catalog should aggregate");
+    let outputs = snapshot
+        .emit_translation_sources()
+        .expect("language Artifact should emit TS");
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].source_id(), "panta-cn.pa");
+    assert_eq!(outputs[0].file_name(), "panta_zh_CN.ts");
+    assert!(outputs[0].contents().contains("language=\"zh_CN\""));
+
+    let duplicate = parse_artifacts([
+        ArtifactSource {
+            source_id: "first.pa",
+            source: CATALOG,
+        },
+        ArtifactSource {
+            source_id: "second.pa",
+            source: CATALOG,
+        },
+    ])
+    .expect("source documents have distinct IDs");
+    let error = duplicate
+        .emit_translation_sources()
+        .expect_err("same catalog and locale cannot overwrite each other");
+    assert_eq!(
+        error.diagnostics[0].diagnostic.code,
+        "pa.duplicate_translation_output"
+    );
+}
+
+#[test]
+fn translation_names_that_differ_only_by_case_are_rejected() {
+    let english = "version: 1\nkind: language\ncatalog: Panta\nlanguage: en\n\n[Menu]\nopen:\n  src: Open\n  tr: Open\n";
+    let chinese = english.replace("catalog: Panta", "catalog: panta");
+    let snapshot = parse_artifacts([
+        ArtifactSource {
+            source_id: "upper.pa",
+            source: english,
+        },
+        ArtifactSource {
+            source_id: "lower.pa",
+            source: &chinese,
+        },
+    ])
+    .expect("source identifiers are distinct");
+
+    let error = snapshot
+        .emit_translation_sources()
+        .expect_err("case-insensitive filesystems cannot represent both output names");
+    assert_eq!(
+        error.diagnostics[0].diagnostic.code,
+        "pa.duplicate_translation_output"
+    );
+}
+
+#[test]
+fn artifact_order_is_canonical_and_failures_keep_source_ids() {
+    let variables = "version: 1\nkind: variables\n\nvalues:\n  scale: real = 0.5\n";
+    let theme = "version: 1\nkind: theme\n\nvalues:\n  control-height: int = 24\n";
+    let left = parse_artifacts([
+        ArtifactSource {
+            source_id: "z-theme.pa",
+            source: theme,
+        },
+        ArtifactSource {
+            source_id: "b-vars.pa",
+            source: variables,
+        },
+        ArtifactSource {
+            source_id: "a-vars.pa",
+            source: variables,
+        },
+    ])
+    .expect("all documents should aggregate");
+    let right = parse_artifacts([
+        ArtifactSource {
+            source_id: "a-vars.pa",
+            source: variables,
+        },
+        ArtifactSource {
+            source_id: "b-vars.pa",
+            source: variables,
+        },
+        ArtifactSource {
+            source_id: "z-theme.pa",
+            source: theme,
+        },
+    ])
+    .expect("same documents in another input order should aggregate");
+    assert_eq!(left, right);
+    assert_eq!(left.documents()[0].source_id(), "z-theme.pa");
+    assert_eq!(left.documents()[1].source_id(), "a-vars.pa");
+
+    let error = parse_artifacts([ArtifactSource {
+        source_id: "broken.pa",
+        source: "version: 2\nkind: variables\n\nvalues:\n  scale: real = 0.5\n",
+    }])
+    .expect_err("unsupported version should fail");
+    assert_eq!(error.diagnostics[0].source_id, "broken.pa");
+    assert_eq!(
+        error.diagnostics[0].diagnostic.code,
+        "pa.unsupported_version"
+    );
 }

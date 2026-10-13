@@ -47,7 +47,8 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
                     diagnostics.push(Diagnostic {
                         code: "pa.placeholder_mismatch".to_owned(),
                         message: format!("message '{}' has different placeholders", message.id),
-                        offset: 0,
+                        start_offset: 0,
+                        end_offset: 0,
                         line: 1,
                         column: 1,
                     });
