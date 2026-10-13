@@ -15,7 +15,7 @@ pub use model::{ProjectCommand, ProjectSnapshot};
 use model::{ProjectManifest, ProjectState};
 pub use panta_import::{
     DEFAULT_MESH_TYPE, IMPORT_RECORD_VERSION, ImportRecord, MESH_TYPES, STL_IMPORT_PARSER_VERSION,
-    StlImportPreview,
+    StlImportPreview, default_display_name,
 };
 pub use service::ProjectService;
 
@@ -36,7 +36,7 @@ mod storage;
 pub use crate::fsm::open_saved_stl::{ActivationAttempt, Outcome, OutcomeKind};
 
 /// 当前范例工程清单的 schema 版本。
-pub const PROJECT_SCHEMA_VERSION: u32 = 2;
+pub const PROJECT_SCHEMA_VERSION: u32 = 3;
 const MIN_SUPPORTED_PROJECT_SCHEMA_VERSION: u32 = 1;
 const PROJECT_FILE_EXTENSION: &str = "panta";
 
@@ -167,7 +167,9 @@ mod tests {
                 record_version: 1,
                 parser_version: 1,
                 id: "import-overflow".to_owned(),
+                display_name: "part".to_owned(),
                 source_name: "part.stl".to_owned(),
+                source_digest: None,
                 asset: "assets/part.stl".to_owned(),
                 format: "stl".to_owned(),
                 mesh_type: "midplane".to_owned(),

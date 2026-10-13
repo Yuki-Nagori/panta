@@ -695,7 +695,7 @@ bool ProjectViewModel::publish_import(const panta::ffi::ProjectImport& imported)
     if (index < 0) {
         index = static_cast<int>(m_documents.size());
         m_documents.append({recordId, QStringLiteral("import"), QStringLiteral("ready"),
-                            QString::fromUtf8(imported.source_name), QString{}});
+                            QString::fromUtf8(imported.display_name), QString{}});
         documentsChangedEmitted = true;
     }
     documentsChangedEmitted = activate_ready_document(index) || documentsChangedEmitted;
@@ -809,7 +809,7 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
     const QDir projectDirectory(QFileInfo(m_currentPath).absolutePath());
     for (std::size_t index = 0; index < imports.size(); ++index) {
         const auto& imported = imports[index];
-        nextImportedPartNames.append(QString::fromUtf8(imported.source_name));
+        nextImportedPartNames.append(QString::fromUtf8(imported.display_name));
         nextPartIds.append(QString::fromUtf8(imported.id));
     }
 
@@ -822,7 +822,7 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
 
     if (imports.size() > 0) {
         const auto& imported = imports[imports.size() - 1];
-        nextPartName = QString::fromUtf8(imported.source_name);
+        nextPartName = QString::fromUtf8(imported.display_name);
         nextAssetPath = projectDirectory.filePath(QString::fromUtf8(imported.asset));
         nextMeshType = QString::fromUtf8(imported.mesh_type);
         nextUnits = QString::fromUtf8(imported.units);
@@ -929,12 +929,31 @@ QVariantList ProjectViewModel::openDocuments() const {
     QVariantList documents;
     documents.reserve(m_documents.size());
     for (const auto& document : m_documents) {
-        documents.append(QVariantMap{{QStringLiteral("id"), document.id},
-                                     {QStringLiteral("kind"), document.kind},
-                                     {QStringLiteral("state"), document.state},
-                                     {QStringLiteral("title"), document.title},
-                                     {QStringLiteral("message"), document.message},
-                                     {QStringLiteral("diagnostic"), document.diagnostic}});
+        QVariantMap projection{{QStringLiteral("id"), document.id},
+                               {QStringLiteral("kind"), document.kind},
+                               {QStringLiteral("state"), document.state},
+                               {QStringLiteral("title"), document.title},
+                               {QStringLiteral("message"), document.message},
+                               {QStringLiteral("diagnostic"), document.diagnostic}};
+        if (document.kind == QStringLiteral("import")) {
+            const qsizetype importIndex = m_importedPartIds.indexOf(document.id);
+            if (importIndex >= 0) {
+                const QString& name = m_importedPartNames.at(importIndex);
+                qsizetype ordinal = 0;
+                qsizetype count = 0;
+                for (qsizetype index = 0; index < m_importedPartNames.size(); ++index) {
+                    if (m_importedPartNames.at(index) == name) {
+                        ++count;
+                        if (index <= importIndex) {
+                            ++ordinal;
+                        }
+                    }
+                }
+                projection.insert(QStringLiteral("displayOrdinal"), ordinal);
+                projection.insert(QStringLiteral("displayCount"), count);
+            }
+        }
+        documents.append(projection);
     }
     return documents;
 }

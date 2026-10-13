@@ -36,7 +36,7 @@ Rust 负责工程、工作区、命令、任务、作业、序列化、撤销/�
 
 ## 存储契约
 
-完整工程容器和二进制资产格式仍未定。任务 057 的最小契约使用 `Documents/panta/<name>/<name>.panta` 目录包；任务 063 将主文件 schema 扩展为 `2`，在名称和修订号之外保存可重放的 STL `imports` 记录，记录固定导入记录版本与 STL 解析器版本，原始 STL 复制到 `assets/imports/`。打开仍接受 schema 1 并按缺省空 imports 读取，成功保存时写当前 schema；保存先在工程目录内写独立临时文件再替换主文件。该实现是当前边界，不代表完整工程格式，也不等于持久化了解析后的 Mesh IR。
+完整工程容器和二进制资产格式仍未定。任务 057 的最小契约使用 `Documents/panta/<name>/<name>.panta` 目录包；任务 063 当前主文件 schema 为 `3`，在名称和修订号之外保存可重放的 STL `imports` 记录，记录固定导入记录版本与 STL 解析器版本，原始 STL 复制到 `assets/imports/`。ImportRecord 持久化与来源名分离的 `display_name`，新记录保存源字节快照的 SHA-256；旧 schema 2 记录从 `source_name` 派生显示名，缺失摘要保持为空，不在打开清单时读取全部来源资产。schema 1 按缺省空 imports 读取，成功保存时写当前 schema。保存先在工程目录内写独立临时文件再替换主文件。该实现是当前边界，不代表完整工程格式，也不等于持久化了解析后的 Mesh IR。
 
 [108](../task/108-project-write-coordination.md) 将工程写入集中到 Rust repository 租约：使用 fs4 同步文件锁协调同一工程的跨实例 / 跨进程写入；争用立即返回 `project.command_invalid`（`project write pending`）。锁文件 `<name>.panta.lock` 保持稳定，不在释放租约时删除。租约销毁时先显式 unlock 再关闭句柄，避免 fork / dup 的共享描述符延长锁存活；解锁失败记录诊断，不改变已提交结果。内存状态分别记录当前 revision 与已保存 revision；租约取得和清单替换前复核磁盘已保存修订，过期服务返回 `project changed on disk` 并保留其候选及旧磁盘内容。该锁为协作式，不拦截绕过租约的外部写入。
 

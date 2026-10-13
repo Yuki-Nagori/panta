@@ -35,6 +35,16 @@ ColumnLayout {
         const entry = meshTypes.find(entry => entry.id === meshType);
         return entry ? qsTranslate("MeshType", entry.sourceText) : meshType;
     }
+    function importedPartDisplayName(index) {
+        const name = importedPartNames[index] ?? "";
+        const matchingIndexes = [];
+        for (let candidate = 0; candidate < importedPartNames.length; ++candidate) {
+            if (importedPartNames[candidate] === name) {
+                matchingIndexes.push(candidate);
+            }
+        }
+        return matchingIndexes.length < 2 ? name : `${matchingIndexes.indexOf(index) + 1} · ${name}`;
+    }
     readonly property var planTaskItems: [
         {
             id: "imported-part",
@@ -119,7 +129,7 @@ ColumnLayout {
     }
 
     // Welcome 或空白视口没有对应导入记录，此时仍显示最近导入项。
-    readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 ? activeDocumentTitle : importedPartName
+    readonly property string activePartTitle: importedPartIds.indexOf(activeDocumentId) >= 0 ? importedPartDisplayName(importedPartIds.indexOf(activeDocumentId)) : importedPartDisplayName(importedPartNames.length - 1)
 
     spacing: 0
 
@@ -209,7 +219,6 @@ ColumnLayout {
         delegate: Rectangle {
             id: importedPartEntry
             objectName: "importedPartEntry"
-            required property var modelData
             required property int index
 
             readonly property string recordId: panel.importedPartIds[index] ?? ""
@@ -242,7 +251,7 @@ ColumnLayout {
                 }
                 ThemedLabel {
                     Layout.fillWidth: true
-                    text: importedPartEntry.modelData
+                    text: panel.importedPartDisplayName(importedPartEntry.index)
                     textSize: Theme.fontBody
                     elide: Text.ElideRight
                 }

@@ -386,14 +386,22 @@ class ThemeComponentTest final : public QObject {
             engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"), owner);
         QVERIFY(panel != nullptr);
         panel->setProperty("importedPartIds", QStringList{QStringLiteral("import-1")});
-        panel->setProperty("importedPartName", QStringLiteral("latest.stl"));
+        panel->setProperty("importedPartNames", QStringList{QStringLiteral("latest")});
         panel->setProperty("activeDocumentId", QStringLiteral("welcome"));
         panel->setProperty("activeDocumentTitle", QStringLiteral("Welcome"));
-        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("latest.stl"));
+        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("latest"));
 
         panel->setProperty("activeDocumentId", QStringLiteral("import-1"));
-        panel->setProperty("activeDocumentTitle", QStringLiteral("active.stl"));
-        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("active.stl"));
+        panel->setProperty("activeDocumentTitle", QStringLiteral("active"));
+        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("latest"));
+
+        panel->setProperty("importedPartIds",
+                           QStringList{QStringLiteral("import-1"), QStringLiteral("import-2")});
+        panel->setProperty("importedPartNames",
+                           QStringList{QStringLiteral("part"), QStringLiteral("part")});
+        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("1 · part"));
+        panel->setProperty("activeDocumentId", QStringLiteral("import-2"));
+        QCOMPARE(panel->property("activePartTitle").toString(), QStringLiteral("2 · part"));
     }
 
     void fill_settings_drafts_profile_rows_and_button_geometry() {
@@ -1295,19 +1303,22 @@ class ThemeComponentTest final : public QObject {
                          "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
 
-        const auto document = [](const QString& id, const QString& kind, const QString& title) {
+        const auto document = [](const QString& id, const QString& kind, const QString& title,
+                                 int ordinal = 1, int count = 1) {
             return QVariantMap{{QStringLiteral("id"), id},
                                {QStringLiteral("kind"), kind},
                                {QStringLiteral("state"), QStringLiteral("ready")},
                                {QStringLiteral("title"), title},
+                               {QStringLiteral("displayOrdinal"), ordinal},
+                               {QStringLiteral("displayCount"), count},
                                {QStringLiteral("message"), QString{}}};
         };
-        const QString longTitle = QStringLiteral("exceptionally-long-source-name.stl");
+        const QString longTitle = QStringLiteral("exceptionally-long-source-name");
         const QVariantList documents{
             document(QStringLiteral("welcome"), QStringLiteral("welcome"),
                      QStringLiteral("Welcome")),
-            document(QStringLiteral("import-1"), QStringLiteral("import"), longTitle),
-            document(QStringLiteral("import-2"), QStringLiteral("import"), longTitle)};
+            document(QStringLiteral("import-1"), QStringLiteral("import"), longTitle, 1, 2),
+            document(QStringLiteral("import-2"), QStringLiteral("import"), longTitle, 2, 2)};
         auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
             QVariantMap{{QStringLiteral("objectName"), QStringLiteral("documentTabBar")},
                         {QStringLiteral("documents"), documents},

@@ -423,6 +423,7 @@ fn project_import(import: panta_core::project::ImportRecord) -> bridge::ProjectI
         record_version: import.record_version,
         parser_version: import.parser_version,
         id: import.id,
+        display_name: import.display_name,
         source_name: import.source_name,
         asset: import.asset,
         format: import.format,

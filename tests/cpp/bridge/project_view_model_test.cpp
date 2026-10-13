@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QIODevice>
+#include <QPair>
 #include <QSignalSpy>
 #include <QString>
 #include <QTemporaryDir>
@@ -247,8 +248,8 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
 
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), true));
-    EXPECT_EQ(view_model.importedPartNames(), QStringList{QStringLiteral("sample.stl")});
-    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(view_model.importedPartNames(), QStringList{QStringLiteral("sample")});
+    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample"));
     EXPECT_EQ(view_model.importedMeshType(), QStringLiteral("dual-domain"));
     EXPECT_EQ(view_model.importedUnits(), QStringLiteral("millimeters"));
     EXPECT_EQ(view_model.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
@@ -276,8 +277,8 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ASSERT_TRUE(view_model.importStl(secondSourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
     EXPECT_EQ(view_model.importedPartNames(),
-              QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl")}));
-    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample-second.stl"));
+              QStringList({QStringLiteral("sample"), QStringLiteral("sample-second")}));
+    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample-second"));
 
     EXPECT_EQ(view_model.planSettings().value(QStringLiteral("meshType")).toString(),
               QStringLiteral("solid-3d"));
@@ -295,8 +296,8 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ProjectViewModel reopened;
     ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
     EXPECT_EQ(reopened.importedPartNames(),
-              QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl")}));
-    EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample-second.stl"));
+              QStringList({QStringLiteral("sample"), QStringLiteral("sample-second")}));
+    EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample-second"));
     EXPECT_EQ(reopened.importedAssetPath(), view_model.importedAssetPath());
     EXPECT_EQ(reopened.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
     // 打开工程只读清单（073/080）：已保存网格须经只读 FSM 激活异步恢复，
@@ -311,9 +312,9 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), false));
     EXPECT_EQ(view_model.importedPartNames(),
-              QStringList({QStringLiteral("sample.stl"), QStringLiteral("sample-second.stl"),
-                           QStringLiteral("sample.stl")}));
-    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample.stl"));
+              QStringList({QStringLiteral("sample"), QStringLiteral("sample-second"),
+                           QStringLiteral("sample")}));
+    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample"));
     EXPECT_EQ(mesh_changed.count(), 1);
     const auto replacement = view_model.mesh_snapshot();
     ASSERT_NE(replacement, nullptr);
@@ -391,7 +392,7 @@ TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelReq
     QTRY_COMPARE(finished.count(), 1);
     EXPECT_TRUE(finished.at(0).at(1).toBool());
     EXPECT_FALSE(model.importPending());
-    EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("part.stl")});
+    EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("part")});
     EXPECT_EQ(model.openDocuments().size(), 2);
     EXPECT_EQ(model.activeDocumentId(), QStringLiteral("import-1"));
     EXPECT_NE(model.mesh_snapshot(), nullptr);
@@ -488,9 +489,9 @@ TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
     const auto imported = view_model.openDocuments()[1].toMap();
     EXPECT_EQ(imported[QStringLiteral("id")].toString(), QStringLiteral("import-1"));
     EXPECT_EQ(imported[QStringLiteral("state")].toString(), QStringLiteral("ready"));
-    EXPECT_EQ(imported[QStringLiteral("title")].toString(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(imported[QStringLiteral("title")].toString(), QStringLiteral("sample"));
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
-    EXPECT_EQ(view_model.activeDocumentTitle(), QStringLiteral("sample.stl"));
+    EXPECT_EQ(view_model.activeDocumentTitle(), QStringLiteral("sample"));
     EXPECT_EQ(activeChanged.count(), 2);
     EXPECT_NE(view_model.mesh_snapshot(), nullptr);
 
@@ -627,6 +628,47 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     reopened.openImportRecord(QStringLiteral("import-1"));
     QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
     QTRY_VERIFY(reopened.mesh_snapshot() != nullptr);
+}
+
+TEST(ProjectViewModelTest, DuplicateImportOrdinalsFollowImportOrderAcrossActivationAndClose) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const QString sourcePath = QDir(fixture.path()).filePath(QStringLiteral("part.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+
+    ProjectViewModel project;
+    ASSERT_TRUE(project.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(project.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                  QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(project.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                  QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(project.saveProject());
+
+    ProjectViewModel reopened;
+    ASSERT_TRUE(reopened.openProject(project.currentPath()));
+    reopened.openImportRecord(QStringLiteral("import-2"));
+    QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-2"));
+    reopened.openImportRecord(QStringLiteral("import-1"));
+    QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-1"));
+
+    const auto ordinal_for = [&reopened](const QString& id) {
+        for (const auto& entry : reopened.openDocuments()) {
+            const auto document = entry.toMap();
+            if (document.value(QStringLiteral("id")).toString() == id) {
+                return qMakePair(document.value(QStringLiteral("displayOrdinal")).toInt(),
+                                 document.value(QStringLiteral("displayCount")).toInt());
+            }
+        }
+        return qMakePair(0, 0);
+    };
+    EXPECT_EQ(ordinal_for(QStringLiteral("import-1")), qMakePair(1, 2));
+    EXPECT_EQ(ordinal_for(QStringLiteral("import-2")), qMakePair(2, 2));
+
+    reopened.closeDocument(QStringLiteral("import-1"));
+    EXPECT_EQ(ordinal_for(QStringLiteral("import-2")), qMakePair(2, 2));
 }
 
 TEST(ProjectViewModelTest, ClosedDocumentsReleaseTheirMeshSnapshotsAfterRepeatedSwitching) {

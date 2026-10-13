@@ -3,6 +3,7 @@
 
 use panta_mesh::{StlError, SurfaceMesh, SurfaceSummary, parse_stl};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -34,7 +35,7 @@ impl Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
-pub const IMPORT_RECORD_VERSION: u32 = 1;
+pub const IMPORT_RECORD_VERSION: u32 = 2;
 pub const STL_IMPORT_PARSER_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,7 +43,11 @@ pub struct ImportRecord {
     pub record_version: u32,
     pub parser_version: u32,
     pub id: String,
+    #[serde(default)]
+    pub display_name: String,
     pub source_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_digest: Option<String>,
     pub asset: String,
     pub format: String,
     pub mesh_type: String,
@@ -50,6 +55,15 @@ pub struct ImportRecord {
     pub show_import_log: bool,
     pub triangle_count: u64,
     pub dimensions: [f64; 3],
+}
+
+/// 返回与来源名称分离的默认资产名；只移除该记录所声明格式的扩展名。
+pub fn default_display_name(source_name: &str, format: &str) -> String {
+    let extension = format.strip_prefix('.').unwrap_or(format);
+    source_name
+        .rsplit_once('.')
+        .filter(|(_, suffix)| suffix.eq_ignore_ascii_case(extension))
+        .map_or_else(|| source_name.to_owned(), |(stem, _)| stem.to_owned())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -311,7 +325,9 @@ impl PreparedStl {
             record_version: IMPORT_RECORD_VERSION,
             parser_version: STL_IMPORT_PARSER_VERSION,
             id: format!("import-{import_number}"),
+            display_name: default_display_name(&self.source_name, "stl"),
             source_name: self.source_name.clone(),
+            source_digest: Some(format!("sha256:{:x}", Sha256::digest(&self.bytes))),
             asset: format!("assets/imports/{}", self.asset_name(import_number)),
             format: "stl".to_owned(),
             mesh_type: options.mesh_type.to_owned(),
@@ -491,6 +507,17 @@ mod tests {
     }
 
     #[test]
+    fn display_name_strips_only_the_declared_format_extension() {
+        assert_eq!(default_display_name("part.stl", "stl"), "part");
+        assert_eq!(default_display_name("Case.STL", "stl"), "Case");
+        assert_eq!(default_display_name("零件.模型.stl", "stl"), "零件.模型");
+        assert_eq!(default_display_name("part", "stl"), "part");
+        assert_eq!(default_display_name("part.stl.bak", "stl"), "part.stl.bak");
+        assert_eq!(default_display_name("part.step", "step"), "part");
+        assert_eq!(default_display_name("part.stl", "step"), "part.stl");
+    }
+
+    #[test]
     fn preview_cancellation_before_read_and_after_parse_does_not_publish_a_snapshot()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = Fixture::new()?;
@@ -552,6 +579,11 @@ mod tests {
         assert_eq!(record.record_version, IMPORT_RECORD_VERSION);
         assert_eq!(record.parser_version, STL_IMPORT_PARSER_VERSION);
         assert_eq!(record.id, "import-7");
+        assert_eq!(record.display_name, "part");
+        assert_eq!(
+            record.source_digest,
+            Some(format!("sha256:{:x}", Sha256::digest(fs::read(&source)?)))
+        );
         assert_eq!(record.asset, "assets/imports/0007-part.stl");
         assert_eq!(record.mesh_type, "dual-domain");
         assert_eq!(record.units, "centimeters");

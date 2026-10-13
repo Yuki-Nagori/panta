@@ -162,6 +162,7 @@ pub mod bridge {
         pub record_version: u32,
         pub parser_version: u32,
         pub id: String,
+        pub display_name: String,
         pub source_name: String,
         pub asset: String,
         pub format: String,

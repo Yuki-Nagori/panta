@@ -330,6 +330,7 @@ version = "0.1.0"
 dependencies = [
  "panta-mesh",
  "serde",
+ "sha2",
 ]
 
 [[package]]

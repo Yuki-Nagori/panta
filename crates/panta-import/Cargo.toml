@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 panta-mesh.workspace = true
 serde.workspace = true
+sha2.workspace = true
 
 [lints]
 workspace = true

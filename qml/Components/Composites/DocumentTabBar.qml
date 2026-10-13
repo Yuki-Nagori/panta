@@ -58,22 +58,17 @@ Item {
     function slot_of(id) {
         return order.indexOf(id);
     }
-    function same_named_imports(document) {
-        return documents.filter(entry => entry.kind === "import" && entry.title === document.title);
-    }
     function display_title(document) {
-        const matches = same_named_imports(document);
-        if (document.kind !== "import" || matches.length < 2) {
+        if (document.kind !== "import" || (document.displayCount ?? 1) < 2) {
             return document.title ?? "";
         }
-        return `${matches.findIndex(entry => entry.id === document.id) + 1} · ${document.title}`;
+        return `${document.displayOrdinal} · ${document.title}`;
     }
     function accessible_title(document) {
-        const matches = same_named_imports(document);
-        if (document.kind !== "import" || matches.length < 2) {
+        if (document.kind !== "import" || (document.displayCount ?? 1) < 2) {
             return document.title ?? "";
         }
-        return qsTr("%1, import %2").arg(document.title).arg(matches.findIndex(entry => entry.id === document.id) + 1);
+        return qsTr("%1, import %2").arg(document.title).arg(document.displayOrdinal);
     }
     function accessible_description(document) {
         if (document.state === "loading") {

@@ -2,11 +2,12 @@
 use super::model::{next_revision, validate_name};
 use super::storage::write_manifest;
 use super::{
-    ActivationAttempt, ImportRecord, MIN_SUPPORTED_PROJECT_SCHEMA_VERSION, Outcome,
-    PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError, ProjectManifest,
-    ProjectSnapshot, ProjectState, StlImportSession, SurfaceMeshCache, analysis_sequence,
-    gate_location, material, preview, process_settings, storage,
+    ActivationAttempt, IMPORT_RECORD_VERSION, ImportRecord, MIN_SUPPORTED_PROJECT_SCHEMA_VERSION,
+    Outcome, PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError,
+    ProjectManifest, ProjectSnapshot, ProjectState, StlImportSession, SurfaceMeshCache,
+    analysis_sequence, gate_location, material, preview, process_settings, storage,
 };
+use panta_import::default_display_name;
 use panta_mesh::SurfaceMesh;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -143,7 +144,7 @@ impl ProjectService {
         }
         let bytes = fs::read(path)
             .map_err(|error| ProjectError::Io(format!("{}: {error}", path.display())))?;
-        let manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
+        let mut manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
             ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
         })?;
         if !(MIN_SUPPORTED_PROJECT_SCHEMA_VERSION..=PROJECT_SCHEMA_VERSION)
@@ -151,6 +152,7 @@ impl ProjectService {
         {
             return Err(ProjectError::UnsupportedSchema(manifest.schema));
         }
+        migrate_import_records(&mut manifest)?;
         validate_name(&manifest.name)?;
         analysis_sequence::validate_sequences(&manifest)?;
         material::validate_materials(&manifest)?;
@@ -351,6 +353,42 @@ impl ProjectService {
             })
             .ok_or(ProjectError::NoProject)
     }
+}
+
+fn migrate_import_records(manifest: &mut ProjectManifest) -> Result<(), ProjectError> {
+    match manifest.schema {
+        1 if manifest.imports.is_empty() => {}
+        1 => {
+            return Err(ProjectError::ManifestInvalid(
+                "schema 1 cannot contain import records".to_owned(),
+            ));
+        }
+        2 => {
+            for import in &mut manifest.imports {
+                if import.record_version != 1 {
+                    return Err(ProjectError::ManifestInvalid(format!(
+                        "unsupported import record version {} in schema 2",
+                        import.record_version
+                    )));
+                }
+                // COMPAT(task 063; remove-task 088): migrate supported schema 2 imports to the
+                // schema 3 display-name contract; remove when 088 replaces the import index.
+                import.display_name = default_display_name(&import.source_name, &import.format);
+                import.record_version = IMPORT_RECORD_VERSION;
+            }
+        }
+        PROJECT_SCHEMA_VERSION => {
+            if manifest.imports.iter().any(|import| {
+                import.record_version != IMPORT_RECORD_VERSION || import.display_name.is_empty()
+            }) {
+                return Err(ProjectError::ManifestInvalid(
+                    "schema 3 imports require record version 2 and a display name".to_owned(),
+                ));
+            }
+        }
+        _ => unreachable!("schema version was checked before migration"),
+    }
+    Ok(())
 }
 
 /// 校验清单内的工程相对资产引用并解析为绝对路径；拒绝绝对路径与

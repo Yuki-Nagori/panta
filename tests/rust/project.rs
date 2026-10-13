@@ -339,6 +339,7 @@ fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn st
     assert_eq!(record.record_version, IMPORT_RECORD_VERSION);
     assert_eq!(record.parser_version, STL_IMPORT_PARSER_VERSION);
     assert_eq!(record.id, "import-1");
+    assert_eq!(record.display_name, "Case");
     assert_eq!(record.source_name, "Case.STL");
     assert_eq!(record.asset, "assets/imports/0001-Case.STL");
     assert_eq!(record.mesh_type, "dual-domain");
@@ -354,6 +355,115 @@ fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn st
     assert_eq!(reopened.imports()?, vec![record]);
     // 打开只读清单；已保存资产由只读激活按需恢复（见 activation.rs）。
     assert!(reopened.current_mesh().is_none());
+    Ok(())
+}
+
+#[test]
+fn migrates_schema_two_import_names_and_saves_schema_three()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("零件.STL");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    service.create(&fixture.root, "Migration")?;
+    service.import_stl(&source, "dual-domain", "millimeters", false)?;
+    let project_path = fixture.root.join("Migration/Migration.panta");
+
+    let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project_path)?)?;
+    manifest["schema"] = serde_json::json!(2);
+    manifest["imports"][0]["record_version"] = serde_json::json!(1);
+    manifest["imports"][0]
+        .as_object_mut()
+        .ok_or("import record was not an object")?
+        .remove("display_name");
+    manifest["imports"][0]
+        .as_object_mut()
+        .ok_or("import record was not an object")?
+        .remove("source_digest");
+    fs::write(&project_path, serde_json::to_vec(&manifest)?)?;
+
+    let mut reopened = ProjectService::new();
+    reopened.open(&project_path)?;
+    let imports = reopened.imports()?;
+    assert_eq!(imports[0].source_name, "零件.STL");
+    assert_eq!(imports[0].display_name, "零件");
+    assert_eq!(imports[0].record_version, IMPORT_RECORD_VERSION);
+    assert_eq!(imports[0].source_digest, None);
+
+    reopened.save()?;
+    let saved: serde_json::Value = serde_json::from_slice(&fs::read(&project_path)?)?;
+    assert_eq!(saved["schema"], PROJECT_SCHEMA_VERSION);
+    assert_eq!(saved["imports"][0]["record_version"], IMPORT_RECORD_VERSION);
+    assert_eq!(saved["imports"][0]["display_name"], "零件");
+
+    let mut final_open = ProjectService::new();
+    final_open.open(&project_path)?;
+    assert_eq!(final_open.imports()?, imports);
+    Ok(())
+}
+
+#[test]
+fn rejects_unsupported_import_record_migrations_without_replacing_current_project()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let created = service.create(&fixture.root, "Migration")?;
+    service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let before = service.current()?;
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&created.path)?)?;
+
+    let invalid_manifests = [
+        ("schema 1 with imports", 1, None, false),
+        ("schema 2 with unknown record version", 2, Some(99), false),
+        ("schema 3 without display name", 3, None, true),
+        ("schema 3 with unknown record version", 3, Some(99), false),
+    ];
+    for (description, schema, record_version, remove_display_name) in invalid_manifests {
+        let mut manifest = original.clone();
+        manifest["schema"] = serde_json::json!(schema);
+        if let Some(version) = record_version {
+            manifest["imports"][0]["record_version"] = serde_json::json!(version);
+        }
+        if remove_display_name {
+            manifest["imports"][0]
+                .as_object_mut()
+                .ok_or("import record was not an object")?
+                .remove("display_name");
+        }
+        fs::write(&created.path, serde_json::to_vec(&manifest)?)?;
+
+        assert!(
+            matches!(
+                service.open(&created.path),
+                Err(ProjectError::ManifestInvalid(_))
+            ),
+            "{description} unexpectedly opened"
+        );
+        assert_eq!(
+            service.current()?,
+            before,
+            "{description} replaced active state"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn imports_with_same_source_name_keep_the_same_display_name()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    service.create(&fixture.root, "Duplicates")?;
+    let first = service.import_stl(&source, "dual-domain", "millimeters", false)?;
+    let second = service.import_stl(&source, "dual-domain", "millimeters", false)?;
+    assert_eq!(first.display_name, "part");
+    assert_eq!(second.display_name, "part");
+    assert_ne!(first.id, second.id);
+    assert_ne!(first.asset, second.asset);
     Ok(())
 }
 
