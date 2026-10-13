@@ -1,6 +1,6 @@
 # 063 — STL 导入、导入选项持久化与工程工作区
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[057](057-new-project-dialog.md)、[060](060-qml-project-workspace-reference.md)、[062](062-ribbon-tab-components.md)
 - 优先级：P1
@@ -11,7 +11,7 @@
 
 将 Home 工具栏的 Import 从视觉入口推进为第一条真实导入流程：选择一个或多个 `.stl` 文件，随后显示网格类型、单位、导入日志和近似尺寸确认窗口；确认后把源文件及影响几何解释的选项纳入当前 `.panta` 工程，并在工程树中展示多个独立零件。左侧工程工作区上下分区：上方展示工程与导入文件，下方展示当前选择零件的任务和属性；右侧视口显示所选 STL，后续再扩展其他格式。
 
-本任务先完成可验收的 HTML 状态参考和持久化边界设计，再分阶段实现 QML、C++ ViewModel、Rust 导入服务与视口数据流。HTML 参考覆盖新建项目弹窗。首期 STL 运行时闭环、结构化导入 / 工程诊断、预检及确认写入的后台事务已落地；任务仍跟踪 `display_name` 重名策略和四档缩放性能验收。实际网格生成不在本任务范围。
+本任务先完成可验收的 HTML 状态参考和持久化边界设计，再分阶段实现 QML、C++ ViewModel、Rust 导入服务与视口数据流。HTML 参考覆盖新建项目弹窗。首期 STL 运行时闭环、结构化导入 / 工程诊断、后台导入事务、`display_name` 重名策略、四档缩放行为验证与 Metal 硬件离屏性能基准均已完成；实际网格生成不在本任务范围。
 
 ## 必读
 
@@ -82,7 +82,7 @@
 - 明确提交截止点：后台事务到 manifest 原子替换前可取消，取消 / 失败不得留下可见资产或修改工程；原子替换成功后视为已提交，即使窗口关闭或宿主销毁也必须完成收尾并记录结果。
 - 同一工程同一时间只接受一个导入写入；开始、完成、取消、容量拒绝和 worker 断开都需稳定请求关联与诊断，不得让迟到回执污染后来打开的工程。
 - 保留现有同步领域入口仅供无 GUI 测试 / 调用方使用时，需由本轮验证确认是否仍有实际消费者；不保留没有消费者的重复路径。
-- 之前的异步写入批次不包含 `display_name` 重名策略、四档缩放性能基准或实际网格生成；这些验收留待后续批次。
+- 当时的异步写入批次不包含 `display_name` 重名策略和四档缩放验证；后续批次已补齐这两项。实际网格生成仍不属于本任务范围。
 
 ### 本轮范围（2026-10-13，显示名）
 
@@ -104,7 +104,7 @@
 - [x] Import record 和 Tasks / 文档页签显示独立的 `display_name`；默认从来源文件名去除已识别的格式扩展名，保留原始 `source_name`、格式、工程内来源资产引用及 SHA-256 内容摘要。同名记录保留同一基础显示名，界面按导入顺序加序号，并有回归测试。Layers Dock 当前没有资产行，内容仍按本任务既定范围留空。
 - [x] 导入及工程服务错误通过结构化 DTO 跨 CXX 传递稳定错误码、类别和必要上下文；C++ 适配 Qt 展示字段与本地化消息，QML 不解析拼接错误文本。
 - [x] STL 预检 / 写入导入迁为 Rust 后台任务，定义取消与提交截止点；GUI 线程不执行文件读取和格式解析。
-- [ ] QML / C++ / Rust 分层、静态检查、native 测试、真实窗口与视口生命周期验证通过。
+- [x] QML / C++ / Rust 分层、静态检查、native 测试、四档缩放行为与 Metal 硬件离屏性能基准、真实窗口及视口生命周期验证通过。
 
 ## 清理与兼容例外
 
@@ -124,7 +124,7 @@
 
 本批不改 manifest schema、UI 样式或 STL 几何算法。已删除 `ProjectViewModel` 对 `rust::Error` 的冒号文本解析；保存资产激活的失败页签另有 code / category / detail，成功或重试时清空。
 
-未覆盖：四档缩放及性能基准。该提交中的 `inspectStl` / `importStl` 仍同步执行文件 I/O 与格式解析；不能据诊断边界和小夹具窗口通过认定完整分层验收通过。
+该批次当时尚未覆盖四档缩放；后续已按最终壳层实现补测。该提交中的 `inspectStl` / `importStl` 当时仍同步执行文件 I/O 与格式解析，之后的异步预检 / 写入批次已迁移到后台执行器。
 
 ### 只读预检批次（写入后台化前置批次）
 
@@ -138,7 +138,7 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 - `cargo build --locked`、`cargo format --check`、`cargo lint --check`：通过；lint 覆盖 Rust、CMake/native、qmllint、clang-tidy、include-cleaner 与 cppcheck。
 - 真实 Cocoa 窗口：通过创建隔离工程、打开 Import、选择 STL 并完成导入；任务列表和文档页签显示导入记录，视口显示网格。日志未见 QML 或导入错误；GPU 设备销毁信息发生在退出时。
 - `git diff --check HEAD`：通过。独立 gpt-6.1-sol medium review 未发现阻断问题；发现的 P2（旧请求完成回执关闭新弹窗）已通过请求编号关联修复，并由 shell 回归覆盖。
-- 本批未运行 sanitizer 或三平台 CI；四档缩放 / 性能基准和 `display_name` 持久化 / 展示仍未验收。
+- 该批次当时未运行 sanitizer 或三平台 CI，也未完成四档缩放和 `display_name` 持久化 / 展示；后两项在之后的批次验收完成。
 
 评审指出异步文件写入失败、接收通道断开、服务 teardown 和提交截止点竞争尚无确定性专用回归；当前测试覆盖正常提交、取消、容量拒绝及弹窗旧回执隔离。以上为后续补充测试的边界，不作为已验证路径。
 
@@ -149,12 +149,30 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 - `cargo test --locked --workspace`：通过 Rust 工作区测试、qmllint 与 75/75 个 native / QML CTest；新增覆盖逆序打开及关闭后同名页签序号稳定、schema 1 非空 imports 和 schema 2/3 不支持记录的拒绝及当前工程状态保留。
 - `cargo build --locked`、`cargo format --check`、`cargo lint --check`：通过。lint 覆盖 Clippy、依赖检查、CMake、qmllint、clang-tidy、include-cleaner 与 cppcheck。
 - 独立 `gpt-6.1-sol` medium review 指出页签序号曾基于当前打开文档，且缺少若干 schema 拒绝回归；修复为全量导入顺序投影并补齐回归。修复后复审确认两项闭环，无新增 actionable findings。
-- 本批未运行 sanitizer、跨平台 CI、真实窗口，也未测四档缩放性能；这些不记录为通过。
+- 该批次当时未运行 sanitizer、跨平台 CI、真实窗口或四档缩放；这些未被记作该批次的通过项，真实窗口和四档缩放随后分别记录在本节相应验证项中。
+
+### 四档缩放与最终收尾（2026-10-13）
+
+- macOS arm64、macOS 26.3.1、Qt 6.11.2；分别设置 `QT_QPA_PLATFORM=offscreen` 和 `QT_SCALE_FACTOR=1 / 1.25 / 1.5 / 2` 运行 `target/native/debug/app/panta_qml_shell_module_test`：每档 15/15 通过，覆盖 Shell、工程工作区、导入预检 / 取消及页签状态。无头运行会跳过 WebGPU 原生 surface，不作为图形生命周期证据。
+- 四档硬件离屏性能：Apple M4、macOS 26.3.1、arm64、Qt 6.11.2；逻辑视口 1280 × 800，Metal hidden hardware surface，native Debug 构建。由 `panta_performance_fixture` 创建合成工程，再将第二个导入资产替换为 500,000 三角形的二进制 STL（25,000,084 字节），并同步更新该临时 schema 2 清单的三角形数与尺寸；较小的 10,000 三角形模型保留作对照。每个模型先各完成一次初始激活与渲染，没有独立的预热循环；之后每模型采集 31 次页签切换样本。下表记录 500k 模型的场景切换至 VTK 队列完成时间；右列为独立 VTK 渲染提交 / 队列完成时间（均为 p50/p95，毫秒）：
+
+  | `QT_SCALE_FACTOR` | 场景切换 → 队列完成 | VTK 提交 | VTK 队列完成 |
+  | --- | ---: | ---: | ---: |
+  | 1 | 174.305 / 184.414 | 66.490 / 71.320 | 72.049 / 78.880 |
+  | 1.25 | 175.036 / 190.323 | 66.067 / 68.452 | 72.665 / 75.864 |
+  | 1.5 | 180.149 / 186.702 | 68.483 / 72.005 | 76.909 / 79.808 |
+  | 2 | 179.636 / 181.954 | 66.273 / 67.780 | 77.141 / 78.791 |
+
+  命令为 `QT_QPA_PLATFORM=cocoa QT_SCALE_FACTOR=<scale> target/native/debug/performance/panta_project_stl_viewport_gpu_benchmark /Users/yuki/eit/panta/target/performance/task-063-fixture/Benchmark/Benchmark.panta 31`；四档均正常结束，完整生成工程保留在忽略目录 `target/performance/task-063-fixture/`。此基准测量已持久化 STL 的激活 / 视口更新，不测导入耗时；使用 Metal 硬件离屏 surface，不是 Cocoa 可见窗口测量；时间不含 GPU 内核时间或显示呈现时间，任务没有规定性能阈值，因此记录实测数据，不宣称达成某个未定义门槛。
+- Cocoa 真实窗口导入、任务 / 页签与 STL 视口显示，以及关闭后重新激活恢复的证据见上方“结构化诊断批次（提交 2f6260c）”；确认写入异步批次另有导入成功后的列表、页签及视口证据。视口资源销毁与生命周期由此前真实窗口验收及既有 007 / 064 / 080 测试覆盖。
+- 本轮尝试重新启动可见 Cocoa 窗口时，当前图形会话返回 `Cannot create window: no screens available`，没有把此次启动尝试记为通过；使用上述此前已记录的 Cocoa 实际窗口证据验收可见窗口路径。四档 Shell 定向测试、四档 Metal 硬件离屏性能基准及 `git diff --check HEAD` 通过。`cargo test --locked --workspace`、`cargo build --locked`、`cargo format --check`、`cargo lint --check` 已在显示名批次通过。
 
 ## 风险与工作记录
 
 - 2026-10-13：按维护者确认，重复导入保留相同 `display_name`，工程树与文档页签按导入顺序加序号；`source_name` 与 ID 不改写。当前导入仍复制 STL 并在激活时解析为内存 `SurfaceMesh`；Mesh sidecar 属于 088。OCCT 几何修复与 Netgen 网格优化边界同步澄清，具体几何修复流程不纳入 063。
 - 2026-10-13：显示名实现评审发现页签序号受打开顺序影响；改为依据完整导入记录顺序计算，并补充关闭后稳定、逆序打开以及旧 schema 无效记录拒绝回归。macOS `cargo test --locked --workspace`、`cargo build --locked`、`cargo format --check`、`cargo lint --check` 全部通过；75/75 个 native / QML CTest 通过。复审无新增 findings；未运行 sanitizer、跨平台 CI、真实窗口或四档缩放基准。
+- 2026-10-13：显示名提交 `a2d7716` 后，四档缩放在 Qt 6.11.2 / macOS 26.3.1 下分别运行 `panta_qml_shell_module_test`，1、1.25、1.5、2 倍均 15/15 通过。四档 Metal 硬件离屏性能基准以 500k 三角形 STL 各测 31 次并正常结束，实测数据及计时边界见上方；可见 Cocoa 窗口重启因当前会话无可用屏幕未能复测，既有真实窗口证据见结构化诊断批次。无头 Shell 结果不描述为 GPU 通过。
+- 2026-10-13：063 收尾的独立 `gpt-6.1-sol` medium review 核实四档指标边界、确认 Cocoa 恢复证据引用正确，并要求补机器 / GPU 与预热边界；已登记 Apple M4、单次初始激活 / 渲染和 31 次测量样本。没有剩余 actionable findings。
 - 2026-10-08：规划后续写入导入后台化按 108 的工程写入协调和 109 的执行基础契约接入；沿用本任务的基础依赖，避免把历史导入基础与后续架构整理连成循环依赖。当时只读预检已完成，写入取消 / 提交截止点仍待实现；该缺口已由本次异步写入批次补齐。
 - 2026-10-13：确认导入写入后台化已完成 macOS 本地验收；取消 / 提交截止点、失败清理、容量拒绝恢复和真实窗口结果记于“确认写入异步批次”。本批未运行 sanitizer / CI；6.1 medium 独立复审未发现阻断，异步失败 / 通道断开 / teardown 的专用回归仍待补充。
 
@@ -181,7 +199,7 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 ## 完成摘要
 
-已完成任务登记、`.panta` 持久化边界说明、首期 HTML 状态参考，以及首期 STL 预检 / 确认导入 / 资产复制 / 重开恢复 / 任务树 / VTK 视口链路。结构化错误迁移、失败回归、异步预检与确认写入、Cargo 聚合 / 质量检查及 macOS 真实窗口验证已完成。当前补充 `display_name` 持久化和重复项展示；剩余四档缩放性能验收，任务状态保持 in-progress；保存资产的异步激活已有 073/080 实现。实际 Create Mesh 不属于本任务。
+已完成任务登记、`.panta` 持久化边界说明、HTML 状态参考，以及 STL 预检 / 确认导入 / 资产复制 / 重开恢复 / 任务树 / VTK 视口链路。结构化错误迁移、失败回归、异步预检与确认写入、`display_name` 持久化与重名展示、Cargo 聚合 / 质量检查、四档 Qt 缩放行为、四档 Metal 硬件离屏性能基准和既有 macOS 可见窗口验收均已完成。保存资产的异步激活由 073/080 实现；实际 Create Mesh 不属于本任务。任务验收完成。
 
 ## 契约更新（080，2026-09-26）
 
