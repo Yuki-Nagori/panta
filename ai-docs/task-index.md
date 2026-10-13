@@ -133,7 +133,7 @@ ai-docs/
 | 032 | [跨语言测试质量门禁与行为契约](task/032-cross-language-quality-gates.md) | 验证基础 | 011, 018, 019 | deferred |
 | 033 | [高 DPI 缩放与多显示屏基础](task/033-display-scaling-and-multi-monitor.md) | 应用平台扩展 | 005, 007 | planned |
 | 034 | [Rust Panta Artifact 解析与 TS/QM 编译入口](task/034-rust-panta-artifact-parser.md) | 应用平台扩展 | 001 | done |
-| 035 | [`.pa` 格式化器与格式校验器选型](task/035-pa-formatter-and-validator.md) | 应用平台扩展 | 034 | in-progress |
+| 035 | [`.pa` 格式化器与格式校验器选型](task/035-pa-formatter-and-validator.md) | 应用平台扩展 | 034 | done |
 | 037 | [软件内增量更新基础](task/037-incremental-update-foundation.md) | 交付基础 | 005, 008, 013, 023 | planned |
 | 042 | [三平台自有 C++ 统一 LLVM/Clang 工具链](task/042-unified-llvm-toolchain.md) | 验证基础 | 018, 032, 038 | in-progress |
 | 043 | [根目录质量入口与测试聚合](task/043-root-quality-runner.md) | 验证基础 | 011, 032 | done |

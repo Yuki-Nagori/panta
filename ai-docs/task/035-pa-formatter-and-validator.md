@@ -1,11 +1,11 @@
 # 035 — `.pa` 格式化器与格式校验器选型
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[034](034-rust-panta-artifact-parser.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-17
+- 创建 / 更新：2026-09-16 / 2026-10-13
 
 ## 目标与背景
 
@@ -35,7 +35,7 @@
 1. 冻结 `.pa` canonical format 与 `pa.md` 规则，建立正反夹具。
 2. 在隔离实验中评估 `yaml-format`/同类工具；若无损条件不成立，删除实验依赖，选择 AST formatter。
 3. 实现确定性格式化、只读 `check`、`format --check` 退出码和原子写回；复用 034 parser/schema，不重复解析。
-4. 将 formatter 接入 Cargo/CMake/CI 入口，记录 lint、失败路径和覆盖率证据。
+4. 将 formatter 接入根 Cargo 格式入口和 CI；由统一 runner 调用 CLI 检查生产 `.pa` 文件。
 
 ## 预计改动
 
@@ -52,16 +52,18 @@
 - [x] `format` 输出 LF、两格缩进、无引号标量和单一末尾换行；重复运行幂等，语义、值、注释和变量声明顺序不变。
 - [x] `format --check` 在 canonical 文件返回 0，在需要格式化的文件返回非零且不修改源文件；写回采用临时文件替换并同步临时文件。
 - [x] language/theme/variables fixtures 和 Unicode/URL/冒号/百分号/转义覆盖，CLI 任意 cwd 可用。
-- [ ] Cargo fmt/test/clippy 与 032 覆盖率门禁通过；022/025/030 只依赖共享 formatter/validator，不保留旁路实现。
+- [x] 根目录 `cargo format --check` 扫描 crates、resources 中的生产 `.pa` 文件并跳过刻意非规范的 fixtures；当前 DSL 实现通过 `cargo lint --check` 与 `cargo test --locked --workspace`。
+- [x] 032 当前为 deferred，其覆盖率目标不阻塞本任务；022/025/030 尚为 planned，消费者集成由各自任务验收，共用本任务交付的 `panta-dsl-core` API。
 
 ## 验证计划与结果
 
-记录 workspace 根目录的 `cargo test --locked`、`cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets --all-features -- -D warnings`、formatter 幂等/失败夹具、工具输出 diff 和任意 cwd CLI 运行。当前未执行。
+验收使用根目录 `cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace`；聚合格式检查覆盖 crates 与 resources 下的生产 `.pa` 文件并跳过 fixtures。定向 DSL 与 CLI 测试用于定位问题，CLI 任意 cwd、格式幂等和失败不写入由测试夹具覆盖。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-16 | 创建 `.pa` formatter/validator 任务并冻结 YAML 风格规则 | 有明确的复用工具评估和自研回退边界 | 仅文档完成，调研与实现未执行 |
 | 2026-09-17 | `cargo search yaml-format --limit 5`；`cargo test -p panta-dsl-core`；CLI `format`/`format --check` 任意临时 cwd | 选型、格式化幂等、Tab/占位符校验和原子写回通过 | crates.io 未返回 `yaml-format` formatter；共享 AST formatter 已实现；9 个核心测试、2 个 fixture 测试、临时文件格式化与只读检查通过 |
+| 2026-10-13 | `cargo format --check`；`cargo lint --check`；`cargo test --locked --workspace`；`cargo run --locked --target aarch64-apple-darwin --package panta-tests -- format --check` | 聚合格式入口覆盖生产 `.pa` 文件并保留非规范测试输入；workspace 质量门禁和显式 target 场景通过 | 格式检查、8 项 lint、workspace Rust 测试及 75/75 native/QML CTest 通过；两份语言资源规范化了空白和可安全去引号形式，TS 基线测试保持通过。独立评审发现并推动修复嵌套 Cargo target 路径与 fixture 扫描范围；修复后复核无新增问题 |
 
 ## 风险与回退
 
@@ -72,9 +74,12 @@
 - 2026-09-16：创建任务；`.pa` 采用 YAML 风格的层级与冒号，但不承诺通用 YAML 兼容。
 - 2026-09-16：formatter 与 validator 单独编排为 035，复用 034 AST，避免第三套 parser。
 - 2026-09-17（选型）：不引入通用 `yaml-format`。`.pa` 具有 `src/tr`、`st`、`numerus`、`type = expression` 等专用节点，且要求禁止 YAML 隐式类型、锚点和 flow collection；直接格式化 YAML 会丢失这些语义。采用共享 AST 的小型 formatter，输出两格缩进、LF 和唯一末尾换行；`check` 继续使用 034 parser 作为唯一校验入口。
+- 2026-10-13：根目录格式聚合入口新增生产 `.pa` 清单检查和修复，复用 `panta-dslc format` 并跳过 `fixtures` 目录中的刻意非规范输入；格式 CI 因已调用 `cargo format --check` 自动纳入该检查。022/025/030 的消费者接入属于各自实现任务，032 的覆盖率扩展保持 deferred，不再阻塞 035。
+- 2026-10-13：不增加独立 CMake 格式入口；`.pa` 是 Rust DSL 的源文件，由根 Cargo 质量 runner 调用唯一 CLI 校验，CI 复用同一入口，避免 CMake 再实现或重复调度 `.pa` 检查。
+- 2026-10-13（独立评审）：`gpt-6.1-sol` medium 复核完整 diff。首轮指出显式 target 下嵌套 Cargo 未传递 target，已改为显式传入宿主 triple 并通过对应 runner 命令验证；同时保留 fixtures 中有意非规范的解析输入。修复后的复核未发现新问题。
 
 ## 完成摘要
 
-当前 formatter 保留独立 // 注释并将其置于规范输出的头部之后；条目 comment/extra 字段仍保留在对应消息上。剩余 032 统一质量门禁与 022/025/030 消费方接入完成后再标记 done。
+formatter 已保留独立 `//` 注释并将其置于规范输出的头部之后；条目 `comment`/`extra` 字段保留在对应消息上。根目录 `cargo format --check` 现会调用共享 formatter 检查生产 `.pa` 文件，并保留 fixtures 中有意非规范的解析输入。032 覆盖率扩展与 022/025/030 消费方实现各由所属任务跟进，不阻塞本任务。
 
 CLI 读取源文件时先校验 UTF-8，非法字节返回稳定的 pa.invalid_utf8 诊断，不进入 parser 或写回流程。
