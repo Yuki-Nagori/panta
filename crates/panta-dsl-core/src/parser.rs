@@ -549,17 +549,15 @@ fn find_message_key(
     source: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<String> {
-    let key = find_text(body.clone(), Rule::bare_key)
-        .or_else(|| find_text(body, Rule::quoted).map(|value| value.trim_matches('"').to_owned()));
-    key.map(|value| decode_scalar(&value, source, diagnostics))
+    find_pair(body.clone(), Rule::bare_key)
+        .or_else(|| find_pair(body, Rule::quoted))
+        .map(|pair| decode_pair_value(pair, source, diagnostics))
 }
 
 fn field_value(body: Pair<'_, Rule>, source: &str, diagnostics: &mut Vec<Diagnostic>) -> String {
-    find_text(body.clone(), Rule::quoted)
-        .map(|value| decode_scalar(value.trim_matches('"'), source, diagnostics))
-        .or_else(|| {
-            find_text(body, Rule::scalar).map(|value| decode_scalar(&value, source, diagnostics))
-        })
+    find_pair(body.clone(), Rule::quoted)
+        .or_else(|| find_pair(body, Rule::scalar))
+        .map(|pair| decode_pair_value(pair, source, diagnostics))
         .unwrap_or_default()
 }
 
@@ -572,7 +570,7 @@ fn translation_value(
         return array
             .into_inner()
             .filter(|pair| pair.as_rule() == Rule::quoted)
-            .map(|pair| decode_scalar(pair.as_str().trim_matches('"'), source, diagnostics))
+            .map(|pair| decode_pair_value(pair, source, diagnostics))
             .collect();
     }
     vec![field_value(body, source, diagnostics)]
@@ -607,18 +605,41 @@ fn typed_entry(
     }
     let value_type =
         find_text(value_pair.clone(), Rule::type_name).and_then(|value| parse_value_type(&value));
-    let expression = find_text(value_pair, Rule::scalar)
-        .map(|value| decode_scalar(&value, source, diagnostics))
+    let expression = find_pair(value_pair, Rule::scalar)
+        .map(|pair| decode_pair_value(pair, source, diagnostics))
         .unwrap_or_default();
     (value_type, expression)
 }
 
-fn decode_scalar(raw: &str, source: &str, diagnostics: &mut Vec<Diagnostic>) -> String {
+fn decode_pair_value(
+    pair: Pair<'_, Rule>,
+    source: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> String {
+    let span = pair.as_span();
+    let raw = pair.as_str();
+    if pair.as_rule() == Rule::quoted {
+        let value = raw
+            .strip_prefix('"')
+            .and_then(|value| value.strip_suffix('"'))
+            .unwrap_or(raw);
+        decode_scalar(value, source, span.start() + 1, diagnostics)
+    } else {
+        decode_scalar(raw, source, span.start(), diagnostics)
+    }
+}
+
+fn decode_scalar(
+    raw: &str,
+    source: &str,
+    source_offset: usize,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> String {
     let raw = raw.trim_end_matches([' ', '\t']);
     let mut result = String::with_capacity(raw.len());
-    let mut escaped = false;
-    for character in raw.chars() {
-        if escaped {
+    let mut escape_offset = None;
+    for (relative_offset, character) in raw.char_indices() {
+        if let Some(escape_start) = escape_offset {
             match character {
                 'n' => result.push('\n'),
                 'r' => result.push('\r'),
@@ -629,25 +650,25 @@ fn decode_scalar(raw: &str, source: &str, diagnostics: &mut Vec<Diagnostic>) -> 
                         diagnostics,
                         "pa.invalid_escape",
                         format!("unsupported escape \\{character}"),
-                        0,
+                        source_offset + escape_start,
                         source,
                     );
                     result.push(character);
                 }
             }
-            escaped = false;
+            escape_offset = None;
         } else if character == '\\' {
-            escaped = true;
+            escape_offset = Some(relative_offset);
         } else {
             result.push(character);
         }
     }
-    if escaped {
+    if let Some(escape_start) = escape_offset {
         push_diagnostic(
             diagnostics,
             "pa.invalid_escape",
             "trailing escape",
-            raw.len().saturating_sub(1),
+            source_offset + escape_start,
             source,
         );
     }
