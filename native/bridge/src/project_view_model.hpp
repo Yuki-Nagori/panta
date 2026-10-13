@@ -59,6 +59,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
         QString importPreviewDimensions READ importPreviewDimensions NOTIFY importPreviewChanged)
     Q_PROPERTY(quint64 importPreviewTriangleCount READ importPreviewTriangleCount NOTIFY
                    importPreviewChanged)
+    Q_PROPERTY(bool importPending READ importPending NOTIFY importPendingChanged)
+    Q_PROPERTY(quint64 importRequestId READ importRequestId NOTIFY importPendingChanged)
     Q_PROPERTY(QVariantList openDocuments READ openDocuments NOTIFY documentsChanged)
     Q_PROPERTY(QString activeDocumentId READ activeDocumentId NOTIFY activeDocumentChanged)
     Q_PROPERTY(QString activeDocumentTitle READ activeDocumentTitle NOTIFY activeDocumentChanged)
@@ -99,6 +101,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] const QString& importPreviewName() const;
     [[nodiscard]] const QString& importPreviewDimensions() const;
     [[nodiscard]] quint64 importPreviewTriangleCount() const;
+    [[nodiscard]] bool importPending() const;
+    [[nodiscard]] quint64 importRequestId() const;
 
     [[nodiscard]] QVariantList meshTypes() const;
     [[nodiscard]] QString defaultMeshType() const;
@@ -139,9 +143,14 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 示例模型命令：修改显示名称并将工程标记为 dirty。
     Q_INVOKABLE bool renameProject(const QString& name);
 
-    /// 读取、复制并记录 STL；源文件的绝对路径只作为一次性输入，不写入清单。
-    Q_INVOKABLE bool importStl(const QString& path, const QString& meshType, const QString& units,
-                               bool showImportLog);
+    /// 同步导入供非 GUI 调用与行为测试使用；QML 必须使用 beginImportStl。
+    bool importStl(const QString& path, const QString& meshType, const QString& units,
+                   bool showImportLog);
+    /// 启动 Rust 后台确认导入；完成由 projectImportFinished 通知。
+    Q_INVOKABLE bool beginImportStl(const QString& path, const QString& meshType,
+                                    const QString& units, bool showImportLog);
+    /// 请求取消导入；manifest 替换阶段开始后返回 false，完成回执仍由 ViewModel 消费。
+    Q_INVOKABLE bool cancelImport();
 
     /// 发起 Rust 后台预检；返回请求是否被接受，完成由 importPreviewFinished 通知。
     /// 新选择替换旧请求，关闭弹窗需调用 cancelImportPreview，不等待解析线程。
@@ -198,6 +207,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void gateLocationSettingsConfirmationPendingChanged();
     void gateLocationSettingsConfirmationFinished(bool succeeded);
     void projectImported(const QString& path);
+    void importPendingChanged();
+    void projectImportFinished(quint64 requestId, bool succeeded);
     void importPreviewChanged();
     /// 当前请求完成且发布快照后触发；取消或在通知中被替换的请求不触发。
     void importPreviewFinished(quint64 requestId, bool succeeded);
@@ -222,6 +233,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
+    bool publish_import(const panta::ffi::ProjectImport& imported);
     void refreshPlanSettings();
     enum class ConfirmationKind : std::uint8_t {
         None,
@@ -246,6 +258,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void drain_activations();
     void sync_activation_poll();
     void finish_import_preview();
+    void finish_stl_import();
 
     QString m_defaultLocation;
     const QVariantList m_analysisSequences;
@@ -272,6 +285,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     QString m_importPreviewName;
     QString m_importPreviewDimensions;
     quint64 m_importPreviewTriangleCount = 0;
+    quint64 m_importRequest = 0;
+    bool m_importPending = false;
     QVector<DocumentEntry> m_documents;
     QString m_activeDocumentId;
     /// Rust 当前方案快照的 Qt 投影，不拥有独立领域选择。
@@ -280,6 +295,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_activeMesh;
     QMap<QString, quint64> m_activationAttempts;
     QTimer m_importPreviewPoll;
+    QTimer m_stlImportPoll;
     quint64 m_previewRequest = 0;
     bool m_importPreviewPending = false;
     QTimer m_activationPoll;

@@ -10,6 +10,7 @@ DialogWindow {
 
     required property ProjectViewModel projectModel
     property string sourcePath: ""
+    property var pendingImportRequestId: 0
 
     width: Theme.importDialogWidth
     height: Theme.importDialogHeight
@@ -21,8 +22,11 @@ DialogWindow {
     readonly property var unitValues: ["millimeters", "centimeters", "inches"]
 
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
+            pendingImportRequestId = 0;
             projectModel.cancelImportPreview();
+            projectModel.cancelImport();
+        }
     }
 
     function resetFields() {
@@ -37,6 +41,7 @@ DialogWindow {
 
     function open() {
         resetFields();
+        pendingImportRequestId = 0;
         centerOnOwner();
         visible = true;
         requestActivate();
@@ -49,9 +54,8 @@ DialogWindow {
     function submit() {
         if (!sourcePath || !projectModel.importPreviewReady)
             return;
-        if (projectModel.importStl(sourcePath, meshTypes[meshTypeCombo.currentIndex].id, unitValues[unitsCombo.currentIndex], showImportLogCheckBox.checked)) {
-            dialog.close();
-        }
+        if (projectModel.beginImportStl(sourcePath, meshTypes[meshTypeCombo.currentIndex].id, unitValues[unitsCombo.currentIndex], showImportLogCheckBox.checked))
+            pendingImportRequestId = projectModel.importRequestId;
     }
 
     function errorMessage() {
@@ -112,6 +116,7 @@ DialogWindow {
                     }
                     ThemedButton {
                         text: qsTranslate("UiCommonNavigation", "Browse")
+                        enabled: !dialog.projectModel.importPending
                         iconName: "open"
                         preserveIconColors: true
                         contentPadding: Theme.spacingSmall
@@ -128,6 +133,7 @@ DialogWindow {
                 ThemedComboBox {
                     id: meshTypeCombo
                     Layout.fillWidth: true
+                    enabled: !dialog.projectModel.importPending
                     model: dialog.meshTypes.map(entry => qsTranslate("MeshType", entry.sourceText))
                     Accessible.name: qsTranslate("ImportDialogForm", "Mesh type")
                 }
@@ -139,6 +145,7 @@ DialogWindow {
                 ThemedComboBox {
                     id: unitsCombo
                     Layout.fillWidth: true
+                    enabled: !dialog.projectModel.importPending
                     model: [qsTranslate("UiCommonUnitMillimeters", "Millimeters"), qsTranslate("UiCommonUnitCentimeters", "Centimeters"), qsTranslate("UiCommonUnitInches", "Inches")]
                     Accessible.name: qsTranslate("ImportDialogForm", "Units")
                 }
@@ -160,6 +167,7 @@ DialogWindow {
 
                 text: qsTranslate("ImportDialogForm", "Show import log")
                 Layout.fillWidth: true
+                enabled: !dialog.projectModel.importPending
             }
 
             ThemedLabel {
@@ -170,6 +178,14 @@ DialogWindow {
                 textSize: Theme.fontSmall
                 textColor: Theme.colorTextMuted
                 wrapMode: Text.Wrap
+            }
+
+            ThemedLabel {
+                Layout.fillWidth: true
+                visible: dialog.projectModel.importPending
+                text: qsTranslate("ImportDialogStatus", "Adding the STL file to the project…")
+                textSize: Theme.fontSmall
+                textColor: Theme.colorTextMuted
             }
 
             ThemedLabel {
@@ -192,6 +208,7 @@ DialogWindow {
 
                 ThemedButton {
                     text: qsTranslate("UiCommonHelp", "Help")
+                    enabled: !dialog.projectModel.importPending
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     borderColor: Theme.colorPanelLine
@@ -203,10 +220,10 @@ DialogWindow {
                 }
 
                 ThemedButton {
-                    text: qsTranslate("DialogAction", "OK")
+                    text: dialog.projectModel.importPending ? qsTranslate("ImportDialogStatus", "Importing…") : qsTranslate("DialogAction", "OK")
                     objectName: "importAccept"
                     primaryAction: true
-                    enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady
+                    enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady && !dialog.projectModel.importPending
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     onClicked: dialog.submit()
@@ -235,6 +252,16 @@ DialogWindow {
                 return;
             dialog.sourcePath = selectedPath;
             dialog.projectModel.inspectStl(selectedPath);
+        }
+    }
+
+    Connections {
+        target: dialog.projectModel
+        function onProjectImportFinished(requestId, succeeded) {
+            if (succeeded && dialog.visible && requestId === dialog.pendingImportRequestId) {
+                dialog.pendingImportRequestId = 0;
+                dialog.close();
+            }
         }
     }
 }

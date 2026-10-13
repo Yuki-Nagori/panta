@@ -81,6 +81,38 @@ pub(super) fn project_service_import_stl(
         .map(project_import)
 }
 
+pub(super) fn project_service_begin_stl_import(
+    service: &mut ProjectService,
+    source: String,
+    mesh_type: String,
+    units: String,
+    show_import_log: bool,
+) -> Result<u64, panta_core::project::ProjectError> {
+    service.service.begin_stl_import(
+        std::path::Path::new(&source),
+        &mesh_type,
+        &units,
+        show_import_log,
+    )
+}
+
+pub(super) fn project_service_finish_stl_import(
+    service: &mut ProjectService,
+    request: u64,
+) -> Result<Option<bridge::ProjectImport>, panta_core::project::ProjectError> {
+    service
+        .service
+        .finish_stl_import(request)
+        .map(|record| record.map(project_import))
+}
+
+pub(super) fn project_service_cancel_stl_import(
+    service: &mut ProjectService,
+    request: u64,
+) -> bool {
+    service.service.cancel_stl_import(request)
+}
+
 pub(super) fn project_service_imports(
     service: &ProjectService,
 ) -> Result<Vec<bridge::ProjectImport>, panta_core::project::ProjectError> {

@@ -150,6 +150,42 @@ pub(super) fn project_service_cancel_stl_preview(
     service.service.cancel_stl_preview(request)
 }
 
+pub(super) fn project_service_begin_stl_import_response(
+    service: &mut ProjectService,
+    source: String,
+    mesh_type: String,
+    units: String,
+    show_import_log: bool,
+) -> bridge::StlPreviewRequestResult {
+    crate::begin_stl_import(service, source, mesh_type, units, show_import_log).into()
+}
+
+pub(super) fn project_service_finish_stl_import_response(
+    service: &mut ProjectService,
+    request: u64,
+) -> bridge::StlImportPoll {
+    match crate::project_service_finish_stl_import(service, request) {
+        Ok(Some(record)) => bridge::StlImportPoll {
+            ready: true,
+            value: record,
+            ..Default::default()
+        },
+        Ok(None) => bridge::StlImportPoll::default(),
+        Err(error) => bridge::StlImportPoll {
+            ready: true,
+            error: error.into(),
+            ..Default::default()
+        },
+    }
+}
+
+pub(super) fn project_service_cancel_stl_import_response(
+    service: &mut ProjectService,
+    request: u64,
+) -> bool {
+    crate::cancel_stl_import(service, request)
+}
+
 pub(super) fn default_material_response() -> bridge::MaterialDefinitionResult {
     crate::default_material().into()
 }
@@ -296,6 +332,55 @@ mod tests {
             );
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
+    }
+
+    fn poll_import(service: &mut ProjectService, request: u64) -> bridge::StlImportPoll {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let result = project_service_finish_stl_import_response(service, request);
+            if result.ready {
+                return result;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "bridge import timed out"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    fn confirmed_import_bridge_returns_committed_record() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let fixture = crate::temp_directory::Fixture::new()?;
+        let source = fixture.root.join("bridge.stl");
+        std::fs::write(&source, "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+        let mut service = crate::project_service_new();
+        let project = project_service_create_response(
+            &mut service,
+            fixture.root.display().to_string(),
+            "Bridge".into(),
+        );
+        assert!(project.error.code.is_empty());
+        let preview =
+            project_service_begin_stl_preview_response(&mut service, source.display().to_string());
+        assert!(preview.error.code.is_empty());
+        assert!(poll_preview(&mut service, preview.value).ready);
+        let request = project_service_begin_stl_import_response(
+            &mut service,
+            source.display().to_string(),
+            "solid-3d".into(),
+            "millimeters".into(),
+            false,
+        );
+        assert!(request.error.code.is_empty());
+        let imported = poll_import(&mut service, request.value);
+        assert!(imported.error.code.is_empty());
+        assert!(imported.ready);
+        assert_eq!(imported.value.id, "import-1");
+        assert_eq!(imported.value.source_name, "bridge.stl");
+        assert_eq!(project_service_current_response(&service).value.revision, 1);
+        Ok(())
     }
 
     #[test]

@@ -332,6 +332,12 @@ impl StlImportSession {
         self.preview = None;
     }
 
+    pub fn has_preview_for(&self, path: &Path) -> bool {
+        self.preview
+            .as_ref()
+            .is_some_and(|preview| preview.path == path)
+    }
+
     pub fn preview(&mut self, path: &Path) -> Result<StlImportPreview, ImportError> {
         match self.preview_checked(path, || false) {
             Ok(preview) => Ok(preview),
@@ -369,19 +375,45 @@ impl StlImportSession {
     }
 
     pub fn prepare(&mut self, path: &Path) -> Result<PreparedStl, ImportError> {
-        let input = read_source(path)?;
+        match self.prepare_checked(path, || false) {
+            Ok(prepared) => Ok(prepared),
+            Err(CheckedReadError::Failed(error)) => Err(error),
+            Err(CheckedReadError::Cancelled(_)) => {
+                unreachable!("an import preparation that never checks cancellation cannot cancel")
+            }
+        }
+    }
+
+    /// 后台确认导入复核源快照时可在分块读取边界取消。
+    /// 源快照一致后复用预检网格，避免重复解析；取消或变化不消耗原预览。
+    pub fn prepare_checked(
+        &mut self,
+        path: &Path,
+        is_cancelled: impl Fn() -> bool,
+    ) -> Result<PreparedStl, CheckedReadError> {
+        let input = read_source_checked(path, &is_cancelled)?;
         if input.format != ImportFormat::Stl {
-            return Err(ImportError::UnsupportedFormat(path.display().to_string()));
+            return Err(CheckedReadError::Failed(ImportError::UnsupportedFormat(
+                path.display().to_string(),
+            )));
         }
         if let Some(cached) = self.preview.as_ref().filter(|cached| cached.path == path) {
             if cached.bytes != input.bytes {
-                return Err(ImportError::SourceChanged(path.display().to_string()));
+                return Err(CheckedReadError::Failed(ImportError::SourceChanged(
+                    path.display().to_string(),
+                )));
+            }
+            if is_cancelled() {
+                return Err(CheckedReadError::Cancelled(path.display().to_string()));
             }
             if let Some(confirmed) = self.preview.take() {
                 return Ok(confirmed);
             }
         }
-        let mesh = parse_stl_snapshot(&input)?;
+        let mesh = parse_stl_snapshot(&input).map_err(CheckedReadError::Failed)?;
+        if is_cancelled() {
+            return Err(CheckedReadError::Cancelled(path.display().to_string()));
+        }
         Ok(PreparedStl {
             path: input.path,
             source_name: input.source_name,

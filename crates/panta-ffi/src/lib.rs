@@ -13,15 +13,16 @@ use project_response::{
     project_service_begin_fill_settings_confirmation_response,
     project_service_begin_gate_location_settings_confirmation_response,
     project_service_begin_material_confirmation_response,
-    project_service_begin_stl_preview_response, project_service_cancel_stl_preview,
+    project_service_begin_stl_import_response, project_service_begin_stl_preview_response,
+    project_service_cancel_stl_import_response, project_service_cancel_stl_preview,
     project_service_create_response, project_service_current_response,
     project_service_execute_response, project_service_finish_fill_settings_confirmation_response,
     project_service_finish_gate_location_settings_confirmation_response,
     project_service_finish_material_confirmation_response,
-    project_service_finish_stl_preview_response, project_service_import_stl_response,
-    project_service_imports_response, project_service_mesh_snapshot_for_import_response,
-    project_service_open_response, project_service_save_response,
-    project_service_set_analysis_sequence_response,
+    project_service_finish_stl_import_response, project_service_finish_stl_preview_response,
+    project_service_import_stl_response, project_service_imports_response,
+    project_service_mesh_snapshot_for_import_response, project_service_open_response,
+    project_service_save_response, project_service_set_analysis_sequence_response,
 };
 mod support;
 pub use support::Session;
@@ -58,16 +59,18 @@ use project::{
     project_service_activate_mesh_document, project_service_begin_asset_activation,
     project_service_begin_fill_settings_confirmation,
     project_service_begin_gate_location_settings_confirmation,
-    project_service_begin_material_confirmation, project_service_cancel_asset_activation,
-    project_service_create, project_service_current, project_service_deactivate_mesh_document,
+    project_service_begin_material_confirmation,
+    project_service_begin_stl_import as begin_stl_import, project_service_cancel_asset_activation,
+    project_service_cancel_stl_import as cancel_stl_import, project_service_create,
+    project_service_current, project_service_deactivate_mesh_document,
     project_service_drain_asset_activations, project_service_execute,
     project_service_finish_fill_settings_confirmation,
     project_service_finish_gate_location_settings_confirmation,
-    project_service_finish_material_confirmation, project_service_import_stl,
-    project_service_imports, project_service_mesh_snapshot_for_import, project_service_new,
-    project_service_open, project_service_plan_settings, project_service_release_mesh_document,
-    project_service_resident_mesh_ids, project_service_save, project_service_set_analysis_sequence,
-    stl_import_preview,
+    project_service_finish_material_confirmation, project_service_finish_stl_import,
+    project_service_import_stl, project_service_imports, project_service_mesh_snapshot_for_import,
+    project_service_new, project_service_open, project_service_plan_settings,
+    project_service_release_mesh_document, project_service_resident_mesh_ids, project_service_save,
+    project_service_set_analysis_sequence, stl_import_preview,
 };
 mod mesh;
 use mesh::{mesh_coordinates, mesh_validate_tet};
@@ -350,6 +353,14 @@ pub mod bridge {
         pub error: ProjectDiagnostic,
     }
 
+    /// 确认导入的终态轮询；ready=false 且诊断为空表示仍在写入。
+    #[derive(Default)]
+    pub struct StlImportPoll {
+        pub ready: bool,
+        pub value: ProjectImport,
+        pub error: ProjectDiagnostic,
+    }
+
     /// 内置材料摘要结果。
     #[derive(Default)]
     pub struct MaterialDefinitionResult {
@@ -555,6 +566,21 @@ pub mod bridge {
             request: u64,
         ) -> StlPreviewPoll;
         fn project_service_cancel_stl_preview(service: &mut ProjectService, request: u64) -> bool;
+        #[rust_name = "project_service_begin_stl_import_response"]
+        fn project_service_begin_stl_import(
+            service: &mut ProjectService,
+            source: String,
+            mesh_type: String,
+            units: String,
+            show_import_log: bool,
+        ) -> StlPreviewRequestResult;
+        #[rust_name = "project_service_finish_stl_import_response"]
+        fn project_service_finish_stl_import(
+            service: &mut ProjectService,
+            request: u64,
+        ) -> StlImportPoll;
+        #[rust_name = "project_service_cancel_stl_import_response"]
+        fn project_service_cancel_stl_import(service: &mut ProjectService, request: u64) -> bool;
         /// 已驻留 Mesh 的一次性显示快照；只由文档激活路径调用，不用于逐帧读取。
         #[rust_name = "project_service_mesh_snapshot_for_import_response"]
         fn project_service_mesh_snapshot_for_import(

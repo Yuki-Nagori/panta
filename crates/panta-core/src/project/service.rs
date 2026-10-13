@@ -31,6 +31,8 @@ pub struct ProjectService {
     pub(super) pending_metadata: Option<storage::PendingMetadataWrite>,
     pub(super) pending_preview: Option<preview::PendingPreview>,
     pub(super) preview_request: u64,
+    pub(super) pending_import: Option<super::import::PendingImport>,
+    pub(super) import_request: u64,
     pub(super) execution: crate::execution::ProjectExecution,
 }
 
@@ -44,6 +46,11 @@ impl ProjectService {
         if self.pending_metadata.is_some() {
             return Err(ProjectError::CommandInvalid(
                 "metadata confirmation pending".to_owned(),
+            ));
+        }
+        if self.pending_import.is_some() {
+            return Err(ProjectError::CommandInvalid(
+                "STL import pending".to_owned(),
             ));
         }
         Ok(())

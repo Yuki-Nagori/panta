@@ -369,6 +369,42 @@ TEST(ProjectViewModelTest, PreviewCancellationReplacementAndProjectSwitchIgnoreO
     EXPECT_EQ(model.currentName(), QStringLiteral("Other"));
 }
 
+TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelRequest) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto path = fixture.filePath(QStringLiteral("part.stl"));
+    QFile source(path);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(model.inspectStl(path));
+    QTRY_VERIFY(!model.importPreviewPending());
+    ASSERT_TRUE(model.importPreviewReady());
+    QSignalSpy finished(&model, &ProjectViewModel::projectImportFinished);
+
+    ASSERT_TRUE(model.beginImportStl(path, QStringLiteral("solid-3d"),
+                                     QStringLiteral("millimeters"), false));
+    EXPECT_TRUE(model.importPending() || finished.count() == 1);
+    QTRY_COMPARE(finished.count(), 1);
+    EXPECT_TRUE(finished.at(0).at(1).toBool());
+    EXPECT_FALSE(model.importPending());
+    EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("part.stl")});
+    EXPECT_EQ(model.openDocuments().size(), 2);
+    EXPECT_EQ(model.activeDocumentId(), QStringLiteral("import-1"));
+    EXPECT_NE(model.mesh_snapshot(), nullptr);
+    EXPECT_EQ(model.errorCode(), QString{});
+
+    QFile manifest(model.currentPath());
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    const auto data = manifest.readAll();
+    EXPECT_TRUE(data.contains("\"id\": \"import-1\""));
+    EXPECT_TRUE(QFile::exists(QDir(fixture.filePath(QStringLiteral("Demo")))
+                                  .filePath(QStringLiteral("assets/imports/0001-part.stl"))));
+}
+
 TEST(ProjectViewModelTest, PreviewNotificationsCanReplaceOrCancelTheCompletedRequest) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());

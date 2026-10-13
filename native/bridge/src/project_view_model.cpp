@@ -117,6 +117,8 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
             &ProjectViewModel::finish_metadata_confirmation);
     m_importPreviewPoll.setInterval(10);
     connect(&m_importPreviewPoll, &QTimer::timeout, this, &ProjectViewModel::finish_import_preview);
+    m_stlImportPoll.setInterval(10);
+    connect(&m_stlImportPoll, &QTimer::timeout, this, &ProjectViewModel::finish_stl_import);
     reset_documents();
 }
 
@@ -503,6 +505,10 @@ quint64 ProjectViewModel::importPreviewTriangleCount() const {
     return m_importPreviewTriangleCount;
 }
 
+bool ProjectViewModel::importPending() const { return m_importPending; }
+
+quint64 ProjectViewModel::importRequestId() const { return m_importRequest; }
+
 bool ProjectViewModel::createProject(const QString& rawName, const QString& rawLocation) {
     clearError();
     std::string name;
@@ -612,7 +618,73 @@ bool ProjectViewModel::importStl(const QString& rawPath, const QString& rawMeshT
     if (!result.error.code.empty()) {
         return fail(result.error);
     }
-    const auto& imported = result.value;
+    return publish_import(result.value);
+}
+
+bool ProjectViewModel::beginImportStl(const QString& rawPath, const QString& rawMeshType,
+                                      const QString& rawUnits, bool showImportLog) {
+    clearError();
+    std::string path;
+    std::string meshType;
+    std::string units;
+    QString conversionError;
+    if (!toBoundaryText(QDir::cleanPath(QDir::fromNativeSeparators(rawPath.trimmed())), &path,
+                        &conversionError) ||
+        !toBoundaryText(rawMeshType.trimmed(), &meshType, &conversionError) ||
+        !toBoundaryText(rawUnits.trimmed(), &units, &conversionError)) {
+        return fail(conversionError);
+    }
+    const auto result = panta::ffi::project_service_begin_stl_import(*m_service, path, meshType,
+                                                                     units, showImportLog);
+    if (!result.error.code.empty()) {
+        return fail(result.error);
+    }
+    m_importRequest = result.value;
+    m_importPending = true;
+    m_stlImportPoll.start();
+    emit importPendingChanged();
+    return true;
+}
+
+bool ProjectViewModel::cancelImport() {
+    if (!m_importPending || m_importRequest == 0) {
+        return false;
+    }
+    if (!panta::ffi::project_service_cancel_stl_import(*m_service, m_importRequest)) {
+        return false;
+    }
+    m_stlImportPoll.stop();
+    m_importRequest = 0;
+    m_importPending = false;
+    emit importPendingChanged();
+    return true;
+}
+
+void ProjectViewModel::finish_stl_import() {
+    const auto request = m_importRequest;
+    if (!m_importPending || request == 0) {
+        m_stlImportPoll.stop();
+        return;
+    }
+    const auto result = panta::ffi::project_service_finish_stl_import(*m_service, request);
+    if (!result.ready) {
+        return;
+    }
+    m_stlImportPoll.stop();
+    m_importRequest = 0;
+    m_importPending = false;
+    bool succeeded = false;
+    if (!result.error.code.empty()) {
+        fail(result.error);
+        cancelImportPreview();
+    } else {
+        succeeded = publish_import(result.value);
+    }
+    emit projectImportFinished(request, succeeded);
+    emit importPendingChanged();
+}
+
+bool ProjectViewModel::publish_import(const panta::ffi::ProjectImport& imported) {
     const auto snapshot = panta::ffi::project_service_current(*m_service);
     if (!applySnapshot(snapshot) || !refreshImports()) {
         return false;

@@ -203,6 +203,14 @@ select-file:
   src: Select an STL file
   tr: 请选择 STL 文件
 
+adding-to-project:
+  src: Adding the STL file to the project…
+  tr: 正在将 STL 文件添加到工程…
+
+importing:
+  src: Importing…
+  tr: 正在导入…
+
 [ImportDialogHelp]
 help-text:
   src: The source file is copied into the project assets so the import can be reopened later.

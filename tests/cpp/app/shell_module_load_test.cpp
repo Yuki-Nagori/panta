@@ -573,7 +573,7 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(project->importStl(sourcePath, QStringLiteral("dual-domain"),
                                    QStringLiteral("millimeters"), false));
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
-        QVERIFY(dialog->isVisible());
+        QVERIFY(dialog->property("visible").toBool());
         const auto initial = project->planSettings();
         QSignalSpy finished(project,
                             &panta::bridge::ProjectViewModel::materialConfirmationFinished);
@@ -843,6 +843,45 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
         QVERIFY(!model->importPreviewReady());
         QVERIFY(!accept->property("enabled").toBool());
+    }
+
+    void import_completion_does_not_close_a_reopened_dialog() {
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        const auto path = fixture.filePath(QStringLiteral("reopen.stl"));
+        QFile source(path);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QVERIFY(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n") > 0);
+        source.close();
+
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* root = engine.rootObjects().constFirst();
+        auto* dialog = root->findChild<QObject*>(QStringLiteral("importDialog"));
+        auto* model =
+            root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        QVERIFY(dialog && model);
+        QVERIFY(model->createProject(QStringLiteral("Reopen"), fixture.path()));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        dialog->setProperty("sourcePath", path);
+        QVERIFY(model->inspectStl(path));
+        QTRY_VERIFY(model->importPreviewReady());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QVERIFY(model->importPending());
+        const auto request = dialog->property("pendingImportRequestId").toULongLong();
+        QVERIFY(request > 0);
+
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QVERIFY(dialog->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(model, "projectImportFinished", Qt::DirectConnection,
+                                          Q_ARG(quint64, request), Q_ARG(bool, true)));
+        QVERIFY(dialog->property("visible").toBool());
+        QTRY_VERIFY(!model->importPending());
+        QVERIFY(dialog->property("visible").toBool());
+        QVERIFY(dialog->property("pendingImportRequestId").toULongLong() == 0);
     }
 
     void layers_tab_row_tracks_imports_and_reopened_projects() {
