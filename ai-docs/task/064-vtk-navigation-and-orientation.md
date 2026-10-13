@@ -1,138 +1,116 @@
 # 064 — VTK 视口导航、笛卡尔坐标系与六面体定位
 
-- 状态：in-progress
+- 状态：implemented
 - 阶段：应用平台扩展
 - 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)
+- 关联任务：[065](065-vtk-zoom-and-cube-transition.md)（交互绑定与方向过渡）
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-22 / 2026-10-02
+- 创建 / 更新：2026-09-22 / 2026-10-13
 
-## 目标与背景
+## 目标
 
-扩展当前 VTK 视口的三维导航能力：在视口右下角显示跟随相机方向的笛卡尔坐标系，在右上角显示可交互的六面体定位器，并支持通过视口拖拽旋转整体几何视图。目标是让用户能够快速理解当前空间方向、跳转到标准正交方向，并围绕模型进行连续观察。
+在 VTK WebGPU 原生视口中提供右下角笛卡尔坐标轴、右上角六面体方向定位器和鼠标拖拽观察旋转。用户可以识别当前空间方向、切换到标准正交视角，并围绕模型连续观察。
 
-这里的“整体几何体旋转”首期解释为相机围绕当前焦点的轨道 / trackball 旋转：不修改 STL 顶点、Mesh IR 或工程 import record，不产生工程 dirty，也不把每一帧鼠标移动写入 `.panta`。如果后续需要真正修改几何坐标或保存建模变换，另建独立任务。
+本任务中的“旋转”是相机围绕焦点旋转，不修改 STL 顶点、Mesh IR 或工程导入记录，不产生工程 dirty，也不将逐帧视角变化写入 `.panta`。模型变换与视角持久化不在本任务范围。
 
-当前视口使用 VTK WebGPU 原生 surface；原生渲染层位于 Qt Quick 内容之上，QML 不能直接覆盖视口矩形。因此坐标系和六面体必须优先评估 VTK 同一 render window 内的 overlay / orientation marker 能力；不得先实现一套看似可用但实际被原生 surface 遮挡的 QML 浮层。
+## 设计边界
 
-## 必读
+- 视口使用 VTK WebGPU 原生 surface，覆盖在 Qt Quick 内容之上；坐标轴和方向定位器必须在同一 VTK render window 内绘制，不能用会被遮挡的 QML 浮层或第二套 Qt overlay。
+- 当前锁定的 VTK SDK 不提供适用的现成 orientation marker、annotated cube 或 trackball style。实现使用 VTK renderer、actor 和自有输入 / 相机逻辑；所有 VTK 类型均留在 `native/visualization/src/vtk/`，公共 `CaeViewport` 接口不暴露 VTK 类型。
+- 坐标轴表示世界坐标系。方向定位器首期支持六个正交面；边、角命中不属于本任务验收范围。方向标签由 VTK 适配层提供英文 ASCII 文案，不经过 QML 或翻译字典。
+- 鼠标职责沿用 [065](065-vtk-zoom-and-cube-transition.md)：右键拖动旋转主相机，左键点击六面体；方向切换使用 260 ms 的平滑过渡。滚轮缩放由 065 验收，本任务继续负责活动过渡期间的真实 GPU 资源销毁覆盖。
+- 拖拽只改变相机姿态。Rust 领域状态、Mesh IR、工程资产及 `.panta` manifest 不因浏览视角变化而修改。
+- 原生 surface 的输入、逻辑坐标到像素坐标换算、DPR、窗口切换和资源释放由 C++ / VTK 适配层处理；QML 只消费后端中立的视口接口。
+
+## 参考资料
 
 - [VTK WebGPU 硬件窗口与渲染数据](../standards/vtk.md)
 - [可视化、RenderScene 与原生视口](../architecture/visualization.md)
-- [组件与主题模块](../modules/qml-components-and-theme.md)
 - [分层与依赖方向](../standards/layering.md)
-- [注释规范](../standards/comments.md)
-- [仓库文件规范](../standards/repository-hygiene.md)
 - [验证与评审](../standards/validation-and-review.md)
-- [提交规范](../standards/commits.md)
+- [注释规范](../standards/comments.md)
 
-## 范围与非目标
+## 范围
 
 包含：
 
-- 在 VTK 原生视口右下角显示笛卡尔坐标系，明确 X / Y / Z 轴方向、颜色和可见性边界；坐标系随相机旋转同步更新，并适配 resize、DPR、隐藏 / 恢复。
-- 在 VTK 原生视口右上角显示六面体定位器；至少支持六个标准面对应的正交视图，面标签和当前方向状态可读；六个方向显示轴向和英文方向。
-- 点击六面体面后将相机平滑或确定性地切换到对应方向；连续点击、快速重复点击和当前已在目标方向时不产生异常跳转。
-- 在视口内实现鼠标拖拽的整体观察旋转，围绕当前焦点保持合理旋转中心、方向和灵敏度；默认欢迎字样与导入 STL 都可旋转。
-- 统一处理原生 surface 的鼠标坐标、视口尺寸、设备像素比、窗口重建和资源销毁顺序；QML 只接收必要的语义状态，不直接操作 VTK。
-- 为相机 / 导航状态定义后端中立边界；VTK、平台输入和 overlay widget 类型仅出现在 `native/visualization/src/vtk/` 或平台桥接实现中。
+- 欢迎场景与已导入网格场景中的坐标轴和六面体覆盖层。
+- 六面体六个面的命中和标准正交视角切换，包括连续或快速重复点击时的相机过渡。
+- 鼠标拖拽相机轨道旋转及与六面体点击、窗口交互的输入协调。
+- resize、DPR、隐藏 / 恢复、窗口重建和关闭时的覆盖层、interactor 与 VTK 资源生命周期。
+- 后端中立接口、可重复的状态 / 命中 / 生命周期测试、任务与架构文档同步。
 
 不包含：
 
-- 不修改 STL、Mesh IR、顶点坐标、法线或工程 import record；不把视角状态持久化到 `.panta`。
-- 不实现模型选择、测量、拾取高亮、裁剪、缩放 / 平移工具、触摸手势和动画时间轴；这些另行登记。
-- 不引入 `QQuickVTKItem`、Qt OpenGL scenegraph 集成或第二套 Qt overlay；不把 VTK 类型加入公共 `CaeViewport` 头文件。
-- 不在 offscreen 测试中伪造 GPU overlay 的真实像素验收；无头测试只验证状态和生命周期，真实窗口负责位置、输入和视觉效果。
+- 几何编辑、模型选择、测量、拾取高亮、裁剪、触摸手势或动画时间轴。
+- 把相机状态写入工程，或修改 STL、网格和资产修订。
+- 引入 `QQuickVTKItem`、Qt OpenGL scenegraph 集成，或将 VTK 类型加入公共视口头文件。
+- 用 offscreen 测试代替真实窗口中的 GPU 像素、输入和视觉验收。
 
-## 前置条件与待决策
+## 实施情况
 
-- 先以当前锁定 VTK SDK 的实际头文件和模块为准，核对 `vtkAxesActor`、`vtkAnnotatedCubeActor`、`vtkOrientationMarkerWidget` 或同等能力是否适用于 WebGPU render window；不能仅凭 nightly 文档假定 API 可用。
-- 由于 native surface 覆盖 QML，确认 overlay 的输入归属、渲染层级和平台行为；若 SDK widget 不适用，应在同一 VTK renderer / render window 内实现最小 overlay，而不是退回 QML 浮层。
-- 明确坐标系显示的是世界坐标系还是模型局部坐标系；首期默认世界坐标系，若工程未来引入局部坐标系需扩展状态契约。
-- 明确六面体面、边、角的交互范围和相机过渡策略；首期至少交付六面正交面，边角交互只有在 SDK / 自绘实现和验收标准稳定后才加入。
-- 记录 macOS、Windows、Wayland 原生 surface 的鼠标事件与高 DPI 差异；缺少真实平台证据时保留未验收状态。
-
-## 实施步骤
-
-1. 核对锁定 VTK SDK 的 orientation marker、annotation cube、相机和交互 API，记录可用能力与平台限制。
-2. 扩展后端中立的导航 / 相机状态和变更入口，区分临时视角状态与工程领域数据。
-3. 在 VTK 适配层实现坐标系、六面体和相机轨道旋转，先覆盖默认场景，再接入 STL 场景。
-4. 接入原生 surface 的输入与坐标转换，验证 overlay 命中测试不会吞掉或误触其他窗口操作。
-5. 增加 offscreen 状态 / 生命周期测试，以及 macOS 真窗口下的位置、点击、拖拽、resize、DPR、隐藏 / 恢复和销毁验证。
-6. 同步可视化架构、模块说明、代码注释和本任务验证记录；若 SDK 能力不足，登记后续替代方案而不保留死实现。
-
-## 预计改动
-
-- `native/visualization/include/panta/visualization/`：仅增加后端中立的相机 / 导航状态或语义接口，具体文件以实现时的最小边界为准。
-- `native/visualization/src/vtk/`：增加坐标系、六面体、相机交互和输入适配；隐藏所有 VTK 第三方类型。
-- `native/visualization/src/<platform>/`：必要时调整原生 surface 的输入与坐标同步，不改变现有平台所有权和销毁顺序。
-- `tests/cpp/visualization/` 与现有 QML / native CTest：增加可重复的状态、命中、相机和生命周期验证。
-- `ai-docs/architecture/visualization.md`、相关模块说明和本任务：实现后记录实际 API、限制和验收证据。
-
-## 清理与兼容例外
-
-- 清理任何被新导航控制器替换的临时相机 / 输入逻辑、重复 overlay 路径和失效测试夹具；不保留双实现。
-- 预计无兼容例外；不改变 `.panta` manifest schema，不新增 `COMPAT(...)`。
+- 已实现 VTK 原生双层渲染中的方向覆盖层：右下角坐标轴、右上角六面体和面方向文案；采用射线与实际六面体求交进行方向命中。
+- 已实现相机轨道状态、过渡与视口输入适配；VTK 与平台输入细节封装在 native VTK 路径中。
+- 已实现按场景挂载 / 移除 Welcome renderer：欢迎场景显示字标，导入场景移除全视口欢迎层，避免它遮挡导航覆盖层。
+- `WelcomeScene::sync()` 是视口与测试共用的挂载决策；native 测试覆盖欢迎 → 导入 → 欢迎 → 隐藏，并确认方向 renderer 在切换中保留。
+- 已扩展真实 GPU 生命周期测试：隐藏和换宿主窗口时启动相机过渡，并断言过渡与定时器停止；另在活动过渡且刷新待执行时销毁视口，等待事件队列排空确认没有析构后回调。macOS Cocoa 下通过。
+- macOS 真实窗口已复验 Welcome / 已导入网格的覆盖层和右键拖动；Cocoa / Metal GPU 生命周期测试在 Qt 配置 DPR 1.0、1.5、2.0 时检查 VTK 应用的目标像素尺寸和真实帧提交，并验证最小化 / 恢复后的过渡停止与帧重提交。实现及当前平台验收完成，仅待 Windows / Wayland 实机验收。
 
 ## 验收标准
 
-- [ ] 默认欢迎场景和已导入 STL 在真实 VTK 窗口中均显示右下角笛卡尔坐标系，位置、大小、方向和颜色稳定。
-- [ ] 真实 VTK 窗口右上角显示六面体定位器；六个面可识别，点击每个面都切换到对应的标准正交方向。
-- [ ] 视口拖拽可连续旋转整体观察视图，旋转中心稳定；不修改几何数据、不污染工程 dirty 状态、不破坏 STL 重开。
-- [ ] resize、DPR 变化、最小化 / 恢复、窗口重建和工程关闭不会留下旧 overlay、输入回调或 VTK 资源。
-- [ ] QML 公共头和 Rust / `.panta` 数据边界不暴露 VTK 类型；offscreen 状态测试、格式检查、qmllint 和 native 测试通过。
-- [ ] 至少完成 macOS 当前平台真实窗口验收；Windows / Wayland 缺少环境时明确记录未验收项，不以离屏测试替代。
+- [x] macOS 真实窗口在本次观察尺寸下，Welcome 与已导入 STL 均显示右下角坐标轴和右上角六面体；Welcome 字样只出现在欢迎场景。
+- [x] macOS 真实窗口显示 Welcome / 导入网格中的坐标轴和六面体；Cocoa / Metal GPU 测试在 Qt 配置 DPR 1.0、1.5、2.0 下校验 VTK 应用的目标像素尺寸与逻辑尺寸缩放一致，并确认真实帧提交。
+- [x] 右键拖动旋转、左键点击六面体及六方向平滑过渡已由 065 的 macOS 人工验收确认（2026-09-23）。
+- [x] 六个面投影命中由 `Visualization.WelcomeWordmark::picks_projected_cube_faces` 覆盖，标准方向和连续过渡由 `Visualization.ViewportNavigation` 覆盖。
+- [x] 用户于 2026-10-13 确认 macOS 真实窗口右键拖动可正常旋转。该路径只更新 C++ / VTK 相机，不修改 Mesh IR 或工程状态。
+- [x] VTK 输入分类测试区分视口点击、右键旋转和滚轮缩放；固定显示尺寸的投影命中测试覆盖六个方向。真实窗口下的右键旋转由用户人工确认。
+- [x] `WelcomeScene::sync()` 生产挂载决策有可重复测试，覆盖欢迎场景 → 导入场景 → 欢迎场景及隐藏状态；测试断言 Welcome renderer 按状态挂载 / 移除，同时方向 renderer 保持挂载。
+- [x] macOS 真实 GPU 测试验证 resize 到零并恢复；活动相机过渡时隐藏视口和切换宿主窗口均断言过渡与定时器停止，并确认旧窗口资源释放；另验证在活动过渡且刷新待执行时销毁视口不会触发析构后回调。
+- [x] Cocoa / Metal GPU 生命周期测试在 Qt 配置 DPR 1.0、1.5、2.0 下校验 VTK 目标尺寸并确认帧提交；窗口最小化停止相机过渡，恢复后重新提交帧。隐藏、换宿主、resize 和析构资源释放也有真实 GPU 覆盖。
+- [x] Rust / `.panta` 数据边界和 QML 公共接口不暴露 VTK 类型；`cargo format --check` 与 `cargo test --locked --workspace`（含 `qmllint` 和 native 测试）通过。
+- [x] 完成 macOS 真实窗口及 GPU 生命周期验收。
+- [ ] Windows / Wayland 真实窗口、DPR 和交互验收（仅待跨平台实机；不以离屏测试替代）。
 
-## 验证计划与结果
+## 验证记录
 
-| 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
-|---|---|---|---|
-| 2026-09-22 | 当前锁定 VTK 9.7.0 WebGPU SDK 头文件与 CMake targets | 确认可用 overlay 几何、文本和 interactor 能力 | 通过；缺少现成 orientation widget / trackball style，采用 `vtkRenderer` 第二层 + `vtkLineSource` / `vtkCubeSource`，坐标轴使用 billboard 文本，六面体使用 `vtkVectorText` + `vtkPolyDataMapper` + `vtkActor`，补充 `VTK::FiltersSources` / `VTK::FiltersGeneral` |
-| 2026-09-22 | `cmake --build target/native/debug` | 使用现有 target 完成 native 构建 | 通过；仅有既存重复静态库链接 warning |
-| 2026-09-22 | C++ / CMake 格式检查、`git diff --check` | 静态格式规则通过 | 直接 clang-format、cmake-format 与 diff 检查通过；统一 `cargo format` 的 uv/system-configuration 检查因本机 NULL system object 失败，未影响直接格式结果 |
-| 2026-09-23 | `ctest --test-dir target/native/debug --output-on-failure -R 'I18n\\.CompiledQmLoads|Visualization\\.DefaultWordmark|Qml\\.FormatCheck|Qml\\.ShellModuleLoads|Qml\\.ViewportModuleLoads'` | i18n、视口、QML 模块和方向命中边界通过 | 通过 5/5；`Visualization.DefaultWordmark` 覆盖六面投影命中、面中心、正向矩阵、生命周期消融路径 |
-| 2026-09-23 | `target/native/debug/visualization/panta_default_wordmark_test` | 获取 overlay 更新与命中路径的 CPU 基线 | 通过；无 overlay 更新约 0.0000058 ms/次，完整 overlay 更新约 0.000094 ms/次，射线命中约 0.00088 ms/次；仅衡量 CPU，不包含 WebGPU 提交 |
-| 2026-09-23 | `cargo test -p panta-dsl-core --locked`、`cargo clippy --locked -p panta-dsl-core --all-targets -- -D warnings`、`cargo build -p panta-launcher --locked`、`cargo lint qmllint` | Rust/i18n 解析、launcher 和 QML lint 回归通过 | 全部通过；`cargo lint cmake` 另受本机 uv/system-configuration 的 NULL system object 崩溃影响，直接 `clang-format`、`git diff --check` 和已有 CMake 配置构建通过 |
-| — | macOS 真窗口：坐标系、六面体、拖拽、resize、DPR、隐藏 / 恢复、关闭 | 交互和资源生命周期通过 | 未执行，待手工验收 |
-
-## 风险与回退
-
-- VTK SDK 的 orientation widget 可能依赖未启用的模块或旧渲染后端；先核对实际制品，无法复用时在同一 WebGPU render window 内实现受限版本并记录差异。
-- 原生 surface 可能使 QML overlay 不可见或无法接收鼠标；回退到 VTK 内部 overlay，输入仍由原生视口统一路由。
-- 相机旋转在极端角度可能发生翻转、穿模或焦点漂移；使用明确的 up 约束、焦点和角度边界，并保留重置到标准方向的路径。
-- 任一平台销毁顺序出现旧回调访问时，优先停用新导航输入并恢复上一版纯视口路径，不改变工程数据和导入资产。
+| 日期 | 环境 / 命令 | 结果 |
+|---|---|---|
+| 2026-09-22 | 锁定 VTK 9.7.0 SDK 头文件与 CMake targets | 未发现适用的现成 orientation widget 或 trackball style；确定使用 VTK 原生 renderer / actor 实现，并加入 `VTK::FiltersSources`、`VTK::FiltersGeneral`。 |
+| 2026-09-22 | `cmake --build target/native/debug` | 构建通过；记录到既有重复静态库链接 warning。 |
+| 2026-09-22 | C++ / CMake 格式检查、`git diff --check` | 直接 clang-format、cmake-format 与 diff 检查通过。统一 `cargo format` 的 uv / system-configuration 检查受本机 NULL system object 影响失败；不代表格式检查通过。 |
+| 2026-09-23 | 定向 CTest：`I18n.CompiledQmLoads`、`Visualization.DefaultWordmark`、`Qml.FormatCheck`、`Qml.ShellModuleLoads`、`Qml.ViewportModuleLoads` | 5/5 通过；覆盖方向投影 / 命中、面姿态、渲染器生命周期消融及 QML 模块加载。 |
+| 2026-09-23 | `target/native/debug/visualization/panta_default_wordmark_test` | CPU 基线：无 overlay 更新约 0.0000058 ms/次、完整 overlay 更新约 0.000094 ms/次、射线命中约 0.00088 ms/次；不含 WebGPU 提交时间。 |
+| 2026-09-23 | macOS 真实窗口，见 [065](065-vtk-zoom-and-cube-transition.md) | 用户人工核对滚轮缩放、右键旋转、左键六面体点击和方向过渡通过；该记录早于本轮 renderer 生命周期改动，需回归复验。 |
+| 2026-10-02 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint --check` | 与统一 1280×720 主窗口下限更新对应；Cargo 聚合测试通过，包含当时 CTest 69/69。该验证早于本轮 VTK renderer 生命周期改动。 |
+| 2026-10-13 | `cargo build --locked` | 本轮 VTK renderer 生命周期改动后构建通过；构建成功不替代测试或真实窗口交互验收。 |
+| 2026-10-13 | `cargo format --check`、`git diff --check`、`cargo test --locked --workspace` | 通过；Cargo 聚合测试包含 75/75 CTest。 |
+| 2026-10-13 | `cargo lint --check` | 通过，8 个阶段全部完成。 |
+| 2026-10-13 | macOS arm64 真实窗口：Welcome 与 `Benchmark/triangles_10000` | 欢迎字标只在 Welcome 场景显示；导入网格场景的 Welcome 字标已隐藏，六面体 FRONT 面和坐标轴可见。本次未测试六面切换、拖拽或窗口生命周期。 |
+| 2026-10-13 | `PANTA_TEST_NATIVE_VIEWPORT=1 ctest ... -R '^Qml\\.ViewportModuleLoads$'` | 未能作为 GPU 验收：CTest 为该目标强制设置 `QT_QPA_PLATFORM=offscreen`，测试等待真实原生 surface 后超时。 |
+| 2026-10-13 | 直接运行原生生命周期测试并设 `QT_QPA_PLATFORM=cocoa` | 运行环境没有可用 Cocoa screen，Qt 报 `Cannot create window: no screens available` 后中止；真实 GPU 生命周期测试仍未验收。 |
+| 2026-10-13 | 临时 `.app` wrapper：`native_refresh_and_window_lifecycle`，Cocoa / macOS GPU | 通过，3/3；实际 GPU surface 下验证 resize 到零并恢复、活动过渡中的隐藏与宿主切换，以及旧窗口 renderer / interactor / hardware window 释放。该用例不覆盖带 pending refresh 的活动过渡析构。 |
+| 2026-10-13 | 临时 `.app` wrapper：`destroys_attached_viewport_with_pending_refresh`，Cocoa / macOS GPU | 通过，3/3；真实 GPU 窗口下启动相机过渡并排入刷新后析构视口，等待 50 ms 未见析构后回调。 |
+| 2026-10-13 | 临时 Cocoa `.app` wrapper：`native_refresh_and_window_lifecycle`，Qt 配置 DPR 1.0 / 1.5 / 2.0 | 三种启动配置均通过，合计 9/9；真实 GPU 窗口中校验 VTK 应用的目标尺寸并确认帧提交，也验证最小化时过渡停止、恢复后帧重提交，以及隐藏、换宿主、resize 和窗口资源释放。未读取 NSView / CAMetalLayer 实际像素尺寸，也未在运行期间切换 DPR。日志：`target/native/debug/app/viewport-tests.log`（临时产物，未提交）。 |
+| 2026-10-13 | macOS 真实应用窗口与用户人工确认 | Welcome 和导入网格均显示坐标轴与六面体；用户确认右键拖动正常，六方向投影命中由 `Visualization.WelcomeWordmark::picks_projected_cube_faces` 确定性测试覆盖。 |
+| 2026-10-13 | `cargo build --locked`、`cargo format --check`、`cargo test --locked --workspace` | 通过；Cargo 聚合测试 CTest 75/75。 |
+| 2026-10-13 | `gpt-6.1-sol` medium 独立只读评审 | 指出过渡自然结束可能掩盖窗口切换停表、pending refresh 析构验收记录超出实际用例，以及旧测试描述过时并遗留无调用方 `set_visible()`；均已修正并复验。 |
+| 2026-10-13 | `gpt-6.1-sol` medium 独立复审本轮改动 | 指出 DPR 测试只证明 VTK 目标尺寸和真实帧提交，未证明 backing surface 尺寸或动态 DPR / 实际输入坐标；已收窄验收证据并把未覆盖的原生行为列为 Windows / Wayland 实机条件，复审确认状态边界一致。 |
+| — | Windows / Wayland 真实窗口、DPR 和交互 | 尚待对应平台实机验收；包含原生 surface 尺寸和实际指针坐标换算验证，不阻塞依赖任务。 |
 
 ## 决策与工作记录
 
-- 2026-09-22：创建任务。用户要求推进 VTK 视口右下角笛卡尔坐标系、右上角六面体定位和整体几何视图旋转。
-- 2026-09-22：首期将“整体几何体旋转”定义为相机轨道旋转，不修改几何数据或工程持久化；坐标系 / 六面体优先采用 VTK 原生 surface 内 overlay。
-- 2026-09-22：核对锁定 VTK 9.7.0 WebGPU SDK，未提供 `vtkOrientationMarkerWidget`、`vtkAnnotatedCubeActor` 或 trackball style；改用第二层 renderer、自有轴线 / 六面体 / `vtkBillboardTextActor3D` 文本 actor，并显式加入 `VTK::FiltersSources`。
-- 2026-09-22：完成第一版 VTK 后端实现：方向标记随主相机方向更新，六面体提供六个确定性方向命中区，左键拖拽通过 interactor 驱动相机轨道旋转；新增方向命中单测。真实窗口下的 overlay 位置、标签可读性和 Cocoa 输入仍待验收。
-- 2026-09-22：按验收反馈细化方向标记：保留右下角独立的 X / Y / Z 轴标注，六面体方向改用短标签 `RIGHT / LEFT / TOP / BOTTOM / FRONT / BACK`；方向文字由 VTK 适配层内置，不经 QML 或翻译字典传入。
-- 2026-09-23：按真窗口反馈调整标签几何：六面体标签锚点落在对应面的中心并留最小面外偏移，文本水平 / 垂直居中；坐标轴标签以轴端点为锚点，避免标签漂移或偏离方向标记。
-- 2026-09-23：按验收反馈放大六面体文字并保持粗体；使用 billboard 文本使字形始终朝向屏幕，六面体位置仍随方向状态更新，但文字本身不随六面体姿态旋转。
-- 2026-09-23：根据真窗口截图修正六面体标签堆叠：标签仍固定在面中心，但只显示朝向当前 overlay 相机的可见面，隐藏背向面；字号调整为适合定位器尺寸的中等值，避免多个背面文字投影到同一区域。
-- 2026-09-23：按验收反馈放大右上角六面体定位器，边长调整为 1.6，并同步面中心锚点和 overlay 相机比例；交互命中区域保持原视口语义范围不变。
-- 2026-09-23：按验收反馈将六面体与右下角坐标系整体向右移动，统一调整 overlay viewport 与命中区域；标签字号继续放大，并采用勃艮第红 X、勃艮第绿 Y、勃艮第蓝 Z 的对应配色，同时增大轴线端点与 X/Y/Z 标签的间距。
-- 2026-09-23：按验收反馈为右上角六面体和右下角坐标系增加统一的右侧内边距，并同步收窄 overlay 命中区域。
-- 2026-09-23：按验收截图将六面体与坐标系继续向右调整到目标区域，同时保留右边界内缩；六面体方向标签改为面内三维矢量文本方案，随定位器相机姿态同步旋转。
-- 2026-09-23：根据定位截图修正 `vtkVectorText` 的局部几何原点：先在 `vtkTransformFilter` 中按文字 bounds 缩放并居中，再将 actor 原点放到六面体面中心；定位器改为不透明实心面，避免文字与半透明面产生深度混淆。
-- 2026-09-23：按标准方向切换反馈，为六个面显式定义“屏幕右 / 屏幕上 / 面法向”正交基，使用完整面内旋转矩阵替代近似欧拉角，保证切到 TOP 等方向时文字保持正向可读。
-- 2026-09-23：修正六面体点击命中：不再按 overlay 矩形的屏幕象限猜方向，改为使用定位器 renderer 的显示坐标反投影射线与实体六面体求交，点击实际可见面后返回对应 `CubeDirection`。
-- 2026-09-23：对暂存区 VTK 代码进行整体 review：收敛方向面姿态和颜色常量，补充 overlay 生命周期 / 无 renderer 消融路径与 CPU 命中、方向更新基准测试；同时校正 VTK interactor 和 hardware window 的释放顺序。
-- 2026-09-23：按 VTK 9.7 的实际契约收敛方向文本：`vtkVectorText` 只接受可打印 ASCII，移除中文字体、翻译条目和第二套文本渲染路径；方向文案固定由 VTK 适配层内置，避免外部本地化输入产生空标签。
-- 2026-09-23：提交评审通过的导航实现、测试与记录；`detach()` 显式移除窗口中的 overlay renderer。保留本轮翻译梳理发现的 `.pa` 校验修复：同一 context 允许不同的等长 source，仅拒绝重复 source，相关测试和规范同步更新。用户已确认当前视觉效果；跨平台输入与完整窗口生命周期仍按未验收项跟进。
+- 2026-09-22：把“整体几何体旋转”定义为相机轨道旋转；坐标轴 / 六面体使用 VTK 原生 surface 内 overlay。首期采用世界坐标系和六个标准面，不持久化视角。
+- 2026-09-22：核对锁定 VTK SDK 后确认缺少可直接用于 WebGPU 的现成 orientation / trackball 组件，采用第二渲染层的独立 renderer、轴线、立方体和矢量文本实现。
+- 2026-09-22 至 2026-09-23：根据窗口截图多次调整 overlay 位置、标签大小与姿态；六面命中改为 renderer 显示坐标的反投影射线与实体六面体求交。方向面使用明确的正交基，避免标准视角下标签倒置；仅显示朝向当前相机的可见面。
+- 2026-09-23：完成一次 VTK 导航实现评审和生命周期 / 命中测试整理；验证结果见上表。方向标签固定为 VTK 适配层内置 ASCII 文案。
+- 2026-09-23：[065](065-vtk-zoom-and-cube-transition.md) 将旋转改为右键拖动，保留左键六面体点击，并加入 260 ms 方向过渡；用户在 macOS 真实窗口人工确认交互通过。活动过渡中的真实 GPU 窗口销毁仍由 064 验收。
+- 2026-10-02：用户确认主窗口最小尺寸统一为 1280×720 逻辑像素。取消针对 640×512 非支持尺寸的适配；跨 DPR 验收仍属于本任务。
+- 2026-10-13：切换导入网格时移除覆盖全视口的 Welcome renderer，并在 render window 初始化后挂载方向 renderer；随后将场景挂载判定集中到 `WelcomeScene::sync()`，补充共享决策测试及活动过渡下隐藏、换宿主和析构用例。使用 `.app` wrapper 在真实 Cocoa/GPU 窗口分别运行相关用例通过，详情见上表。
+- 2026-10-13：完成 macOS 窗口和 GPU 生命周期回归，用户确认右键拖动正常；独立评审后将状态更新为 `implemented`，仅保留 Windows / Wayland 原生窗口验收。
 
-## 完成摘要
+## 风险与限制
 
-第一版导航后端已落地：坐标轴和六面体在 VTK 原生 render window 的第二层 renderer 绘制，主相机支持鼠标右键轨道旋转，六面体六个方向由鼠标左键按实际面命中并确定性切换；方向文案由 VTK 适配层内置，六面体标签使用贴面矢量几何并保持标准视角正向。右键旋转绑定由任务 065 更新；当前通过现有 target 构建、投影命中 / 几何姿态 / 生命周期消融 / CPU 基准测试及 5 个 QML/native 回归测试；仍需 macOS 真窗口完成 resize、DPR、隐藏 / 恢复和关闭的人工验收，以及后续 Windows / Wayland 输入路径校准。
-
-## 2026-10-02 窗口补验发现
-
-任务 007 的 macOS Retina DPR 2 实际窗口从 1470×841 缩到 640×512 逻辑尺寸后，Welcome 仍完整，但右下角坐标系的 X 标签在视口右边界有裁切迹象，右上角 FRONT 文字明显变小。证据为忽略目录 `artifacts/task-007/welcome-small.png`，大窗口对照为 `welcome.png`。该发现尚未定位根因；后续用户确认采用 1280×720 窗口下限，640×512 不再属于支持范围，取消针对该尺寸的适配。受支持尺寸及跨 DPR 验收仍需按本任务标准推进。
-
-## 2026-10-02 改为统一窗口下限
-
-Yuki 明确不再为极小窗口做适配，并确认主窗口最小尺寸为 1280×720 逻辑像素。本批更新 Theme 的共享下限（完整与无 Bridge Shell 均已绑定），取消尚未发布的坐标轴缩放及小尺寸投影测试，保持原有 VTK 覆盖层比例；主窗口布局回归使用 1280 最小宽度，并断言共享最小宽高。此前 640×512 的截图只保留为历史证据，不再是受支持的窗口尺寸。
-
-验证：macOS arm64 的 `cargo test --locked --workspace` 通过，包含 qmllint 与 CTest 69/69；`cargo format --check`、`cargo lint --check` 均通过；Shell 加载测试断言最小宽高为 1280×720，窗口布局与 Ribbon 导航覆盖 1280 / 1440 两种宽度。本批不修改 VTK 覆盖层实现。最小尺寸的真实窗口截图与跨 DPR / 跨平台验收尚未补齐，任务保持 in-progress。
+- 原生 surface 与 Qt 窗口层级、DPR 和平台 interactor 有关；macOS 真实 GPU 测试覆盖多种启动 DPR 下的 VTK 目标尺寸与帧提交，但未直接读取 backing surface 尺寸或验证动态 DPR 变化；Windows / Wayland 仍需对应实机验证。
+- 六面体可见性、投影命中及相机输入分别由真实窗口观察、确定性命中测试和用户人工确认覆盖；跨平台真实输入仍待验收。
+- 视口隐藏、宿主窗口切换或销毁时如发现旧回调访问，优先停用对应输入并修复 VTK 对象释放顺序，不改变工程数据边界。

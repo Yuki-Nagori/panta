@@ -221,6 +221,16 @@ bool VtkViewport::test_previous_window_resources_released() const {
            impl_->retired_webgpu_configuration.GetPointer() == nullptr;
 }
 
+bool VtkViewport::test_camera_transition_active() const {
+    return impl_->camera_transition.active();
+}
+
+bool VtkViewport::test_camera_transition_timer_active() const {
+    return impl_->camera_transition_timer.isActive();
+}
+
+QSize VtkViewport::test_applied_pixel_size() const { return impl_->applied_pixel_size; }
+
 bool VtkViewport::test_render_resources_absent() const {
     return impl_->render_window == nullptr && impl_->hardware_window == nullptr &&
            impl_->interactor == nullptr && impl_->renderer == nullptr &&
@@ -228,6 +238,19 @@ bool VtkViewport::test_render_resources_absent() const {
 }
 
 void VtkViewport::test_fail_webgpu_device_initialization() { impl_->fail_webgpu_device = true; }
+
+void VtkViewport::test_start_camera_transition() {
+    if (impl_->renderer == nullptr || impl_->primitive_actor == nullptr) {
+        return;
+    }
+    const double* center = impl_->primitive_actor->GetCenter();
+    if (impl_->camera_transition.start(impl_->renderer->GetActiveCamera(),
+                                       CameraFrame{{1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}},
+                                       {center[0], center[1], center[2]}, impl_->primitive_actor)) {
+        impl_->camera_transition_clock.restart();
+        impl_->camera_transition_timer.start();
+    }
+}
 
 void VtkViewport::apply_state(const RenderScene& state) {
     if (state.revision < impl_->pending.revision) {
@@ -353,9 +376,6 @@ void VtkViewport::ensure_render_window() {
     impl_->applied_mesh = impl_->pending.mesh;
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
-    impl_->orientation.attach(impl_->render_window);
-
-    impl_->welcome_scene.attach(impl_->render_window);
 
 #if defined(Q_OS_MACOS)
     impl_->interactor = vtkSmartPointer<vtkCocoaRenderWindowInteractor>::New();
@@ -381,6 +401,7 @@ void VtkViewport::ensure_render_window() {
     impl_->interactor->AddObserver(vtkCommand::MouseWheelForwardEvent, interaction_command);
     impl_->interactor->AddObserver(vtkCommand::MouseWheelBackwardEvent, interaction_command);
     impl_->render_window->Initialize();
+    impl_->orientation.attach(impl_->render_window);
     impl_->interactor->Initialize();
     impl_->webgpu_configuration = impl_->render_window->GetWGPUConfiguration();
 
@@ -606,8 +627,9 @@ void VtkViewport::sync_native_surface() {
     }
     // ResetCameraClippingRange 只计算可见 prop；恢复网格时先更新 actor 可见性。
     impl_->primitive_actor->SetVisibility(impl_->pending.primitive_visible);
-    impl_->welcome_scene.set_visible(impl_->pending.primitive_visible &&
-                                     impl_->pending.mesh == nullptr);
+    // 欢迎页覆盖整个第二渲染层；导入场景时移除它，避免遮挡导航覆盖层。
+    impl_->welcome_scene.sync(impl_->render_window, impl_->pending.primitive_visible,
+                              impl_->pending.mesh != nullptr);
     if (resized) {
         stop_camera_transition();
         impl_->render_window->SetSize(pixel_size.width(), pixel_size.height());

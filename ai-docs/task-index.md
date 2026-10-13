@@ -20,7 +20,7 @@ ai-docs/
 1. 从 [模板](task/_template.md) 建立任务，填写目标、边界、依赖、必读规范和可判断的验收条件。
 2. 在本索引登记，核对依赖无环；信息充分且依赖完成后标 ready。日常“开始任务 001”即可指向对应任务，不需要另建应用里的 task。
 3. 开始实现时标 in-progress；只按该任务范围工作。范围明显变化先更新任务，额外功能先创建新任务。
-4. 每次 commit 更新 task 的实际进展、验证与清理/兼容记录；状态、依赖或标题变化时同步索引。全部验收完成才标 done，文档已写好不等于实现完成。
+4. 每次 commit 更新 task 的实际进展、验证与清理/兼容记录；状态、依赖或标题变化时同步索引。当前可用平台验收已完成、只待明确列出的跨平台实机验收时标 implemented；此状态不阻塞依赖任务。全部验收完成才标 done，文档已写好不等于实现完成。
 
 提交的最小完整性及消息格式见 [提交规范](standards/commits.md)，代码删除和兼容例外见 [代码生命周期](standards/code-lifecycle.md)。
 
@@ -32,6 +32,7 @@ ai-docs/
 | planned | 内容已编排，依赖尚未满足 |
 | ready | 依赖完成且可开始，尚无实现 |
 | in-progress | 正在实施 |
+| implemented | 实现和当前可用平台验收已完成；仅待任务列出的 Windows / Wayland 等跨平台实机验收，不阻塞依赖任务 |
 | blocked | 有具体阻塞，记录解除条件 |
 | done | 验收完成且有证据 |
 | deferred | 暂不排入当前交付 |
@@ -98,7 +99,7 @@ ai-docs/
 | 061 | [Home 与 Start & Learn 工具栏切换](task/061-ribbon-tab-navigation.md) | 应用平台扩展 | 060, 057 | done |
 | 062 | [Ribbon 页签内容与公共渲染拆分](task/062-ribbon-tab-components.md) | 应用平台扩展 | 061, 060 | done |
 | 063 | [STL 导入、导入选项持久化与工程工作区](task/063-stl-import-and-mesh-workspace.md) | 应用平台扩展 | 057, 060, 062 | done |
-| 064 | [VTK 视口导航、笛卡尔坐标系与六面体定位](task/064-vtk-navigation-and-orientation.md) | 应用平台扩展 | 007, 063 | in-progress |
+| 064 | [VTK 视口导航、笛卡尔坐标系与六面体定位](task/064-vtk-navigation-and-orientation.md) | 应用平台扩展 | 007, 063 | implemented |
 | 065 | [VTK 视口缩放、右键旋转与方向过渡](task/065-vtk-zoom-and-cube-transition.md) | 应用平台扩展 | 007, 064 | done |
 | 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | done |
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |

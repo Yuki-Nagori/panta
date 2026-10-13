@@ -82,7 +82,7 @@ class OffscreenVtkRenderer final {
             update_geometry(scene);
         }
         m_actor->SetVisibility(scene.primitive_visible);
-        m_welcome.set_visible(scene.primitive_visible && scene.mesh == nullptr);
+        m_welcome.sync(m_window, scene.primitive_visible, scene.mesh != nullptr);
         m_renderer->SetBackground(scene.background.redF(), scene.background.greenF(),
                                   scene.background.blueF());
         m_orientation.update(m_renderer->GetActiveCamera());
