@@ -316,7 +316,6 @@ search-placeholder:
   src: Enter a keyword or phrase
   tr: 请输入关键字或短语
 
-
 [IconActionNewDocument]
 label:
   src: New document
@@ -554,8 +553,8 @@ label:
 
 [RibbonActionMacroSlot]
 label:
-  src: "Macro %1"
-  tr: "宏 %1"
+  src: Macro %1
+  tr: 宏 %1
 
 [RibbonActionApplicationOptions]
 label:
@@ -934,7 +933,6 @@ entry-14:
   src: Add material to commonly used list after selecting
   tr: 选择后将材料添加到常用列表
 
-
 saving:
   src: Saving material...
   tr: 正在保存材料…
@@ -947,7 +945,6 @@ entry-1:
 entry-2:
   src: Polypropylene (PP)
   tr: 聚丙烯（PP）
-
 
 [MaterialProperty]
 entry-1:
@@ -1051,7 +1048,6 @@ entry-19:
   src: Fiber Solver Parameters…
   tr: 纤维求解器参数…
 
-
 saving:
   src: Saving process settings…
   tr: 正在保存工艺设置…
@@ -1106,7 +1102,6 @@ duration-unit:
   tr: 秒 · ≥ 0
 
 [GateLocationSettings]
-
 entry-1:
   src: Process Settings · Gate Location
   tr: 工艺设置 · 浇口定位
@@ -1144,7 +1139,6 @@ entry-9:
   tr: 浇口数量
 
 [ResultsRibbon]
-
 entry-1:
   src: New Plot
   tr: 新建图
@@ -1350,7 +1344,6 @@ entry-52:
   tr: 锁定
 
 [AnalysisLogPanel]
-
 entry-1:
   src: No analysis logs yet.
   tr: 暂无分析日志。
@@ -1376,7 +1369,6 @@ entry-6:
   tr: 分析运行
 
 [AnalysisLogCategory]
-
 entry-1:
   src: Mesh Log
   tr: 网格日志
@@ -1406,7 +1398,6 @@ entry-7:
   tr: 浇口定位检查
 
 [AnalysisResult]
-
 entry-1:
   src: Flow
   tr: 流动
@@ -1477,36 +1468,36 @@ entry-17:
 
 [ViewRibbon]
 entry-1:
-  src: "Appearance"
-  tr: "外观"
+  src: Appearance
+  tr: 外观
 
 entry-2:
-  src: "Solid"
-  tr: "实体"
+  src: Solid
+  tr: 实体
 
 entry-3:
   src: "Model\nDisplay"
   tr: "模型\n显示"
 
 entry-4:
-  src: "Current display mode"
-  tr: "当前显示模式"
+  src: Current display mode
+  tr: 当前显示模式
 
 entry-5:
-  src: "Perspective"
-  tr: "透视"
+  src: Perspective
+  tr: 透视
 
 entry-6:
-  src: "Metric Units"
-  tr: "公制单位"
+  src: Metric Units
+  tr: 公制单位
 
 entry-7:
-  src: "Units"
-  tr: "单位"
+  src: Units
+  tr: 单位
 
 entry-8:
-  src: "Window"
-  tr: "窗口"
+  src: Window
+  tr: 窗口
 
 entry-9:
   src: "User\nInterface"
@@ -1514,144 +1505,144 @@ entry-9:
 
 entry-10:
   src: "Clean\nScreen"
-  tr: "清屏"
+  tr: 清屏
 
 entry-11:
-  src: "Switch"
-  tr: "切换"
+  src: Switch
+  tr: 切换
 
 entry-12:
-  src: "Tile"
-  tr: "平铺"
+  src: Tile
+  tr: 平铺
 
 entry-13:
-  src: "New"
-  tr: "新建"
+  src: New
+  tr: 新建
 
 entry-14:
-  src: "Split"
-  tr: "拆分"
+  src: Split
+  tr: 拆分
 
 entry-15:
-  src: "Close"
-  tr: "关闭"
+  src: Close
+  tr: 关闭
 
 entry-16:
-  src: "Cascade"
-  tr: "层叠"
+  src: Cascade
+  tr: 层叠
 
 entry-17:
-  src: "Arrange"
-  tr: "排列"
+  src: Arrange
+  tr: 排列
 
 entry-18:
-  src: "Locking"
-  tr: "锁定"
+  src: Locking
+  tr: 锁定
 
 entry-19:
-  src: "Lock View"
-  tr: "锁定视图"
+  src: Lock View
+  tr: 锁定视图
 
 entry-20:
-  src: "Lock Point"
-  tr: "锁定点"
+  src: Lock Point
+  tr: 锁定点
 
 entry-21:
-  src: "Lock Animation"
-  tr: "锁定动画"
+  src: Lock Animation
+  tr: 锁定动画
 
 entry-22:
-  src: "Browse"
-  tr: "浏览"
+  src: Browse
+  tr: 浏览
 
 entry-23:
   src: "Global\nNavigation\nControl"
   tr: "全局\n导航\n控制"
 
 entry-24:
-  src: "Select"
-  tr: "选择"
+  src: Select
+  tr: 选择
 
 entry-25:
-  src: "Dynamic Orbit"
-  tr: "动态观察"
+  src: Dynamic Orbit
+  tr: 动态观察
 
 entry-26:
-  src: "Previous View"
-  tr: "上一个视图"
+  src: Previous View
+  tr: 上一个视图
 
 entry-27:
-  src: "Pan"
-  tr: "平移"
+  src: Pan
+  tr: 平移
 
 entry-28:
-  src: "Center"
-  tr: "居中"
+  src: Center
+  tr: 居中
 
 entry-29:
-  src: "Front View"
-  tr: "前视图"
+  src: Front View
+  tr: 前视图
 
 entry-30:
-  src: "Zoom All"
-  tr: "缩放全部"
+  src: Zoom All
+  tr: 缩放全部
 
 entry-31:
-  src: "Measure"
-  tr: "测量"
+  src: Measure
+  tr: 测量
 
 entry-32:
-  src: "View Cube"
-  tr: "视图立方体"
+  src: View Cube
+  tr: 视图立方体
 
 entry-33:
-  src: "Cutting Plane"
-  tr: "剖切平面"
+  src: Cutting Plane
+  tr: 剖切平面
 
 entry-34:
-  src: "Edit"
-  tr: "编辑"
+  src: Edit
+  tr: 编辑
 
 entry-35:
-  src: "Edit Cutting Plane"
-  tr: "编辑剖切平面"
+  src: Edit Cutting Plane
+  tr: 编辑剖切平面
 
 entry-36:
-  src: "Move"
-  tr: "移动"
+  src: Move
+  tr: 移动
 
 entry-37:
-  src: "Move Cutting Plane"
-  tr: "移动剖切平面"
+  src: Move Cutting Plane
+  tr: 移动剖切平面
 
 entry-38:
-  src: "View"
-  tr: "视图"
+  src: View
+  tr: 视图
 
 entry-39:
-  src: "Edit View"
-  tr: "编辑视图"
+  src: Edit View
+  tr: 编辑视图
 
 entry-40:
-  src: "Rotation Angle"
-  tr: "旋转角度"
+  src: Rotation Angle
+  tr: 旋转角度
 
 entry-41:
-  src: "View Name"
-  tr: "视图名称"
+  src: View Name
+  tr: 视图名称
 
 entry-42:
-  src: "Save"
-  tr: "保存"
+  src: Save
+  tr: 保存
 
 entry-43:
-  src: "Save View"
-  tr: "保存视图"
+  src: Save View
+  tr: 保存视图
 
 entry-44:
-  src: "Delete"
-  tr: "删除"
+  src: Delete
+  tr: 删除
 
 entry-45:
-  src: "Delete View"
-  tr: "删除视图"
+  src: Delete View
+  tr: 删除视图

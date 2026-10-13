@@ -316,7 +316,6 @@ search-placeholder:
   src: Enter a keyword or phrase
   tr: Enter a keyword or phrase
 
-
 [IconActionNewDocument]
 label:
   src: New document
@@ -554,8 +553,8 @@ label:
 
 [RibbonActionMacroSlot]
 label:
-  src: "Macro %1"
-  tr: "Macro %1"
+  src: Macro %1
+  tr: Macro %1
 
 [RibbonActionApplicationOptions]
 label:
@@ -934,7 +933,6 @@ entry-14:
   src: Add material to commonly used list after selecting
   tr: Add material to commonly used list after selecting
 
-
 saving:
   src: Saving material...
   tr: Saving material...
@@ -947,7 +945,6 @@ entry-1:
 entry-2:
   src: Polypropylene (PP)
   tr: Polypropylene (PP)
-
 
 [MaterialProperty]
 entry-1:
@@ -1051,7 +1048,6 @@ entry-19:
   src: Fiber Solver Parameters…
   tr: Fiber Solver Parameters…
 
-
 saving:
   src: Saving process settings…
   tr: Saving process settings…
@@ -1106,7 +1102,6 @@ duration-unit:
   tr: s · ≥ 0
 
 [GateLocationSettings]
-
 entry-1:
   src: Process Settings · Gate Location
   tr: Process Settings · Gate Location
@@ -1144,7 +1139,6 @@ entry-9:
   tr: Number of gates
 
 [ResultsRibbon]
-
 entry-1:
   src: New Plot
   tr: New Plot
@@ -1350,7 +1344,6 @@ entry-52:
   tr: Locking
 
 [AnalysisLogPanel]
-
 entry-1:
   src: No analysis logs yet.
   tr: No analysis logs yet.
@@ -1376,7 +1369,6 @@ entry-6:
   tr: Analysis run
 
 [AnalysisLogCategory]
-
 entry-1:
   src: Mesh Log
   tr: Mesh Log
@@ -1406,7 +1398,6 @@ entry-7:
   tr: Gate Location Check
 
 [AnalysisResult]
-
 entry-1:
   src: Flow
   tr: Flow
@@ -1477,36 +1468,36 @@ entry-17:
 
 [ViewRibbon]
 entry-1:
-  src: "Appearance"
-  tr: "Appearance"
+  src: Appearance
+  tr: Appearance
 
 entry-2:
-  src: "Solid"
-  tr: "Solid"
+  src: Solid
+  tr: Solid
 
 entry-3:
   src: "Model\nDisplay"
   tr: "Model\nDisplay"
 
 entry-4:
-  src: "Current display mode"
-  tr: "Current display mode"
+  src: Current display mode
+  tr: Current display mode
 
 entry-5:
-  src: "Perspective"
-  tr: "Perspective"
+  src: Perspective
+  tr: Perspective
 
 entry-6:
-  src: "Metric Units"
-  tr: "Metric Units"
+  src: Metric Units
+  tr: Metric Units
 
 entry-7:
-  src: "Units"
-  tr: "Units"
+  src: Units
+  tr: Units
 
 entry-8:
-  src: "Window"
-  tr: "Window"
+  src: Window
+  tr: Window
 
 entry-9:
   src: "User\nInterface"
@@ -1517,141 +1508,141 @@ entry-10:
   tr: "Clean\nScreen"
 
 entry-11:
-  src: "Switch"
-  tr: "Switch"
+  src: Switch
+  tr: Switch
 
 entry-12:
-  src: "Tile"
-  tr: "Tile"
+  src: Tile
+  tr: Tile
 
 entry-13:
-  src: "New"
-  tr: "New"
+  src: New
+  tr: New
 
 entry-14:
-  src: "Split"
-  tr: "Split"
+  src: Split
+  tr: Split
 
 entry-15:
-  src: "Close"
-  tr: "Close"
+  src: Close
+  tr: Close
 
 entry-16:
-  src: "Cascade"
-  tr: "Cascade"
+  src: Cascade
+  tr: Cascade
 
 entry-17:
-  src: "Arrange"
-  tr: "Arrange"
+  src: Arrange
+  tr: Arrange
 
 entry-18:
-  src: "Locking"
-  tr: "Locking"
+  src: Locking
+  tr: Locking
 
 entry-19:
-  src: "Lock View"
-  tr: "Lock View"
+  src: Lock View
+  tr: Lock View
 
 entry-20:
-  src: "Lock Point"
-  tr: "Lock Point"
+  src: Lock Point
+  tr: Lock Point
 
 entry-21:
-  src: "Lock Animation"
-  tr: "Lock Animation"
+  src: Lock Animation
+  tr: Lock Animation
 
 entry-22:
-  src: "Browse"
-  tr: "Browse"
+  src: Browse
+  tr: Browse
 
 entry-23:
   src: "Global\nNavigation\nControl"
   tr: "Global\nNavigation\nControl"
 
 entry-24:
-  src: "Select"
-  tr: "Select"
+  src: Select
+  tr: Select
 
 entry-25:
-  src: "Dynamic Orbit"
-  tr: "Dynamic Orbit"
+  src: Dynamic Orbit
+  tr: Dynamic Orbit
 
 entry-26:
-  src: "Previous View"
-  tr: "Previous View"
+  src: Previous View
+  tr: Previous View
 
 entry-27:
-  src: "Pan"
-  tr: "Pan"
+  src: Pan
+  tr: Pan
 
 entry-28:
-  src: "Center"
-  tr: "Center"
+  src: Center
+  tr: Center
 
 entry-29:
-  src: "Front View"
-  tr: "Front View"
+  src: Front View
+  tr: Front View
 
 entry-30:
-  src: "Zoom All"
-  tr: "Zoom All"
+  src: Zoom All
+  tr: Zoom All
 
 entry-31:
-  src: "Measure"
-  tr: "Measure"
+  src: Measure
+  tr: Measure
 
 entry-32:
-  src: "View Cube"
-  tr: "View Cube"
+  src: View Cube
+  tr: View Cube
 
 entry-33:
-  src: "Cutting Plane"
-  tr: "Cutting Plane"
+  src: Cutting Plane
+  tr: Cutting Plane
 
 entry-34:
-  src: "Edit"
-  tr: "Edit"
+  src: Edit
+  tr: Edit
 
 entry-35:
-  src: "Edit Cutting Plane"
-  tr: "Edit Cutting Plane"
+  src: Edit Cutting Plane
+  tr: Edit Cutting Plane
 
 entry-36:
-  src: "Move"
-  tr: "Move"
+  src: Move
+  tr: Move
 
 entry-37:
-  src: "Move Cutting Plane"
-  tr: "Move Cutting Plane"
+  src: Move Cutting Plane
+  tr: Move Cutting Plane
 
 entry-38:
-  src: "View"
-  tr: "View"
+  src: View
+  tr: View
 
 entry-39:
-  src: "Edit View"
-  tr: "Edit View"
+  src: Edit View
+  tr: Edit View
 
 entry-40:
-  src: "Rotation Angle"
-  tr: "Rotation Angle"
+  src: Rotation Angle
+  tr: Rotation Angle
 
 entry-41:
-  src: "View Name"
-  tr: "View Name"
+  src: View Name
+  tr: View Name
 
 entry-42:
-  src: "Save"
-  tr: "Save"
+  src: Save
+  tr: Save
 
 entry-43:
-  src: "Save View"
-  tr: "Save View"
+  src: Save View
+  tr: Save View
 
 entry-44:
-  src: "Delete"
-  tr: "Delete"
+  src: Delete
+  tr: Delete
 
 entry-45:
-  src: "Delete View"
-  tr: "Delete View"
+  src: Delete View
+  tr: Delete View

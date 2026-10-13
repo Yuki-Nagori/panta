@@ -66,7 +66,7 @@ Rust library 是唯一 parser/validator；C++/QML 不复制 grammar，也不把 
 
 ## 验证与演进
 
-测试覆盖 pest 正反文法、源码位置、kind 分派、确定性快照、TS 生成、占位符/context 一致性、聚合资源上限、输出名冲突和完整目录替换。用固定夹具验证 CLI 在任意 cwd 工作、输出路径不依赖本地环境；用锁定的 QtTools 做 QM 编译冒烟。任务 032 当前为 deferred，因此其覆盖率门槛不作为本任务阻塞条件；本任务仍要求行为和失败契约测试。
+测试覆盖 pest 正反文法、源码位置、kind 分派、确定性快照、TS 生成、占位符/context 一致性、聚合资源上限、输出名冲突和完整目录替换。用固定夹具验证 CLI 在任意 cwd 工作、输出路径不依赖本地环境；根目录 `cargo format --check` 还会调用共享 CLI 检查 `crates/` 与 `resources/` 中的 `.pa` 源文件，并跳过刻意非规范的 fixture。用锁定的 QtTools 做 QM 编译冒烟。任务 032 当前为 deferred，因此其覆盖率目标不阻塞 DSL 工具链任务；行为和失败契约测试仍由各任务验收。
 
 V1 只支持声明式 `.pa` 数据和由编译器生成的 Qt TS 载荷，不提供 eval、脚本、import、网络、shell、字节码或任意 XML 注入。需要新 kind 时先增加 schema、诊断和夹具，再扩展 parser；不在公共 parser 里加入业务字段猜测或隐式兼容分支。
 

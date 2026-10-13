@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::command::{cargo, run, run_scanner};
+use crate::command::{cargo, cargo_command, run, run_scanner};
 use crate::paths::{repository_root, target_root};
 
 pub(super) fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Error>> {
@@ -21,6 +21,7 @@ pub(super) fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Err
     } else {
         cargo("fmt", ["--all"])?;
     }
+    run_pa_format(check)?;
     check_cpp_format(check)?;
     run_cmake_format(check)?;
     run_qml_format(check)?;
@@ -30,6 +31,59 @@ pub(super) fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Err
         println!("format 完成");
     }
     Ok(())
+}
+
+/// 所有仓库 `.pa` 源文件共享同一个 parser 和 formatter 规范。
+fn run_pa_format(check: bool) -> Result<(), Box<dyn Error>> {
+    let root = repository_root()?;
+    let mut files = Vec::new();
+    for directory in ["crates", "resources"] {
+        files.extend(pa_sources(&root.join(directory))?);
+    }
+    if files.is_empty() {
+        return Err(".pa 源文件清单为空".into());
+    }
+    files.sort();
+
+    let (description, mut build) = cargo_command("build", ["--locked", "--package", "panta-dslc"])?;
+    build.arg("--target").arg(env!("PANTA_TEST_HOST"));
+    run(&description, build)?;
+    let profile = if env!("PANTA_TEST_BUILD_TYPE") == "Release" {
+        "release"
+    } else {
+        "debug"
+    };
+    let binary = Path::new(env!("PANTA_TEST_CARGO_TARGET_DIR"))
+        .join(profile)
+        .join(panta_build::exe_name("panta-dslc"));
+    if !binary.is_file() {
+        return Err(format!("panta-dslc 不存在：{}", binary.display()).into());
+    }
+
+    for file in files {
+        let mut command = Command::new(&binary);
+        command.arg("format");
+        if check {
+            command.arg("--check");
+        }
+        command.arg(&file);
+        run(&format!("panta-dslc format {}", file.display()), command)?;
+    }
+    Ok(())
+}
+
+fn pa_sources(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type()?.is_dir() && entry.file_name() != "fixtures" {
+            files.extend(pa_sources(&path)?);
+        } else if path.extension().is_some_and(|extension| extension == "pa") {
+            files.push(path);
+        }
+    }
+    Ok(files)
 }
 
 fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {
