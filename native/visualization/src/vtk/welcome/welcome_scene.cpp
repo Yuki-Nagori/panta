@@ -175,6 +175,14 @@ vtkSmartPointer<vtkPolyData> create_welcome_wordmark() {
 
 WelcomeScene::~WelcomeScene() { detach(); }
 
+void WelcomeScene::sync(vtkRenderWindow* render_window, bool primitive_visible, bool has_mesh) {
+    if (render_window == nullptr || !primitive_visible || has_mesh) {
+        detach();
+        return;
+    }
+    attach(render_window);
+}
+
 void WelcomeScene::attach(vtkRenderWindow* render_window) {
     if (render_window == nullptr || renderer_ != nullptr) {
         return;
@@ -221,12 +229,6 @@ void WelcomeScene::detach() {
     text_actor_ = nullptr;
     renderer_ = nullptr;
     render_window_ = nullptr;
-}
-
-void WelcomeScene::set_visible(bool visible) {
-    if (text_actor_ != nullptr) {
-        text_actor_->SetVisibility(visible);
-    }
 }
 
 } // namespace panta::visualization

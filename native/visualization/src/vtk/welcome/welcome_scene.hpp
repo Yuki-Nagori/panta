@@ -14,9 +14,9 @@ class WelcomeScene final {
   public:
     ~WelcomeScene();
 
+    void sync(vtkRenderWindow* render_window, bool primitive_visible, bool has_mesh);
     void attach(vtkRenderWindow* render_window);
     void detach();
-    void set_visible(bool visible);
 
   private:
     vtkSmartPointer<vtkRenderWindow> render_window_;

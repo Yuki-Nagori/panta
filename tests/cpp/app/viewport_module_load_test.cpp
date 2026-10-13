@@ -51,6 +51,15 @@ class ViewportTestAccess final {
     static bool previous_window_resources_released(const VtkViewport& viewport) {
         return viewport.test_previous_window_resources_released();
     }
+    static bool camera_transition_active(const VtkViewport& viewport) {
+        return viewport.test_camera_transition_active();
+    }
+    static bool camera_transition_timer_active(const VtkViewport& viewport) {
+        return viewport.test_camera_transition_timer_active();
+    }
+    static void start_camera_transition(VtkViewport& viewport) {
+        viewport.test_start_camera_transition();
+    }
     static bool render_resources_absent(const VtkViewport& viewport) {
         return viewport.test_render_resources_absent();
     }
@@ -191,7 +200,13 @@ class ViewportModuleLoadTest final : public QObject {
             }
         }
 
+        panta::visualization::ViewportTestAccess::start_camera_transition(viewport);
+        QVERIFY(panta::visualization::ViewportTestAccess::camera_transition_active(viewport));
+        QVERIFY(panta::visualization::ViewportTestAccess::camera_transition_timer_active(viewport));
         viewport.setVisible(false);
+        QVERIFY(!panta::visualization::ViewportTestAccess::camera_transition_active(viewport));
+        QVERIFY(
+            !panta::visualization::ViewportTestAccess::camera_transition_timer_active(viewport));
         scene.mesh.reset();
         ++scene.revision;
         viewport.apply_state(scene);
@@ -229,8 +244,14 @@ class ViewportModuleLoadTest final : public QObject {
         QTest::qWait(100);
         QCOMPARE(capture.count(), 1);
 
+        panta::visualization::ViewportTestAccess::start_camera_transition(viewport);
+        QVERIFY(panta::visualization::ViewportTestAccess::camera_transition_active(viewport));
+        QVERIFY(panta::visualization::ViewportTestAccess::camera_transition_timer_active(viewport));
         second.show();
         parent.setParentItem(second.contentItem());
+        QVERIFY(!panta::visualization::ViewportTestAccess::camera_transition_active(viewport));
+        QVERIFY(
+            !panta::visualization::ViewportTestAccess::camera_transition_timer_active(viewport));
         QTRY_COMPARE_WITH_TIMEOUT(initialized.count(), 2, 10000);
         QVERIFY(
             panta::visualization::ViewportTestAccess::previous_window_resources_released(viewport));
@@ -293,13 +314,28 @@ class ViewportModuleLoadTest final : public QObject {
 
     void destroys_attached_viewport_with_pending_refresh() {
         QQuickWindow window;
+        window.resize(320, 240);
         {
             panta::visualization::VtkViewport viewport(window.contentItem());
             viewport.setSize(QSizeF(200, 100));
             viewport.apply_state({});
+            if (qEnvironmentVariableIsSet("PANTA_TEST_NATIVE_VIEWPORT")) {
+                QSignalSpy initialized(&viewport,
+                                       &panta::visualization::VtkViewport::sceneInitialized);
+                window.show();
+                QTRY_COMPARE_WITH_TIMEOUT(initialized.count(), 1, 10000);
+                panta::visualization::ViewportTestAccess::start_camera_transition(viewport);
+                QVERIFY(
+                    panta::visualization::ViewportTestAccess::camera_transition_active(viewport));
+                QVERIFY(panta::visualization::ViewportTestAccess::camera_transition_timer_active(
+                    viewport));
+            }
+            panta::visualization::RenderScene changed_scene;
+            changed_scene.revision = 1;
+            viewport.apply_state(changed_scene);
         }
         // 基类析构的 windowChanged 与待执行的刷新都不得访问已释放的 Impl。
-        QCoreApplication::processEvents();
+        QTest::qWait(50);
     }
 };
 
