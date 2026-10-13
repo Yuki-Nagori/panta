@@ -57,6 +57,9 @@ class ViewportTestAccess final {
     static bool camera_transition_timer_active(const VtkViewport& viewport) {
         return viewport.test_camera_transition_timer_active();
     }
+    static QSize applied_pixel_size(const VtkViewport& viewport) {
+        return viewport.test_applied_pixel_size();
+    }
     static void start_camera_transition(VtkViewport& viewport) {
         viewport.test_start_camera_transition();
     }
@@ -147,6 +150,14 @@ class ViewportModuleLoadTest final : public QObject {
         QCoreApplication::processEvents();
         first.show();
         QTRY_COMPARE_WITH_TIMEOUT(initialized.count(), 1, 10000);
+        const qreal dpr = first.devicePixelRatio();
+        qInfo() << "Native viewport test DPR:" << dpr;
+        const QByteArray expected_dpr = qgetenv("PANTA_TEST_EXPECTED_DPR");
+        if (!expected_dpr.isEmpty()) {
+            QCOMPARE(dpr, expected_dpr.toDouble());
+        }
+        QCOMPARE(panta::visualization::ViewportTestAccess::applied_pixel_size(viewport),
+                 QSize(qRound(viewport.width() * dpr), qRound(viewport.height() * dpr)));
         QTest::qWait(100);
         capture.reset();
         panta::visualization::RenderScene scene;
@@ -214,6 +225,18 @@ class ViewportModuleLoadTest final : public QObject {
         QVERIFY(panta::visualization::ViewportTestAccess::previous_mapper_released(viewport));
         capture.reset();
         viewport.setVisible(true);
+        QTRY_VERIFY_WITH_TIMEOUT(capture.count() > 0, 10000);
+
+        capture.reset();
+        panta::visualization::ViewportTestAccess::start_camera_transition(viewport);
+        first.showMinimized();
+        QTRY_VERIFY_WITH_TIMEOUT(first.visibility() == QWindow::Minimized, 10000);
+        QVERIFY(!panta::visualization::ViewportTestAccess::camera_transition_active(viewport));
+        QVERIFY(
+            !panta::visualization::ViewportTestAccess::camera_transition_timer_active(viewport));
+        QTest::qWait(100);
+        QCOMPARE(capture.count(), 0);
+        first.showNormal();
         QTRY_VERIFY_WITH_TIMEOUT(capture.count() > 0, 10000);
 
         capture.reset();

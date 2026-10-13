@@ -5,6 +5,7 @@
 #pragma once
 
 #include <QQuickItem>
+#include <QSize>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
 #include <panta/visualization/viewport_backend.hpp>
@@ -57,6 +58,7 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     bool test_previous_window_resources_released() const;
     bool test_camera_transition_active() const;
     bool test_camera_transition_timer_active() const;
+    QSize test_applied_pixel_size() const;
     /// 当前没有 render window、hardware window、interactor 或已接入的原生 view。
     bool test_render_resources_absent() const;
     /// 下次初始化用 Dawn 不提供的 backend 预检 adapter，走 device 失败清理。

@@ -229,6 +229,8 @@ bool VtkViewport::test_camera_transition_timer_active() const {
     return impl_->camera_transition_timer.isActive();
 }
 
+QSize VtkViewport::test_applied_pixel_size() const { return impl_->applied_pixel_size; }
+
 bool VtkViewport::test_render_resources_absent() const {
     return impl_->render_window == nullptr && impl_->hardware_window == nullptr &&
            impl_->interactor == nullptr && impl_->renderer == nullptr &&
