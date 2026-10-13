@@ -107,7 +107,9 @@ fn orchestrate() -> Result<PathBuf, String> {
     // TS，供 CMake 侧锁定 lrelease 编 QM。解析失败立即终止构建，旧 TS 保持
     // 不动；与 panta-dslc CLI 共享 panta-dsl-core，无第二套 parser。
     let i18n_dir = PathBuf::from(&manifest_dir).join("../../resources/i18n");
-    let ts_dir = binary_dir.join("i18n");
+    // TS 是 CMake i18n 子目录的输入；必须与该子目录的 QM、qrc 和对象产物分开，
+    // 否则替换 TS 集合时会清掉 CMake 的增量构建状态。
+    let ts_dir = binary_dir.join("generated/i18n-ts");
     emit_translation_sources(&i18n_dir, &ts_dir)?;
     // 托管引导（任务 020）：定位 → 缺失时按固定资产下载并校验。
     let cmake = provision::resolve_cmake(&target_root)?;

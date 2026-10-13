@@ -236,6 +236,35 @@ fn emit_ts_carries_status_comment_and_numerus_features() -> Result<(), Box<dyn E
 }
 
 #[test]
+fn emit_ts_preserves_every_plural_form() -> Result<(), Box<dyn Error>> {
+    let document = parse(
+        "version: 1\nkind: language\nlanguage: ru-RU\n\n[App]\nitems:\n  src: \"%n item\"\n  numerus: true\n  tr: [\"%n one\", \"%n few\", \"%n many\"]\n",
+    )?;
+
+    let ts = emit_ts(&document, "ru-RU")?;
+
+    assert!(ts.contains("<numerusform>%n one</numerusform>"), "{ts}");
+    assert!(ts.contains("<numerusform>%n few</numerusform>"), "{ts}");
+    assert!(ts.contains("<numerusform>%n many</numerusform>"), "{ts}");
+    Ok(())
+}
+
+#[test]
+fn emit_ts_rejects_colliding_qualified_ids() -> Result<(), Box<dyn Error>> {
+    let document = parse(
+        "version: 1\nkind: language\nlanguage: en\n\n[A]\nb.c:\n  src: First\n\n[A.b]\nc:\n  src: Second\n",
+    )?;
+
+    let error = match emit_ts(&document, "en") {
+        Err(error) => error,
+        Ok(_) => panic!("colliding Qt IDs unexpectedly emitted"),
+    };
+
+    assert!(error.to_string().contains("pa.duplicate_ts_id"), "{error}");
+    Ok(())
+}
+
+#[test]
 fn emit_ts_rejects_placeholder_mismatch_and_invalid_locale() -> Result<(), Box<dyn Error>> {
     // TS 输出只接受 language 文档；theme / variables 仍可解析和格式化。
     let variables = parse("version: 1\nkind: variables\n\nvalues:\n  spacing-small: int = 8\n")?;
@@ -392,19 +421,47 @@ fn valid_escapes_decode_into_control_characters() -> Result<(), Box<dyn std::err
 
 #[test]
 fn unsupported_escapes_are_rejected() -> Result<(), Box<dyn std::error::Error>> {
-    assert!(matches!(
-        parse("version: 1\nkind: language\nlanguage: en\n\n[App]\ntext:\n  src: bad\\x\n"),
-        Err(ref diagnostics) if diagnostics.to_string().contains("pa.invalid_escape")
-    ));
+    let source = "version: 1\nkind: language\nlanguage: en\n\n[中]\ntext:\n  src: \"前缀\\x\"\n";
+    let escape_offset = source.find("\\x").unwrap_or(usize::MAX);
+    let error = match parse(source) {
+        Err(error) => error,
+        Ok(_) => panic!("unsupported escape unexpectedly accepted"),
+    };
+    let diagnostic = error
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "pa.invalid_escape")
+        .unwrap_or_else(|| panic!("missing invalid escape diagnostic: {error}"));
+
+    assert_eq!(diagnostic.start_offset, escape_offset);
+    assert_eq!(diagnostic.end_offset, escape_offset);
+    assert_eq!(diagnostic.line, 7);
+    assert_eq!(diagnostic.column, 11);
     Ok(())
 }
 
 #[test]
 fn trailing_escape_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
-    assert!(matches!(
-        parse("version: 1\nkind: language\nlanguage: en\n\n[App]\ntext:\n  src: bad\\\n"),
-        Err(ref diagnostics) if diagnostics.to_string().contains("pa.invalid_escape")
-    ));
+    let mut source =
+        String::from("version: 1\nkind: language\nlanguage: en\n\n[中]\ntext:\n  src: ");
+    source.push_str(&"a".repeat(41));
+    source.push('\\');
+    let escape_offset = source.len() - 1;
+
+    let error = match parse(&source) {
+        Err(error) => error,
+        Ok(_) => panic!("trailing escape unexpectedly accepted"),
+    };
+    let diagnostic = error
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "pa.invalid_escape")
+        .unwrap_or_else(|| panic!("missing invalid escape diagnostic: {error}"));
+
+    assert_eq!(diagnostic.start_offset, escape_offset);
+    assert_eq!(diagnostic.end_offset, escape_offset);
+    assert_eq!(diagnostic.line, 7);
+    assert_eq!(diagnostic.column, 49);
     Ok(())
 }
 

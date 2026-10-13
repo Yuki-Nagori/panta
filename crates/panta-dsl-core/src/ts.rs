@@ -1,6 +1,7 @@
 //! 确定性 Qt TS 输出；公共 AST 可手工修改，输出前复核目标 locale 与占位符。
 
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::string::FromUtf8Error;
 
 use quick_xml::Writer;
@@ -37,7 +38,19 @@ pub fn emit_ts(document: &Document, locale: &str) -> Result<String, Diagnostics>
         ));
     }
     let mut diagnostics = Vec::new();
+    let mut qualified_ids = HashSet::new();
     for message in document.messages.values() {
+        let qualified_id = qualified_id(message);
+        if !qualified_ids.insert(qualified_id.clone()) {
+            diagnostics.push(Diagnostic {
+                code: "pa.duplicate_ts_id".to_owned(),
+                message: format!("multiple messages produce Qt ID '{qualified_id}'"),
+                start_offset: 0,
+                end_offset: 0,
+                line: 1,
+                column: 1,
+            });
+        }
         if let Some(translation) = message.translations.get(&locale)
             && message.status != Some(Status::Unfinished)
             && message.status != Some(Status::Vanished)
@@ -106,7 +119,7 @@ fn emit_message(
     let mut node = BytesStart::new("message");
     // Qt 的 ID 在整个 TS 中唯一，.pa 的 ID 只在 context 内唯一。
     // 为 qtTrId 限定命名空间，同时保持 context + source 查找语义。
-    let qualified_id = format!("{}.{}", message.context, message.id);
+    let qualified_id = qualified_id(message);
     node.push_attribute(("id", qualified_id.as_str()));
     if message.numerus {
         node.push_attribute(("numerus", "yes"));
@@ -138,7 +151,7 @@ fn emit_message(
         .map(|value| value.forms.as_slice())
         .unwrap_or(&[]);
     if message.numerus {
-        for form in forms.iter().take(2) {
+        for form in forms {
             write_text_element(writer, "numerusform", form)?;
         }
         if forms.is_empty() {
@@ -158,6 +171,10 @@ fn emit_message(
         .write_event(Event::End(BytesEnd::new("message")))
         .map_err(writer_error)?;
     Ok(())
+}
+
+fn qualified_id(message: &Message) -> String {
+    format!("{}.{}", message.context, message.id)
 }
 
 fn write_text_element(

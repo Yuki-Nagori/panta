@@ -50,6 +50,9 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 - [x] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 context/ID、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。固定快照测试已加入；本批次 macOS/Linux/Windows CI 已通过。
 - [x] Pest 语法诊断保留准确 UTF-8 字节位置/范围；版本、locale、消息与 language-only 头部语义诊断定位到相关声明。kind variables/theme/language 分派明确，未知域与重复字段返回稳定诊断。
 - [x] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/source、自动生成的内部 id、占位符和 locale 基线不丢失。
+- [x] 构建树 TS 输入目录与 CMake `native/i18n` 输出目录隔离；重复构建保留 QM、qrc 和 native 增量构建状态。
+- [x] Qt ID 生成无歧义，遇到不同 context/ID 组合产生相同最终 ID 时稳定报错；numerus 的每个 plural form 均写入 TS，不静默截断。
+- [x] 转义诊断使用原文 UTF-8 字节位置；quoted / unquoted 字段中的非 ASCII 前缀后出现错误转义时都能准确定位且不 panic。
 - [x] CLI 为单文件可执行物，任意 cwd 可运行且不访问网络/系统 Qt；输出临时 TS 后由锁定的预编译 `lrelease` 生成 QM。
 - [x] Cargo workspace 测试、format、lint、Clippy 与关键失败夹具通过；任务 032 当前 deferred，其 100% 覆盖率目标不阻塞本任务，仍以行为/失败契约测试验收。
 - [x] 022、025、030 文档明确复用本共享 parser；当前语言构建入口直接依赖 `panta-dsl-core`，仓库没有第二套 parser 或 TS XML 生成实现。025/030 的业务消费者仍由各自 planned task 实施。
@@ -93,7 +96,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 完成摘要
 
-实现、文档、本地验证、独立评审及本批次三平台 CI 均已完成。032 覆盖率工作保持 deferred，不作为本任务阻塞项。
+原始实现和 PR #14 已合并。后续独立复审发现 TS 构建目录与 CMake 输出目录重叠、转义诊断偏移、多复数形式截断和 Qt ID 碰撞风险；修复、回归测试、本机 workspace 门禁、独立评审及 PR #15 三平台 CI 均已完成。032 覆盖率工作保持 deferred，不作为本任务阻塞项。
 
 ## 历史进展（截至 2026-09-17）
 
@@ -102,3 +105,11 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 ## 本轮实现与验收（2026-10-13）
 
 独立审查发现并修复重复 context、language 声明计数、隐式 Context 往返和重复 `numerus` 问题。本轮新增 Artifact 聚合与固定 JSON 快照、确定性顺序、source ID 诊断、聚合来源/字节/声明上限、按 locale 生成 TS 和输出名冲突拒绝。launcher 在解析全部来源、生成全部 TS 后才通过 `panta-build` 的 staging/backup 目录发布完整文件集。诊断现保留 UTF-8 字节范围，并将消息、版本和 locale 相关语义错误定位到源声明。022/025/030 及 DSL 模块文档已按实际职责更正；032 deferred 不阻塞 034。macOS arm64 的 format、聚合 lint、workspace 测试及 75/75 CTest 均通过；独立最终评审未发现阻塞提交的问题；PR #14 的三平台构建与必需检查全部通过。
+
+## 复审跟进（2026-10-13）
+
+独立复审指出四项遗漏：TS 临时输入目录不能复用 CMake 的 `native/i18n` 输出目录；转义错误位置必须基于 pair 在原文中的字节起点；TS 生成要保留所有复数形式；扁平 Qt ID 组合必须检测碰撞。以上均已修复。回归测试覆盖 quoted/unquoted Unicode 前缀的转义位置、多 plural forms 和 Qt ID 碰撞；本机 launcher 构建及最终 workspace 聚合门禁通过。独立评审未发现实现问题；其关于 quoted 错误转义位置断言的建议已落实并通过复验。PR #15 的 macOS、Linux、Windows 构建，Rust/C++ 覆盖率、QML、格式和适用 lint 检查全部通过。
+
+| 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
+|---|---|---|---|
+| 2026-10-13 | Review follow-up：`cargo build --locked -p panta-launcher`；`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace`；TS/CMake 产物目录检查；PR #15 三平台 CI（run [38399461566](https://github.com/Yuki-Nagori/panta/actions/runs/38399461566)） | TS 输入与 CMake 输出目录隔离；转义字节位置稳定；TS 保留所有 forms 并拒绝 ID 碰撞；本机与三平台门禁通过 | 本机 macOS arm64 构建及 workspace 门禁通过；CTest 75/75。TS 位于 `target/native/debug/generated/i18n-ts`，QM、qrc 与 CMake 构建状态仍在 `target/native/debug/i18n`。独立评审无阻塞问题；quoted/unquoted Unicode 转义精确位置测试均通过。PR #15 的 macOS/Linux/Windows Cargo build、Rust/native 覆盖率、格式、Clippy、clang-tidy、cppcheck、include 检查全部通过；按变更路径跳过的 cargo audit、CMake lint、qmllint 符合预期。 |
