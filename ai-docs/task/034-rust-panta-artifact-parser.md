@@ -1,6 +1,6 @@
 # 034 — Rust Panta Artifact 解析与 TS/QM 编译入口
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P1
@@ -47,7 +47,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 验收标准
 
-- [ ] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 context/ID、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。固定快照测试已加入，需本批次 macOS/Linux/Windows CI 运行作为平台证据。
+- [x] 同一 `.pa` 输入在三平台得到相同规范化 Artifact 快照；未知必需版本、重复 context/ID、非法 locale、语法错误和资源上限均拒绝且不覆盖旧产物。固定快照测试已加入；本批次 macOS/Linux/Windows CI 已通过。
 - [x] Pest 语法诊断保留准确 UTF-8 字节位置/范围；版本、locale、消息与 language-only 头部语义诊断定位到相关声明。kind variables/theme/language 分派明确，未知域与重复字段返回稳定诊断。
 - [x] quick-xml 根据语言快照生成受支持的 Qt TS XML，context/source、自动生成的内部 id、占位符和 locale 基线不丢失。
 - [x] CLI 为单文件可执行物，任意 cwd 可运行且不访问网络/系统 Qt；输出临时 TS 后由锁定的预编译 `lrelease` 生成 QM。
@@ -72,7 +72,8 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 | 2026-09-17 | 三平台 CI（push 2f62a69，run [35233366640](https://github.com/Yuki-Nagori/panta/actions/runs/35233366640)） | 三平台走通 qttools 下载 + TS/QM 链路 | macOS/Windows 全绿（含锁定 lrelease 编 QM、qrc 嵌入与链接）；Linux 暴露 qtdeclarative 历史记录哈希笔误（`…db6e92…` 应为 `…dbb6e92…`，此前被 CI 缓存掩盖，新的每归档指纹强制复验后失败）。修复：实测回填正确哈希，并在两处 `file(DOWNLOAD)` 后立即复验 + FATAL——该命令的哈希不符是延迟错误，会继续跑完 configure 并写入带错哈希的解包指纹，毒化后续缓存判定。 |
 | 2026-09-17 | 三平台 CI 复跑（push 0c16681，run [35234986184](https://github.com/Yuki-Nagori/panta/actions/runs/35234986184)） | 哈希修正后三平台全绿 | windows-2022 / macos-latest / ubuntu-latest 全部 success：qttools 下载校验、build.rs TS 生成、锁定 lrelease 编 QM、qrc 嵌入与链接在三平台干净环境成立（QTranslator 加载为 ctest，CI 执行待 011 聚合）。 |
 | 2026-10-13 | `cargo test --locked -p panta-dsl-core` | 重复 context 稳定拒绝；language message 纳入声明上限，刚好达到上限可通过、超限拒绝 | 通过：新增重复 context/跨 context 同 ID 行为测试；language 16,384 条消息可解析，第 16,385 条返回 `pa.too_many_declarations`。 |
-| 2026-10-13 | 最终复验：`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace`、`git diff --check` | workspace 与 DSL core 检查通过 | 通过：Rust workspace 测试、聚合 lint 全绿，CTest 75/75；Clippy 包含在聚合 lint 中。macOS arm64。本批次三平台 CI 仍待提交后验证。 |
+| 2026-10-13 | 最终复验：`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace`、`git diff --check` | workspace 与 DSL core 检查通过 | 通过：Rust workspace 测试、聚合 lint 全绿，CTest 75/75；Clippy 包含在聚合 lint 中。macOS arm64。 |
+| 2026-10-13 | PR #14 三平台 CI（run [38364866559](https://github.com/Yuki-Nagori/panta/actions/runs/38364866559)） | macOS、Linux、Windows 构建及适用质量检查通过 | 通过：三平台 Cargo check/build、格式、lint、Rust 与 native 覆盖率、QML 测试、依赖审计全部通过；CMake/QML 单项 lint 按变更路径跳过。 |
 | 2026-10-13 | 重复 `numerus` 字段回归用例；`cargo test --locked -p panta-dsl-core`、`cargo format --check`、DSL core Clippy | 重复元数据不得静默覆盖，定向质量门禁通过 | 通过：第二个 `numerus` 返回 `pa.duplicate_field`；core 单元/集成测试、格式与 Clippy 全绿。 |
 | 2026-10-13 | Artifact 快照、确定性 JSON、来源关联诊断、TS 冲突与多来源资源边界测试；`cargo test --locked -p panta-dsl-core` | 输入顺序无关、失败包含 source ID、冲突和资源超限稳定拒绝 | 通过：固定 JSON fixture、source ID 错误关联、16 MiB 聚合输入、256 来源和 65,536 声明上限均由测试覆盖。 |
 | 2026-10-13 | launcher `cargo build --locked`；`panta-build` 目录发布单测 | build.rs 通过共享 Artifact 核心生成 locale TS；失败时保留既有输出，成功后移除陈旧 TS | 通过：本机 macOS arm64 构建成功；TS 产物出现在 `target/native/debug/i18n`，完整目录替换及非法文件名不触碰旧目录由单测覆盖。 |
@@ -92,7 +93,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 完成摘要
 
-实现范围已完成；本批次本地验证与独立评审通过后，剩余最终门槛为三平台 CI。032 覆盖率工作保持 deferred，不作为本任务阻塞项。CI 成功后同步本节和索引状态为 done。
+实现、文档、本地验证、独立评审及本批次三平台 CI 均已完成。032 覆盖率工作保持 deferred，不作为本任务阻塞项。
 
 ## 历史进展（截至 2026-09-17）
 
@@ -100,4 +101,4 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 本轮实现与验收（2026-10-13）
 
-独立审查发现并修复重复 context、language 声明计数、隐式 Context 往返和重复 `numerus` 问题。本轮新增 Artifact 聚合与固定 JSON 快照、确定性顺序、source ID 诊断、聚合来源/字节/声明上限、按 locale 生成 TS 和输出名冲突拒绝。launcher 在解析全部来源、生成全部 TS 后才通过 `panta-build` 的 staging/backup 目录发布完整文件集。诊断现保留 UTF-8 字节范围，并将消息、版本和 locale 相关语义错误定位到源声明。022/025/030 及 DSL 模块文档已按实际职责更正；032 deferred 不阻塞 034。macOS arm64 的 format、聚合 lint、workspace 测试及 75/75 CTest 均通过；独立最终评审未发现阻塞提交的问题。任务保持 in-progress，等待本批提交的 macOS/Linux/Windows CI 验证后再更新为 done。
+独立审查发现并修复重复 context、language 声明计数、隐式 Context 往返和重复 `numerus` 问题。本轮新增 Artifact 聚合与固定 JSON 快照、确定性顺序、source ID 诊断、聚合来源/字节/声明上限、按 locale 生成 TS 和输出名冲突拒绝。launcher 在解析全部来源、生成全部 TS 后才通过 `panta-build` 的 staging/backup 目录发布完整文件集。诊断现保留 UTF-8 字节范围，并将消息、版本和 locale 相关语义错误定位到源声明。022/025/030 及 DSL 模块文档已按实际职责更正；032 deferred 不阻塞 034。macOS arm64 的 format、聚合 lint、workspace 测试及 75/75 CTest 均通过；独立最终评审未发现阻塞提交的问题；PR #14 的三平台构建与必需检查全部通过。
