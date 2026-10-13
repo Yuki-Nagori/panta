@@ -12,9 +12,9 @@ V1 先保证导入与检查闭环，不预设完整 CAD 建模、布尔编辑或
 
 ## 从 STL 表面构造 B-rep
 
-未来的 STL 修复路线以 Rust `panta-mesh::SurfaceMesh` 作为来源资产。Rust 任务根据几何摘要、用户选择和限制决定转换策略；C++ OCCT adapter 将三角片构造成 faceted B-rep、执行明确范围的修复，并返回结构化诊断。Rust 验证结果后提交一个新的 `GeometryAsset` ID / revision，记录它来源于哪个 Mesh revision；失败、取消或来源 revision 变化不能覆盖旧 Mesh 或已提交几何。
+未来的 STL 修复路线以 Rust `panta-mesh::SurfaceMesh` 作为来源资产。Rust 领域任务根据几何摘要、用户选择和领域约束决定是否转换、采用哪类操作及其可移植选项；C++ OCCT adapter 将这些选项映射到 OCCT 专属参数，将三角片构造成 faceted B-rep、执行明确范围的 B-rep 修复并返回结构化诊断。Rust 验证结果后提交一个新的 `GeometryAsset` ID / revision，记录它来源于哪个 Mesh revision；失败、取消或来源 revision 变化不能覆盖旧 Mesh 或已提交几何。
 
-由三角片重建的 faceted B-rep 不会恢复原始 STEP/IGES 中的解析曲面、尺寸约束或设计历史。曲面拟合、闭合判定、修复容差、拓扑身份映射和可逆性必须由单独任务定义，不可将 OCCT 接口调用描述为可无损“修复 STL”。提交后的 B-rep 需要独立的数据文件格式 / native shape 所有权策略；Mesh sidecar 任务 088 只负责 Surface / Volume Mesh 资产，不持久化 OCCT 对象。
+由三角片重建的 faceted B-rep 不会恢复原始 STEP/IGES 中的解析曲面、尺寸约束或设计历史。`ShapeFix` / `ShapeUpgrade` 的具体能力要按操作和输入 B-rep 验证；`BRepMesh` 负责从 B-rep 生成离散三角化，不等同于对任意 STL 表面网格做通用质量优化。曲面拟合、闭合判定、修复容差、拓扑身份映射和可逆性必须由单独任务定义，不可将 OCCT 接口调用描述为可无损“修复 STL”。提交后的 B-rep 需要独立的数据文件格式 / native shape 所有权策略；Mesh sidecar 任务 088 只负责 Surface / Volume Mesh 资产，不持久化 OCCT 对象。
 
 ## 导入流程
 

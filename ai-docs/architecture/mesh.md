@@ -23,7 +23,7 @@ STL source asset → panta-import → panta-mesh::SurfaceMesh（Rust 权威）
                                               → vtkUnstructuredGrid → VTK
 ```
 
-Rust 拥有资产身份、来源 revision、转换 / 网格任务策略、参数和成功提交；C++ adapter 调用 OCCT / Netgen、转换输入输出并管理 native 所有权；VTK 只承担显示对象与 GPU 生命周期。场景 A 使用单个批量快照，不让 QML 持有数组，也不将 VTK 类型穿过 Rust。当前 SurfaceMesh 以每个三角面三个 f64 顶点表示；C++ 直接生成面法线，绕过 VTK 上重复拆点 / 三角化的处理。
+Rust 拥有资产身份、来源 revision、转换 / 网格任务策略、领域参数和成功提交；C++ adapter 调用 OCCT / Netgen，将领域选项映射为库参数、转换输入输出并管理 native 所有权；VTK 只承担显示对象与 GPU 生命周期。Netgen 可执行表面和体网格生成及相应网格优化；这些能力不等同于对原始 CAD 几何做 B-rep 修复。场景 A 使用单个批量快照，不让 QML 持有数组，也不将 VTK 类型穿过 Rust。当前 SurfaceMesh 以每个三角面三个 f64 顶点表示；C++ 直接生成面法线，绕过 VTK 上重复拆点 / 三角化的处理。
 
 场景 B 从 STL 三角面重建的是离散面片构成的 faceted B-rep；这不会恢复原始 CAD 的解析曲面、参数和设计历史。需要曲面拟合或拓扑修复时，任务必须定义容差、诊断、实体有效性、失败保留旧 GeometryAsset 和映射失效行为。GeometryAsset 的 ID 与 revision 由 Rust 持有；C++ OCCT shape 是运行期 native 对象，不能当成跨 FFI 的 Rust 领域对象。
 

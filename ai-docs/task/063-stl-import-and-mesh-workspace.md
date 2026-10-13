@@ -5,7 +5,7 @@
 - 依赖：[057](057-new-project-dialog.md)、[060](060-qml-project-workspace-reference.md)、[062](062-ribbon-tab-components.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-22 / 2026-10-02
+- 创建 / 更新：2026-09-22 / 2026-10-13
 
 ## 目标与背景
 
@@ -28,7 +28,8 @@
 
 将导入选项记录在 `.panta` 内是正确的边界，但不应只保存 UI 当前值或原始绝对路径。导入确认后，工程 manifest 应保存可重放的 import record，至少包含：
 
-- 工程内的源资产相对引用（首期将 STL 纳入目录包或由工程资产层托管），以及格式 / schema 版本；不能依赖用户电脑上的原绝对路径才能重新打开。
+- 独立的用户可见 `display_name`，与来源文件名、资产 ID 分离；默认由来源文件名去除已识别扩展名得到。名称冲突规则在实现前确认。
+- 来源文件原名、格式、工程内来源副本相对引用及内容摘要（建议 SHA-256）；原始修改时间仅可作为诊断元数据，不作为资产身份或内容一致性的依据。工程重开不能依赖用户电脑上的原绝对路径。
 - `meshType`：`midplane`、`dual-domain`、`solid-3d`；这是影响后续网格解释的工程数据。
 - `units`：首期支持界面中的明确单位选项，不能把“未指定”静默当成某个单位。
 - `showImportLog`：记录用户对该次导入的日志可见性选择，但它只是展示偏好，不替代导入诊断和结果状态。
@@ -36,7 +37,15 @@
 
 原始 STL 不应被修改；近似尺寸由解析结果计算并在确认窗只读展示。取消或导入失败不能写入工程 manifest、替换当前工程或清空已有视口。确认后的导入记录采用追加 / 版本化语义，避免改写其他已导入资产；具体 manifest schema 和资产复制策略在 native 实现阶段锁定并同步 034/048 的契约。
 
-当前实现将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。后续 `.panta` 元数据 + Mesh 索引、按页签加载规范 Mesh 的设计由 [任务 088](088-mesh-asset-sidecar-storage.md) 跟踪；不在 063 中提前改变现有 schema 或把 VTK 快照持久化。
+当前实现将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。063 负责为 import record 明确并持久化 `display_name` 与来源信息的分离；后续 `.panta` 元数据 + Mesh 索引、按页签加载规范 Mesh 的设计由 [任务 088](088-mesh-asset-sidecar-storage.md) 跟踪，并须从 import record 保留名称和来源契约。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
+
+### 资产显示名与来源
+
+来源文件、工程内资产和运行期数据是三个相关但不同的概念。当前工程复制并保存原始 STL；打开时由 `panta-mesh` 解析为内存中的 `SurfaceMesh`，尚未持久化为 Mesh sidecar。Sidecar 由 088 定义和实施，不能把当前 STL 源副本描述成已经转换后的工程 Mesh 文件。
+
+导入记录应区分用户看到的 `display_name` 与来源信息：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名，格式单独记录，工程内源副本使用相对资产引用。外部绝对路径不作为工程可移交性或资产身份的依据。当前 import record 的 ID 标识导入记录；未来 Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。063 在 import record 中持久化该显示名；088 迁移到 Mesh sidecar 索引时保留这一契约。
+
+显示名是否允许重复及冲突时如何区分仍待决策；实现前需要明确规则，且不得通过改写 `source_name` 或资产 ID 来消除显示冲突。
 
 ## 范围与非目标
 
@@ -48,6 +57,7 @@
 - 工程工作区左栏有两个独立 Dock：上部工程 / 任务 Dock 内部分为上下两区，顶部工程树展示多个导入 study，中间显示当前 study 的任务；底部保留独立的 Layers Dock、截图中的工具按钮和带 Layers 图标的单一页签，内容先留空，具体图层行为待后续确认。
 - `.panta` 工程打开后可再次导入一个或多个 STL；每个文件作为工程下独立零件加入，不覆盖已有零件，文件选择器允许多选。
 - `.panta` 内的 import record、源资产引用、失败回滚和重新打开恢复；QML 只发语义请求，C++ ViewModel 负责 Qt 适配，Rust 服务负责解析、校验、持久化和导入 DTO。
+- 将显示名与来源名分开：STL 默认显示名不带 `.stl`，来源名保留原扩展名；显示名与来源格式、工程内源副本引用及稳定资产身份分别保存 / 表达。
 - 新建项目弹窗 HTML 参考，补齐 homepage 之前遗漏的 Create New Project 状态。
 - 独立 HTML 状态参考：`open-project` 中点击 Import 后的导入弹窗，以及导入完成后的 `imported-project` 页面。
 
@@ -75,6 +85,7 @@
 - [x] 首期文件选择只接受 `.stl`，且格式集合可在不复制导入流程的情况下扩展。
 - [x] 取消 / 失败不修改工程；确认后 `.panta` 内有可重放 import record 和源资产引用。
 - [x] 重新打开工程可恢复导入记录、任务树和 STL 视口；版本 / 单位 / 尺寸错误可诊断。
+- [ ] Import record 和 Tasks / Layers / 文档页签显示独立的 `display_name`；默认从来源文件名去除已识别的格式扩展名，保留原始 `source_name`、格式、工程内来源资产引用及内容摘要。重复显示名规则经确认并有回归测试。
 - [x] 导入及工程服务错误通过结构化 DTO 跨 CXX 传递稳定错误码、类别和必要上下文；C++ 适配 Qt 展示字段与本地化消息，QML 不解析拼接错误文本。
 - [ ] STL 预检 / 写入导入迁为 Rust 后台任务，定义取消与提交截止点；GUI 线程不执行文件读取和格式解析。
 - [ ] QML / C++ / Rust 分层、静态检查、native 测试、真实窗口与视口生命周期验证通过。
@@ -101,6 +112,7 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 ## 风险与工作记录
 
+- 2026-10-13：按维护者补充，将工程导入资产的 `display_name` 与原始 `source_name` / 格式 / 来源副本引用区分；STL 默认显示文件名主体，来源内容摘要用于追溯，修改时间仅作诊断。当前导入仍复制 STL 并在激活时解析为内存 `SurfaceMesh`；Mesh sidecar 属于 088。重复显示名规则待实现前确认。OCCT 几何修复与 Netgen 网格优化边界同步澄清，具体几何修复流程不纳入 063。
 - 2026-10-08：后续写入导入后台化按 108 的工程写入协调和 109 的执行基础契约接入；沿用本任务的基础依赖，避免把历史导入基础与后续架构整理连成循环依赖。只读预检已完成，写入取消 / 提交截止点仍待实现。
 
 - 2026-10-02：CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/37005793824) 的 Linux TSan 在四个新接入后台预检的 ViewModel 用例中报告 Rust std mpsc 交付 / 释放竞态。当前 sanitizer 仅插桩自有 C++，Rust std 同步不可见，属于 042 已登记的工具边界；本轮按精确用例名补齐 TSan 组合排除，普通聚合及 ASan/UBSan 继续执行全部预检回归，Rust 并发正确性由既有 Miri 入口覆盖。不改业务同步实现或新增运行时抑制；修复后 macOS `cargo test --locked --workspace` 通过 Rust 测试及 72/72 个 native / QML CTest；`cargo sanitize` 通过 ASan/UBSan 72/72、TSan 51/51，`cargo format --check` 通过。用 CTest `--show-only=json-v1 -E` 对比实际清单，确认相对原名单仅减少这四个用例。`cargo lint --check` 全部通过；Linux 最终结果待新 CI 验证。

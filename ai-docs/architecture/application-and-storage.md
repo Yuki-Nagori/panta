@@ -44,7 +44,7 @@ Rust 负责工程、工作区、命令、任务、作业、序列化、撤销/�
 
 [092](../task/092-plan-analysis-sequence-and-mesh-settings.md) 在当前清单中增加按导入记录 ID 索引的 `analysis_sequences` 稀疏覆盖表；缺省表示 Fill，非默认选择由 Rust 校验并事务保存。读取时拒绝未知序列或没有对应导入记录的覆盖项。`imports[].mesh_type` 保留 STL 导入时选择的类型，供 Tasks 展示；它不代表已经生成对应分析网格。当前暂以导入记录关联方案设置，后续独立 Study 模型应保持领域 ID 和修订边界。
 
-目标存储将 `.panta` 保持为元数据和资产索引，规范 `SurfaceMesh` / 体 Mesh payload 旁置于同一可移交工程目录。索引按稳定 asset ID 和 revision 指向带格式版本、单位、来源 revision、内容摘要及相对路径的资产文件；打开工程只读索引，视口页签打开时由 Rust `panta-mesh` 按需读取并验证单个 Mesh。运行期缓存保存拥有内存的领域快照，C++ 通过批量 CXX DTO 创建 VTK 数据；VTK mapper、filter、actor 和 GPU 资源不写入工程。当前 `SurfaceMesh` 的三角面 payload 约 72 字节 / 面，binary STL 约 50 字节 / 面；若两者同时保留，Mesh sidecar 可能增加磁盘占用，不能预设其会压缩或减少显示内存。实现跟踪于 [088](../task/088-mesh-asset-sidecar-storage.md)，格式、原 STL 留存策略和事务细节尚待测量与决策。
+目标存储将 `.panta` 保持为元数据和资产索引，规范 `SurfaceMesh` / 体 Mesh payload 旁置于同一可移交工程目录。索引按稳定 asset ID 和 revision 指向带格式版本、单位、来源 revision、内容摘要及相对路径的资产文件；用户可见 `display_name` 是资产元数据，与 asset ID、来源文件名和格式分开。打开工程只读索引，视口页签打开时由 Rust `panta-mesh` 按需读取并验证单个 Mesh。运行期缓存保存拥有内存的领域快照，C++ 通过批量 CXX DTO 创建 VTK 数据；VTK mapper、filter、actor 和 GPU 资源不写入工程。当前导入仍将原始 STL 复制到 `assets/imports/`，再在激活时解析成内存 `SurfaceMesh`，尚无持久 Mesh sidecar。当前 `SurfaceMesh` 的三角面 payload 约 72 字节 / 面，binary STL 约 50 字节 / 面；若两者同时保留，Mesh sidecar 可能增加磁盘占用，不能预设其会压缩或减少显示内存。实现跟踪于 [088](../task/088-mesh-asset-sidecar-storage.md)，格式、原 STL 留存策略和事务细节尚待测量与决策。
 
 资产文件使用不可变 revision 名称。保存时先写临时 sidecar、校验并发布文件，再原子提交引用它的新 `.panta`；崩溃产生的未引用文件不影响上个有效索引，后续清理也必须检查运行中任务和资产引用。相对路径使整个工程目录可移动。单文件原子替换不代表多文件事务；资产发布顺序、摘要校验和失败恢复须由实际实现测试。
 

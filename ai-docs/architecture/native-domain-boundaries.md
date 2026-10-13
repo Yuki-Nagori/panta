@@ -42,8 +42,8 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 | 内容 | 责任 | 不允许 |
 |---|---|---|
 | Qt Quick / QML 界面、窗口、输入、场景图渲染及 Qt 工具链 | Qt / QML 提供平台集成、事件循环、控件、布局、即时图形能力和开发检查工具；C++ ViewModel 适配 QObject 属性、信号和 Rust 值 DTO | Rust 依赖 Qt；ViewModel 或 QML 承担工程持久化、导入 / 几何解析、领域校验或重库算法；为迁移语言重写 Qt 已提供的图形 / 工具能力；无任务论证而新增 Qt 运行时模块 |
-| STEP 读取、拓扑操作、几何修复、几何三角化 | C++ adapter 调用 OCCT；Rust 决定修复选项和是否提交 | 适配层重写几何修复算法或自行决定领域提交 |
-| 网格生成、库提供的网格优化 | C++ adapter 调用 Netgen；Rust 选择参数、输入修订与任务策略 | 适配层维护独立于领域层的网格有效性规则 |
+| STEP 读取、拓扑操作、几何修复、几何三角化 | C++ adapter 调用 OCCT；Rust 决定领域操作选项和是否提交，C++ 映射 OCCT 专属参数 | 适配层重写几何修复算法或自行决定领域提交 |
+| 网格生成、库提供的网格优化 | C++ adapter 调用 Netgen；Rust 选择领域参数、输入修订与任务策略，C++ 映射 Netgen 参数 | 适配层维护独立于领域层的网格有效性规则 |
 | 异常归一化、类型转换、数组展开、索引起点与单元节点顺序转换 | C++ adapter，属于接口语义转换 | 对外泄漏 OCCT/Netgen 类型或未声明所有权的指针 |
 | 工程网格有效性、应用质量阈值、区域 / 边界引用、资产失效 | Rust 领域层；边界仍保留必要长度 / 溢出 / 范围检查 | Rust 重写重库的几何修复或网格生成算法 |
 | 运行期 `SurfaceMesh` 缓存预算、LRU、驻留查询和关闭释放 | Rust `ProjectService`；C++ ViewModel 提供活动文档 pin 意图并投影批量驻留 ID | 在 ViewModel 按 ID 保留 Mesh 集合、计算预算或决定淘汰次序 |
@@ -99,10 +99,10 @@ Rust 工作区由 `panta-import` 承担统一的**导入服务契约**，不要�
 |---|---|---|---|
 | 读取 STL | `panta-import` 编排来源快照，`panta-mesh` 解析并拥有 `SurfaceMesh` | 无格式解析或业务选择 | 原始 source asset 与 Surface Mesh revision 分别标识 |
 | A. 直接显示 | 选择活动 Mesh revision，返回拥有内存的批量快照 | C++ 将三角面转换为 `vtkPolyData`，VTK 管 renderer / WebGPU 生命周期 | 无工程写入，仅显示派生数据 |
-| B. 修复为几何 | 决定是否启动转换任务、策略 / 容差、来源 revision；校验并提交新 `GeometryAsset` | C++ adapter 调用 OCCT 重建 faceted B-rep、执行范围明确的修复并返回诊断 | 新几何 ID / revision 与来源 Mesh revision 关联；原 Mesh 保留 |
-| C. 生成体网格 | 选择 `SurfaceMesh` revision、Netgen 参数和任务语义；`panta-mesh` 校验 `TetMesh` 并提交 | C++ adapter 调用 Netgen 的 STL 几何入口，转换输出 DTO，不持有 Rust 领域规则 | 新 Volume Mesh ID / revision 与来源 Mesh 和参数关联 |
+| B. 修复为几何 | 决定是否启动转换任务、领域操作选项和来源 revision；校验并提交新 `GeometryAsset` | C++ adapter 将领域选项映射到 OCCT 参数，重建 faceted B-rep、执行范围明确的 B-rep 修复并返回诊断 | 新几何 ID / revision 与来源 Mesh revision 关联；原 Mesh 保留 |
+| C. 生成体网格 | 选择 `SurfaceMesh` revision、领域网格参数和任务语义；`panta-mesh` 校验 `TetMesh` 并提交 | C++ adapter 调用 Netgen 的 STL 几何入口与适用的表面 / 体网格优化步骤，转换输出 DTO，不持有 Rust 领域规则 | 新 Volume Mesh ID / revision 与来源 Mesh 和参数关联 |
 
-读取 / 解析、OCCT 修复和 Netgen 网格生成都是不可预测耗时操作，应在 Rust 后台任务中编排并支持取消 / 过期结果拒绝。固定 SDK Netgen 6.2.2604 的 [`nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h) 暴露 STL 三角片填充和表面到体网格生成入口；这只是 adapter 可行性依据，封闭性等输入要求与实测留给后续网格任务。CXX 只声明快照 / DTO 与受控适配调用，不存领域策略。Mesh sidecar 和 `.panta` 索引规划见 [088](../task/088-mesh-asset-sidecar-storage.md)；OCCT B-rep 持久化不在该任务中。
+读取 / 解析、OCCT 修复和 Netgen 网格生成都是不可预测耗时操作，应在 Rust 后台任务中编排并支持取消 / 过期结果拒绝。固定 SDK Netgen 6.2.2604 的 [`nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h) 暴露 STL 几何、表面网格和体网格入口；其具体优化步骤与输入要求由对应 adapter / 网格任务验证，不据此推断 Netgen 执行 B-rep 修复。Rust 保存领域操作选项和提交策略，C++ adapter 负责映射到底层库参数并执行调用。CXX 只声明快照 / DTO 与受控适配调用，不存领域策略。Mesh sidecar 和 `.panta` 索引规划见 [088](../task/088-mesh-asset-sidecar-storage.md)；OCCT B-rep 持久化不在该任务中。
 
 格式分发以显式声明或扩展名为入口，再由实际解析器验证内容；扩展名本身不保证格式有效。各格式返回结构化错误，公共流程只决定是否提交，不吞掉 OCCT / STL 的专门诊断。新的导入格式在有端到端使用者时才加入路由、bridge 和测试；若新增本构、网格生成或格式修复算法，仍调用相应重库或另立明确的轻量功能任务。
 
