@@ -62,6 +62,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     let mut section: Option<String> = None;
     let mut current_context = "Panta".to_owned();
     let mut current_message: Option<(String, Message)> = None;
+    let mut current_message_numerus_seen = false;
     let mut declaration_count = 0usize;
     let mut seen_contexts = HashSet::new();
     let mut declaration_limit_exceeded = false;
@@ -223,6 +224,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                         numerus: false,
                     },
                 ));
+                current_message_numerus_seen = false;
             }
             Rule::src => {
                 if let Some((_, message)) = current_message.as_mut() {
@@ -341,7 +343,10 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             }
             Rule::numerus => {
                 if let Some((_, message)) = current_message.as_mut() {
-                    if let Some(value) = find_text(body, Rule::boolean) {
+                    if current_message_numerus_seen {
+                        duplicate_field(&mut diagnostics, "numerus", body_offset, source);
+                    } else if let Some(value) = find_text(body, Rule::boolean) {
+                        current_message_numerus_seen = true;
                         message.numerus = value == "true";
                     }
                 } else {

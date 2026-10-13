@@ -73,6 +73,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 | 2026-09-17 | 三平台 CI 复跑（push 0c16681，run [35234986184](https://github.com/Yuki-Nagori/panta/actions/runs/35234986184)） | 哈希修正后三平台全绿 | windows-2022 / macos-latest / ubuntu-latest 全部 success：qttools 下载校验、build.rs TS 生成、锁定 lrelease 编 QM、qrc 嵌入与链接在三平台干净环境成立（QTranslator 加载为 ctest，CI 执行待 011 聚合）。 |
 | 2026-10-13 | `cargo test --locked -p panta-dsl-core` | 重复 context 稳定拒绝；language message 纳入声明上限，刚好达到上限可通过、超限拒绝 | 通过：新增重复 context/跨 context 同 ID 行为测试；language 16,384 条消息可解析，第 16,385 条返回 `pa.too_many_declarations`。 |
 | 2026-10-13 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint --check`、`cargo clippy --locked -p panta-dsl-core --all-targets -- -D warnings`、`git diff --check` | workspace 与 DSL core 检查通过 | 通过：Cargo workspace 测试及 75/75 CTest 全绿；格式、聚合 lint、DSL core Clippy 和 diff 检查通过。macOS arm64。 |
+| 2026-10-13 | 重复 `numerus` 字段回归用例；`cargo test --locked -p panta-dsl-core`、`cargo format --check`、DSL core Clippy | 重复元数据不得静默覆盖，定向质量门禁通过 | 通过：第二个 `numerus` 返回 `pa.duplicate_field`；core 单元/集成测试、格式与 Clippy 全绿。 |
 
 ## 风险与回退
 
@@ -96,4 +97,4 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 当前进展（2026-10-13）
 
-独立审查指出单文档校验仍缺少重复 context 拒绝，且 language message 没有计入 `MAX_DECLARATIONS`。已在共享 parser 中补齐两项约束，并新增边界测试：重复 context 返回 `pa.duplicate_context`（包含先使用隐式 `Panta`、后显式声明的情况）；不同 context 可复用相同短 ID；language 文档恰好达到 16,384 条声明可通过，超出时返回一次 `pa.too_many_declarations` 并停止继续构造声明。初审发现隐式 Context 格式化往返风险，已修复并加入回归测试；评审者复核通过，未发现其他可操作问题。`cargo test --locked -p panta-dsl-core` 与本轮 `cargo test --locked --workspace` 均通过；完整验证为 75/75 CTest 全绿，format、cargo lint、DSL core Clippy 与 diff 检查通过（macOS arm64）。Artifact 聚合与快照契约、重复 `numerus` 字段、跨平台快照比对、消费方接入及 032 覆盖率仍未完成，本记录不代表任务验收通过。
+独立审查指出单文档校验仍缺少重复 context 拒绝，且 language message 没有计入 `MAX_DECLARATIONS`。已在共享 parser 中补齐两项约束，并新增边界测试：重复 context 返回 `pa.duplicate_context`（包含先使用隐式 `Panta`、后显式声明的情况）；不同 context 可复用相同短 ID；language 文档恰好达到 16,384 条声明可通过，超出时返回一次 `pa.too_many_declarations` 并停止继续构造声明。初审发现隐式 Context 格式化往返风险，已修复并加入回归测试；评审者复核通过，未发现其他可操作问题。重复 `numerus` 也改为返回 `pa.duplicate_field`。`cargo test --locked -p panta-dsl-core` 与本轮 `cargo test --locked --workspace` 均通过；完整验证为 75/75 CTest 全绿，format、cargo lint、DSL core Clippy 与 diff 检查通过（macOS arm64）。Artifact 聚合与快照契约、跨平台快照比对、消费方接入及 032 覆盖率仍未完成，本记录不代表任务验收通过。

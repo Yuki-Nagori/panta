@@ -121,10 +121,10 @@ fn duplicate_contexts_are_rejected_but_ids_are_scoped_to_context() -> Result<(),
 
 #[test]
 fn duplicate_and_orphan_message_fields_are_rejected() -> Result<(), Box<dyn Error>> {
-    let duplicated = "version: 1\nkind: language\nlanguage: en\n\n[App]\ntitle:\n  src: Hi\n  src: Hi\n  oldsrc: Old\n  oldsrc: Old\n  tr: Hi\n  tr: Hi\n  st: finished\n  st: finished\n  comment: a\n  comment: a\n  extra: b\n  extra: b\n";
+    let duplicated = "version: 1\nkind: language\nlanguage: en\n\n[App]\ntitle:\n  src: Hi\n  src: Hi\n  oldsrc: Old\n  oldsrc: Old\n  tr: Hi\n  tr: Hi\n  st: finished\n  st: finished\n  comment: a\n  comment: a\n  extra: b\n  extra: b\n  numerus: true\n  numerus: false\n";
     assert!(matches!(
         parse(duplicated),
-        Err(ref diagnostics) if diagnostics.to_string().matches("pa.duplicate_field").count() >= 6
+        Err(ref diagnostics) if diagnostics.to_string().matches("pa.duplicate_field").count() >= 7
     ));
 
     // 孤儿字段必须缩进:0 列字段会被语法直接拒绝。
