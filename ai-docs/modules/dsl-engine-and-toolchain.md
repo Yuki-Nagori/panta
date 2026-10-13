@@ -23,7 +23,7 @@
 | `ts` | Qt TS 输出及输出前的 locale / 占位符复核 |
 | `fsm` | 独立 FSM schema、校验、格式化与 Rust 生成；复用 syntax / diagnostic |
 
-Artifact 聚合器、完整来源信息与运行期快照接口仍按后续需求实施；本次模块拆分不代表这些规划接口已经落地。
+`artifact` 模块已提供 `parse_artifacts`、不可变 `ArtifactSnapshot` 与 `ArtifactDocument`，保留逻辑来源 ID、版本、kind、locale 和规范化 payload。CLI 与构建脚本共用该核心；聚合采用固定排序与资源上限，任一来源失败时不产出部分快照。跨平台编码由固定快照 fixture 约束。
 
 首选 `pest` 描述公共 `.pa` grammar：配置文件规模小，规则可审阅，`pest` 能稳定给出源码 span，适合错误定位和后续域扩展。暂不同时引入 `nom`；只有有可重复的吞吐或流式输入证据时才评估迁移，并保留同一 AST/诊断契约。`quick-xml` 负责从规范化翻译模型生成 Qt TS XML，必要时校验生成结果；不要求开发者阅读或编辑 XML。`serde` 映射领域 DTO 和机器可读诊断；依赖版本、许可证和 MSRV 进入 Cargo.lock。
 
@@ -52,21 +52,21 @@ open-file:
 
 构建流程为：读取 `.pa` → pest 解析与领域校验 → Artifact 聚合器按 `kind` 生成语言/Theme/变量快照 → 按目标 locale 由 quick-xml 写出构建树临时 TS → 调用锁定的 Qt Linguist 预编译 `lrelease` → 生成并嵌入 QM。QM 是唯一的运行期翻译输入；应用启动和语言切换不解析 `.pa` 或 XML。`panta-dslc` 不自行下载、编译或寻找系统 Qt，`lrelease` 路径由 CMake 供给并记录版本。
 
-构建入口已落地（034，2026-09-17）：launcher build.rs 以 build-dependency 复用 `panta-dsl-core` 解析 `resources/i18n/*.pa`，把语言字典原子写入构建树 `target/native/<profile>/i18n/*.ts`（解析失败立即终止且保留旧 TS），经 `PANTA_I18N_TS_DIR` 交给 `native/i18n`；该 CMake 模块从 Qt 供给（qttools 归档，`qt-provision.cmake` 锁定）解析 `lrelease` 编译 QM，以 qrc 列表嵌入 `:/i18n/<catalog>_<locale>.qm`，并由 ctest `I18n.CompiledQmLoads` 用 QTranslator 验证端到端加载。presets 纯净 configure 缺 TS 时立即失败并提示先 `cargo build`（与 FFI 输入同边界）。
+构建入口已落地（034）：launcher build.rs 以 build-dependency 复用 `panta-dsl-core` 聚合 `resources/i18n/*.pa`，生成每个 locale 的临时 TS，并通过同文件系统的 staging/backup 目录发布完整文件集合；解析、生成或暂存失败时保留上一份有效目录。`PANTA_I18N_TS_DIR` 交给 `native/i18n`；该 CMake 模块从 Qt 供给（qttools 归档，`qt-provision.cmake` 锁定）解析 `lrelease` 编译 QM，以 qrc 列表嵌入 `:/i18n/<catalog>_<locale>.qm`，并由 ctest `I18n.CompiledQmLoads` 用 QTranslator 验证端到端加载。presets 纯净 configure 缺 TS 时立即失败并提示先 `cargo build`（与 FFI 输入同边界）。
 
-临时 TS 和 QM 不作为源码提交；失败时不覆盖上一份有效 TS/QM。编译器限制输入字节、token、嵌套深度和 message/变量数，拒绝未知必需版本、重复 context/ID、非法 locale、占位符不一致和任意脚本/文件访问。
+临时 TS 和 QM 不作为源码提交；解析或 TS 准备失败时不覆盖上一份有效 TS 集合。限制为单文档 1 MiB、单次聚合 16 MiB、256 个来源、每文档 16,384 条声明及聚合 65,536 条声明。grammar 不支持嵌套结构、脚本或文件访问，因此没有独立的递归深度/token 预算。parser 拒绝未知必需版本、重复 context/ID、非法 locale 和占位符不一致。
 
 catalog 的 source-text 兼容索引按 `src` 长度降序构建，`ok ok` 优先于 `ok`，重复 source 在校验阶段失败；不同且等长的 source 可以共存，QML/C++ 不走这个索引而使用 context + ID 或完整 source 精确查找。
 
 ## 诊断、快照与 FFI
 
-解析结果是不可变 ArtifactSnapshot：源文档 ID、版本、kind、locale、规范化 payload、源位置和诊断。诊断包含稳定 code、参数、源文件、字节范围及行列转换；UI 只翻译 code，不按错误文本分支。输入字节、token、嵌套深度、声明数和生成节点数有可测试上限。
+解析结果由不可变 `ArtifactSnapshot` 保存来源 ID、版本、kind、locale 和规范化 payload；快照只能通过校验入口创建，再以固定 JSON 编码输出。来源 ID 在本次聚合中必须非空且唯一；文档按 kind、来源 ID 排序，不合并不同文档。语言 TS 以 catalog（缺省 `panta`）和规范化 locale 命名；任意两个输出名在大小写不敏感文件系统上冲突时拒绝整批生成。诊断带稳定 code、来源 ID、UTF-8 字节起止位置及行列；Pest 报告的零宽位置保留为零宽范围，语义诊断定位到对应声明或字段，缺失项定位到文件末尾。CLI 在读取前限制单文件字节数；launcher 在读取前限制来源数、单文件和聚合字节数，核心也会复核聚合来源数、字节数和声明数；GUI 可按 code 翻译，不按诊断文本分支。
 
 Rust library 是唯一 parser/validator；C++/QML 不复制 grammar，也不把 AST 指针跨 FFI。未来 CXX 接口只传递已验证 DTO、诊断和 QM 路径/资源 ID；快照发布采用一次提交，失败保留旧状态。CLI 与 UI 使用相同核心库，避免“命令行能读、应用不能读”的分叉。
 
 ## 验证与演进
 
-测试覆盖 pest 正反文法、源码 span、领域 kind 分派、TS XML 生成/校验、占位符/context 一致性、输入资源上限和失败保留。用固定夹具验证 CLI 在任意 cwd 工作、输出路径不依赖本地环境；用锁定的 QtTools 只做 QM 编译冒烟。任务 032 对自有 Rust 可执行代码施加 line/branch 100% 门禁，生成 XML 和第三方解析代码按排除清单记录。
+测试覆盖 pest 正反文法、源码位置、kind 分派、确定性快照、TS 生成、占位符/context 一致性、聚合资源上限、输出名冲突和完整目录替换。用固定夹具验证 CLI 在任意 cwd 工作、输出路径不依赖本地环境；用锁定的 QtTools 做 QM 编译冒烟。任务 032 当前为 deferred，因此其覆盖率门槛不作为本任务阻塞条件；本任务仍要求行为和失败契约测试。
 
 V1 只支持声明式 `.pa` 数据和由编译器生成的 Qt TS 载荷，不提供 eval、脚本、import、网络、shell、字节码或任意 XML 注入。需要新 kind 时先增加 schema、诊断和夹具，再扩展 parser；不在公共 parser 里加入业务字段猜测或隐式兼容分支。
 
