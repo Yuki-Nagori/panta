@@ -5,7 +5,7 @@
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-17
+- 创建 / 更新：2026-09-16 / 2026-10-13
 
 ## 目标与背景
 
@@ -71,6 +71,8 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 | 2026-09-17 | `cargo test --locked`、`cargo fmt --all -- --check`、`cargo clippy --locked --workspace --all-targets -- -D warnings`、`git diff --check` | Rust 侧检查全绿 | 通过 |
 | 2026-09-17 | 三平台 CI（push 2f62a69，run [35233366640](https://github.com/Yuki-Nagori/panta/actions/runs/35233366640)） | 三平台走通 qttools 下载 + TS/QM 链路 | macOS/Windows 全绿（含锁定 lrelease 编 QM、qrc 嵌入与链接）；Linux 暴露 qtdeclarative 历史记录哈希笔误（`…db6e92…` 应为 `…dbb6e92…`，此前被 CI 缓存掩盖，新的每归档指纹强制复验后失败）。修复：实测回填正确哈希，并在两处 `file(DOWNLOAD)` 后立即复验 + FATAL——该命令的哈希不符是延迟错误，会继续跑完 configure 并写入带错哈希的解包指纹，毒化后续缓存判定。 |
 | 2026-09-17 | 三平台 CI 复跑（push 0c16681，run [35234986184](https://github.com/Yuki-Nagori/panta/actions/runs/35234986184)） | 哈希修正后三平台全绿 | windows-2022 / macos-latest / ubuntu-latest 全部 success：qttools 下载校验、build.rs TS 生成、锁定 lrelease 编 QM、qrc 嵌入与链接在三平台干净环境成立（QTranslator 加载为 ctest，CI 执行待 011 聚合）。 |
+| 2026-10-13 | `cargo test --locked -p panta-dsl-core` | 重复 context 稳定拒绝；language message 纳入声明上限，刚好达到上限可通过、超限拒绝 | 通过：新增重复 context/跨 context 同 ID 行为测试；language 16,384 条消息可解析，第 16,385 条返回 `pa.too_many_declarations`。 |
+| 2026-10-13 | `cargo test --locked --workspace`、`cargo format --check`、`cargo lint --check`、`cargo clippy --locked -p panta-dsl-core --all-targets -- -D warnings`、`git diff --check` | workspace 与 DSL core 检查通过 | 通过：Cargo workspace 测试及 75/75 CTest 全绿；格式、聚合 lint、DSL core Clippy 和 diff 检查通过。macOS arm64。 |
 
 ## 风险与回退
 
@@ -91,3 +93,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 ## 当前进展（2026-09-17）
 
 核心 parser、TS 生成入口和 formatter 消费契约已实现；实际 language 源文件已加入 resources/i18n/panta-en.pa 与 resources/i18n/panta-cn.pa。QM 冒烟已用任务 005 staging 的锁定 lrelease 打通（emit-ts → lrelease → QM），CLI 任意 cwd 与失败夹具验证完成。TS/QM 的 CMake 构建入口已接通：qt-provision 增补三平台 qttools 锁定归档（lrelease），launcher build.rs 复用 `panta-dsl-core` 生成构建树 TS，`native/i18n` 编 QM、以 qrc 嵌入 `:/i18n/` 并由 `I18n.CompiledQmLoads` 端到端验证；`.pa` 变更增量传播与失败路径（保留旧 TS、纯净 configure 边界）有实测记录。剩余：三平台确定性快照证据（CI 已跑 TS 生成，缺逐平台比对）、032 覆盖率门禁与 022/025/030 消费方接入。
+
+## 当前进展（2026-10-13）
+
+独立审查指出单文档校验仍缺少重复 context 拒绝，且 language message 没有计入 `MAX_DECLARATIONS`。已在共享 parser 中补齐两项约束，并新增边界测试：重复 context 返回 `pa.duplicate_context`（包含先使用隐式 `Panta`、后显式声明的情况）；不同 context 可复用相同短 ID；language 文档恰好达到 16,384 条声明可通过，超出时返回一次 `pa.too_many_declarations` 并停止继续构造声明。初审发现隐式 Context 格式化往返风险，已修复并加入回归测试；评审者复核通过，未发现其他可操作问题。`cargo test --locked -p panta-dsl-core` 与本轮 `cargo test --locked --workspace` 均通过；完整验证为 75/75 CTest 全绿，format、cargo lint、DSL core Clippy 与 diff 检查通过（macOS arm64）。Artifact 聚合与快照契约、重复 `numerus` 字段、跨平台快照比对、消费方接入及 032 覆盖率仍未完成，本记录不代表任务验收通过。

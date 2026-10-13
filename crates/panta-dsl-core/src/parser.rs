@@ -1,6 +1,6 @@
 //! Pest 节点到数据文档的转换；构造后统一执行语义校验。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use pest::Parser as PestParser;
 use pest::iterators::Pair;
@@ -63,6 +63,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     let mut current_context = "Panta".to_owned();
     let mut current_message: Option<(String, Message)> = None;
     let mut declaration_count = 0usize;
+    let mut seen_contexts = HashSet::new();
+    let mut declaration_limit_exceeded = false;
     let mut diagnostics = Vec::new();
 
     for line in document_pair.into_inner() {
@@ -70,6 +72,9 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             continue;
         };
         let body_offset = body.as_span().start();
+        if declaration_limit_exceeded {
+            continue;
+        }
         match body.as_rule() {
             Rule::blank => {}
             Rule::comment_line => {
@@ -167,6 +172,15 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     Some(value) => value.trim().to_owned(),
                     None => "Panta".to_owned(),
                 };
+                if !seen_contexts.insert(current_context.clone()) {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "pa.duplicate_context",
+                        format!("context '{}' is repeated", current_context),
+                        body_offset,
+                        source,
+                    );
+                }
                 section = None;
             }
             Rule::section => {
@@ -174,6 +188,16 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
             }
             Rule::message => {
                 flush_message(&mut current_message, &mut result, &mut diagnostics, source);
+                declaration_limit_exceeded = count_declaration(
+                    &mut declaration_count,
+                    &mut diagnostics,
+                    body_offset,
+                    source,
+                );
+                if declaration_limit_exceeded {
+                    continue;
+                }
+                seen_contexts.insert(current_context.clone());
                 let id = find_message_key(body, source, &mut diagnostics).unwrap_or_default();
                 if id.is_empty() {
                     push_diagnostic(
@@ -331,15 +355,13 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                 }
             }
             Rule::entry => {
-                declaration_count += 1;
-                if declaration_count > MAX_DECLARATIONS {
-                    push_diagnostic(
-                        &mut diagnostics,
-                        "pa.too_many_declarations",
-                        format!("more than {MAX_DECLARATIONS} declarations"),
-                        body_offset,
-                        source,
-                    );
+                declaration_limit_exceeded = count_declaration(
+                    &mut declaration_count,
+                    &mut diagnostics,
+                    body_offset,
+                    source,
+                );
+                if declaration_limit_exceeded {
                     continue;
                 }
                 let mut parts = body.into_inner();
@@ -397,6 +419,27 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
     } else {
         Err(Diagnostics { diagnostics })
     }
+}
+
+fn count_declaration(
+    count: &mut usize,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: usize,
+    source: &str,
+) -> bool {
+    *count += 1;
+    if *count <= MAX_DECLARATIONS {
+        return false;
+    }
+
+    push_diagnostic(
+        diagnostics,
+        "pa.too_many_declarations",
+        format!("more than {MAX_DECLARATIONS} declarations"),
+        offset,
+        source,
+    );
+    true
 }
 
 fn duplicate_field(diagnostics: &mut Vec<Diagnostic>, field: &str, offset: usize, source: &str) {

@@ -101,6 +101,25 @@ fn duplicate_headers_are_rejected() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn duplicate_contexts_are_rejected_but_ids_are_scoped_to_context() -> Result<(), Box<dyn Error>> {
+    assert!(matches!(
+        parse("version: 1\nkind: language\nlanguage: en\n\n[App]\nfirst:\n  src: First\n[App]\nsecond:\n  src: Second\n"),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.duplicate_context")
+    ));
+    assert!(matches!(
+        format_source(
+            "version: 1\nkind: language\nlanguage: en\n\nimplicit:\n  src: Implicit\n[App]\nexplicit:\n  src: Explicit\n[Panta]\nlast:\n  src: Last\n"
+        ),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.duplicate_context")
+    ));
+    let document = parse(
+        "version: 1\nkind: language\nlanguage: en\n\n[Menu]\nopen:\n  src: Open\n[Toolbar]\nopen:\n  src: Open toolbar\n",
+    )?;
+    assert_eq!(document.messages.len(), 2);
+    Ok(())
+}
+
+#[test]
 fn duplicate_and_orphan_message_fields_are_rejected() -> Result<(), Box<dyn Error>> {
     let duplicated = "version: 1\nkind: language\nlanguage: en\n\n[App]\ntitle:\n  src: Hi\n  src: Hi\n  oldsrc: Old\n  oldsrc: Old\n  tr: Hi\n  tr: Hi\n  st: finished\n  st: finished\n  comment: a\n  comment: a\n  extra: b\n  extra: b\n";
     assert!(matches!(
@@ -266,6 +285,24 @@ fn declaration_overflow_is_rejected() -> Result<(), Box<dyn Error>> {
     for index in 0..16_400 {
         source.push_str(&format!("  v{index}: int = {index}\n"));
     }
+    assert!(matches!(
+        parse(&source),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.too_many_declarations")
+    ));
+    Ok(())
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn language_messages_obey_the_declaration_limit() -> Result<(), Box<dyn Error>> {
+    const MAX_DECLARATIONS: usize = 16_384;
+    let mut source = String::from("version: 1\nkind: language\nlanguage: en\n\n[App]\n");
+    for index in 0..MAX_DECLARATIONS {
+        source.push_str(&format!("message-{index}:\n  src: Source {index}\n"));
+    }
+    assert_eq!(parse(&source)?.messages.len(), MAX_DECLARATIONS);
+
+    source.push_str("extra:\n  src: Extra\n");
     assert!(matches!(
         parse(&source),
         Err(ref diagnostics) if diagnostics.to_string().contains("pa.too_many_declarations")
