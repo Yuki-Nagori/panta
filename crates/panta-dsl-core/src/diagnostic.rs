@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 pub struct Diagnostic {
     pub code: String,
     pub message: String,
-    pub offset: usize,
+    /// 原始源码中的 UTF-8 字节范围；点诊断的起止位置相同。
+    pub start_offset: usize,
+    pub end_offset: usize,
     pub line: usize,
     pub column: usize,
 }
@@ -20,12 +22,25 @@ pub struct Diagnostics {
 
 impl Diagnostics {
     pub(crate) fn one(code: &str, message: impl Into<String>, offset: usize, source: &str) -> Self {
-        let (line, column) = source_position(source, offset);
+        Self::one_span(code, message, offset, offset, source)
+    }
+
+    pub(crate) fn one_span(
+        code: &str,
+        message: impl Into<String>,
+        start_offset: usize,
+        end_offset: usize,
+        source: &str,
+    ) -> Self {
+        let start_offset = start_offset.min(source.len());
+        let end_offset = end_offset.clamp(start_offset, source.len());
+        let (line, column) = source_position(source, start_offset);
         Self {
             diagnostics: vec![Diagnostic {
                 code: code.to_owned(),
                 message: message.into(),
-                offset,
+                start_offset,
+                end_offset,
                 line,
                 column,
             }],
@@ -51,6 +66,16 @@ impl Display for Diagnostics {
 
 impl std::error::Error for Diagnostics {}
 
+impl Display for Diagnostic {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "{} at {}:{}: {}",
+            self.code, self.line, self.column, self.message
+        )
+    }
+}
+
 pub(crate) fn push_diagnostic(
     diagnostics: &mut Vec<Diagnostic>,
     code: &str,
@@ -58,11 +83,25 @@ pub(crate) fn push_diagnostic(
     offset: usize,
     source: &str,
 ) {
-    let (line, column) = source_position(source, offset);
+    push_diagnostic_span(diagnostics, code, message, offset, offset, source);
+}
+
+pub(crate) fn push_diagnostic_span(
+    diagnostics: &mut Vec<Diagnostic>,
+    code: &str,
+    message: impl Into<String>,
+    start_offset: usize,
+    end_offset: usize,
+    source: &str,
+) {
+    let start_offset = start_offset.min(source.len());
+    let end_offset = end_offset.clamp(start_offset, source.len());
+    let (line, column) = source_position(source, start_offset);
     diagnostics.push(Diagnostic {
         code: code.to_owned(),
         message: message.into(),
-        offset,
+        start_offset,
+        end_offset,
         line,
         column,
     });

@@ -3,6 +3,7 @@
 
 mod archive;
 mod assets;
+mod atomic_directory;
 mod compiler;
 mod environment;
 mod install;
@@ -12,6 +13,7 @@ pub mod database;
 pub mod python;
 
 pub use assets::LLVM_VERSION;
+pub use atomic_directory::replace_directory_with_files;
 pub use compiler::{
     LlvmCompilers, compiler_rt_dll_dir, resolve_cmake, resolve_llvm_compilers, resolve_ninja,
 };

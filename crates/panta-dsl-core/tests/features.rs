@@ -54,6 +54,19 @@ fn theme_rejects_language_fields_and_values_reject_messages() -> Result<(), Box<
         parse("version: 1\nkind: language\nlanguage: en\n\nvalues:\n  scale: real = 0.5\n"),
         Err(ref diagnostics) if diagnostics.to_string().contains("pa.unexpected_values")
     ));
+    let source = "version: 1\nkind: variables\ncatalog: panta\n\nvalues:\n  scale: real = 0.5\n";
+    let error = match parse(source) {
+        Err(error) => error,
+        Ok(_) => panic!("catalog is a language-only header"),
+    };
+    let diagnostic = error
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "pa.unexpected_language_field");
+    assert_eq!(
+        diagnostic.map(|item| item.start_offset),
+        Some(source.find("catalog:").unwrap_or(usize::MAX))
+    );
     Ok(())
 }
 
@@ -101,11 +114,30 @@ fn duplicate_headers_are_rejected() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn duplicate_contexts_are_rejected_but_ids_are_scoped_to_context() -> Result<(), Box<dyn Error>> {
+    assert!(matches!(
+        parse("version: 1\nkind: language\nlanguage: en\n\n[App]\nfirst:\n  src: First\n[App]\nsecond:\n  src: Second\n"),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.duplicate_context")
+    ));
+    assert!(matches!(
+        format_source(
+            "version: 1\nkind: language\nlanguage: en\n\nimplicit:\n  src: Implicit\n[App]\nexplicit:\n  src: Explicit\n[Panta]\nlast:\n  src: Last\n"
+        ),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.duplicate_context")
+    ));
+    let document = parse(
+        "version: 1\nkind: language\nlanguage: en\n\n[Menu]\nopen:\n  src: Open\n[Toolbar]\nopen:\n  src: Open toolbar\n",
+    )?;
+    assert_eq!(document.messages.len(), 2);
+    Ok(())
+}
+
+#[test]
 fn duplicate_and_orphan_message_fields_are_rejected() -> Result<(), Box<dyn Error>> {
-    let duplicated = "version: 1\nkind: language\nlanguage: en\n\n[App]\ntitle:\n  src: Hi\n  src: Hi\n  oldsrc: Old\n  oldsrc: Old\n  tr: Hi\n  tr: Hi\n  st: finished\n  st: finished\n  comment: a\n  comment: a\n  extra: b\n  extra: b\n";
+    let duplicated = "version: 1\nkind: language\nlanguage: en\n\n[App]\ntitle:\n  src: Hi\n  src: Hi\n  oldsrc: Old\n  oldsrc: Old\n  tr: Hi\n  tr: Hi\n  st: finished\n  st: finished\n  comment: a\n  comment: a\n  extra: b\n  extra: b\n  numerus: true\n  numerus: false\n";
     assert!(matches!(
         parse(duplicated),
-        Err(ref diagnostics) if diagnostics.to_string().matches("pa.duplicate_field").count() >= 6
+        Err(ref diagnostics) if diagnostics.to_string().matches("pa.duplicate_field").count() >= 7
     ));
 
     // 孤儿字段必须缩进:0 列字段会被语法直接拒绝。
@@ -212,11 +244,20 @@ fn emit_ts_rejects_placeholder_mismatch_and_invalid_locale() -> Result<(), Box<d
         Err(ref diagnostics) if diagnostics.to_string().contains("pa.ts_kind")
     ));
 
-    // 占位符一致性在 parse 阶段校验(validate_messages)。
-    assert!(matches!(
-        parse("version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision\n"),
-        Err(ref diagnostics) if diagnostics.to_string().contains("pa.placeholder_mismatch")
-    ));
+    // 占位符不匹配指向错误翻译字段，方便编辑器定位。
+    let source = "version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision\n";
+    let error = match parse(source) {
+        Err(error) => error,
+        Ok(_) => panic!("占位符不匹配意外通过"),
+    };
+    let diagnostic = error
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "pa.placeholder_mismatch");
+    assert_eq!(
+        diagnostic.map(|item| item.start_offset),
+        Some(source.find("  tr: Revision").unwrap_or(usize::MAX))
+    );
     // emit_ts 对请求 locale 复核:合法文档 + 非法输出 locale → pa.ts_locale。
     let document = parse(
         "version: 1\nkind: language\nlanguage: en\n\n[App]\nrevision:\n  src: Revision %1\n  tr: Revision %1\n",
@@ -266,6 +307,24 @@ fn declaration_overflow_is_rejected() -> Result<(), Box<dyn Error>> {
     for index in 0..16_400 {
         source.push_str(&format!("  v{index}: int = {index}\n"));
     }
+    assert!(matches!(
+        parse(&source),
+        Err(ref diagnostics) if diagnostics.to_string().contains("pa.too_many_declarations")
+    ));
+    Ok(())
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn language_messages_obey_the_declaration_limit() -> Result<(), Box<dyn Error>> {
+    const MAX_DECLARATIONS: usize = 16_384;
+    let mut source = String::from("version: 1\nkind: language\nlanguage: en\n\n[App]\n");
+    for index in 0..MAX_DECLARATIONS {
+        source.push_str(&format!("message-{index}:\n  src: Source {index}\n"));
+    }
+    assert_eq!(parse(&source)?.messages.len(), MAX_DECLARATIONS);
+
+    source.push_str("extra:\n  src: Extra\n");
     assert!(matches!(
         parse(&source),
         Err(ref diagnostics) if diagnostics.to_string().contains("pa.too_many_declarations")
@@ -351,11 +410,21 @@ fn trailing_escape_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn pest_syntax_errors_render_with_position() {
-    let Err(error) = parse("%%%\n") else {
+    let source = "version: nope\n";
+    let Err(error) = parse(source) else {
         panic!("语法错误文档意外通过")
     };
     let rendered = error.to_string();
     assert!(rendered.contains("pa.syntax"), "{rendered}");
+    let diagnostic = &error.diagnostics[0];
+    // Pest may report a zero-width position where a required token should begin.
+    assert_eq!(
+        diagnostic.start_offset,
+        source.find("nope").unwrap_or(usize::MAX)
+    );
+    assert_eq!(diagnostic.start_offset, diagnostic.end_offset);
+    assert!(diagnostic.end_offset <= source.len());
+    assert_eq!(&source[diagnostic.start_offset..diagnostic.end_offset], "");
 }
 
 #[test]
@@ -387,14 +456,17 @@ fn diagnostic_order_and_text_match_the_pre_refactor_baseline() {
     };
     assert_eq!(
         diagnostics.to_string(),
-        "pa.missing_src at 1:1: message 'x' requires src\n\
+        "pa.missing_src at 6:1: message 'x' requires src\n\
 pa.unsupported_version at 1:1: only version 1 is supported\n\
-pa.invalid_locale at 1:1: invalid language locale 'en--US'"
+pa.invalid_locale at 3:1: invalid language locale 'en--US'"
     );
-    assert!(
-        diagnostics
-            .diagnostics
-            .iter()
-            .all(|item| { item.offset == 0 && item.line == 1 && item.column == 1 })
+    assert_eq!(
+        diagnostics.diagnostics[0].start_offset,
+        source.find("x:").unwrap_or(usize::MAX)
+    );
+    assert_eq!(diagnostics.diagnostics[1].start_offset, 0);
+    assert_eq!(
+        diagnostics.diagnostics[2].start_offset,
+        source.find("language:").unwrap_or(usize::MAX)
     );
 }

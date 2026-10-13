@@ -8,8 +8,13 @@
 //! 产物和依赖缓存位于 Cargo target；原生诊断继承到 Cargo 输出。
 
 use panta_build as provision;
+use panta_dsl_core::{
+    ArtifactSource, MAX_ARTIFACT_BYTES, MAX_ARTIFACT_SOURCES, MAX_SOURCE_BYTES, parse_artifacts,
+};
 
-use std::fs;
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::SystemTime;
@@ -342,60 +347,90 @@ fn ffi_artifacts(out_dir: &Path) -> Result<(PathBuf, PathBuf), String> {
 fn emit_translation_sources(i18n_dir: &Path, ts_dir: &Path) -> Result<(), String> {
     let entries = fs::read_dir(i18n_dir)
         .map_err(|error| format!("读取 i18n 目录 {} 失败：{error}", i18n_dir.display()))?;
-    let mut sources = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().is_some_and(|extension| extension == "pa"))
-        .collect::<Vec<_>>();
-    sources.sort();
-    if sources.is_empty() {
+    let mut paths = Vec::new();
+    for entry in entries {
+        let path = entry
+            .map_err(|error| format!("读取 i18n 目录项失败：{error}"))?
+            .path();
+        if path.is_file() && path.extension().is_some_and(|extension| extension == "pa") {
+            if paths.len() == MAX_ARTIFACT_SOURCES {
+                return Err(format!(
+                    "{} 下的 .pa 文件超过来源上限 {MAX_ARTIFACT_SOURCES}",
+                    i18n_dir.display()
+                ));
+            }
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    if paths.is_empty() {
         return Err(format!(
             "{} 下没有 .pa 字典；语言字典缺失时构建不支持继续",
             i18n_dir.display()
         ));
     }
-
-    fs::create_dir_all(ts_dir)
-        .map_err(|error| format!("创建 TS 目录 {} 失败：{error}", ts_dir.display()))?;
-    for source in &sources {
-        let bytes =
-            fs::read(source).map_err(|error| format!("读取 {} 失败：{error}", source.display()))?;
-        let text = String::from_utf8(bytes).map_err(|error| {
+    let mut loaded = Vec::with_capacity(paths.len());
+    let mut total_bytes = 0usize;
+    for path in paths {
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| format!("字典文件名不是有效 UTF-8：{}", path.display()))?;
+        let remaining_bytes = MAX_ARTIFACT_BYTES - total_bytes;
+        let mut bytes = Vec::new();
+        File::open(&path)
+            .map_err(|error| format!("打开 {} 失败：{error}", path.display()))?
+            .take(remaining_bytes.min(MAX_SOURCE_BYTES) as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("读取 {} 失败：{error}", path.display()))?;
+        if bytes.len() > MAX_SOURCE_BYTES {
+            return Err(format!(
+                "pa.source_too_large: {} 超过单文件上限 {MAX_SOURCE_BYTES} 字节",
+                path.display()
+            ));
+        }
+        if bytes.len() > remaining_bytes {
+            return Err(format!(
+                "i18n 字典总字节数超过上限 {MAX_ARTIFACT_BYTES}（读取 {} 时）",
+                path.display()
+            ));
+        }
+        total_bytes += bytes.len();
+        let source = String::from_utf8(bytes).map_err(|error| {
             format!(
                 "pa.invalid_utf8 at byte {} in {}",
                 error.utf8_error().valid_up_to(),
-                source.display()
+                path.display()
             )
         })?;
-        let document = panta_dsl_core::parse(&text)
-            .map_err(|error| format!("{}：{error}", source.display()))?;
-        if document.kind != panta_dsl_core::Kind::Language {
-            // theme/variables 字典在此只做校验；其消费方（025/030）接入前不
-            // 生成任何产物。
-            continue;
-        }
-        let locale = document.language.clone().ok_or_else(|| {
-            format!(
-                "{}：语言字典缺少 language 头，无法生成 TS",
-                source.display()
-            )
-        })?;
-        let catalog = document
-            .catalog
-            .clone()
-            .unwrap_or_else(|| "panta".to_owned());
-        let ts_name = locale.replace('-', "_");
-        let ts = panta_dsl_core::emit_ts(&document, &locale)
-            .map_err(|error| format!("{}：{error}", source.display()))?;
-        let destination = ts_dir.join(format!("{catalog}_{ts_name}.ts"));
-        // 临时文件 + rename：写一半失败不破坏上一份有效 TS。
-        let temporary = destination.with_extension("ts.tmp");
-        fs::write(&temporary, ts.as_bytes())
-            .map_err(|error| format!("写 {} 失败：{error}", temporary.display()))?;
-        fs::rename(&temporary, &destination)
-            .map_err(|error| format!("替换 {} 失败：{error}", destination.display()))?;
+        loaded.push((format!("resources/i18n/{file_name}"), source));
     }
-    Ok(())
+
+    let snapshot = parse_artifacts(
+        loaded
+            .iter()
+            .map(|(source_id, source)| ArtifactSource { source_id, source }),
+    )
+    .map_err(|error| error.to_string())?;
+    let generated = snapshot
+        .emit_translation_sources()
+        .map_err(|error| error.to_string())?;
+    let mut files = BTreeMap::new();
+    for output in generated {
+        if files
+            .insert(
+                output.file_name().to_owned(),
+                output.contents().as_bytes().to_vec(),
+            )
+            .is_some()
+        {
+            return Err(format!(
+                "多个语言 Artifact 输出同名 TS：{}",
+                output.file_name()
+            ));
+        }
+    }
+    provision::replace_directory_with_files(ts_dir, &files)
 }
 
 fn run_step(name: &str, command: &mut Command) -> Result<(), String> {

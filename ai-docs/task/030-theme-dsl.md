@@ -27,7 +27,7 @@
 
 上述依赖产物可用后实施；029 无需等待正式模块迁移 026，030 无需等待热重载 027。涉及 FFI 时沿用 025 已落地的契约。
 
-先冻结键/类型/范围与 QML 属性映射，复用 025 无工程依赖的解析器。默认 GUI 尺寸进入 `kind: variables` 的 `gui.pa`，主题颜色和可覆盖 token 进入 `kind: theme` 的 `light.pa`/`dark.pa`；合并后的完整快照由 C++ ThemeViewModel 发布给 Theme.qml。实现 GUI 线程发布、主题选择及偏好保存。
+先冻结键/类型/范围与 QML 属性映射。公共文法、解析器和源码诊断复用 034 的 `panta-dsl-core`；025 提供变量类型、求值与快照语义，030 负责主题 schema 与 QML 属性映射。默认 GUI 尺寸进入 `kind: variables` 的 `gui.pa`，主题颜色和可覆盖 token 进入 `kind: theme` 的 `light.pa`/`dark.pa`；合并后的完整快照由 C++ ThemeViewModel 发布给 Theme.qml。实现 GUI 线程发布、主题选择及偏好保存。
 
 ## 预计改动
 

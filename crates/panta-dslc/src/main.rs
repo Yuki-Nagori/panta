@@ -1,10 +1,12 @@
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use panta_dsl_core::{Kind, SourceKind, emit_ts, format_source, fsm, parse, source_kind};
+use panta_dsl_core::{
+    Kind, MAX_SOURCE_BYTES, SourceKind, emit_ts, format_source, fsm, parse, source_kind,
+};
 
 fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
@@ -85,7 +87,18 @@ fn required_path(arguments: &[String], index: usize) -> Result<&Path, String> {
 }
 
 fn read_source(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let mut bytes = Vec::new();
+    fs::File::open(path)
+        .map_err(|error| format!("read {}: {error}", path.display()))?
+        .take(MAX_SOURCE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("read {}: {error}", path.display()))?;
+    if bytes.len() > MAX_SOURCE_BYTES {
+        return Err(format!(
+            "pa.source_too_large: source exceeds {MAX_SOURCE_BYTES} bytes in {}",
+            path.display()
+        ));
+    }
     String::from_utf8(bytes).map_err(|error| {
         format!(
             "pa.invalid_utf8 at byte {} in {}",
@@ -119,7 +132,7 @@ fn usage() -> String {
 mod tests {
     // 测试统一以 ? 传播错误：避免永不执行的错误闭包（会被计为未覆盖行），
     // 同时不使用 unwrap/expect（工作区 lint 与 011 决策）。
-    use super::{required_path, run, usage, write_atomically};
+    use super::{MAX_SOURCE_BYTES, required_path, run, usage, write_atomically};
     use std::fs;
     use std::path::PathBuf;
 
@@ -369,7 +382,8 @@ mod tests {
     }
 
     #[test]
-    fn read_source_reports_missing_and_invalid_utf8() -> Result<(), Box<dyn std::error::Error>> {
+    fn read_source_reports_missing_invalid_utf8_and_oversized_files()
+    -> Result<(), Box<dyn std::error::Error>> {
         let dir = TempDir::new("read")?;
         assert!(
             matches!(
@@ -391,6 +405,13 @@ mod tests {
             ),
             "非法 UTF-8 必须带字节位置"
         );
+
+        let oversized = dir.path.join("oversized.pa");
+        fs::write(&oversized, vec![b'x'; MAX_SOURCE_BYTES + 1])?;
+        assert!(matches!(
+            run(vec!["check".to_owned(), oversized.display().to_string()]),
+            Err(ref error) if error.to_string().starts_with("pa.source_too_large")
+        ));
         Ok(())
     }
 

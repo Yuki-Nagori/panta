@@ -296,6 +296,7 @@ dependencies = [
  "pest_derive",
  "quick-xml",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

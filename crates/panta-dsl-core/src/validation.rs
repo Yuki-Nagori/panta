@@ -5,6 +5,21 @@ use std::collections::BTreeMap;
 use crate::diagnostic::push_diagnostic;
 use crate::{Diagnostic, Document, Kind, Status};
 
+#[derive(Default)]
+pub(crate) struct DocumentLocations {
+    pub version: Option<usize>,
+    pub catalog: Option<usize>,
+    pub language: Option<usize>,
+    pub source_language: Option<usize>,
+    pub messages: BTreeMap<String, MessageLocations>,
+}
+
+#[derive(Default)]
+pub(crate) struct MessageLocations {
+    pub declaration: usize,
+    pub translation: Option<usize>,
+}
+
 pub(crate) fn normalize_locale(locale: &str) -> String {
     if locale.eq_ignore_ascii_case("cn")
         || locale.eq_ignore_ascii_case("zh-cn")
@@ -45,6 +60,7 @@ pub(crate) fn validate_document(
     seen_version: bool,
     seen_kind: bool,
     source: &str,
+    locations: &DocumentLocations,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     if !seen_version {
@@ -52,7 +68,7 @@ pub(crate) fn validate_document(
             diagnostics,
             "pa.missing_version",
             "version is required",
-            0,
+            source.len(),
             source,
         );
     } else if document.version != 1 {
@@ -60,7 +76,7 @@ pub(crate) fn validate_document(
             diagnostics,
             "pa.unsupported_version",
             "only version 1 is supported",
-            0,
+            locations.version.unwrap_or(source.len()),
             source,
         );
     }
@@ -69,7 +85,7 @@ pub(crate) fn validate_document(
             diagnostics,
             "pa.missing_kind",
             "kind is required",
-            0,
+            source.len(),
             source,
         );
     }
@@ -80,7 +96,7 @@ pub(crate) fn validate_document(
             diagnostics,
             "pa.invalid_locale",
             format!("invalid language locale '{language}'"),
-            0,
+            locations.language.unwrap_or(source.len()),
             source,
         );
     }
@@ -89,7 +105,7 @@ pub(crate) fn validate_document(
             diagnostics,
             "pa.invalid_locale",
             format!("invalid source locale '{}'", document.source_language),
-            0,
+            locations.source_language.unwrap_or(source.len()),
             source,
         );
     }
@@ -100,7 +116,7 @@ pub(crate) fn validate_document(
                     diagnostics,
                     "pa.missing_language",
                     "language requires a target locale",
-                    0,
+                    source.len(),
                     source,
                 );
             }
@@ -109,7 +125,7 @@ pub(crate) fn validate_document(
                     diagnostics,
                     "pa.empty_language",
                     "language catalog has no messages",
-                    0,
+                    source.len(),
                     source,
                 );
             }
@@ -118,7 +134,7 @@ pub(crate) fn validate_document(
                     diagnostics,
                     "pa.unexpected_values",
                     "values are only valid for theme or variables",
-                    0,
+                    source.len(),
                     source,
                 );
             }
@@ -132,7 +148,15 @@ pub(crate) fn validate_document(
                     diagnostics,
                     "pa.unexpected_language_field",
                     "language fields are only valid for language",
-                    0,
+                    locations
+                        .language
+                        .or(locations.catalog)
+                        .or(locations
+                            .messages
+                            .values()
+                            .next()
+                            .map(|item| item.declaration))
+                        .unwrap_or(source.len()),
                     source,
                 );
             }
@@ -141,18 +165,27 @@ pub(crate) fn validate_document(
                     diagnostics,
                     "pa.empty_values",
                     "theme or variables requires values",
-                    0,
+                    source.len(),
                     source,
                 );
             }
         }
     }
-    validate_messages(document, source, diagnostics);
+    validate_messages(document, source, locations, diagnostics);
 }
 
-fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Diagnostic>) {
+fn validate_messages(
+    document: &Document,
+    source: &str,
+    locations: &DocumentLocations,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let mut sources: BTreeMap<(String, String), String> = BTreeMap::new();
     for message in document.messages.values() {
+        let message_locations = locations
+            .messages
+            .get(&format!("{}\u{1f}{}", message.context, message.id));
+        let message_offset = message_locations.map_or(source.len(), |item| item.declaration);
         let source_key = (message.context.clone(), message.source.clone());
         if let Some(previous_id) = sources.insert(source_key, message.id.clone())
             && previous_id != message.id
@@ -164,7 +197,7 @@ fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Di
                     "context '{}' contains messages '{}' and '{}' with the same source text",
                     message.context, previous_id, message.id
                 ),
-                0,
+                message_offset,
                 source,
             );
         }
@@ -178,7 +211,7 @@ fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Di
                 diagnostics,
                 "pa.empty_plural",
                 format!("message '{}' has no plural forms", message.id),
-                0,
+                message_offset,
                 source,
             );
         }
@@ -192,7 +225,7 @@ fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Di
                 diagnostics,
                 "pa.unexpected_plural",
                 format!("message '{}' is not numerus", message.id),
-                0,
+                message_offset,
                 source,
             );
         }
@@ -207,7 +240,9 @@ fn validate_messages(document: &Document, source: &str, diagnostics: &mut Vec<Di
                         diagnostics,
                         "pa.placeholder_mismatch",
                         format!("message '{}' has different placeholders", message.id),
-                        0,
+                        message_locations
+                            .and_then(|item| item.translation)
+                            .unwrap_or(message_offset),
                         source,
                     );
                     break;
