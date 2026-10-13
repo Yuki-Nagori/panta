@@ -1,6 +1,6 @@
 # 034 — Rust Panta Artifact 解析与 TS/QM 编译入口
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[001](001-cargo-config.md)
 - 优先级：P1
@@ -96,7 +96,7 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 完成摘要
 
-原始实现和 PR #14 已合并。2026-10-13 的独立复审发现 TS 构建目录与 CMake 输出目录重叠、转义诊断偏移、多复数形式截断和 Qt ID 碰撞风险；本次跟进已修复并完成本机完整验证，三平台 CI 待本批提交运行，因此任务保持 in-progress。032 覆盖率工作保持 deferred，不作为本任务阻塞项。
+原始实现和 PR #14 已合并。后续独立复审发现 TS 构建目录与 CMake 输出目录重叠、转义诊断偏移、多复数形式截断和 Qt ID 碰撞风险；修复、回归测试、本机 workspace 门禁、独立评审及 PR #15 三平台 CI 均已完成。032 覆盖率工作保持 deferred，不作为本任务阻塞项。
 
 ## 历史进展（截至 2026-09-17）
 
@@ -108,8 +108,8 @@ Rust workspace 入口 001 可用；实施前冻结 `.pa` 的 UTF-8、language/so
 
 ## 复审跟进（2026-10-13）
 
-独立复审指出四项遗漏：TS 临时输入目录不能复用 CMake 的 `native/i18n` 输出目录；转义错误位置必须基于 pair 在原文中的字节起点；TS 生成要保留所有复数形式；扁平 Qt ID 组合必须检测碰撞。以上均已修复。回归测试覆盖 quoted/unquoted Unicode 前缀的转义位置、多 plural forms 和 Qt ID 碰撞；本机 launcher 构建及最终 workspace 聚合门禁通过。独立评审未发现实现问题，并建议补 quoted 错误转义的位置断言；该建议已落实且复验通过。三平台 CI 尚待本批提交运行。
+独立复审指出四项遗漏：TS 临时输入目录不能复用 CMake 的 `native/i18n` 输出目录；转义错误位置必须基于 pair 在原文中的字节起点；TS 生成要保留所有复数形式；扁平 Qt ID 组合必须检测碰撞。以上均已修复。回归测试覆盖 quoted/unquoted Unicode 前缀的转义位置、多 plural forms 和 Qt ID 碰撞；本机 launcher 构建及最终 workspace 聚合门禁通过。独立评审未发现实现问题；其关于 quoted 错误转义位置断言的建议已落实并通过复验。PR #15 的 macOS、Linux、Windows 构建，Rust/C++ 覆盖率、QML、格式和适用 lint 检查全部通过。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-10-13 | Review follow-up：`cargo build --locked -p panta-launcher`；`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace`；TS/CMake 产物目录检查 | TS 输入与 CMake 输出目录隔离；转义字节位置稳定；TS 保留所有 forms 并拒绝 ID 碰撞；workspace 门禁通过 | 本机 macOS arm64 构建与 workspace 门禁通过；CTest 75/75。TS 位于 `target/native/debug/generated/i18n-ts`，QM、qrc 与 CMake 构建状态仍在 `target/native/debug/i18n`。独立评审无阻塞问题；quoted/unquoted Unicode 转义精确位置测试均通过。三平台 CI 待本批提交运行。 |
+| 2026-10-13 | Review follow-up：`cargo build --locked -p panta-launcher`；`cargo format --check`、`cargo lint --check`、`cargo test --locked --workspace`；TS/CMake 产物目录检查；PR #15 三平台 CI（run [38399461566](https://github.com/Yuki-Nagori/panta/actions/runs/38399461566)） | TS 输入与 CMake 输出目录隔离；转义字节位置稳定；TS 保留所有 forms 并拒绝 ID 碰撞；本机与三平台门禁通过 | 本机 macOS arm64 构建及 workspace 门禁通过；CTest 75/75。TS 位于 `target/native/debug/generated/i18n-ts`，QM、qrc 与 CMake 构建状态仍在 `target/native/debug/i18n`。独立评审无阻塞问题；quoted/unquoted Unicode 转义精确位置测试均通过。PR #15 的 macOS/Linux/Windows Cargo build、Rust/native 覆盖率、格式、Clippy、clang-tidy、cppcheck、include 检查全部通过；按变更路径跳过的 cargo audit、CMake lint、qmllint 符合预期。 |
