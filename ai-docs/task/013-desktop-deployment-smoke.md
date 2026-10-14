@@ -11,7 +11,7 @@
 
 验证安装产物可独立启动，发现并修复 Qt/QML 和 native 运行时依赖缺口。
 
-本任务先完成 macOS arm64 主平台安装部署基础设施，并将 app 与全部 macOS 原生 SDK 的最低部署版本统一为 macOS 13.0。旧 SDK 必须按该基线重产并更新 manifest 后，才可确认完整依赖链支持该版本。当前 app 只链接 VTK；OCCT/Netgen 由几何、网格测试目标消费，因此桌面 app 的 OCCT/Netgen 加载验收仍未满足，不能靠无用地复制动态库伪装通过。
+本任务先完成 macOS arm64 主平台安装部署基础设施，并将 app 与全部 macOS 原生 SDK 的最低部署版本统一为 macOS 13.0。VTK/Dawn、OCCT/Netgen 和 GoogleTest SDK 已按该基线重产并发布，manifest 摘要已更新；消费端 CI 完成后才能确认完整依赖链支持该版本。当前 app 只链接 VTK；OCCT/Netgen 由几何、网格测试目标消费，因此桌面 app 的 OCCT/Netgen 加载验收仍未满足，不能靠无用地复制动态库伪装通过。
 
 ## 必读
 
@@ -86,7 +86,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：新增手动 `Package desktop builds` workflow，三平台分别构建 Release、通过 `cargo run --locked --release --package panta-launcher -- package "$PACKAGE_DIR"` 执行安装并上传 1 天有效的测试归档。workflow 配置已本地检查，三平台结果须在 GitHub Actions 手动运行后记录；Linux 测试机需满足 README 所列系统运行时要求。
 - 2026-10-14：首次手动打包中 macOS arm64 与 Linux x86_64 成功；Windows x86_64 的 `file(GET_RUNTIME_DEPENDENCIES)` 将 `api-ms-win-*` API Set 虚拟 DLL 报为未解析依赖。Windows 安装规则在扫描前排除 `api-ms-*` 和 `ext-ms-*` 系统名称。独立评审确认正则只匹配这两类 API Set；修复效果仍须由 Windows Actions 复验。
 - 2026-10-14：Windows package run 38505719386 确认 API Set 预排除已生效；新失败来自 `install(FILES "$ENV{windir}/...")` 将 `C:\Windows` 写入生成的 CMake 安装脚本，`\W` 触发解析错误。安装规则与开发期拷贝共用 `PANTA_D3DCOMPILER_47_DLL`，配置时先把 Windows 系统根目录转换为 CMake 正斜杠格式；等待 Windows Actions 复验。
-- 2026-10-14：将 app、CXX bridge、VTK/Dawn、OCCT、Netgen、GoogleTest 的 macOS 构建最低版本统一为 13.0；Qt 6.11.2 已支持 13.0。更新三个 SDK Release 说明为中文并移除重复一级标题。现有发布归档仍须重产、替换并更新 SHA256 manifest，完成前不宣称 macOS 13 依赖链已验收。
+- 2026-10-14：将 app、CXX bridge、VTK/Dawn、OCCT、Netgen、GoogleTest 的 macOS 构建最低版本统一为 13.0；Qt 6.11.2 已支持 13.0。更新三个 SDK Release 说明为中文并移除重复一级标题。VTK/Dawn、OCCT/Netgen、GoogleTest 三个平台归档已按新基线重产，Release 与 manifest SHA 已更新；消费端 CI 和 app 安装验收仍待复验。
 - 2026-10-14：将维护者提供的 Welcome tab CSS 视觉临时实现为 SVG，加入 app 窗口图标并替换 Welcome 页签上的文字 P。它作为临时品牌资源单独打包，不加入操作图标 symbol 清单。
 - 当前范围限制：桌面 app 实际只链接 VTK。OCCT 和 Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包；第一条验收保持未完成，需在桌面功能正式接入后补库加载验收。Windows/Linux 安装与实机验收也未完成。
 

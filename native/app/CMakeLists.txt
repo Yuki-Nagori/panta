@@ -37,8 +37,8 @@ elseif(WIN32)
   # Windows 根路径中的反斜杠被解释成 CMake 转义序列。
   string(REPLACE "\\" "/" PANTA_WINDOWS_SYSTEM_ROOT "$ENV{windir}")
   set(PANTA_D3DCOMPILER_47_DLL "${PANTA_WINDOWS_SYSTEM_ROOT}/System32/d3dcompiler_47.dll")
-  panta_deploy_windows_app_runtime(
-    panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "${PANTA_D3DCOMPILER_47_DLL}")
+  panta_deploy_windows_app_runtime(panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml"
+                                   "${PANTA_D3DCOMPILER_47_DLL}")
 endif()
 if(PANTA_ENABLE_BRIDGE_MODULE)
   # main.cpp 的进程级 crash handler 已在上方链接 FFI；这里仅追加 Bridge/VTK

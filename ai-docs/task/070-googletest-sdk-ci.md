@@ -1,6 +1,6 @@
 # 070 — GoogleTest 三平台 SDK 制品 CI
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[019 GTest 测试配置与规则](019-gtest-native-testing.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)、[038 native SDK 制品生产](038-native-sdk-artifact-production.md)
 - 优先级：P1
@@ -11,7 +11,7 @@
 
 GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 commit。Git 历史克隆在网络慢或受限环境中会拖住 Cargo 聚合构建。上游 GitHub Release 提供源码归档而非各平台可直接链接的二进制库；本任务增加仓库自己的受信 CI，在 macOS arm64、Ubuntu x86_64、Windows x86_64 分别构建并打包静态 GoogleTest SDK，完成包自检后上传 Actions artifacts，并支持由维护者显式发布到固定 GitHub Release。后续消费者 run `35992062001` 发现 Windows 产物实际由 MinGW 构建，与消费端 MSVC ABI 不兼容；此前生产自检使用了同一默认编译器，因此通过自检并未验证消费者 ABI，Windows 制品需重产。
 
-2026-10-14 维护者要求 macOS 依赖最低部署版本统一为 13.0。producer workflow 已设置该版本，但现有 macOS Release SDK 是旧基线，必须重产、替换资产并更新 071 manifest SHA 后才能完成本轮验收。
+2026-10-14 按维护者要求将 macOS 依赖最低部署版本统一为 13.0。GoogleTest 三平台 SDK 已按新基线重产并替换 Release 资产；摘要更新至 071 manifest。新摘要的消费端 CI 复验由任务 071 跟进。
 
 本任务仅交付 SDK 生产管线和可验证制品，不切换普通构建中的 GoogleTest 消费路径。等三平台资产发布并取得真实 URL/SHA256 后，再由独立消费任务更新 `sdk-provision` manifest 与 `BUILD_TESTING` 集成。
 
@@ -73,8 +73,8 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 - [x] Windows SDK 使用 MSVC 2022 x64 Release 工具链（而非 runner PATH 中的 MinGW）生产并由同 ABI 自检；workflow run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) 通过。
 - [x] Windows consumer build 与 sanitizer 在 MSVC ABI 下链接并测试通过。
 - [x] Release 默认不发布；启用发布时由单一 job 全量替换 `sdk-googletest-1.18.0` 资产。
-- [x] 普通 CI 和当前本地 Cargo 测试入口行为保持不变；资产摘要已在任务 071 登记并经消费者 CI 验证。
-- [ ] GoogleTest SDK 按 macOS 13.0 部署目标重产并通过三平台自检；Release 资产和任务 071 manifest 中所有平台的 SHA 已同步（metadata 变化也会改变 Linux/Windows 归档摘要）。
+- [x] 普通 CI 和当前本地 Cargo 测试入口行为保持不变；三平台 Release 资产摘要已更新至任务 071 manifest。
+- [x] GoogleTest SDK 按 macOS 13.0 部署目标重产并通过三平台自检；Release 资产和任务 071 manifest 中所有平台的 SHA 已同步（metadata 变化也会改变 Linux/Windows 归档摘要）。
 - [x] 本任务和索引记录真实 workflow/本地验证结果，CI-only 限制如实注明。
 
 ## 验证计划与结果
@@ -88,6 +88,7 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 | 2026-09-24 | Actions run [35992062001](https://github.com/Yuki-Nagori/panta/actions/runs/35992062001) Windows consumer link | 固定 Windows SDK 能与仓库 MSVC ABI 链接 | 失败；link log 引用了 `libgtest.a`、`__mingw_vfprintf` 和 `__cxxabiv1`，证明现有 Windows SDK 是 MinGW ABI；producer selfcheck 曾用同一默认编译器，因此未覆盖该错配。修复跟踪见任务 075 |
 | 2026-09-24 | Actions run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) `workflow_dispatch`，发布输入开启 | 三平台重产、自检、归档与 Release 发布成功；Windows 使用 MSVC | 全绿；Windows job 使用 Visual Studio 2022 x64 + Release，SDK 自检和全平台资产发布通过；新摘要回填见任务 071。consumer run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) 使用旧 manifest 时发现摘要不匹配及 standalone cppcheck 缺 moc，后由新 CI 复验 |
 | 2026-09-24 | Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | 三平台 consumer build/test、Windows MSVC sanitizer 及修复后的质量检查通过 | 全绿。macOS、Linux、Windows 的 Cargo build/test 均通过；Windows sanitizer、Linux native C++/QML、Rust coverage、cppcheck、clang-tidy、qmllint、格式和其他 lint 均通过。确认重产 SDK 可被消费端使用，关闭本任务 |
+| 2026-10-14 | Actions run [38509650651](https://github.com/Yuki-Nagori/panta/actions/runs/38509650651) `workflow_dispatch`，发布输入开启 | 三平台以 macOS 13.0 为最低部署目标重产、自检、归档并替换 Release 资产 | 全绿；三平台生产、自检、打包、发布成功。新归档 SHA 与 sidecar 及 Release API digest 一致，已登记至任务 071；新摘要的消费端复验由任务 071 跟进 |
 
 ## 风险与回退
 
@@ -100,7 +101,8 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 - 2026-09-24：三平台 workflow run 35972333653 全绿并发布 `sdk-googletest-1.18.0`；所有矩阵 job 的 SDK 静态链接自检与发布 job 均通过。
 - 2026-09-24：consumer run 35992062001 证明旧 Windows Release 资产由 MinGW 构建且不兼容 MSVC consumer；原先的 `gtest_force_shared_crt=ON` 只设 CRT 选项，没有选择 MSVC 编译器。任务重新打开，任务 075 登记 producer 与 consumer 修复。
 - 2026-09-24：run 35999015400 使用修正后的 Visual Studio 2022 x64 Release 配置，三平台自检、打包和 Release 发布通过；run 35998981964 使用旧 manifest 消费期间检测到 Windows 摘要失配，并发现独立 cppcheck 漏了 benchmark moc 准备。摘要已在 manifest 更新，cppcheck runner 补齐前置步骤后由 run 36001859191 全绿复验。
+- 2026-10-14：run 38509650651 按 macOS 13.0 最低部署目标重产三平台 SDK 并替换 Release；生产、自检、打包和发布全部成功。新 SHA 与 sidecar、Release API digest 一致，已同步至 071 manifest；消费端复验留在任务 071。
 
 ## 完成摘要
 
-手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程已落地。run 35999015400 使用 MSVC 2022 x64 重产并发布三平台资产，Release digest 与消费 manifest 一致；run 36001859191 三平台 build/test 和 Windows sanitizer 全绿，生产与消费验证闭环完成。
+手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程已落地。run 35999015400 修复 Windows MSVC ABI；run 38509650651 按 macOS 13.0 目标重产并发布三平台资产，Release digest、sidecar 与任务 071 manifest 一致。新摘要的消费端复验由任务 071 跟进。

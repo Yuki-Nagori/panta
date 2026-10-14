@@ -1,11 +1,11 @@
 # 071 — GoogleTest SDK 消费接入
 
-- 状态：done
+- 状态：in-progress
 - 阶段：验证基础
 - 依赖：[070 GoogleTest 三平台 SDK 制品 CI](070-googletest-sdk-ci.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-24
+- 创建 / 更新：2026-09-24 / 2026-10-14
 
 ## 目标与背景
 
@@ -21,7 +21,7 @@
 - [仓库文件规范](../standards/repository-hygiene.md)
 - [提交规范](../standards/commits.md)
 - [代码生命周期](../standards/code-lifecycle.md)
-- [GoogleTest SDK Release](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-googletest-1.18.0)（2026-09-24 实测）
+- [GoogleTest SDK Release](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-googletest-1.18.0)（2026-10-14 重产）
 
 ## 范围与非目标
 
@@ -33,10 +33,10 @@
 
 ## 前置条件与待决策
 
-- Release `sdk-googletest-1.18.0` 已由修正版 workflow run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) 重产三平台资产与 sidecar。新归档 SHA256 与 sidecar 内容及 Release API digest 一致：
-  - macOS arm64：`654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`
-  - Linux x86_64：`4b4b1281828c095cda29fdc4e7b150d816296da2b2c1375a2a2326ebc68de5ae`
-  - Windows x86_64：`d070f6fbe77d1060033e8eb6bac97b7efba736db7b40fc50ef2ce9ce914c03ff`
+- Release `sdk-googletest-1.18.0` 已由 run [38509650651](https://github.com/Yuki-Nagori/panta/actions/runs/38509650651) 按 macOS 13.0 最低部署目标重产三平台资产与 sidecar。新归档 SHA256 与 sidecar 内容及 Release API digest 一致：
+  - macOS arm64：`5c7c6467a1988da5891ff57a864308bbc54f7cc5c593bd3b30b6f6dd43678a18`
+  - Linux x86_64：`2c3f1941a732475106a3caea607299fe8f8cd7a0481af3f8246d2e6e2794c841`
+  - Windows x86_64：`0fc2f014e6b2b5c7c84fd5020fb53cac30072717008d238bd06af03cfcd70a33`
 - 归档内包含 `GTestConfig.cmake`、静态库、headers、`panta-sdk.json` 和 BSD-3-Clause license。
 
 ## 实施步骤
@@ -74,6 +74,7 @@
 - [x] `cargo test --locked --workspace` 在当前 macOS 平台通过；native CTest 中各 GoogleTest suite 全绿。
 - [x] SDK 归档二次复用不下载；损坏 marker/哈希时按现有 provision 契约重建或拒绝。
 - [x] 三平台消费 CI 使用固定资产完成构建与测试；task / index / 固定清单已同步。
+- [ ] 消费端 CI 使用 2026-10-14 重产的三平台资产及新 manifest 完成构建与测试；macOS 13.0 部署基线复验通过。
 
 ## 验证计划与结果
 
@@ -89,6 +90,8 @@
 | 2026-09-24 | macOS：更新三平台摘要后运行 `cargo test --locked --workspace` | staging 用新 manifest 摘要下载/接受当前平台 SDK，native 与 Rust 测试通过 | 通过；staging marker SHA256 为 `654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`，native CTest 56/56 |
 | 2026-09-24 | GitHub Actions run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) | 三平台 consumer CI 使用新 Release 摘要通过 | 该 run 的 commit `262ad8b` 尚未包含新 SHA；Windows 比较旧期望值与新资产 digest 后按设计拒绝，不能视为新 manifest 的消费者失败。下一次 push CI 待复验 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | macOS arm64、Linux x86_64、Windows x86_64 使用新 manifest 完成 build/test；Windows sanitizer 与固定 ABI 校验通过 | 全绿。三平台 Cargo build/test 均成功，Windows MSVC sanitizer 成功；Release API 的三个归档 digest 与 manifest SHA256 一致 |
+| 2026-10-14 | `/tmp` 下载三平台全部 SDK 归档和 sidecar；逐包计算 SHA256、核对 sidecar/manifest，并运行 `tar -tzf` | 12 个归档的字节摘要与 sidecar、manifest 一致，归档目录表可读取 | 通过；VTK、OCCT、Netgen、GoogleTest 共 12 个归档全部匹配；新摘要消费端 CI 待运行 |
+| 2026-10-14 | macOS：`CARGO_TARGET_DIR=/tmp/panta-sdk-validation-target cargo test --locked --workspace` | 更新后的 manifest 消费 GoogleTest SDK，Rust、native 与 QML 聚合测试通过 | 通过；75/75 native CTest、Rust workspace 与 QML 检查通过。Linux/Windows 新摘要 consumer CI 待运行；临时 target 已清理 |
 
 ## 风险与回退
 
@@ -102,7 +105,8 @@ SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT。�
 - 2026-09-24：完成 manifest、CMake 消费、toolchain 检查及文档迁移；macOS 聚合测试两次通过、`BUILD_TESTING=OFF` configure 和 toolchain 检查通过。等待三平台消费者 CI 结果后关闭任务。
 - 2026-09-24：run 35992062001 的 Linux/macOS consumer checks 通过，但 Windows normal build 和 sanitizer 均在链接 GTest 时失败；确认 Release Windows `libgtest.a` 是 MinGW ABI。跟踪任务 075 将修复 Windows producer、自检与资产摘要。
 - 2026-09-24：run 36001859191 在三平台完成 Cargo build/test，Windows sanitizer 及 Linux native/QML 检查也通过；Release API digest 与 manifest SHA256 匹配，关闭消费接入任务。
+- 2026-10-14：生产任务 070 按 macOS 13.0 目标重产并替换所有 GoogleTest 平台资产。manifest 已更新为新摘要；任务重新标记 in-progress，等待消费端 CI 对更新后的归档完成构建与测试验收。
 
 ## 完成摘要
 
-GoogleTest 静态 SDK 现通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。三平台归档来自 MSVC 修正后的 Release，API digest 与 manifest 摘要一致；run 36001859191 的三平台 Cargo build/test、Windows sanitizer 和相关质量检查全绿，生产与消费闭环完成。
+GoogleTest 静态 SDK 通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。之前的消费闭环由 run 36001859191 验证；2026-10-14 三平台资产按 macOS 13.0 目标重产，当前摘要已同步，等待新摘要的消费端 CI 复验。
