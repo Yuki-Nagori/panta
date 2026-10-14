@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <panta/visualization/cae_viewport.hpp>
 #include <panta/visualization/render_scene.hpp>
 #include <qtenvironmentvariables.h>
 #include <qtestsupport_core.h>
@@ -34,6 +35,18 @@
 #include <vtk_viewport.hpp>
 
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
+
+class TestMeshSource final : public panta::visualization::MeshSource {
+  public:
+    using MeshSource::MeshSource;
+
+    std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> snapshot;
+
+    [[nodiscard]] auto mesh_snapshot() const
+        -> std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> override {
+        return snapshot;
+    }
+};
 
 namespace panta::visualization {
 class ViewportTestAccess final {
@@ -131,6 +144,40 @@ class ViewportModuleLoadTest final : public QObject {
         QVERIFY2(component.isReady(), component.errorString().toUtf8().constData());
         std::unique_ptr<QObject> object(component.create());
         QVERIFY2(object != nullptr, "CaeViewport 创建失败");
+    }
+
+    void mesh_source_destruction_clears_scene_and_notifies() {
+        panta::visualization::CaeViewport viewport;
+        QSignalSpy source_changed(&viewport, &panta::visualization::CaeViewport::meshSourceChanged);
+        QVERIFY(source_changed.isValid());
+
+        auto snapshot = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> snapshot_lifetime =
+            snapshot;
+        auto source = std::make_unique<TestMeshSource>();
+        source->snapshot = std::move(snapshot);
+        viewport.setMeshSource(source.get());
+        QCOMPARE(source_changed.count(), 1);
+        QVERIFY(!snapshot_lifetime.expired());
+
+        source.reset();
+        QVERIFY(viewport.meshSource() == nullptr);
+        QCOMPARE(source_changed.count(), 2);
+        QTRY_VERIFY_WITH_TIMEOUT(snapshot_lifetime.expired(), 1000);
+
+        auto replaced_source = std::make_unique<TestMeshSource>();
+        auto current_source = std::make_unique<TestMeshSource>();
+        viewport.setMeshSource(replaced_source.get());
+        viewport.setMeshSource(current_source.get());
+        const qsizetype notification_count = source_changed.count();
+        replaced_source.reset();
+        QCoreApplication::processEvents();
+        QCOMPARE(viewport.meshSource(), static_cast<QObject*>(current_source.get()));
+        QCOMPARE(source_changed.count(), notification_count);
+
+        current_source.reset();
+        QVERIFY(viewport.meshSource() == nullptr);
+        QCOMPARE(source_changed.count(), notification_count + 1);
     }
 
     void native_refresh_and_window_lifecycle() {

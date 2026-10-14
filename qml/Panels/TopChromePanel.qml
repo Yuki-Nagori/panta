@@ -13,7 +13,6 @@ Rectangle {
     property string activeRibbonTab: "start-learn"
     property real nativeControlsLeftInset: 0
     property real nativeControlsRightInset: 0
-    readonly property bool macOS: Qt.platform.os === "osx"
 
     // 面板仅报告稳定菜单 key，由宿主决定哪些入口可导航。
     signal menuRequested(string key)
@@ -26,10 +25,10 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // macOS 由系统交通灯标识窗口，不显示应用图标。
+        // macOS 使用系统交通灯，不再重复显示应用内品牌块。
         Rectangle {
             objectName: "titleBrandTile"
-            visible: !chrome.macOS
+            visible: Qt.platform.os !== "osx"
             Layout.fillHeight: true
             Layout.preferredWidth: Theme.logoWidth
             color: Theme.colorBrand
@@ -53,9 +52,8 @@ Rectangle {
                 id: titleStrip
                 objectName: "titleStrip"
                 Layout.fillWidth: true
-                Layout.leftMargin: chrome.macOS ? chrome.nativeControlsLeftInset : 0
-                // macOS 右侧没有原生标题栏按钮；SafeArea 的右边距会留下大块空白。
-                Layout.rightMargin: chrome.macOS ? 0 : chrome.nativeControlsRightInset
+                Layout.leftMargin: chrome.nativeControlsLeftInset
+                Layout.rightMargin: chrome.nativeControlsRightInset
                 Layout.preferredHeight: Theme.titlebarHeight
                 contentRoot: titleContent
 

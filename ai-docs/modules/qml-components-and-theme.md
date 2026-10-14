@@ -12,7 +12,7 @@
 
 029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。
 
-主窗口标题栏融合由 [051 无边框外观与一体化窗口标题栏](../task/051-integrated-window-titlebar.md) 推进：当前使用 Qt 扩展客户区 flags，macOS 查询原生标题栏按钮矩形并对称避让，Windows/Linux 保留系统窗口控制；跨平台真实窗口验收仍未完成。`WindowChromeMetrics` 属于 Shell 平台适配，只提供原生窗口几何，不承载业务行为。该方案不依赖不存在的 `QWindow::setTitleBar(QWidget*)`。
+主窗口标题栏融合由 [051 无边框外观与一体化窗口标题栏](../task/051-integrated-window-titlebar.md) 推进：macOS 查询 AppKit 原生标题栏按钮矩形并避让；Windows 按 Qt 6.11.2 标题栏按钮布局，通过系统 DPI 指标运行时计算避让；Linux 保留窗口管理器标题栏和系统按钮提示，以零宽标题隐藏文字。三个平台都隐藏系统栏中的应用图标和标题，Windows/Linux 保留应用内 P 品牌块。Linux/Wayland 与 Windows 的真实窗口验收仍未完成。`WindowChromeMetrics` 属于 Shell 平台适配，只提供原生窗口几何，不承载业务行为。该方案不依赖不存在的 `QWindow::setTitleBar(QWidget*)`。
 
 ## 页面设计工作流：HTML 先行复刻
 

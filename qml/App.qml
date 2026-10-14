@@ -9,8 +9,12 @@ ApplicationWindow {
     id: shellWindow
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
-    // 将应用顶栏绘入原生标题栏客户区，保留系统提供的窗口控制。
-    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+    // Linux XCB 会把空标题替换为应用名；零宽字符让窗口管理器保留原生标题栏按钮，
+    // 同时不显示文字。应用显示名在 Linux 入口中显式留空，避免 QPA 追加名称。
+    title: Qt.platform.os === "linux" ? "\u200B" : ""
+    // Windows 隐藏系统图标/标题但保留 Qt 原生控制按钮。Linux 显式保留空标题
+    // 和系统按钮提示，使 XCB 保留窗口管理器装饰及操作按钮。
+    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint | (Qt.platform.os === "windows" ? Qt.CustomizeWindowHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint : Qt.platform.os === "linux" ? Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint : 0)
     topPadding: 0
     leftPadding: 0
     rightPadding: 0
@@ -140,7 +144,7 @@ ApplicationWindow {
             projectOpen: shellWindow.projectOpen
             activeRibbonTab: shellWindow.activeRibbonTab
             nativeControlsLeftInset: shellWindow.nativeControlsLeftInset
-            nativeControlsRightInset: shellWindow.SafeArea.margins.right
+            nativeControlsRightInset: WindowChromeMetrics.trailingSystemControlsInset
             onMenuRequested: key => shellWindow.selectRibbonTab(key)
         }
 
