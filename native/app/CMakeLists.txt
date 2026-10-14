@@ -33,7 +33,12 @@ elseif(WIN32)
   target_link_libraries(panta_native_app PRIVATE ws2_32 userenv ntdll)
   # 真实窗口验收直接裸启 exe（AGENTS 验收流程）：部署机制与覆盖范围见
   # cmake/windows-app-runtime-deployment.cmake 头注。
-  panta_deploy_windows_app_runtime(panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml")
+  # install(FILES) 会把路径写入 cmake_install.cmake；先转换为正斜杠，避免
+  # Windows 根路径中的反斜杠被解释成 CMake 转义序列。
+  string(REPLACE "\\" "/" PANTA_WINDOWS_SYSTEM_ROOT "$ENV{windir}")
+  set(PANTA_D3DCOMPILER_47_DLL "${PANTA_WINDOWS_SYSTEM_ROOT}/System32/d3dcompiler_47.dll")
+  panta_deploy_windows_app_runtime(
+    panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "${PANTA_D3DCOMPILER_47_DLL}")
 endif()
 if(PANTA_ENABLE_BRIDGE_MODULE)
   # main.cpp 的进程级 crash handler 已在上方链接 FFI；这里仅追加 Bridge/VTK
@@ -151,7 +156,7 @@ elseif(WIN32)
     Runtime)
   # Dawn 动态加载 D3DCompiler，依赖扫描无法发现它；沿用开发部署的系统 DLL 来源。
   install(
-    FILES "$ENV{windir}/System32/d3dcompiler_47.dll"
+    FILES "${PANTA_D3DCOMPILER_47_DLL}"
     DESTINATION bin
     COMPONENT Runtime)
 else()
