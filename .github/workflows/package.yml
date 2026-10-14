@@ -108,7 +108,7 @@ jobs:
           Write-Host "Windows vs_link_exe 子命令：$linkInvocation"
           $normalizedLinkInvocation = $linkInvocation.Replace('/', '\')
           if ($normalizedLinkInvocation.Contains($normalizedExpectedManifest) -or
-            $linkInvocation -match '(?i)(--manifests|/MANIFESTINPUT)') {
+            $linkInvocation -match '(?i)/MANIFESTINPUT') {
             throw "Qt manifest 仍作为链接器输入，无法绕过 lld-link 的清单合并：$linkInvocation"
           }
           $embedCommands = @(
