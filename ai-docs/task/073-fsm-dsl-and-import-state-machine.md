@@ -1,11 +1,11 @@
 # 073 — FSM DSL 与首个异步 STL 视口资源激活
 
-- 状态：in-progress
+- 状态：done
 - 阶段：CAE 业务编排
 - 依赖：[008](008-tasks-errors-logging.md)、[034](034-rust-panta-artifact-parser.md)、[035](035-pa-formatter-and-validator.md)、[067](067-rust-mesh-domain-migration.md)、[072](072-flow-state-machine-planning.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-09
+- 创建 / 更新：2026-09-24 / 2026-10-14
 
 ## 目标与背景
 
@@ -48,14 +48,14 @@
 
 ## 验收标准
 
-- [ ] FSM 输入在 CLI 与 build script 中按同一规则接受 / 拒绝，坏引用、重复 / 歧义边、终态出边、不可达状态、命名冲突、未知字段及资源上限都有定位诊断；旧 kind 不回归。
-- [ ] 相同输入生成一致的枚举 / 元数据，每条 guard 关联保留；跨文件 / 输出路径命名冲突被拒绝；输入增删改触发正确重建，错误或已删除的必需输入不能使用残留生成文件通过，源码树保持不变。
-- [ ] `ALL_STATES × ALL_EVENTS` 对实际手写决策做双向结构校验；每个 guard 有真 / 假及边界场景，生产 API 不开放任意设状态。
-- [ ] 从初态到解析就绪、失败、取消和过期丢弃的资源激活事件路径可重放；结果与已提交 ImportRecord 一致，ProjectManifest、revision 与 dirty 原值不变。
-- [ ] 覆盖关闭待加载 tab、连续切换目标、工程关闭 / 重开、project generation 变化、旧 attempt 与重复 / 迟到结果；过期事件不发布快照且解析资源得到释放。
-- [ ] Task 成功只表示网格快照已加载并可供 ViewModel 使用；失败和取消各终止一次；长解析不阻塞 GUI，GUI 线程不等待 worker join。
-- [ ] 可控解析器接缝覆盖读取失败、格式错误、取消和 worker 启动失败；当前活动视口与工程持久状态按契约保留。
-- [ ] 无重复 parser、工程事务反向依赖或遗留执行路径；适用 Cargo 聚合与窗口 / 跨平台验证有真实证据，文档和状态同步。
+- [x] FSM 输入在 CLI 与 build script 中按同一规则接受 / 拒绝，坏引用、重复 / 歧义边、终态出边、不可达状态、命名冲突、未知字段及资源上限都有定位诊断；旧 kind 不回归。
+- [x] 相同输入生成一致的枚举 / 元数据，每条 guard 关联保留；输出路径注册拒绝重复目标；真实 Cargo fixture 验证输入增删改触发重建，删除 `include!` 所需输入即使仍有其他 FSM 也会因缺少生成文件而构建失败；错误后无残留输出，源码树保持不变。当前 canonical kebab-case 名称和 stem 一致约束下无法构造不同合法名称映射到同一输出的输入，防御性冲突检查另有直接测试。
+- [x] `ALL_STATES × ALL_EVENTS` 对实际手写决策做双向结构校验；每个 guard 有真 / 假及边界场景，生产 API 不开放任意设状态。
+- [x] 从初态到解析就绪、失败、取消和过期丢弃的资源激活事件路径可重放；结果与已提交 ImportRecord 一致，ProjectManifest、revision 与 dirty 原值不变。
+- [x] 覆盖关闭待加载 tab、连续切换目标、工程关闭 / 重开、project generation 变化、旧 attempt 与重复 / 迟到结果；过期事件不发布快照且解析资源得到释放。
+- [x] Task 成功只表示网格快照已加载并可供 ViewModel 使用；失败和取消各终止一次；长解析不阻塞 GUI，GUI 线程不等待 worker join。
+- [x] 可控解析器接缝覆盖读取失败、格式错误、取消和 worker 启动失败；当前活动视口与工程持久状态按契约保留。
+- [x] 无重复 parser、工程事务反向依赖或遗留执行路径；现有真实窗口和三平台验证均有记录。本轮 Cargo fixture 已随 PR #19 通过 macOS、Linux、Windows 构建与测试。
 
 ## 验证计划与结果
 
@@ -67,13 +67,11 @@
 | 2026-09-26 | `cargo coverage` | 新增 FSM / 激活代码纳入函数 / 行门禁，边界完整 | 通过；函数 89.59%（门槛 89）、行 92.97%（门槛 92），退出码 0。边界补齐：状态 / 边数恰好达限（128 / 512）接受、超限拒绝，from / on / to 逐字段缺失，states 节内转移声明，1MiB 源上限，无 guard 生成物，checked 读取未登记扩展名，清单资产 `..` / 绝对路径穿越在激活提交边界拒绝，drain 旧代次过滤，空推进无操作；`fsm/mod.rs` 行覆盖 83.61%→95.51%、`generate.rs` 100% |
 | 2026-09-26 | `cargo format --check`、`cargo lint`（clippy + clang-tidy + cppcheck） | 质量门禁通过且不再被 windows.h 自动修复破坏 | 通过；`.clang-tidy` / comments.md 例外条款落地后 vtk_native_surface.cpp include-cleaner 全清 |
 | 2026-09-26 | `cargo test --locked --workspace`（聚合入口，含 native CTest 56 项） | 聚合门禁全绿；C++ ViewModel 侧与新 open 契约一致 | 通过；100% tests passed。顺带修正 `ProjectViewModelTest` 对已移除的同步网格重载断言（重开工程后快照为空，激活恢复由 FFI / Rust 集成测试覆盖） |
-| 待验收 | `cargo build --locked` | 构建期生成与实际消费者可编译；另测输入增删改、错误输入及独立构建目录 | 待补充 |
-| 待验收 | `cargo test --locked --workspace` | Rust 行为回归、native 和 QML 适用测试从统一入口通过 | 待补充 |
-| 待验收 | `cargo format --check`、`cargo lint` | 适用格式与静态检查通过 | 待补充 |
-| 待验收 | 新建 FSM 夹具后的 `panta-dslc check / format --check` | 由上述测试覆盖实际夹具，实施后记录完整文件参数；当前不伪造不存在的输入命令 | 待补充 |
-| 待验收 | 按 ImportRecord ID 只读读取 STL、取消与过期结果 | 验证资产内容正确、网格快照可释放，且 Manifest / revision / dirty 均不变 | 待补充 |
-| 待验收 | 关闭待加载标签、切换工程与同记录重复请求 | 用可控解析后端验证 session generation / attempt 过滤和资源释放；由 080 联调 | 待补充 |
-| 待验收 | 真实窗口验收及受影响平台 CI | 按仓库窗口规范验证异步完成后更新单一 VTK 视口；无头测试不能替代 | 待补充 |
+| 2026-10-14 | `cargo test --locked -p panta-core --test fsm_build` | 验证生成器和真实 Cargo 输入生命周期 | 通过；4 项测试覆盖生成器增删改、无效输入清理、stem 与输出名冲突，以及临时 Cargo 消费者的目录监听重建和必需输入删除失败。Fixture 使用仓库 `build.rs`、根 `Cargo.lock` 与转义后的绝对依赖路径；变更后的构建使用 `--locked --offline`。 |
+| 2026-10-14 | `cargo test --locked --workspace` | Rust、native、QML 聚合回归通过 | 通过；Rust workspace 测试通过，CTest 75/75，包含 FSM、资产激活、ViewModel、QML 和 FFI 回归。 |
+| 2026-10-14 | `cargo format --check`、`cargo lint` | 格式与静态质量门禁通过 | 通过；Clippy、依赖检查、CMake/QML lint、clang-tidy、include-cleaner、cppcheck 均通过。 |
+| 2026-10-14 | [PR #19 CI](https://github.com/Yuki-Nagori/panta/actions/runs/38491168172) | 新增 Cargo fixture 的三平台构建 / 测试与聚合质量门禁 | 通过；15/15 作业通过，包含 macOS、Linux、Windows 构建及 Rust / native 覆盖率、QML 测试和静态检查。Windows 作业通过；编译日志中的 `lock_crash_state` 未使用警告来自既有 Unix 测试辅助函数，不影响构建，也不属于本任务改动。 |
+| 2026-10-09 | [CI 37910040544](https://github.com/Yuki-Nagori/panta/actions/runs/37910040544) 及 080 真窗口验收 | 三平台 CI 与异步页签真实视口行为 | 三平台 CI 全部 19 个作业通过；真实窗口切换、关闭、迟到结果与 VTK 资源释放证据见 [080](080-qml-viewport-document-tabs.md#验证计划与结果)。 |
 
 
 ## 清理与兼容例外
@@ -93,4 +91,12 @@
 
 ## 完成摘要
 
-未完成。DSL 内核、只读激活 FSM、FFI 与 080 联调已实现，现有失败 / 取消 / 过期及结构矩阵回归和三平台 CI 已通过；109 已收敛后台执行容量与回收。剩余消费者构建输入增删改、错误或必需输入删除、输出命名冲突等原验收场景的专门验证记录，当前名称限定为 canonical kebab-case，文件 stem 必须与名称一致，输出名称转换未发现碰撞；这不替代消费者构建增删改与失败路径的受控验证。2026-10-09 复查见 [101](101-active-task-ci-acceptance.md#2026-10-09-当前复查)，保持 in-progress。
+实现与验收完成。DSL 内核、只读激活 FSM、FFI 与 080 联调已实现；本轮补齐真实 Cargo 输入生命周期与必需输入删除的失败验收。现有失败 / 取消 / 过期、状态矩阵、视口生命周期、三平台 CI 和 109 执行容量回归均通过。输出命名冲突检查作为防御路径测试；根据 canonical 名称和 stem 一致规则，不同合法输入之间无法形成同名输出。PR #19 的 Linux、Windows、macOS 构建与完整质量门禁均通过。
+
+- 2026-10-14 独立只读评审：首轮指出直接调用生成器不足以证明 Cargo 重建，且唯一输入删除未覆盖仍有其他 FSM 的情况；已增加使用仓库原版 build.rs 的临时 Cargo 消费者 fixture，补测真实新增 / 修改 / 删除和必需 `include!` 输入删除。复核指出 Windows canonical path 直接替换分隔符会破坏 verbatim 路径，已改用 JSON 字符串编码写入 TOML；复制根 Cargo.lock 作为解析起点，首次离线锁定 fixture 后后续检查传 `--locked`。评审未实际运行 Windows，跨平台结果留给 CI。
+
+## 本轮继续范围（2026-10-14）
+
+- 为 `panta-core/build.rs` 的真实生成逻辑建立可控临时目录测试，覆盖输入新增、修改、删除后输出集合与内容更新，以及唯一必需输入删除、空目录、无效声明和输出命名冲突的失败行为。
+- 验收生成器在失败时不留下可被后续构建误用的旧输出；测试直接调用 build script 共用的生成逻辑，不复制生成规则。随后运行所属 crate 测试、workspace 聚合验证、格式与 lint，并完成独立只读评审。
+- 当前没有改写 FSM 业务状态机，也不调整 DSL schema；本轮只补齐原验收中缺失的消费者构建生命周期证据。

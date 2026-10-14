@@ -104,7 +104,7 @@ ai-docs/
 | 067 | [Rust 统一 STL 解析与 Mesh IR 领域校验](task/067-rust-mesh-domain-migration.md) | CAE 领域模块迁移 | 010, 063, 066 | done |
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |
 | 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
-| 073 | [FSM DSL 与首个异步 STL 视口资源激活](task/073-fsm-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | in-progress |
+| 073 | [FSM DSL 与首个异步 STL 视口资源激活](task/073-fsm-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | done |
 | 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
 | 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073, 086 | done |
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | in-progress |

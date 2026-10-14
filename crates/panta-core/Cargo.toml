@@ -17,6 +17,9 @@ panta-import.workspace = true
 [build-dependencies]
 panta-dsl-core.workspace = true
 
+[dev-dependencies]
+panta-dsl-core.workspace = true
+
 [lints]
 workspace = true
 
@@ -27,6 +30,10 @@ path = "../../tests/rust/project.rs"
 [[test]]
 name = "activation"
 path = "../../tests/rust/activation.rs"
+
+[[test]]
+name = "fsm_build"
+path = "../../tests/rust/fsm_build.rs"
 
 [[example]]
 name = "background_execution"
