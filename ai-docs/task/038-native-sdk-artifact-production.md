@@ -69,10 +69,10 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 | 2026-09-20 | VTK WebGPU 三平台 Release [sdk-vtk-9.7.0-webgpu](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-vtk-9.7.0-webgpu)，run [35479202321](https://github.com/Yuki-Nagori/panta/actions/runs/35479202321) | 三平台 production/selfcheck/package 成功；required targets 为 `VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn`，metadata 标记 C++20 与 Cocoa/Wayland/Win32。 |
 | 2026-09-18–20 | macOS 生产 consumer 与 SDK 自检 | VTK、OCCT、Netgen 均完成 Release 下载、SHA256、`find_package` 和 required-target 检查；离线缓存复用通过。该证据说明制品可被最小 consumer 消费，不等于应用运行时分发闭环。 |
 | 2026-09-24 | SDK-consuming CI [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191) | 三平台构建及 CTest 通过（Linux 56/56、macOS ASan/UBSan 56/56、Windows 54/54）；不替代 producer 可复现性复核、真实窗口/引擎集成或 SBOM/provenance 验收。 |
+| 2026-10-14 | macOS 13.0 SDK 重产：VTK [38509650210](https://github.com/Yuki-Nagori/panta/actions/runs/38509650210)、OCCT/Netgen [38509650514](https://github.com/Yuki-Nagori/panta/actions/runs/38509650514) | 三平台生产、自检、打包和 Release 发布全部成功；sidecar 与 Release API digest 一致；SHA256 已回填 031 manifest，消费端 CI 待复验。 |
 
 ### 待执行与未覆盖
 
-- 按 macOS 13.0 最低部署版本重产 VTK/Dawn 与 OCCT/Netgen 制品，完成自检后全量替换 Release 资产并更新 031 manifest 中所有重产平台的 SHA256；metadata 变化会改变 Linux/Windows 归档摘要，不能只更新 macOS。生产 workflow 的目标设置已纳入，当前归档仍是旧基线。
 - 复核 OCCT/Netgen 当前 manifest 与生产发布链，记录 Linux glibc 最低有效基线。
 - 完成 SDK 消费侧 SBOM/provenance，以及 007/009/010 的真实链接、运行时分发与引擎集成验收。
 
@@ -87,7 +87,7 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 - 2026-09-18：OCCT 8.0.1 与 Netgen 6.2.2604 必须同工具链配对，故合并为一个三平台 workflow 和一个 Release；保留 STEP/DataExchange，关闭无关 GUI、Freetype/Xlib、Python/MPI 等依赖。
 - 2026-09-19–20：007 路线转为 VTK WebGPU hardware window。生产依赖固定为 VTK 9.7 所要求的 Dawn 源码版本与 RTTI 配置、C++20；Linux 只构建 Wayland 后端，并把消费所需 CMake Find 模块随 SDK 安装。
 - 2026-09-21（任务 049）：Release 重产在单一 tag 内全量替换资产；Netgen 关闭 `USE_NATIVE_ARCH`，避免制品依赖构建机 ISA。
-- 2026-10-14：维护者要求所有 macOS 依赖最低支持版本统一为 13.0；VTK/Dawn、OCCT、Netgen 的 producer workflow 已纳入该部署目标。任务仍为 deferred，macOS SDK 重产、Release 替换和 031 manifest SHA 更新尚未完成。
+- 2026-10-14：维护者要求所有 macOS 依赖最低支持版本统一为 13.0；VTK/Dawn、OCCT、Netgen 已按该部署目标重产并替换三平台 Release 资产（runs 38509650210、38509650514），sidecar 与 API digest 一致，摘要已登记到 031。任务仍为 deferred，原因是 SBOM/provenance、Linux glibc 基线及真实链接/运行验收仍未完成。
 - 后续变更需同步 manifest 的 URL/SHA256、SDK metadata、许可证、自检结果与 task 031；当前待办见上方“待执行与未覆盖”。
 
 ## 完成摘要
