@@ -54,30 +54,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $buildScriptOutputs = @(
-            Get-ChildItem -Path 'target/release/build/panta-launcher-*/output' -File
-          )
-          if ($buildScriptOutputs.Count -eq 0) {
-            throw 'Cargo 未保留 panta-launcher build script 输出，无法核对 CMake manifest 诊断。'
-          }
-          $configureDiagnostics = @(
-            Select-String `
-              -Path $buildScriptOutputs.FullName `
-              -Pattern 'Qt finalization 前的应用 manifest 输入|Windows 应用清单（构建后嵌入）：'
-          )
-          if ($configureDiagnostics.Count -lt 2) {
-            throw 'Cargo build script 输出缺少 manifest 输入或生成路径诊断。'
-          }
-          $generatedManifestLines = @(
-            $configureDiagnostics | Where-Object { $_.Line -match '^-- Windows 应用清单（构建后嵌入）：' }
-          )
-          if ($generatedManifestLines.Count -ne 1) {
-            throw "预期一条 Qt manifest 生成路径诊断，实际找到 $($generatedManifestLines.Count) 条。"
-          }
-          $expectedManifest = $generatedManifestLines[0].Line -replace '^-- Windows 应用清单（构建后嵌入）：', ''
-          $expectedManifest = [IO.Path]::GetFullPath($expectedManifest.Trim())
-
           $buildDir = (Resolve-Path 'target/native/release').Path
+          $expectedManifest = [IO.Path]::GetFullPath((Join-Path $buildDir 'app/panta.exe.manifest'))
           $cachePath = Join-Path $buildDir 'CMakeCache.txt'
           $makeProgramEntry = Select-String -Path $cachePath -Pattern '^CMAKE_MAKE_PROGRAM:[^=]+=([^\r\n]+)$' | Select-Object -First 1
           if (-not $makeProgramEntry) {
@@ -124,6 +102,7 @@ jobs:
           if (-not (Test-Path -LiteralPath $expectedManifestTool) -or -not (Test-Path -LiteralPath $expectedManifest)) {
             throw "Windows SDK mt.exe 或 Qt 生成的源 manifest 不存在：$expectedManifestTool；$expectedManifest"
           }
+          Add-Content -Path $env:GITHUB_ENV -Value "PANTA_WINDOWS_MANIFEST_TOOL=$expectedManifestTool"
           $null = [xml](Get-Content -Raw -LiteralPath $expectedManifest)
 
       - name: Create relocatable installation tree
@@ -148,12 +127,9 @@ jobs:
           if ($builtHash -ne $packagedHash) {
             throw "安装包中的 panta.exe 与链接产物不同：$builtHash / $packagedHash"
           }
-          $kitsRoot = Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)')) 'Windows Kits/10/bin'
-          $mt = Get-ChildItem -Path $kitsRoot -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | ForEach-Object {
-            Join-Path $_.FullName 'x64/mt.exe'
-          } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-          if (-not $mt) {
-            throw "Windows SDK mt.exe 未找到：$kitsRoot"
+          $mt = $env:PANTA_WINDOWS_MANIFEST_TOOL
+          if (-not $mt -or -not (Test-Path -LiteralPath $mt)) {
+            throw "Windows SDK mt.exe 不存在：$mt"
           }
           $manifestPath = Join-Path $env:RUNNER_TEMP 'panta.exe.manifest'
           & $mt "-inputresource:$packagedExe;#1" "-out:$manifestPath"

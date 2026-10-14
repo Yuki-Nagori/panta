@@ -78,23 +78,6 @@ qt_add_qml_module(
   QML_FILES
   "${_panta_entry}")
 
-# 若目标残留指向源码树但已不存在的 manifest，Qt 会将其视为用户清单并跳过自动生成。
-if(WIN32)
-  get_target_property(_panta_app_sources panta_native_app SOURCES)
-  set(_panta_source_manifest "${CMAKE_CURRENT_SOURCE_DIR}/panta.exe.manifest")
-  set(_panta_manifest_inputs "${_panta_app_sources}")
-  list(FILTER _panta_manifest_inputs INCLUDE REGEX "\\.manifest$")
-  if(_panta_manifest_inputs)
-    message(STATUS "Qt finalization 前的应用 manifest 输入：${_panta_manifest_inputs}")
-  else()
-    message(STATUS "Qt finalization 前的应用 manifest 输入：无")
-  endif()
-  if(NOT EXISTS "${_panta_source_manifest}")
-    list(REMOVE_ITEM _panta_app_sources "${_panta_source_manifest}" "panta.exe.manifest")
-    set_property(TARGET panta_native_app PROPERTY SOURCES "${_panta_app_sources}")
-  endif()
-endif()
-
 # 在 app 子目录显式完成 Qt executable finalization，使最终目标配置集中在 app 入口处。
 qt_finalize_executable(panta_native_app)
 if(WIN32)
@@ -132,9 +115,8 @@ if(WIN32)
         FATAL_ERROR
           "Windows 应用目标必须且只能引用二进制目录中的清单：${_panta_windows_manifest}；实际引用：${_panta_manifest_sources}")
     endif()
-    # CMake 的 VS 链接包装会把用户清单改为 /MANIFESTINPUT 交给 lld-link，
-    # LLD 内部合并器会改写 Qt 清单的 UAC 属性命名空间。让链接器遵守 Qt 的
-    # /MANIFEST:NO，再由 Windows SDK mt.exe 单独嵌入 Qt 生成的清单。
+    # CMake 的 VS 链接包装会把用户清单作为 /MANIFESTINPUT 交给 LLD，
+    # 其内部合并会改写 UAC 属性命名空间。链接阶段排除清单，再由 SDK mt.exe 嵌入。
     list(REMOVE_ITEM _panta_app_sources "${_panta_windows_manifest}")
     set_property(TARGET panta_native_app PROPERTY SOURCES "${_panta_app_sources}")
     # 清单是链接后的资源输入；修改应用标识或 UAC 设置时必须重链并重新嵌入。
@@ -142,11 +124,10 @@ if(WIN32)
       TARGET panta_native_app
       APPEND
       PROPERTY LINK_DEPENDS "${_panta_windows_manifest}")
-    message(STATUS "Windows 应用清单（构建后嵌入）：${_panta_windows_manifest}")
     add_custom_command(
       TARGET panta_native_app
       POST_BUILD
-      COMMAND "${CMAKE_MT}" -nologo -manifest "${_panta_windows_manifest}"
+      COMMAND "${PANTA_WINDOWS_MANIFEST_TOOL}" -nologo -manifest "${_panta_windows_manifest}"
               "-outputresource:$<TARGET_FILE:panta_native_app>;#1"
       COMMENT "嵌入 Windows 应用清单"
       VERBATIM)
