@@ -13,9 +13,44 @@
 # 3. d3dcompiler_47.dll（System32 副本）：Dawn 的 HLSL 编译要求它位于应
 #    用目录，仅 System32 可见时 LoadLibraryEx 报 Error 87、WebGPU 设备创
 #    建失败并 SEH 崩溃。
+# 4. dxcompiler.dll / dxil.dll（Windows SDK redistributable 副本）：Dawn
+#    的 D3D12 后端运行期动态加载，依赖扫描不可见；缺失同样使适配器枚举
+#    失败并 SEH 崩溃。安装包侧由 native/app/CMakeLists.txt 的 install 规则
+#    使用相同的路径查找函数。
 #
-# 调用：panta_deploy_windows_app_runtime(<target> <qmldir> <d3dcompiler-dll>)
-function(panta_deploy_windows_app_runtime target qml_dir d3dcompiler_dll)
+function(panta_find_windows_dxc_runtime out_compiler out_dxil)
+  set(_search_paths)
+  if(DEFINED ENV{WindowsSdkDir} AND NOT "$ENV{WindowsSdkDir}" STREQUAL "")
+    file(TO_CMAKE_PATH "$ENV{WindowsSdkDir}" _windows_sdk_root)
+    list(APPEND _search_paths "${_windows_sdk_root}/Redist/D3D/x64")
+  endif()
+  list(APPEND _search_paths "C:/Program Files (x86)/Windows Kits/10/Redist/D3D/x64")
+
+  find_file(
+    _dxcompiler dxcompiler.dll
+    PATHS ${_search_paths}
+    NO_DEFAULT_PATH NO_CACHE)
+  find_file(
+    _dxil dxil.dll
+    PATHS ${_search_paths}
+    NO_DEFAULT_PATH NO_CACHE)
+  if(NOT _dxcompiler OR NOT _dxil)
+    message(FATAL_ERROR "Windows SDK D3D redistributable must provide dxcompiler.dll and dxil.dll")
+  endif()
+
+  file(TO_CMAKE_PATH "${_dxcompiler}" _dxcompiler)
+  file(TO_CMAKE_PATH "${_dxil}" _dxil)
+  set(${out_compiler}
+      "${_dxcompiler}"
+      PARENT_SCOPE)
+  set(${out_dxil}
+      "${_dxil}"
+      PARENT_SCOPE)
+endfunction()
+
+# 调用：panta_deploy_windows_app_runtime(<target> <qmldir> <d3dcompiler-dll>
+#       <dxcompiler-dll> <dxil-dll>)
+function(panta_deploy_windows_app_runtime target qml_dir d3dcompiler_dll dxcompiler_dll dxil_dll)
   if(NOT WIN32)
     return()
   endif()
@@ -74,6 +109,8 @@ function(panta_deploy_windows_app_runtime target qml_dir d3dcompiler_dll)
     TARGET ${target}
     POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy "${d3dcompiler_dll}" "$<TARGET_FILE_DIR:${target}>"
-    COMMENT "拷贝 d3dcompiler_47.dll 到 $<TARGET_FILE_NAME:${target}> 目录"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${dxcompiler_dll}" "$<TARGET_FILE_DIR:${target}>"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${dxil_dll}" "$<TARGET_FILE_DIR:${target}>"
+    COMMENT "拷贝 Dawn 运行期加载的 D3D 编译 DLL 到 $<TARGET_FILE_NAME:${target}> 目录"
     VERBATIM)
 endfunction()

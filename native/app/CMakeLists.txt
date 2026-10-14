@@ -1,6 +1,13 @@
 # 桌面入口（任务 005）：链接 QML 模块与 ViewModel 模块。
 qt_add_executable(panta_native_app main.cpp)
 set_target_properties(panta_native_app PROPERTIES OUTPUT_NAME panta EXPORT_NAME native-app)
+if(WIN32)
+  # Qt 6.11.1+ 负责生成清单及 Windows 兼容/长路径声明，并禁用链接器默认清单。
+  # 官方属性只覆盖应用标识和 UAC 级别，避免维护重复的手写 manifest。
+  set_target_properties(
+    panta_native_app PROPERTIES QT_WINDOWS_APP_PROJECT_IDENTIFIER "com.yuki-nagori.panta"
+                                QT_WINDOWS_APP_PROJECT_EXECUTION_LEVEL "asInvoker")
+endif()
 if(APPLE)
   # Qt 的 macOS 安装部署入口要求标准 .app 布局；开发期也从 bundle 内启动，
   # 让 cargo run 与安装后启动使用相同的可执行文件相对资源结构。
@@ -37,8 +44,10 @@ elseif(WIN32)
   # Windows 根路径中的反斜杠被解释成 CMake 转义序列。
   string(REPLACE "\\" "/" PANTA_WINDOWS_SYSTEM_ROOT "$ENV{windir}")
   set(PANTA_D3DCOMPILER_47_DLL "${PANTA_WINDOWS_SYSTEM_ROOT}/System32/d3dcompiler_47.dll")
-  panta_deploy_windows_app_runtime(panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml"
-                                   "${PANTA_D3DCOMPILER_47_DLL}")
+  panta_find_windows_dxc_runtime(_panta_dxcompiler_dll _panta_dxil_dll)
+  panta_deploy_windows_app_runtime(
+    panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "${PANTA_D3DCOMPILER_47_DLL}"
+    "${_panta_dxcompiler_dll}" "${_panta_dxil_dll}")
 endif()
 if(PANTA_ENABLE_BRIDGE_MODULE)
   # main.cpp 的进程级 crash handler 已在上方链接 FFI；这里仅追加 Bridge/VTK
@@ -139,6 +148,11 @@ if(APPLE)
     COMPONENT
     Runtime)
 elseif(WIN32)
+  # 系统目录排除必须取实际 %windir% 的大小写与分隔符：依赖解析给出的路径
+  # 未规范化（如 C:\WINDOWS\system32/user32.dll，见 CMP0207），而 CMake
+  # REGEX 区分大小写；写死 "Windows" 会在 windir=C:\WINDOWS 的机器上失配，
+  # 把 kernel32/d3d12 等系统 DLL 复制进 bin 并在运行期阴影系统副本。
+  string(REGEX REPLACE "[/\\\\]" "[/\\\\]" _panta_windir_regex "$ENV{windir}")
   install(
     RUNTIME_DEPENDENCY_SET
     panta_native_runtime_dependencies
@@ -146,11 +160,17 @@ elseif(WIN32)
     ${PANTA_RUNTIME_DEPENDENCY_DIRS}
     # Windows API Set 是由系统加载器映射的虚拟 DLL，不对应可复制的文件。
     # 在解析前排除它们，避免 CMake 将 api-ms-win-* / ext-ms-* 报为缺失依赖。
+    # Windows 11 的系统库（shell32、urlmon、DMCmnUtils、Print.PrintSupport.
+    # Source 等）经延迟导入引用 WDAC/设备证明可选组件；这些组件只存在于系统
+    # 侧（部分机器无对应文件），由加载器按需解析，永不随应用分发。CMake 4.x
+    # 原生 PE 解析器以小写名匹配 PRE_EXCLUDE（错误输出仍为原名），因此模式
+    # 必须用小写。
     PRE_EXCLUDE_REGEXES
     "^api-ms-.*\\.dll$"
     "^ext-ms-.*\\.dll$"
+    "^(hvsifiletrust|wpaxholder|pdmutilities|azureattestmanager|azureattestnormal)\\.dll$"
     POST_EXCLUDE_REGEXES
-    "^[A-Za-z]:[/\\\\]Windows[/\\\\].*"
+    "^${_panta_windir_regex}[/\\\\].*"
     "^${QT_STAGING}/.*"
     RUNTIME
     DESTINATION
@@ -160,6 +180,16 @@ elseif(WIN32)
   # Dawn 动态加载 D3DCompiler，依赖扫描无法发现它；沿用开发部署的系统 DLL 来源。
   install(
     FILES "${PANTA_D3DCOMPILER_47_DLL}"
+    DESTINATION bin
+    COMPONENT Runtime)
+  # Dawn 的 D3D12 后端同样动态加载 DXC 与 DXIL 签名库；缺它们时适配器枚举
+  # 失败并 SEH 崩溃。二者随 Windows SDK  redistributable 分发，不进 System32。
+  # find_file 返回本机反斜杠路径，先转正斜杠，避免生成安装脚本时被当作
+  # 转义序列（013 记录过 \W/\a 解析事故）。
+  # Dawn 在运行期动态加载这两个 SDK redistributable；路径查找与开发期部署
+  # 共用 windows-app-runtime-deployment.cmake 中的实现。
+  install(
+    FILES "${_panta_dxcompiler_dll}" "${_panta_dxil_dll}"
     DESTINATION bin
     COMPONENT Runtime)
 else()
