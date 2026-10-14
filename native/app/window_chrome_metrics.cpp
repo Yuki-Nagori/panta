@@ -1,6 +1,10 @@
 #include "window_chrome_metrics.hpp"
 
-#include <QtGlobal>
+#include <QEvent>
+#include <QObject>
+#include <QQuickWindow>
+#include <QWindow>
+#include <QtCore/qtmetamacros.h>
 
 namespace panta {
 

@@ -97,6 +97,7 @@
 | 2026-10-14 | macOS；`cargo test --locked --workspace --no-default-features` | Bridge 关闭时 Shell、Objective-C++ 几何适配和应用入口仍可构建并通过测试 | 通过；CTest 30/30，包含 `Qml.ShellModuleLoads` |
 | 2026-10-14 | macOS Qt 6.11.2；启动 `target/native/debug/app/panta.app` 并检查真实窗口与辅助功能树 | 顶栏保留居中标题；品牌标识不重复；快捷操作避开交通灯；右侧不留异常空白 | 通过；真实窗口可见居中 `panta 2027`，左侧无品牌 P/重复原生标题，快捷操作从原生控件右侧开始，搜索区延伸至窗口右侧。Windows/Linux/Wayland 尚未实机验收 |
 | 2026-10-14 | `gpt-6.1-sol` medium 独立评审与修复后复核 | 检查需求覆盖、平台生命周期、构建接线及完整变更 | 已按评审修正原生控件边距刷新和安全区域重复留白；复核未发现新的阻塞问题。真实窗口和跨平台验收仍按上项跟踪 |
+| 2026-10-14 | PR #32 CI 的 `cargo lint (includes, ubuntu)`；本机对变更翻译单元运行 `misc-include-cleaner` | 新增窗口指标适配代码通过 include-cleaner | CI 指出实现文件通过间接头文件使用 Qt 类型；补充 `QEvent`、`QObject`、`QQuickWindow`、`QWindow` 和 `QtCore/qtmetamacros.h` 直接包含。对应检查通过；同时将仓库中唯一的 `Q_EMIT` 用法统一为 `emit` |
 
 ## 风险与回退
 
@@ -112,6 +113,7 @@
 - 2026-10-14：窗口指标使用可见性、窗口状态、屏幕切换和 expose 事件刷新；不使用定时轮询。后续若确需引入轮询机制，先征求维护者意见。
 - 2026-10-14：独立评审发现 macOS 无 Bridge 构建未启用 Objective-C++；将语言启用条件改为适用于所有 Apple 构建。并修正步骤中残留的固定最小避让宽度描述。
 - 2026-10-14：独立评审后完成 macOS 无 Bridge 构建验证；同步移除该启动变体遗留的原生 `panta` 标题。顶栏 hover 使用中性灰、按压态使用稍深灰，并增加短时颜色过渡，不另设圆角。
+- 2026-10-14：修复 PR #32 的 include-cleaner 门禁：`window_chrome_metrics.cpp` 显式包含使用的 Qt 类型头文件与 `emit` 宏定义头；同步规定自有 Qt 代码发射信号统一使用 `emit`。
 - 2026-10-14：复核发现顶栏按钮仍继承通用组件的圆角；新增 `ChromeToolButton` 原子组件统一直角与顶栏悬停/按压颜色，避免重复配置并限定样式作用范围。
 - 2026-10-14：维护者反馈悬停状态闪烁；移除通用工具按钮的颜色过渡和无其他用途的 Theme 时长 token，让悬停/按压状态直接切换，避免动画被频繁打断。
 - 2026-10-14：按维护者要求将 Ribbon 背景渐变替换为统一的 `#b0b0b0` 深灰单色，并移除上下渐变专用 Theme token。
