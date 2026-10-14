@@ -391,6 +391,7 @@ mod tests {
     use super::*;
 
     /// 记录与安装都改进程级 fd；并行测试会互相覆盖。
+    #[cfg(unix)]
     fn lock_crash_state() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: Mutex<()> = Mutex::new(());
         LOCK.lock()

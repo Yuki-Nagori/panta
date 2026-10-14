@@ -5,7 +5,7 @@
 - 依赖：[008](008-tasks-errors-logging.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-19 / 2026-10-02
+- 创建 / 更新：2026-09-19 / 2026-10-14
 
 ## 目标与背景
 
@@ -54,6 +54,7 @@ minidump/WER 报告采集、Qt 消息处理、远程上报。
 | 2026-09-20 | GitHub Actions CI run [35459273420](https://github.com/Yuki-Nagori/panta/actions/runs/35459273420)（commit `a613a31`）Windows job `105940092071`、Rust coverage job `105940092069` | Windows 暴露实现只使用 Unix `std::os::fd`、POSIX 信号常量和 `libc::write`；Rust 覆盖率为 88.55%，新增 crash 模块仅 42.79% 行覆盖，低于现行 92% 门禁。保留 POSIX 完整信号路径，补 Windows 最小 SEH 日志路径，并为纯格式化/写出辅助函数增加同进程测试覆盖 |
 | 2026-09-20 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets`、`cargo check --locked -p panta-foundation --target x86_64-pc-windows-msvc`、`cargo coverage` | 通过：macOS crash 测试 2/2；Windows 目标交叉检查通过；覆盖率函数 89.18%、行 93.84%。Windows 使用 `SetUnhandledExceptionFilter` 写出最小 SEH 进程记录后继续 WER，POSIX 路径保留信号重发与 `.ips` 语义 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`，macOS/Linux/Windows Cargo test | macOS 与 Linux 的 `handler_logs_segfault_and_reraises` 通过；Windows `handler_installs_windows_filter` 通过。Windows 测试只验证 filter 安装和日志路径创建，尚未在子进程触发 SEH 并验证异常记录/WER；POSIX stderr 仍缺捕获断言，因此保留 in-progress。 |
+| 2026-10-14 | macOS arm64；`cargo test --locked -p panta-foundation --all-targets`、`cargo check --locked -p panta-foundation --tests --target x86_64-pc-windows-msvc` | 通过；macOS 测试 5 项（4 passed / 1 ignored）和集成测试 1 项通过。Windows 测试目标交叉检查通过，`lock_crash_state` 不再产生未使用警告。 |
 
 ## 决策与工作记录
 
