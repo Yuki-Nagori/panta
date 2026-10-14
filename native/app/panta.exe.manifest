@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- panta.exe 应用清单（Windows）。
+     不用 Qt 默认模板：其 requestedExecutionLevel 的 level/uiAccess 写成
+     ms_asmv2: 前缀属性，SxS 激活上下文判定缺少 level（事件查看器
+     SideBySide 33），exe 无法启动。此处按 asm.v2 默认命名空间内联属性，
+     并在 qt_add_executable 源列表传入本文件，Qt 检测到 .manifest 即跳过
+     自身生成。assemblyIdentity 的 version 与 CMake project 版本同步维护。 -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="com.yuki-nagori.panta" version="0.1.0.0" processorArchitecture="*"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 / Server 2016+ -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+  <asmv3:application>
+    <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+      <longPathAware>true</longPathAware>
+    </asmv3:windowsSettings>
+  </asmv3:application>
+</assembly>

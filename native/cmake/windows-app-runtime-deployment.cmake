@@ -13,12 +13,32 @@
 # 3. d3dcompiler_47.dll（System32 副本）：Dawn 的 HLSL 编译要求它位于应
 #    用目录，仅 System32 可见时 LoadLibraryEx 报 Error 87、WebGPU 设备创
 #    建失败并 SEH 崩溃。
+# 4. dxcompiler.dll / dxil.dll（Windows SDK redistributable 副本）：Dawn
+#    的 D3D12 后端运行期动态加载，依赖扫描不可见；缺失同样使适配器枚举
+#    失败并 SEH 崩溃。安装包侧由 native/app/CMakeLists.txt 的 install 规则
+#    覆盖，两处来源保持一致。
 #
 # 调用：panta_deploy_windows_app_runtime(<target> <qmldir> <d3dcompiler-dll>)
 function(panta_deploy_windows_app_runtime target qml_dir d3dcompiler_dll)
   if(NOT WIN32)
     return()
   endif()
+
+  find_file(
+    PANTA_DXC_COMPILER_DLL dxcompiler.dll
+    PATHS "$ENV{WindowsSdkDir}Redist/D3D/x64"
+    "C:/Program Files (x86)/Windows Kits/10/Redist/D3D/x64"
+    NO_DEFAULT_PATH
+    REQUIRED)
+  find_file(
+    PANTA_DXIL_DLL dxil.dll
+    PATHS "$ENV{WindowsSdkDir}Redist/D3D/x64"
+    "C:/Program Files (x86)/Windows Kits/10/Redist/D3D/x64"
+    NO_DEFAULT_PATH
+    REQUIRED)
+  foreach(_panta_dx_dll IN ITEMS PANTA_DXC_COMPILER_DLL PANTA_DXIL_DLL)
+    string(REPLACE "\\" "/" ${_panta_dx_dll} "${${_panta_dx_dll}}")
+  endforeach()
 
   find_program(
     PANTA_WINDEPLOYQT_EXECUTABLE
@@ -74,6 +94,8 @@ function(panta_deploy_windows_app_runtime target qml_dir d3dcompiler_dll)
     TARGET ${target}
     POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy "${d3dcompiler_dll}" "$<TARGET_FILE_DIR:${target}>"
-    COMMENT "拷贝 d3dcompiler_47.dll 到 $<TARGET_FILE_NAME:${target}> 目录"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${PANTA_DXC_COMPILER_DLL}" "$<TARGET_FILE_DIR:${target}>"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${PANTA_DXIL_DLL}" "$<TARGET_FILE_DIR:${target}>"
+    COMMENT "拷贝 Dawn 运行期加载的 D3D 编译 DLL 到 $<TARGET_FILE_NAME:${target}> 目录"
     VERBATIM)
 endfunction()
