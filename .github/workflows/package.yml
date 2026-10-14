@@ -50,7 +50,7 @@ jobs:
       - name: Build release application
         run: cargo build --locked --release
 
-      - name: Verify Windows manifest link input
+      - name: Verify Windows manifest embedding setup
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -68,7 +68,6 @@ jobs:
           if ($configureDiagnostics.Count -lt 2) {
             throw 'Cargo build script 输出缺少 manifest 输入或生成路径诊断。'
           }
-          $configureDiagnostics | ForEach-Object { Write-Host $_.Line }
           $generatedManifestLines = @(
             $configureDiagnostics | Where-Object { $_.Line -match '^-- Windows 应用清单（构建后嵌入）：' }
           )
@@ -105,11 +104,11 @@ jobs:
             throw "预期唯一的 vs_link_exe 子命令，实际找到 $($linkInvocations.Count) 个。"
           }
           $linkInvocation = $linkInvocations[0]
-          Write-Host "Windows vs_link_exe 子命令：$linkInvocation"
           $normalizedLinkInvocation = $linkInvocation.Replace('/', '\')
           if ($normalizedLinkInvocation.Contains($normalizedExpectedManifest) -or
-            $linkInvocation -match '(?i)/MANIFESTINPUT') {
-            throw "Qt manifest 仍作为链接器输入，无法绕过 lld-link 的清单合并：$linkInvocation"
+            $linkInvocation -match '(?i)/MANIFESTINPUT' -or
+            $linkInvocation -notmatch '(?i)/MANIFEST:NO') {
+            throw '链接器必须保留 /MANIFEST:NO，且不得接收 Qt manifest 输入。'
           }
           $embedCommands = @(
             $commands | Where-Object {
@@ -125,11 +124,7 @@ jobs:
           if (-not (Test-Path -LiteralPath $expectedManifestTool) -or -not (Test-Path -LiteralPath $expectedManifest)) {
             throw "Windows SDK mt.exe 或 Qt 生成的源 manifest 不存在：$expectedManifestTool；$expectedManifest"
           }
-          Write-Host "Windows SDK manifest 工具（post-link）：$expectedManifestTool"
-          Write-Host "Windows 应用清单（post-link）：$expectedManifest"
-          [xml]$sourceManifest = Get-Content -Raw -LiteralPath $expectedManifest
-          Write-Host 'Qt 生成的源 manifest：'
-          Write-Host $sourceManifest.OuterXml
+          $null = [xml](Get-Content -Raw -LiteralPath $expectedManifest)
 
       - name: Create relocatable installation tree
         shell: bash

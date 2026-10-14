@@ -133,8 +133,8 @@ if(WIN32)
           "Windows 应用目标必须且只能引用二进制目录中的清单：${_panta_windows_manifest}；实际引用：${_panta_manifest_sources}")
     endif()
     # CMake 的 VS 链接包装会把用户清单改为 /MANIFESTINPUT 交给 lld-link，
-    # 其清单合并器会破坏 Qt 清单的 asm.v2/asm.v3 命名空间边界。让链接器遵守
-    # Qt 设置的 /MANIFEST:NO，再由 Windows SDK mt.exe 原样嵌入 Qt 生成的清单。
+    # LLD 内部合并器会改写 Qt 清单的 UAC 属性命名空间。让链接器遵守 Qt 的
+    # /MANIFEST:NO，再由 Windows SDK mt.exe 单独嵌入 Qt 生成的清单。
     list(REMOVE_ITEM _panta_app_sources "${_panta_windows_manifest}")
     set_property(TARGET panta_native_app PROPERTY SOURCES "${_panta_app_sources}")
     # 清单是链接后的资源输入；修改应用标识或 UAC 设置时必须重链并重新嵌入。

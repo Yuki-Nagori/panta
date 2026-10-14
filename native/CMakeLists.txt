@@ -8,8 +8,8 @@ project(
   LANGUAGES C CXX)
 
 if(WIN32)
-  # LLVM llvm-mt 22.1.7 会给 Qt 清单的 UAC 属性添加错误的 asm.v2 前缀；
-  # 复用 CMake 已选中的 Windows SDK RC 目录中的 mt.exe 完成链接清单合并。
+  # CI 的 CMake/LLD 链接路径会改写 Qt 清单的 UAC 属性命名空间；
+  # app 目标改由 SDK mt.exe 在链接后嵌入清单，因此与 RC 编译器使用同一 SDK。
   get_filename_component(_panta_windows_sdk_bin "${CMAKE_RC_COMPILER}" DIRECTORY)
   set(_panta_windows_mt "${_panta_windows_sdk_bin}/mt.exe")
   if(NOT EXISTS "${_panta_windows_mt}")
