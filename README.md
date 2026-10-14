@@ -24,7 +24,7 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 
 | 平台 | 需要预装 |
 |---|---|
-| macOS | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
+| macOS（arm64；目标基线 13.0，待 SDK 重产与验收） | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
 | Linux | git、[rustup](https://rustup.rs)、C 编译器及 OpenGL/Wayland 前置；Debian/Ubuntu 需要 `pkg-config`、`libgl-dev`、`libegl1`、`libxkbcommon0`、`libxkbcommon-dev`、`libwayland-dev`、`wayland-protocols`，运行 QML 另需 `libgl1-mesa-dri`。Qt 预编译包要求 glibc ≥ 2.34。 |
 | Windows | git、[rustup](https://rustup.rs)、Visual Studio Build Tools 2022（MSVC） |
 

@@ -198,16 +198,7 @@ fn orchestrate() -> Result<PathBuf, String> {
         configure.arg(format!("-DCMAKE_OSX_SYSROOT={}", sdk.display()));
         let deployment = match std::env::var("MACOSX_DEPLOYMENT_TARGET") {
             Ok(version) => version,
-            Err(_) => {
-                let output = Command::new("xcrun")
-                    .args(["--sdk", "macosx", "--show-sdk-version"])
-                    .output()
-                    .map_err(|e| e.to_string())?;
-                if !output.status.success() {
-                    return Err("无法查询 Apple SDK 版本".into());
-                }
-                String::from_utf8_lossy(&output.stdout).trim().to_owned()
-            }
+            Err(_) => provision::MACOS_DEPLOYMENT_TARGET.to_owned(),
         };
         configure.arg(format!("-DCMAKE_OSX_DEPLOYMENT_TARGET={deployment}"));
     }

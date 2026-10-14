@@ -27,6 +27,7 @@ ExternalProject_Add(
   DEPENDS occt_sdk
   BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+             ${PANTA_SDK_PLATFORM_CMAKE_ARGS}
              -DBUILD_SHARED_LIBS=ON
              -DBUILD_FOR_CONVERSION=OFF
              -DUSE_NATIVE_ARCH=OFF
@@ -73,6 +74,7 @@ file(
     "commit": "@PANTA_NETGEN_COMMIT@"
   },
   "build_type": "Release",
+  "macos_deployment_target": @PANTA_SDK_MACOS_DEPLOYMENT_TARGET_JSON@,
   "shared": true,
   "options": {"USE_OCC": true, "USE_NATIVE_ARCH": false, "USE_GUI": false, "USE_PYTHON": false, "USE_MPI": false},
   "dependencies": ["occt 8.0.1 (same sdk-occt-netgen pipeline/release, same triple, paired upgrade)"],

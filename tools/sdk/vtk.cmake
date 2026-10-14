@@ -63,6 +63,7 @@ ExternalProject_Add(
   GIT_PROGRESS TRUE
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${PANTA_DAWN_INSTALL_DIR}
+             ${PANTA_SDK_PLATFORM_CMAKE_ARGS}
              ${PANTA_DAWN_WINDOW_ARGS}
              -DDAWN_ENABLE_INSTALL=ON
              -DDAWN_ENABLE_RTTI=ON
@@ -110,6 +111,7 @@ ExternalProject_Add(
              -DBUILD_TESTING=OFF
              -DVTK_ENABLE_WRAPPING=OFF
              -DCMAKE_INSTALL_PREFIX=${PANTA_VTK_INSTALL_DIR}
+             ${PANTA_SDK_PLATFORM_CMAKE_ARGS}
              -DDawn_DIR=${PANTA_DAWN_INSTALL_DIR}/lib/cmake/Dawn
              -DVTK_RELOCATABLE_INSTALL=ON
              -DVTK_GROUP_ENABLE_Qt=NO
@@ -173,6 +175,7 @@ file(
     "commit": "@PANTA_VTK_COMMIT@"
   },
   "build_type": "Release",
+  "macos_deployment_target": @PANTA_SDK_MACOS_DEPLOYMENT_TARGET_JSON@,
   "cxx_standard": 20,
   "shared": true,
   "relocatable_install": true,

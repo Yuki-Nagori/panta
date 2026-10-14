@@ -21,6 +21,7 @@ ExternalProject_Add(
   GIT_PROGRESS TRUE
   BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+             ${PANTA_SDK_PLATFORM_CMAKE_ARGS}
              -DBUILD_LIBRARY_TYPE=Shared
              -DBUILD_MODULE_Draw=OFF
              -DBUILD_MODULE_Visualization=OFF
@@ -53,6 +54,7 @@ file(
     "commit": "@PANTA_OCCT_COMMIT@"
   },
   "build_type": "Release",
+  "macos_deployment_target": @PANTA_SDK_MACOS_DEPLOYMENT_TARGET_JSON@,
   "shared": true,
   "modules_off": ["Draw", "Visualization", "DETools"],
   "options_off": ["USE_FREETYPE", "USE_XLIB"],

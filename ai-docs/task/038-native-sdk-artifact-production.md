@@ -72,6 +72,7 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 
 ### 待执行与未覆盖
 
+- 按 macOS 13.0 最低部署版本重产 VTK/Dawn 与 OCCT/Netgen 制品，完成自检后全量替换 Release 资产并更新 031 manifest 中所有重产平台的 SHA256；metadata 变化会改变 Linux/Windows 归档摘要，不能只更新 macOS。生产 workflow 的目标设置已纳入，当前归档仍是旧基线。
 - 复核 OCCT/Netgen 当前 manifest 与生产发布链，记录 Linux glibc 最低有效基线。
 - 完成 SDK 消费侧 SBOM/provenance，以及 007/009/010 的真实链接、运行时分发与引擎集成验收。
 
@@ -86,6 +87,7 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 - 2026-09-18：OCCT 8.0.1 与 Netgen 6.2.2604 必须同工具链配对，故合并为一个三平台 workflow 和一个 Release；保留 STEP/DataExchange，关闭无关 GUI、Freetype/Xlib、Python/MPI 等依赖。
 - 2026-09-19–20：007 路线转为 VTK WebGPU hardware window。生产依赖固定为 VTK 9.7 所要求的 Dawn 源码版本与 RTTI 配置、C++20；Linux 只构建 Wayland 后端，并把消费所需 CMake Find 模块随 SDK 安装。
 - 2026-09-21（任务 049）：Release 重产在单一 tag 内全量替换资产；Netgen 关闭 `USE_NATIVE_ARCH`，避免制品依赖构建机 ISA。
+- 2026-10-14：维护者要求所有 macOS 依赖最低支持版本统一为 13.0；VTK/Dawn、OCCT、Netgen 的 producer workflow 已纳入该部署目标。任务仍为 deferred，macOS SDK 重产、Release 替换和 031 manifest SHA 更新尚未完成。
 - 后续变更需同步 manifest 的 URL/SHA256、SDK metadata、许可证、自检结果与 task 031；当前待办见上方“待执行与未覆盖”。
 
 ## 完成摘要

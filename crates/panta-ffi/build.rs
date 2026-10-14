@@ -45,9 +45,12 @@ fn main() -> Result<(), io::Error> {
         builder.env(key, value);
     }
     if let Some(sdk) = provision::macos_sdk().map_err(io::Error::other)? {
+        let deployment = env::var("MACOSX_DEPLOYMENT_TARGET")
+            .unwrap_or_else(|_| provision::MACOS_DEPLOYMENT_TARGET.to_owned());
         builder
             .flag("-isysroot")
             .flag(sdk.as_os_str())
+            .flag(format!("-mmacosx-version-min={deployment}"))
             .flag("-nostdinc++")
             .flag("-isystem")
             .flag(sdk.join("usr/include/c++/v1").as_os_str());

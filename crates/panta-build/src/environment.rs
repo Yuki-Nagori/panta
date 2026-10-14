@@ -4,6 +4,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Qt 与 macOS 原生 SDK 制品共同支持的最低部署版本。
+pub const MACOS_DEPLOYMENT_TARGET: &str = "13.0";
+
 pub fn use_system_tools() -> bool {
     matches!(
         std::env::var("PANTA_USE_SYSTEM_TOOLS").as_deref(),

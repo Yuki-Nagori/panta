@@ -52,6 +52,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set macOS SDK deployment target
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
+
       - name: Install Linux window-system development packages
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -119,7 +123,7 @@ jobs:
           if gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release edit sdk-vtk-9.7.0-webgpu \
               --repo "$GITHUB_REPOSITORY" \
-              --title "VTK 9.7.0 WebGPU hardware-window SDKs" \
+              --title "VTK 9.7.0 WebGPU 原生窗口 SDK" \
               --notes-file tools/sdk/releases/vtk-9.7.0.md
             gh release view sdk-vtk-9.7.0-webgpu --repo "$GITHUB_REPOSITORY" --json assets \
               --jq '.assets[].name' | while IFS= read -r asset; do
@@ -129,7 +133,7 @@ jobs:
           else
             gh release create sdk-vtk-9.7.0-webgpu \
               --repo "$GITHUB_REPOSITORY" \
-              --title "VTK 9.7.0 WebGPU hardware-window SDKs" \
+              --title "VTK 9.7.0 WebGPU 原生窗口 SDK" \
               --notes-file tools/sdk/releases/vtk-9.7.0.md
           fi
           gh release upload sdk-vtk-9.7.0-webgpu sdk-build/dist/* --clobber \

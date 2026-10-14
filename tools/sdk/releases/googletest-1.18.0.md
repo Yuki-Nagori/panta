@@ -1,28 +1,20 @@
-# GoogleTest 1.18.0 static SDKs
+Panta 项目 CI 为 macOS arm64、Linux x86_64 和 Windows x86_64 构建并自检
+GoogleTest 静态 SDK。每个归档都包含上游 CMake 包、头文件、静态库、源码元数据
+和 BSD-3-Clause 许可证。任务 071 已将制品登记到 `native/cmake/sdk-provision.cmake`；
+启用 `BUILD_TESTING=ON` 时，native 测试通过 `panta_require_sdk` 使用已验证的平台
+SDK。GoogleTest 仅供测试目标使用，关闭测试时不会下载或查找该 SDK。
 
-Panta project CI builds and self-checks a static GoogleTest SDK for macOS arm64,
-Linux x86_64, and Windows x86_64. Each archive contains the upstream CMake
-package, headers, static libraries, source metadata, and BSD-3-Clause license.
-The normal project build continues to use its current FetchContent path until a
-task 071 registers these assets in `native/cmake/sdk-provision.cmake`; native
-tests consume the verified platform SDK through `panta_require_sdk` when
-`BUILD_TESTING=ON`. No FetchContent or system-package fallback remains.
+## 源码与构建
 
-## Source and build
+- 上游：<https://github.com/google/googletest>
+- 版本：`v1.18.0`；固定 commit：`063de7e9578f82b369302001269680b4b1553359`
+- 构建：Release、C++17、静态库；关闭 GoogleMock；Windows 使用共享 CRT。
+- 自检：归档内的 `GTestConfig.cmake` 必须提供 `GTest::gtest` 和
+  `GTest::gtest_main`；CI 在打包前编译、链接并运行测试程序。
+- 许可证：BSD-3-Clause；每个归档都包含从上游源码复制的
+  `share/licenses/GoogleTest/LICENSE`。
+- macOS arm64 制品以 macOS 13.0 为最低部署版本；Qt 与其他运行时依赖也须满足此基线。
 
-- Upstream: <https://github.com/google/googletest>
-- Release: `v1.18.0`
-- Commit: `063de7e9578f82b369302001269680b4b1553359`
-- Build: Release, C++17, static libraries, GoogleMock disabled, shared CRT on
-  Windows.
-- Self-check: the archive-local `GTestConfig.cmake` must provide
-  `GTest::gtest` and `GTest::gtest_main`; CI compiles, links, and runs a test
-  executable before packaging.
-- License: BSD-3-Clause, copied from the upstream source tree to
-  `share/licenses/GoogleTest/LICENSE` in every archive.
-
-The release uses the single tag `sdk-googletest-1.18.0`. Reproduction clears
-all previous assets and uploads the complete three-platform set after all
-matrix jobs pass. Every archive has an adjacent `.sha256` file. Task 071
-registers these artifacts in the native SDK provision manifest with the
-verified SHA256 values.
+Release 使用单一 tag `sdk-googletest-1.18.0`。重新生产时，只有所有平台矩阵任务
+通过后才会清除旧资产并上传完整的三平台制品集。每个归档都有对应的 `.sha256`
+校验文件；任务 071 会将已核验的 SHA256 登记到 native SDK 供给清单。
