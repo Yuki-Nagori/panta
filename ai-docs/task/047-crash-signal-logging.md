@@ -28,9 +28,9 @@ minidump/WER 报告采集、Qt 消息处理、远程上报。
 
 ## 实施步骤
 
-1. `panta::foundation::install_crash_handler(log_file)`：安装时预创建并持有
-   日志 fd（处理器内不做路径/分配操作），登记 SIGSEGV/SIGBUS/SIGFPE/SIGILL/
-   SIGABRT/SIGTRAP。
+1. `panta_foundation::crash::install_crash_handler(log_dir)`：参数是日志目录，
+   空字符串时使用系统临时目录。安装时预创建并持有日志 fd（处理器内不做路径/
+   分配操作），登记 SIGSEGV/SIGBUS/SIGFPE/SIGILL/SIGABRT/SIGTRAP。
 2. 处理器仅用 async-signal-safe 操作（write/整数格式化）；回溯
    `backtrace_symbols_fd` 为 best-effort（崩溃点在分配器内时可能缺失，
    头文件注明取舍）。
@@ -92,4 +92,4 @@ minidump/WER 报告采集、Qt 消息处理、远程上报。
 
 2026-10-02 通过 gh 核对 [CI run 36932703454](https://github.com/Yuki-Nagori/panta/actions/runs/36932703454)，对应 `bf0ecfb4546ad262bed90c013c957c56ddc2e378`，19 个 job 全部 success。macOS / Linux / Windows 的 `handler_logs_crash_and_preserves_exit` 均通过：POSIX 保留 SIGSEGV 退出；Windows 校验 SEH 异常码、PID、日志路径和原异常退出码。处理器保留默认系统处置；macOS `.ips` 已有本地证据，WER 报告采集不在范围内。
 
-Cargo 聚合测试的 CTest 为 macOS 69/69、Linux 68/68、Windows 66/66；格式、lint、审计与 sanitizer job 通过。Rust coverage 门禁通过（函数 90.83%、行 93.07%），[报告制品](https://github.com/Yuki-Nagori/panta/actions/runs/36932703454/artifacts/11196183017)上传成功。实现、测试、文档及索引一致，无兼容例外。
+Cargo 聚合测试的 CTest 为 macOS 69/69、Linux 68/68、Windows 66/66；格式、lint、审计与 sanitizer job 通过。Rust coverage 门禁通过（函数 90.83%、行 93.07%），[报告制品](https://github.com/Yuki-Nagori/panta/actions/runs/36932703454/artifacts/11196183017)上传成功。2026-10-14 根据现行 Rust API 修正了本节安装函数的模块路径和 `log_dir` 参数语义。实现、测试、文档及索引一致，无兼容例外。
