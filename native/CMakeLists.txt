@@ -119,6 +119,29 @@ if(PANTA_ENABLE_BRIDGE_MODULE)
   add_subdirectory(visualization)
   add_subdirectory(bridge)
 endif()
+
+# 安装时扫描 app 的真实动态依赖；搜索目录来自锁定供给树，避免依赖开发机
+# 的 DYLD_LIBRARY_PATH、LD_LIBRARY_PATH 或 PATH 才能解析 SDK 运行库。
+set(PANTA_RUNTIME_DEPENDENCY_DIRS)
+panta_sdk_triple(_panta_runtime_triple)
+foreach(_panta_sdk IN ITEMS vtk occt netgen)
+  get_property(_panta_sdk_version GLOBAL PROPERTY "panta_sdk_version_${_panta_sdk}")
+  set(_panta_sdk_root
+      "${PANTA_SDK_PROVISION_DIR}/${_panta_sdk}/${_panta_sdk_version}/${_panta_runtime_triple}")
+  if(EXISTS "${_panta_sdk_root}")
+    file(
+      GLOB_RECURSE _panta_sdk_runtime_files
+      LIST_DIRECTORIES false
+      "${_panta_sdk_root}/*.dylib" "${_panta_sdk_root}/*.so" "${_panta_sdk_root}/*.so.*"
+      "${_panta_sdk_root}/*.dll")
+    foreach(_panta_sdk_runtime_file IN LISTS _panta_sdk_runtime_files)
+      get_filename_component(_panta_sdk_runtime_dir "${_panta_sdk_runtime_file}" DIRECTORY)
+      list(APPEND PANTA_RUNTIME_DEPENDENCY_DIRS "${_panta_sdk_runtime_dir}")
+    endforeach()
+  endif()
+endforeach()
+list(REMOVE_DUPLICATES PANTA_RUNTIME_DEPENDENCY_DIRS)
+
 # qml/ 位于仓库根（repository-layout）；二进制目录固定在 native 构建树内。
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../qml" qml)
 add_subdirectory(app)
@@ -129,6 +152,49 @@ endif()
 if(PANTA_ENABLE_FFI_TEST)
   add_subdirectory(ffi)
 endif()
+
+# 应用随动态 SDK 库一起部署时也要带上各 SDK 的许可证与制品来源记录。
+# 只复制运行时依赖，不把 SDK 头文件、静态库和 CMake 包装进应用安装树。
+if(PANTA_ENABLE_BRIDGE_MODULE)
+  panta_sdk_triple(_panta_runtime_triple)
+  if(APPLE)
+    set(_panta_runtime_resource_dir "panta.app/Contents/Resources")
+  else()
+    set(_panta_runtime_resource_dir "share/panta")
+  endif()
+  foreach(_panta_sdk IN ITEMS vtk occt netgen)
+    get_property(_panta_sdk_version GLOBAL PROPERTY "panta_sdk_version_${_panta_sdk}")
+    set(_panta_sdk_root
+        "${PANTA_SDK_PROVISION_DIR}/${_panta_sdk}/${_panta_sdk_version}/${_panta_runtime_triple}")
+    if(EXISTS "${_panta_sdk_root}/share/licenses")
+      install(
+        DIRECTORY "${_panta_sdk_root}/share/licenses/"
+        DESTINATION "${_panta_runtime_resource_dir}/licenses"
+        COMPONENT Runtime)
+    endif()
+    if(EXISTS "${_panta_sdk_root}/panta-sdk.json")
+      install(
+        FILES "${_panta_sdk_root}/panta-sdk.json"
+        DESTINATION "${_panta_runtime_resource_dir}/sdk/${_panta_sdk}"
+        COMPONENT Runtime)
+    endif()
+  endforeach()
+endif()
+
+# Qt 的 SPDX/CycloneDX 文档含运行时依赖逐组件的许可证表达式与来源信息。
+# 所有构建变体都会部署 Qt，即使裁掉 Bridge 也要保留这份机器可读清单。
+if(APPLE)
+  set(_panta_runtime_resource_dir "panta.app/Contents/Resources")
+else()
+  set(_panta_runtime_resource_dir "share/panta")
+endif()
+install(
+  DIRECTORY "${QT_STAGING}/sbom/"
+  DESTINATION "${_panta_runtime_resource_dir}/sbom"
+  COMPONENT Runtime
+  FILES_MATCHING
+  PATTERN "*.spdx.json"
+  PATTERN "*.cdx.json")
 
 set(PANTA_NATIVE_INSTALL_CONFIG_DIR lib/cmake/panta-native)
 

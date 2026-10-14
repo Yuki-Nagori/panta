@@ -3,65 +3,77 @@
 [![CI](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Yuki-Nagori/panta/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-规划中的 CAE 桌面平台，采用 Qt Quick/QML、OpenCASCADE、Netgen 和 VTK；物理求解通过外部进程接入。
-
 > **命名**：Panta 取自赫拉克利特的名言 *Panta rhei*（希腊语 **πάντα ῥεῖ**，意为"万物皆流"）。注塑过程中，聚合物熔体、温度场、压力场与材料形态始终处于动态演化之中；CAE 的本质，正是对这一"流变万物"过程的数值再现。
 
-**当前状态：Rust workspace、Cargo 调度 native 构建、Qt Quick/C++ ViewModel 桌面骨架和 `.pa` parser/formatter CLI 已落地；完整 CAE 业务尚未实现。**
+Panta 是一个规划中的 CAE 桌面平台，使用 Qt Quick/QML 构建界面，以 OpenCASCADE、Netgen 和 VTK 提供几何、网格与可视化基础；物理求解通过外部进程接入。
 
-## 环境要求
+**当前已交付：** Rust workspace、Cargo 驱动的 native 构建、Qt Quick/C++ ViewModel 桌面骨架，以及 `.pa` parser/formatter CLI。CAE 工程、导入、网格、求解和持久化流程仍在开发中。
 
-必须预装：
+## 快速开始
 
-| 平台 | 必要环境 |
-|---|---|
-| macOS | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
-| Linux | git、[rustup](https://rustup.rs)、C 编译器（Rust 链接驱动）与 OpenGL 前置（Debian/Ubuntu：`libgl-dev`、`libegl1`、`libxkbcommon0`，运行 QML 另需 `libgl1-mesa-dri`）；发行版需 glibc ≥ 2.34（Qt 预编译包基于 RHEL 9.6） |
-| Windows | git、[rustup](https://rustup.rs)、MSVC 构建工具（Visual Studio Build Tools 2022） |
-
-Rust 工具链版本由 [rust-toolchain.toml](rust-toolchain.toml) 固定，仓库内执行 cargo 命令时按提示 `rustup toolchain install` 即可；其余依赖（CMake、Ninja、Qt、VTK、OCCT、Netgen）由构建引导自动拉取，无需预装，见 [依赖获取与主平台环境](ai-docs/standards/dependency-acquisition.md)。
-
-## 当前可用命令
-
-| 命令 | 当前行为 |
-|---|---|
-| `cargo build` | 统一构建入口：构建 `panta-launcher` 及其依赖——先生成 `panta-ffi` staticlib，再经 build.rs 调度托管 CMake/Ninja 构建 native（Qt、GoogleTest 等首次自动下载到 `target/`）；全部成员用 `cargo build --workspace` |
-| `cargo run --locked --package panta-tests -- toolchain` | 校验最近一次 Cargo build 使用了托管 LLVM 22.1.7（clang/clang++/clang-cl/clang-format/clang-tidy）、CMake/Ninja、Qt、GoogleTest，并生成 native `compile_commands.json`；CI 在跨平台 build 后执行 |
-| `cargo build --no-default-features` | 诊断构建：通过 Cargo feature 裁剪 `Panta.Bridge` 静态模块，构建不依赖 ViewModel 的最小 Shell；默认构建启用该模块 |
-| `cargo lint` | 根 `tests/` 入口统一执行 Clippy、cargo-machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner 和 Cppcheck；工具缺失或任一检查失败即非零。可用 `cargo lint <tool>` 单独运行 |
-| `cargo audit` | 通过根 runner 按固定版本准备 cargo-deny 到 `target/panta-tools/<cargo-tool>/<version>`，执行 RustSec、许可证和依赖关系审计 |
-| `cargo test --workspace` | Cargo workspace 测试入口，并由根 `tests/` package 集成测试聚合 qmllint、完整 CTest/GTest/QtTest/QML 行为套件；裸 `cargo test` 只跑默认成员 `panta-launcher` |
-| `cargo format` | 根 `tests/` 入口检查 Rust、C++/CXX、CMake 和 QML 格式；只改 Rust 时使用官方 `cargo fmt --all -- --check` |
-| `cargo coverage` | 通过根 runner 按固定版本准备 cargo-llvm-cov 到 `target/panta-tools/<cargo-tool>/<version>`，执行 Rust 覆盖率门禁；`cargo coverage native` 生成 native C++ 覆盖率报告，两个 CI job 分开运行 |
-| `cargo sanitize` | sanitizer 矩阵：ASan+UBSan 插桩构建并执行完整 CTest（Windows 仅 ASan；Linux/macOS 另验证 TSan 独立树）；矩阵与官方依据见任务 042 |
-| `cargo ub-check` | Miri（固定 nightly）解释执行纯 Rust crate 测试，检出越界、悬垂引用与数据竞争类 UB；CXX FFI 与进程类 crate 不适用，见任务 032 |
-| `cargo quality` | 依次执行 `cargo format`、`cargo lint`、依赖审计、Rust 测试和 native/QML 测试 |
-| `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典 |
-| `cargo run -p panta-dslc -- format --check resources/i18n/panta-cn.pa` | 检查 `.pa` 是否为规范格式；写回使用 `format <file>` |
-| `cargo run` | 启动 Qt Quick 主窗口（当前为骨架界面：主题、命令按钮、占位面板、错误展示入口） |
-
-作为完整 CAE 桌面（工程树/视口/属性区等）的体验仍是目标：[构建说明](ai-docs/architecture/build-and-development.md) 列出落地条件；托管引导（CMake/Ninja 二进制自动供给）见任务 020。
-
-native 直接诊断构建（不经 Cargo）仍可用：在 `native/` 下执行 `cmake --preset debug`、`cmake --build --preset debug`、`ctest --preset debug`、`cmake --install build/debug`。
-
-日常命令默认使用 Cargo 的常规依赖解析。CI 和需要复现锁文件的验证会显式追加 `--locked`（例如 `cargo test --locked --workspace`）；它要求已提交的 `Cargo.lock` 与 manifests 一致，不会自动更新锁文件。根 `tests/` 目录按 `src/` 调度器、`integration/` Cargo 聚合测试、`cpp/` C++ 测试和 `qml/` QML 测试分类；Rust 单元测试仍与被测实现同文件，跨 crate 行为测试放在对应 crate 的 `tests/`。
-
-## 开始工作
-
-1. 从 [任务索引](ai-docs/task-index.md) 选择任务；新增工作先复制 [任务模板](ai-docs/task/_template.md)。
-2. 阅读任务引用的 [架构说明](ai-docs/architecture/README.md) 与 [技术规范](ai-docs/standards/README.md)。
-3. 按任务实施、验证并更新状态。具体依赖与可开始任务以[任务索引](ai-docs/task-index.md)为准。
-
-提交前质量门禁（fmt + clippy）经 git hooks 强制，新克隆后启用一次：
+安装下表所列基础工具后，在仓库根目录运行：
 
 ```sh
-git config core.hooksPath .githooks
+cargo build --locked
+cargo run --locked
 ```
 
-性能测试与剖析（Criterion、火焰图、QML Profiler、Massif 等）是开发侧工作台，不进 CI 门禁，见[性能模块](ai-docs/modules/performance.md)。
+Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `target/`。首次构建需要网络访问。Rust 版本见 [rust-toolchain.toml](rust-toolchain.toml)，依赖来源、版本和平台限制见[依赖获取规范](ai-docs/standards/dependency-acquisition.md)。
 
-国际化、跨平台路径与运行时、变量 DSL、C++/QML 模块和热重载的规划见[重要模块说明](ai-docs/modules/README.md)。
+## 系统要求
 
-完整路由见 [AGENTS.md](AGENTS.md)。
+| 平台 | 需要预装 |
+|---|---|
+| macOS | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
+| Linux | git、[rustup](https://rustup.rs)、C 编译器及 OpenGL/Wayland 前置；Debian/Ubuntu 需要 `pkg-config`、`libgl-dev`、`libegl1`、`libxkbcommon0`、`libxkbcommon-dev`、`libwayland-dev`、`wayland-protocols`，运行 QML 另需 `libgl1-mesa-dri`。Qt 预编译包要求 glibc ≥ 2.34。 |
+| Windows | git、[rustup](https://rustup.rs)、Visual Studio Build Tools 2022（MSVC） |
 
-外部边界：[[External / 非本仓库] MoldSolver](ai-docs/architecture/external-moldsolver.md) · [[External / 非本仓库] Mold Protocol](ai-docs/architecture/external-mold-protocol.md)。许可证：[Apache-2.0](LICENSE)。
+## 常用命令
+
+| 命令 | 用途 |
+|---|---|
+| `cargo build --locked` | 构建默认成员 `panta-launcher` 及其依赖，并生成桌面程序 `panta`（Windows 为 `panta.exe`）。 |
+| `cargo build --locked --workspace` | 构建 workspace 全部成员。 |
+| `cargo run --locked` | 启动桌面窗口并转发程序参数与退出码。 |
+| `cargo panta-package` | 生成当前 profile 的可搬迁安装目录，默认位于 `target/package/<profile>`。 |
+| `cargo panta-package /path/to/output` | 将安装目录写到指定路径。macOS 输出 `panta.app`，Windows/Linux 输出 `bin/panta[.exe]`。 |
+| `cargo test --locked --workspace` | 运行 Rust、native、QML 聚合测试。 |
+| `cargo format` | 检查 Rust、C++、CMake 和 QML 格式。 |
+| `cargo lint` | 运行 Clippy、依赖、CMake、QML、C++ 静态检查。 |
+| `cargo quality` | 依次运行格式、lint、依赖审计和测试。 |
+| `cargo coverage` | 运行 Rust 覆盖率门禁，CI 当前要求函数覆盖率 89%、行覆盖率 92%；`cargo coverage native` 生成 C++ 报告 artifact，当前不设阈值。门槛调整规划见任务 032（deferred）。 |
+| `cargo performance` | 手动运行性能基准，不纳入常规测试门禁。 |
+| `cargo run --locked --package panta-tests -- toolchain` | 检查 Cargo 托管的编译、格式和构建工具。 |
+| `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典；`format --check` 检查格式。 |
+
+`cargo panta-package` 通过 Qt 部署脚本收集 Qt/QML 运行时，并由 CMake 安装 app 实际链接的 native 动态依赖及许可清单；不会带上 native 开发用静态库、头文件和 CMake 导出。它生成安装目录，不生成 DMG、MSI 或 DEB 安装器，也不执行签名或公证。macOS arm64 安装目录已做独立启动和真实窗口检查；Windows/Linux 的安装目录和目标机窗口仍待验收。
+
+GitHub Actions 的 **Package desktop builds** workflow 可手动触发，为 macOS arm64、Windows x86_64 和 Linux x86_64 分别构建测试包，并将归档作为保留 1 天的 workflow artifact 上传。下载后可转发给测试者；Linux 仍需满足[系统要求](#系统要求)。这些是便于测试的可搬迁目录，不是正式发行安装器。
+
+Release 安装目录可用 `cargo run --locked --release --package panta-launcher -- package` 生成到 `target/package/release`。
+
+Cargo alias 定义在 [.cargo/config.toml](.cargo/config.toml)。Cargo 自带的 `cargo package` 保持原有 Rust crate 打包语义，因此桌面安装命令使用独立名称 `cargo panta-package`。
+
+## 构建与测试
+
+Cargo 负责 Rust workspace 和 native 构建调度；CMake 管理 C++、Qt/QML 和桌面程序构建图。native 诊断命令也可直接在 `native/` 下运行：
+
+```sh
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
+cmake --install ../target/native/debug --prefix /path/to/output
+```
+
+日常构建可按 Cargo 常规行为解析依赖；CI 和可复现验证使用 `--locked`。跨语言测试、质量门禁和任务约束见 [AGENTS.md](AGENTS.md)、[测试规范](ai-docs/standards/testing.md)和[任务索引](ai-docs/task-index.md)。
+
+## 项目说明
+
+项目采用 Apache-2.0，第三方依赖按各自许可分发，见[依赖获取规范](ai-docs/standards/dependency-acquisition.md)。
+
+- [架构总览](ai-docs/architecture/README.md)
+- [构建、开发与部署](ai-docs/architecture/build-and-development.md)
+- [重要模块说明](ai-docs/modules/README.md)
+- [实施任务索引](ai-docs/task-index.md)
+- [MoldSolver 外部边界](ai-docs/architecture/external-moldsolver.md)
+- [Mold Protocol 外部边界](ai-docs/architecture/external-mold-protocol.md)

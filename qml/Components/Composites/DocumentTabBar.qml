@@ -314,19 +314,14 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Theme.spacingMedium
 
-                        Rectangle {
+                        Image {
                             visible: (tab.doc.kind ?? "") === "welcome"
                             width: Theme.documentTabWelcomeIconSize
                             height: Theme.documentTabWelcomeIconSize
-                            radius: Theme.documentTabRadius / 2
-                            color: Theme.colorDocumentWelcomeIcon
-                            ThemedLabel {
-                                anchors.centerIn: parent
-                                text: "P"
-                                textSize: Theme.fontSmall
-                                textColor: Theme.colorPanel
-                                font.bold: true
-                            }
+                            source: "qrc:/qt/qml/Panta/Shell/branding/panta-placeholder.svg"
+                            sourceSize: Qt.size(width, height)
+                            fillMode: Image.PreserveAspectFit
+                            Accessible.ignored: true
                         }
                         BusyIndicator {
                             visible: tab.tabState === "loading"

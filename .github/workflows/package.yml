@@ -1,0 +1,96 @@
+# 手动生成三平台可搬迁测试包；不创建正式 Release。
+name: Package desktop builds
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: package (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos-arm64
+            archive: panta-macos-arm64.zip
+          - os: windows-2022
+            platform: windows-x86_64
+            archive: panta-windows-x86_64.zip
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            archive: panta-linux-x86_64.tar.gz
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      CMAKE_GENERATOR: Ninja
+      PACKAGE_DIR: target/package/portable
+      ARCHIVE_DIR: target/package/archive
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Build release application
+        run: cargo build --locked --release
+
+      - name: Create relocatable installation tree
+        shell: bash
+        run: cargo run --locked --release --package panta-launcher -- package "$PACKAGE_DIR"
+
+      - name: Verify package layout
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            macOS)
+              test -x "$PACKAGE_DIR/panta.app/Contents/MacOS/panta"
+              ;;
+            Windows)
+              test -f "$PACKAGE_DIR/bin/panta.exe"
+              test -f "$PACKAGE_DIR/bin/d3dcompiler_47.dll"
+              ;;
+            Linux)
+              test -x "$PACKAGE_DIR/bin/panta"
+              ;;
+          esac
+
+      - name: Prepare archive directory
+        shell: bash
+        run: mkdir -p "$ARCHIVE_DIR"
+
+      - name: Archive macOS app bundle
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent "$PACKAGE_DIR/panta.app" "$ARCHIVE_DIR/${{ matrix.archive }}"
+
+      - name: Archive Windows installation tree
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:ARCHIVE_DIR | Out-Null
+          Compress-Archive -Path "$env:PACKAGE_DIR\*" -DestinationPath "$env:ARCHIVE_DIR\${{ matrix.archive }}"
+
+      - name: Archive Linux installation tree
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "$ARCHIVE_DIR"
+          tar -czf "$ARCHIVE_DIR/${{ matrix.archive }}" -C "$PACKAGE_DIR" .
+
+      - name: Upload portable test package
+        uses: actions/upload-artifact@v5
+        with:
+          name: panta-${{ matrix.platform }}
+          path: target/package/archive/${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 1

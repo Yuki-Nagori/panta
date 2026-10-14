@@ -14,14 +14,64 @@ const EXIT_PRODUCT_UNAVAILABLE: u8 = 69;
 const EXIT_SIGNAL_FALLBACK: u8 = 130;
 
 fn main() -> ExitCode {
-    let product = native_product();
     let arguments: Vec<OsString> = std::env::args_os().skip(1).collect();
+    if arguments
+        .first()
+        .is_some_and(|argument| argument == "package")
+    {
+        return match install_package(&arguments[1..]) {
+            Ok(code) => code,
+            Err(message) => {
+                eprintln!("panta-launcher: {message}");
+                ExitCode::from(EXIT_PRODUCT_UNAVAILABLE)
+            }
+        };
+    }
+
+    let product = native_product();
     match run(product.as_deref(), &arguments) {
         Ok(code) => code,
         Err(message) => {
             eprintln!("panta-launcher: {message}");
             ExitCode::from(EXIT_PRODUCT_UNAVAILABLE)
         }
+    }
+}
+
+/// 通过当前 Cargo 构建对应的 CMake install 规则生成可搬迁安装目录。
+/// 默认写入 `target/package/<profile>`；可用第一个参数指定其他前缀。
+fn install_package(arguments: &[OsString]) -> Result<ExitCode, String> {
+    if arguments.len() > 1 {
+        return Err("用法：cargo panta-package [输出目录]".to_owned());
+    }
+    let cmake = option_env!("PANTA_CMAKE_EXECUTABLE")
+        .ok_or("构建配置异常：未注入 PANTA_CMAKE_EXECUTABLE")?;
+    let build_dir = option_env!("PANTA_NATIVE_BUILD_DIR")
+        .ok_or("构建配置异常：未注入 PANTA_NATIVE_BUILD_DIR")?;
+    let build_type = option_env!("PANTA_NATIVE_BUILD_TYPE")
+        .ok_or("构建配置异常：未注入 PANTA_NATIVE_BUILD_TYPE")?;
+    let prefix = arguments
+        .first()
+        .map(|argument| PathBuf::from(argument.as_os_str()))
+        .or_else(|| option_env!("PANTA_PACKAGE_PREFIX").map(PathBuf::from))
+        .ok_or("构建配置异常：未注入 PANTA_PACKAGE_PREFIX")?;
+
+    let status = std::process::Command::new(cmake)
+        .arg("--install")
+        .arg(build_dir)
+        .arg("--config")
+        .arg(build_type)
+        .arg("--component")
+        .arg("Runtime")
+        .arg("--prefix")
+        .arg(&prefix)
+        .status()
+        .map_err(|error| format!("无法启动 CMake install：{error}"))?;
+    if status.success() {
+        println!("panta 安装目录：{}", prefix.display());
+        Ok(ExitCode::SUCCESS)
+    } else {
+        Ok(exit_code_of(&status))
     }
 }
 
@@ -77,7 +127,7 @@ mod tests {
 
     #[test]
     fn missing_product_reports_unavailable() {
-        let missing = Path::new("/panta/definitely/missing/panta-native");
+        let missing = Path::new("/panta/definitely/missing/panta");
         let error = run(Some(missing), &[]).unwrap_err();
         assert!(error.contains("native 产物不存在"));
     }

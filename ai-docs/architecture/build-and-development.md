@@ -12,29 +12,30 @@ Cargo 调度已接通（任务 004）：Cargo manifest 通过 panta-ffi 的普�
 
 QML 模块可裁剪：`cargo build --locked` 默认启用 `bridge-module` feature，构建并静态注册 `Panta.Bridge`；诊断时使用 `cargo build --locked --no-default-features`，由 launcher 将 feature 状态映射为 `PANTA_ENABLE_BRIDGE_MODULE=OFF`，移除该模块并使用 `Panta.Shell` 的 `AppNoBridge` 最小入口。
 
-Qt Quick 主窗口已可用（任务 005）：`native/app` 为 Qt 入口，`native/bridge` 提供 ViewModel（GTest 信号测试），`qml/`（URI `Panta.Shell`，NO_PLUGIN 资源模块）承载界面；Qt 6.11.2 预编译包由 `native/cmake/qt-provision.cmake` 按三平台固定清单下载到构建树。任务 006 的 `panta-ffi` 以 CXX 1.0.202 生成 Rust/C++ 桥接静态库和 native 边界测试，任务 047 的 `panta-foundation` 由该边界暴露进程级崩溃安装入口，launcher build.rs 将生成头与静态库路径传入 CMake；该最小路径已由三平台 CI 干净构建覆盖。QML/资源目录已纳入 build.rs 重建追踪（改 QML 即重跑 qmlcachegen）。i18n 编译链已接通（任务 034）：`resources/i18n/*.pa` 经 `panta-dsl-core` 生成构建树 TS，`native/i18n` 用 Qt 供给的锁定 `lrelease` 编 QM 并嵌入 `:/i18n/`（ctest 覆盖加载）；运行期语言切换由 022 接入。VTK 的 007 模块、适配器和创建级测试已接入构建；macOS 26 窗口化渲染仍 blocked，默认界面保留占位面板，不宣称 VTK 桌面视口已交付。
+Qt Quick 主窗口已可用（任务 005）：`native/app` 为 Qt 入口，`native/bridge` 提供 ViewModel（GTest 信号测试），`qml/`（URI `Panta.Shell`，NO_PLUGIN 资源模块）承载界面；Qt 6.11.2 预编译包由 `native/cmake/qt-provision.cmake` 按三平台固定清单下载到构建树。任务 006 的 `panta-ffi` 以 CXX 1.0.202 生成 Rust/C++ 桥接静态库和 native 边界测试，任务 047 的 `panta-foundation` 由该边界暴露进程级崩溃安装入口，launcher build.rs 将生成头与静态库路径传入 CMake；该最小路径已由三平台 CI 干净构建覆盖。QML/资源目录已纳入 build.rs 重建追踪（改 QML 即重跑 qmlcachegen）。i18n 编译链已接通（任务 034）：`resources/i18n/*.pa` 经 `panta-dsl-core` 生成构建树 TS，`native/i18n` 用 Qt 供给的锁定 `lrelease` 编 QM 并嵌入 `:/i18n/`（ctest 覆盖加载）；运行期语言切换由 022 接入。VTK 的 007 模块、适配器和创建级测试已接入构建；macOS 与 Windows 已有真实窗口验收记录，Linux Wayland 真实窗口与跨显示器 DPR 仍待验收，详见任务 007。
 
 构建图与扩展点：Cargo → launcher 的 build.rs → CMake/Ninja → native targets，单向无环；CMake 侧不回调 Cargo。重建追踪显式列举 native 源/配置与 qml/ 目录；`resources/` 落地时追加（qt_add_resources 扩展点已在 qml/CMakeLists.txt 标注）。Rust 库供 C++ 消费的接入点在 CMake 侧，由任务 006 确定。
 
-仍不能完成 CAE 业务流程：几何导入、网格、渲染与持久化均为后续任务；桌面分发（013）未实施。工具二进制供给（020/042）已落地：受支持平台由构建引导按固定资产下载校验 CMake、Ninja 与 LLVM 22.1.7 到根 `target/panta-tools/`，CMake、Cargo CXX、clang-format 和 clang-tidy 复用同一套 LLVM；只有显式设置 `PANTA_USE_SYSTEM_TOOLS=1` 才读取 `CMAKE`、`CC`、`CXX` 或 PATH 的本机工具。Linux aarch64 无官方固定资产时需走该旁路。VTK/OCCT/Netgen 的 SDK 供给模块（031 `native/cmake/sdk-provision.cmake`）已落地并经 ctest `Build.SdkProvision` 验证，缓存于 `target/panta-deps/sdk/`；当前仅 OCCT Windows 有固定资产，消费方任务接入前不触发下载。下面是构建契约与实施要求，不是已验证的安装教程。
+仍不能完成 CAE 业务流程：几何导入、网格与持久化均为后续任务。桌面安装部署（013）已具备 CMake 安装规则：macOS 生成 `.app` 并使用 Qt 部署脚本收集 QML imports 和 Qt 插件；CMake runtime dependency set 收集应用实际链接的 SDK 动态库，许可、制品来源和 Qt SBOM 随安装树保存。macOS arm64 安装包已在清理开发环境变量后启动并检查真实窗口；Windows/Linux 的安装树和真实窗口仍待各平台验收，不能据此标记为受支持。当前 app 只链接 VTK；OCCT 和 Netgen 仍由几何/网格测试目标消费，没有被桌面 app 加载。工具二进制供给（020/042）已落地：受支持平台由构建引导按固定资产下载校验 CMake、Ninja 与 LLVM 22.1.7 到根 `target/panta-tools/`，CMake、Cargo CXX、clang-format 和 clang-tidy 复用同一套 LLVM；只有显式设置 `PANTA_USE_SYSTEM_TOOLS=1` 才读取 `CMAKE`、`CC`、`CXX` 或 PATH 的本机工具。Linux aarch64 无官方固定资产时需走该旁路。VTK/OCCT/Netgen 的 SDK 供给模块（031 `native/cmake/sdk-provision.cmake`）已落地并经 ctest `Build.SdkProvision` 验证，三者均有三平台固定资产；当前 app 只链接 VTK，OCCT 和 Netgen 由几何/网格目标消费。以下命令是现有构建/安装入口；跨平台安装尚未全部实测。
 
 ## 构建职责
 
 Cargo 提供统一开发入口，负责 Rust workspace 和原生构建调度；CMake 拥有 C++、Qt、QML 和 native desktop executable 的构建图；Ninja 作为计划采用的原生构建执行器。
 
-Qt 桌面可执行文件由 CMake 生成，使 moc、rcc、QML 模块处理和部署处在同一构建图中。计划使用 `qt_add_qml_module()` 组织 QML；具体 Qt 版本和部署 API 的可用性在锁定版本后验证。
+Qt 桌面可执行文件由 CMake 生成，使 moc、rcc、QML 模块处理和部署处在同一构建图中。应用 QML 入口在 `Panta.App` 模块中包装可复用的 `Panta.Shell` 页面，让 Qt 部署扫描从可执行目标解析传递的 QML imports。Qt 版本锁定为 6.11.2；`qt_generate_deploy_qml_app_script()` 已接入 install 规则。
 
 `cmake` crate 可用于 Rust package 的 `build.rs` 构建原生库，但这不自动实现整个桌面程序的运行与部署。不能把示意的 `cmake::Config::new("native").build()` 当成完整工程方案：还需处理安装产物、链接目录、运行时动态库和增量构建。
 
-## 目标命令与落地条件
+## Cargo 命令
 
-| 目标入口 | 预期行为 | 必须补齐的实现 |
-|---|---|---|
-| `cargo build` | 由 Cargo 依赖图先构建 FFI staticlib，再构建 Rust 与 native desktop | 编排入口、原生调度、依赖发现、失败码传递 |
-| `cargo run` | 启动 CMake 生成的桌面程序 | Cargo 可运行 launcher、可执行文件定位、参数转发 |
-| `cargo test --workspace` | 提供统一验证入口 | Rust 测试及 native/集成检查的明确调度 |
+| 命令 | 当前行为 |
+|---|---|
+| `cargo build --locked` | 构建 FFI staticlib、Rust workspace 和 native 桌面程序。 |
+| `cargo run --locked` | 启动 CMake 生成的桌面程序，并转发参数与退出码。 |
+| `cargo panta-package` | 通过 launcher 调用托管 CMake 的 `--install --component Runtime`，默认输出到 `target/package/<profile>`。可在命令后附加自定义安装前缀。 |
+| `cargo test --locked --workspace` | 运行 Rust 测试及已聚合的 native/QML 测试。 |
 
-这些是目标用户体验。Cargo 默认只理解已配置的 Rust targets，不会自动运行 CTest、QML 检查或 CMake executable。若采用 launcher 或专门的调度 crate，需记录它与桌面进程之间的退出码、信号和工作目录约定。
+Cargo 自带的 `cargo package` 保留给 Rust crate 打包；桌面安装命令使用 `cargo panta-package` alias。该命令只安装应用运行时文件，不附带 native 开发用静态库、头文件和 CMake 导出；它生成可搬迁安装目录，不负责生成平台安装器、签名或公证。
 
 避免构建递归：Cargo 调 CMake 时，CMake 不应再次无条件调用同一 Cargo target。Rust 库产物与 native target 的依赖顺序应显式描述。
 
@@ -46,8 +47,15 @@ Qt 桌面可执行文件由 CMake 生成，使 moc、rcc、QML 模块处理和�
 
 依赖路径应通过公开的构建配置传入，不硬编码个人机器路径。分别管理 Debug/Release 产物，追踪源文件与配置变动，验证连续构建和清理后构建的一致性。
 
-## 打包与发布
+## 安装与部署
 
-开发机能启动不等于可分发。部署需包含 Qt plugins、QML modules、VTK/OCCT/Netgen 动态库和应用资源，并在无开发环境的目标机器上验证。`qt_generate_deploy_qml_app_script()` 是可评估的 Qt 部署机制，适用版本和平台需要确认。
+在仓库根目录构建并安装到独立目录：
 
-发行前核对依赖许可证与再分发要求，记录资源定位、日志目录和用户数据目录。当前仓库只确定自身采用 Apache-2.0；不据此推断所有第三方依赖的许可证。
+```sh
+cargo build --locked
+cmake --install target/native/debug --prefix /tmp/panta-install
+```
+
+macOS 的应用位于 `/tmp/panta-install/panta.app`；Windows/Linux 的入口为安装前缀下 `bin/panta[.exe]`。macOS arm64 可通过 `open /tmp/panta-install/panta.app` 启动；无开发环境变量的检查可用 `env -i PATH=/usr/bin:/bin HOME="$HOME" /tmp/panta-install/panta.app/Contents/MacOS/panta`。真实窗口通过 CUA 检查，不以成功构建或进程启动替代窗口验收。Windows/Linux 目标机和安装树仍需独立验证。
+
+Qt 的运行期 QML imports、平台插件和所需 Qt 动态库由 `qt_generate_deploy_qml_app_script()` 安装；应用实际链接的 VTK 等 native 动态依赖由 CMake runtime dependency set 收集。macOS 许可、SDK provenance 和 Qt SBOM 位于 `.app/Contents/Resources/{licenses,sdk,sbom}`；其他平台位于安装前缀 `share/panta/`。安装依赖集只包含 app 的链接闭包：当前几何/网格模块由测试目标消费，OCCT/Netgen 不属于桌面 app 的运行时闭包。许可证标识与版本基线见[依赖获取规范](../standards/dependency-acquisition.md)，发布前仍须结合实际打包内容复核各上游再分发要求。

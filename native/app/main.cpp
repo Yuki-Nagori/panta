@@ -8,6 +8,7 @@
 #include "panta_ffi.h"
 #include <QCoreApplication>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QtCore/qnamespace.h>
@@ -40,7 +41,7 @@ struct BackgroundWriteDrain {
 
 void print_version() {
     const panta::foundation::Version version = panta::foundation::native_version();
-    std::printf("panta-native %d.%d.%d\n", version.major, version.minor, version.patch);
+    std::printf("panta %d.%d.%d\n", version.major, version.minor, version.patch);
 }
 
 } // namespace
@@ -51,7 +52,7 @@ int main(int argc, char* argv[]) {
     try {
         panta::ffi::install_crash_handler(rust::String(""));
     } catch (const rust::Error& error) {
-        std::fprintf(stderr, "panta-native: 崩溃日志初始化失败：%s\n", error.what());
+        std::fprintf(stderr, "panta: 崩溃日志初始化失败：%s\n", error.what());
     }
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument = argv[index];
@@ -64,14 +65,14 @@ int main(int argc, char* argv[]) {
         }
         // 其余 Qt 标准参数交给 QGuiApplication；明确的未知参数在此拒绝，
         // 避免吞掉拼写错误。
-        std::fprintf(
-            stderr,
-            "panta-native: 未知参数 '%.*s'（用法：panta-native [--version] [-- <Qt 参数>]）\n",
-            static_cast<int>(argument.size()), argument.data());
+        std::fprintf(stderr, "panta: 未知参数 '%.*s'（用法：panta [--version] [-- <Qt 参数>]）\n",
+                     static_cast<int>(argument.size()), argument.data());
         return kExitUsage;
     }
 
     const QGuiApplication app(argc, argv);
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(":/qt/qml/Panta/Shell/branding/panta-placeholder.svg")));
 
     // Shell 自绘控件（ThemedToolButton 背景等）依赖非原生样式（qml.md：
     // 定制需 Basic/Fusion 等）；固定 Basic 保证三平台观感一致，测试同源。
@@ -84,9 +85,9 @@ int main(int argc, char* argv[]) {
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         []() { QCoreApplication::exit(kExitUnavailable); }, Qt::QueuedConnection);
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
-    engine.loadFromModule("Panta.Shell", "App");
+    engine.loadFromModule("Panta.App", "AppEntry");
 #else
-    engine.loadFromModule("Panta.Shell", "AppNoBridge");
+    engine.loadFromModule("Panta.App", "AppNoBridgeEntry");
 #endif
     if (engine.rootObjects().isEmpty()) {
         return kExitUnavailable;
