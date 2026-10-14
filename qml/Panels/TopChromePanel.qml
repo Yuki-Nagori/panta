@@ -1,5 +1,4 @@
 // 品牌、快捷工具、标题、搜索和菜单；宿主注入标题与页签状态，导航只发语义请求。
-// 原生窗口控制仍由系统标题栏承接。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -12,20 +11,25 @@ Rectangle {
     property string caption: ""
     property bool projectOpen: false
     property string activeRibbonTab: "start-learn"
+    property real nativeControlsLeftInset: 0
+    property real nativeControlsRightInset: 0
+    readonly property bool macOS: Qt.platform.os === "osx"
 
     // 面板仅报告稳定菜单 key，由宿主决定哪些入口可导航。
     signal menuRequested(string key)
 
     implicitWidth: Theme.chromeImplicitWidth
     implicitHeight: Theme.titlebarHeight + Theme.menubarHeight + Theme.borderWidth
-    color: Theme.colorPanel
+    color: Theme.colorChrome
 
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // 品牌区域跨标题工具条与菜单栏。
+        // macOS 由系统交通灯标识窗口，不显示应用图标。
         Rectangle {
+            objectName: "titleBrandTile"
+            visible: !chrome.macOS
             Layout.fillHeight: true
             Layout.preferredWidth: Theme.logoWidth
             color: Theme.colorBrand
@@ -49,6 +53,9 @@ Rectangle {
                 id: titleStrip
                 objectName: "titleStrip"
                 Layout.fillWidth: true
+                Layout.leftMargin: chrome.macOS ? chrome.nativeControlsLeftInset : 0
+                // macOS 右侧没有原生标题栏按钮；SafeArea 的右边距会留下大块空白。
+                Layout.rightMargin: chrome.macOS ? 0 : chrome.nativeControlsRightInset
                 Layout.preferredHeight: Theme.titlebarHeight
                 contentRoot: titleContent
 
@@ -63,41 +70,41 @@ Rectangle {
                         id: quickActions
                         objectName: "titleQuickActions"
                         Layout.minimumWidth: implicitWidth
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "new"
                             preserveIconColors: true
                             accessibleName: qsTranslate("IconActionNewDocument", "New document")
                             showCaret: true
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "open"
                             preserveIconColors: true
                             accessibleName: qsTranslate("IconActionOpenDocument", "Open document")
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "save"
                             preserveIconColors: true
                             accessibleName: qsTranslate("IconActionSaveDocument", "Save document")
                             showCaret: true
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "undo"
                             accessibleName: qsTranslate("IconActionUndo", "Undo")
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "redo"
                             accessibleName: qsTranslate("IconActionRedo", "Redo")
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "print"
                             accessibleName: qsTranslate("IconActionPrint", "Print")
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "preview"
                             accessibleName: qsTranslate("IconActionPreviewAnimation", "Preview animation")
                             showCaret: true
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             text: qsTr("Activate Animation (A)")
                             showCaret: true
                             contentColor: Theme.colorText
@@ -118,6 +125,7 @@ Rectangle {
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                         text: chrome.caption
+                        visible: text.length > 0
                         textSize: Theme.fontTitle
                         textColor: Theme.colorText
                         font.weight: Font.DemiBold
@@ -158,22 +166,22 @@ Rectangle {
                                     border.color: searchField.activeFocus ? Theme.colorIcon : Theme.colorPanelLine
                                 }
                             }
-                            ThemedToolButton {
+                            ChromeToolButton {
                                 objectName: "searchButton"
                                 iconName: "search"
                                 accessibleName: qsTranslate("IconActionSearch", "Search")
                             }
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             text: qsTr("Sign in")
                             iconName: "account"
                             showCaret: true
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "cart"
                             accessibleName: qsTranslate("IconActionShoppingCart", "Shopping cart")
                         }
-                        ThemedToolButton {
+                        ChromeToolButton {
                             iconName: "help"
                             accessibleName: qsTranslate("UiCommonHelp", "Help")
                             showCaret: true

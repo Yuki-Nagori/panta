@@ -175,6 +175,23 @@ class ShellModuleLoadTest final : public QObject {
 #endif
 
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
+        const auto flags = static_cast<Qt::WindowFlags>(root->property("flags").toUInt());
+        QVERIFY(flags.testFlag(Qt::ExpandedClientAreaHint));
+        QVERIFY(flags.testFlag(Qt::NoTitleBarBackgroundHint));
+        QCOMPARE(root->property("topPadding").toDouble(), 0.0);
+        QCOMPARE(root->property("leftPadding").toDouble(), 0.0);
+        QCOMPARE(root->property("rightPadding").toDouble(), 0.0);
+
+        auto* chrome = root->findChild<QObject*>(QStringLiteral("titleChromePanel"));
+        QVERIFY(chrome != nullptr);
+        const bool macOS = chrome->property("macOS").toBool();
+        QVERIFY(root->property("title").toString().isEmpty());
+        auto* brandTile = root->findChild<QObject*>(QStringLiteral("titleBrandTile"));
+        auto* macBrandMark = root->findChild<QObject*>(QStringLiteral("titleBrandMarkMac"));
+        QVERIFY(brandTile != nullptr);
+        QVERIFY(macBrandMark == nullptr);
+        QCOMPARE(brandTile->property("visible").toBool(), !macOS);
+
         // 标题组不能被 Layout 压到内容宽度以下；窄窗口 Tab 到搜索时应自动滚入视口。
         auto* shellWindow = qobject_cast<QQuickWindow*>(root);
         QVERIFY(shellWindow != nullptr);
@@ -182,6 +199,15 @@ class ShellModuleLoadTest final : public QObject {
         auto* search = root->findChild<QQuickItem*>(QStringLiteral("globalSearch"));
         QVERIFY(strip != nullptr);
         QVERIFY(search != nullptr);
+        chrome->setProperty("nativeControlsLeftInset", 48.0);
+        const qreal minimumInset = macOS ? 48.0 : 0.0;
+        QTRY_VERIFY(strip->x() >= minimumInset);
+        strip->setProperty("contentX", strip->property("contentWidth").toReal());
+        QTRY_VERIFY(strip->x() >= minimumInset);
+        if (macOS) {
+            chrome->setProperty("nativeControlsLeftInset", 120.0);
+            QTRY_VERIFY(strip->x() >= 120.0);
+        }
         shellWindow->showNormal();
         for (const int width : {1440, 1280}) {
             shellWindow->resize(width, 900);

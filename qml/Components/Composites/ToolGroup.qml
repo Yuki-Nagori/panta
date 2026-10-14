@@ -1,4 +1,4 @@
-// 标题工具分组：渐变底色与齐边内容行；默认属性接收调用方的按钮。
+// 标题工具分组：统一浅灰底色与齐边内容行；默认属性接收调用方的按钮。
 import QtQuick
 
 Rectangle {
@@ -6,18 +6,9 @@ Rectangle {
 
     implicitHeight: Theme.titlebarHeight
     implicitWidth: row.implicitWidth
+    color: Theme.colorChrome
     border.width: Theme.borderWidth
     border.color: Theme.colorPanelLine
-    gradient: Gradient {
-        GradientStop {
-            position: 0
-            color: Theme.colorToolGroupTop
-        }
-        GradientStop {
-            position: 1
-            color: Theme.colorToolGroupBottom
-        }
-    }
 
     Row {
         id: row

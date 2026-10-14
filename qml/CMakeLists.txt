@@ -12,6 +12,7 @@ set(PANTA_SHELL_QML_FILES
     Themes/Theme.qml
     Components/Atoms/MenuTabButton.qml
     Components/Atoms/ThemedNumberField.qml
+    Components/Atoms/ChromeToolButton.qml
     Components/Atoms/ThemedButton.qml
     Components/Atoms/ThemedCheckBox.qml
     Components/Atoms/ThemedRadioButton.qml
@@ -98,6 +99,11 @@ qt_add_qml_module(
   SOURCES
   ../native/app/platform_fonts.hpp
   ../native/app/platform_fonts.cpp)
+target_sources(panta_shell PRIVATE ../native/app/window_chrome_metrics.cpp
+                                   ../native/app/window_chrome_metrics.hpp)
+if(APPLE)
+  target_sources(panta_shell PRIVATE ../native/app/window_chrome_metrics_mac.mm)
+endif()
 
 set_target_properties(panta_shell PROPERTIES EXPORT_NAME shell)
 panta_native_defaults(panta_shell)

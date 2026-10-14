@@ -18,6 +18,7 @@ QML 部署脚本参与 install 流程，其平台支持和行为依 Qt 版本而
 
 - 只有一个应用对象和清晰的入口初始化序列。ViewModel 在 GUI 线程管理，长任务交给 worker/service，通过排队事件更新可观察状态。
 - 类型注册优先使用模块化方式。每个可变 Q_PROPERTY 配置正确通知，值未改变时不重复发通知；模型增删使用相应模型 API，避免静默修改底层容器。
+- 发射 Qt 信号统一使用 `emit`，明确标识信号发射点；它是编译期标记，不改变信号槽的连接和调用语义。实现文件直接包含 `<QtCore/qtmetamacros.h>`，使 include-cleaner 能识别该宏依赖。
 - QObject parent 表达唯一销毁关系；无 parent 对象另定 RAII 所有者，不能两者重复删除。回调捕获 QObject 时使用受控上下文/存活检查。
 - 明确 worker、QThread 对象、事件循环的生命周期；停止线程前完成取消与对象清理，不能把 QThread 对象自身当成已运行于 worker 线程。
 - 可观察错误进入 UI，详细诊断进入日志；后台错误不打开任意线程的对话框。关闭窗口时阻止迟到任务更新已销毁 ViewModel。

@@ -11,6 +11,7 @@ ToolButton {
     property real cornerRadius: Theme.radiusSmall
     property color contentColor: Theme.colorIcon
     property color hoverColor: Theme.colorHover
+    property color pressedColor: Theme.colorTransparent
     property color borderColor: Theme.colorTransparent
     property bool primaryAction: false
     property string iconName: ""
@@ -48,6 +49,9 @@ ToolButton {
             }
             if (button.primaryAction) {
                 return Theme.colorDialogPrimary;
+            }
+            if (button.enabled && button.pressed && button.pressedColor.a > 0) {
+                return button.pressedColor;
             }
             if (button.enabled && (button.hovered || button.visualFocus)) {
                 return button.hoverColor;

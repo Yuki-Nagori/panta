@@ -411,7 +411,7 @@ void VtkViewport::ensure_render_window() {
         return;
     }
 
-    Q_EMIT sceneInitialized();
+    emit sceneInitialized();
 }
 
 void VtkViewport::schedule_refresh() {
