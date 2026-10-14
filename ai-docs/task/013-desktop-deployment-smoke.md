@@ -99,16 +99,17 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：Windows package run 38516920066/job 115697697724 确认前次路径修复有效；新错误位于 SDK 许可证安装规则，`PANTA_SDK_PROVISION_DIR` 的 Windows 反斜杠使 `cmake_install.cmake` 把 `\a` 解析为非法转义。规范化 SDK install 源路径及 Qt SBOM 源路径，等待 Windows package 复验。
 - 2026-10-14：检查用户下载的 macOS `.app`，发现 Qt 部署签名后才安装 SDK licenses、provenance 与 Qt SBOM，导致 sealed resources 失效并使启动被系统终止。将 Qt 部署脚本安排在全部 install 资源之后，并在 package workflow 中运行 `codesign --verify --deep --strict`，等待打包 CI 验证。
 - 2026-10-14：独立只读评审检查完整 diff 及 native install 源路径，未发现遗漏的 Windows 反斜杠路径或文档验收问题；Windows package 复验仍待运行。
+- 2026-10-14：本机 `cargo format --check`、`cargo build --locked`、`cargo test --locked --workspace` 和清单 XML 结构检查通过；聚合测试的 75 项 native/QML CTest 全部通过。仓库聚合 `cargo lint` 因沙箱不允许 Clippy 锁服务绑定 TCP 而未启动，直接运行等价的 workspace Clippy 命令通过。LLVM PR #165285 已修正 LLD 内部 UAC 清单命名空间，仓库固定 LLVM 22.1.7 包含此修复；app 改用 Qt 6.11.2 官方 `QT_WINDOWS_APP_PROJECT_IDENTIFIER` 与 `QT_WINDOWS_APP_PROJECT_EXECUTION_LEVEL` 属性生成清单。Qt 自动清单还设置 `/MANIFEST:NO`，避免链接器重复生成默认清单。最终 PE 资源及 Windows 启动仍需在 Windows 复验。
 - 2026-10-14：将维护者提供的 Welcome tab CSS 视觉临时实现为 SVG，加入 app 窗口图标并替换 Welcome 页签上的文字 P。它作为临时品牌资源单独打包，不加入操作图标 symbol 清单。
 - 2026-10-14（Windows 启动失败根因链，本机复现并逐层修复）：
-  1. **SxS 清单**：Qt `qt_add_executable` 默认清单把 `requestedExecutionLevel` 的 `level`/`uiAccess` 写成 `ms_asmv2:` 前缀属性，SxS 判定缺少 `level`，exe 拒绝激活。新增仓库自持 `native/app/panta.exe.manifest`（asm.v2 默认命名空间内联属性，保留 longPathAware/supportedOS），并随 `qt_add_executable` 源传入——Qt 检测到 `.manifest` 源即跳过默认生成。
+  1. **SxS 清单**：Windows 事件与提取出的 exe 资源显示，最终嵌入清单把 `level`/`uiAccess` 变成带 `ms_asmv2:` 前缀的属性，SxS 因此报告 `level` 缺失。Qt 官方自动清单使用无前缀的 `requestedExecutionLevel` 属性，并允许通过 CMake 属性设置应用标识与执行级别；自动清单路径还禁用链接器默认清单生成。LLVM [issue #120394](https://github.com/llvm/llvm-project/issues/120394) 记录了 LLD 内部 UAC 清单与输入清单合并时的命名空间缺陷；[PR #165285](https://github.com/llvm/llvm-project/pull/165285) 将 LLD 内部 `trustInfo` 改为 asm.v3，issue 因此关闭。仓库固定的 LLVM 22.1.7 已包含此修复。当前通过 Qt 6.11.2 官方 `QT_WINDOWS_APP_PROJECT_IDENTIFIER` 与 `QT_WINDOWS_APP_PROJECT_EXECUTION_LEVEL` 属性生成清单；最终 exe 资源仍需在 Windows 验收中检查。
   2. **系统 DLL 阴影**：依赖解析路径未规范化（`C:\WINDOWS\system32/user32.dll`，CMP0207），而 CMake REGEX 区分大小写，写死的 `Windows` 在 `%windir%=C:\WINDOWS` 的机器上失配，239 个系统 DLL（含 d3d12/dxgi/urlmon）被复制进 bin 并在运行期阴影系统副本，导致 D3D12 适配器枚举失败后 SEH 崩溃。POST_EXCLUDE 改为由 `%windir%` 生成大小写精确、分隔符无关的前缀正则（单遍 `string(REGEX REPLACE)`）。
   3. **延迟导入**：CMake 4.x 原生 PE 解析器以**小写名**匹配 PRE_EXCLUDE（错误输出仍为原名）；Windows 11 的 shell32/urlmon/DMCmnUtils/Print.PrintSupport.Source 经延迟导入引用的 WDAC/证明可选组件（hvsifiletrust/wpaxholder/pdmutilities/azureattest*）在本机无文件，resolve 失败直接报错。按名称小写加入 PRE_EXCLUDE。
-  4. **Dawn 动态加载缺口**：`dxcompiler.dll`/`dxil.dll` 由 Dawn 运行期加载，依赖扫描不可见；从 Windows SDK redistributable（`Windows Kits/10/Redist/D3D/x64`）显式安装。OCCT/Netgen 由应用运行期按需加载，Windows 安装规则改为把 SDK bin 目录整目录随包（与开发部署语义一致）。
+  4. **Dawn 动态加载缺口**：`dxcompiler.dll`/`dxil.dll` 由 Dawn 运行期加载，依赖扫描不可见；从 Windows SDK redistributable（`Windows Kits/10/Redist/D3D/x64`）显式安装。当前桌面 app 尚未使用 OCCT/Netgen，安装包不复制未使用的 SDK DLL；开发裸启部署仍按任务 083 覆盖未来 consumer。
   验证：修复后包内无系统 DLL 阴影（保留 redist/d3dcompiler/dxc），`bin` 134 文件；解压一次启动真实窗口。诊断工具为临时脚本，未入库。
-- 2026-10-14：独立只读评审确认四项根因修复方向与实现正确、最终包实证有效；按评审意见收敛——dxcompiler/dxil 补入开发裸启 POST_BUILD（与安装包同源）、find_file 结果转正斜杠（防 `\W` 型转义事故复发）、windir 排除正则补尾随 `[/\\].*`、SDK bin 目录安装加 `FILES_MATCHING *.dll` 过滤。PRE_EXCLUDE 小写依赖 CMake 4.x 原生 PE 解析器行为（CMake REGEX 无 (?i)），保留注释说明。评审同时指出本包发布仍需一轮全平台 CI 与多机型复验。
-- 当前范围限制：桌面 app 实际只链接 VTK。OCCT 和 Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包；第一条验收保持未完成，需在桌面功能正式接入后补库加载验收。Linux 安装与实机验收也未完成；Windows 包最终发布仍需 CI 与多机型复验。
+- 2026-10-14：独立只读评审确认 DXC/DXIL 开发部署路径与 Windows 依赖排除逻辑，并指出 OCCT/Netgen 的运行期加载说明及 Windows 完成摘要不准确。随后将 DXC/DXIL 查找集中为安装与开发部署共用函数、安装包移除未使用的 OCCT/Netgen DLL，修正文档。整理后的 Windows 构建与包尚待复验。
+- 当前范围限制：桌面 app 实际链接 VTK；OCCT/Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包。Windows 11 x64 单机安装包已启动并显示真实窗口；本次 manifest/部署整理后的 Windows 包、Linux 安装与实机验收仍待验证。桌面 app 的 OCCT/Netgen 加载验收需待对应 consumer 接入后完成。
 
 ## 完成摘要
 
-部分完成：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收。OCCT/Netgen 尚无桌面 app consumer，Windows/Linux 尚未实机验收；任务保持 in-progress，后续接入这些库或补齐平台证据后再评估完成。
+部分完成：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收；Windows 11 x64 的单机包启动也已通过。OCCT/Netgen 尚无桌面 app consumer，Linux 尚未实机验收，本次 Windows 调整仍待新包复验；任务保持 in-progress。

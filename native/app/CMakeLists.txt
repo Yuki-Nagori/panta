@@ -1,9 +1,13 @@
 # 桌面入口（任务 005）：链接 QML 模块与 ViewModel 模块。
-# panta.exe.manifest 必须随目标源传入：Qt 检测到 .manifest 源即跳过默认
-# 清单生成（QtPublicWindowsHelpers.cmake），默认模板的 ms_asmv2: 前缀属性
-# 会让 Windows SxS 拒绝激活（见该文件头注）。
-qt_add_executable(panta_native_app main.cpp panta.exe.manifest)
+qt_add_executable(panta_native_app main.cpp)
 set_target_properties(panta_native_app PROPERTIES OUTPUT_NAME panta EXPORT_NAME native-app)
+if(WIN32)
+  # Qt 6.11.1+ 负责生成清单及 Windows 兼容/长路径声明，并禁用链接器默认清单。
+  # 官方属性只覆盖应用标识和 UAC 级别，避免维护重复的手写 manifest。
+  set_target_properties(
+    panta_native_app PROPERTIES QT_WINDOWS_APP_PROJECT_IDENTIFIER "com.yuki-nagori.panta"
+                                QT_WINDOWS_APP_PROJECT_EXECUTION_LEVEL "asInvoker")
+endif()
 if(APPLE)
   # Qt 的 macOS 安装部署入口要求标准 .app 布局；开发期也从 bundle 内启动，
   # 让 cargo run 与安装后启动使用相同的可执行文件相对资源结构。
@@ -40,8 +44,10 @@ elseif(WIN32)
   # Windows 根路径中的反斜杠被解释成 CMake 转义序列。
   string(REPLACE "\\" "/" PANTA_WINDOWS_SYSTEM_ROOT "$ENV{windir}")
   set(PANTA_D3DCOMPILER_47_DLL "${PANTA_WINDOWS_SYSTEM_ROOT}/System32/d3dcompiler_47.dll")
-  panta_deploy_windows_app_runtime(panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml"
-                                   "${PANTA_D3DCOMPILER_47_DLL}")
+  panta_find_windows_dxc_runtime(_panta_dxcompiler_dll _panta_dxil_dll)
+  panta_deploy_windows_app_runtime(
+    panta_native_app "${CMAKE_CURRENT_SOURCE_DIR}/../../qml" "${PANTA_D3DCOMPILER_47_DLL}"
+    "${_panta_dxcompiler_dll}" "${_panta_dxil_dll}")
 endif()
 if(PANTA_ENABLE_BRIDGE_MODULE)
   # main.cpp 的进程级 crash handler 已在上方链接 FFI；这里仅追加 Bridge/VTK
@@ -180,39 +186,12 @@ elseif(WIN32)
   # 失败并 SEH 崩溃。二者随 Windows SDK  redistributable 分发，不进 System32。
   # find_file 返回本机反斜杠路径，先转正斜杠，避免生成安装脚本时被当作
   # 转义序列（013 记录过 \W/\a 解析事故）。
-  find_file(
-    PANTA_DXC_COMPILER_DLL dxcompiler.dll
-    PATHS "$ENV{WindowsSdkDir}Redist/D3D/x64"
-    "C:/Program Files (x86)/Windows Kits/10/Redist/D3D/x64"
-    NO_DEFAULT_PATH
-    REQUIRED)
-  find_file(
-    PANTA_DXIL_DLL dxil.dll
-    PATHS "$ENV{WindowsSdkDir}Redist/D3D/x64"
-    "C:/Program Files (x86)/Windows Kits/10/Redist/D3D/x64"
-    NO_DEFAULT_PATH
-    REQUIRED)
-  foreach(_panta_dx_dll IN ITEMS PANTA_DXC_COMPILER_DLL PANTA_DXIL_DLL)
-    string(REPLACE "\\" "/" ${_panta_dx_dll} "${${_panta_dx_dll}}")
-  endforeach()
+  # Dawn 在运行期动态加载这两个 SDK redistributable；路径查找与开发期部署
+  # 共用 windows-app-runtime-deployment.cmake 中的实现。
   install(
-    FILES "${PANTA_DXC_COMPILER_DLL}" "${PANTA_DXIL_DLL}"
+    FILES "${_panta_dxcompiler_dll}" "${_panta_dxil_dll}"
     DESTINATION bin
     COMPONENT Runtime)
-  # OCCT/Netgen 由应用运行期按需加载（依赖扫描看不到），与开发部署语义一致
-  # 地整目录随包；只取 DLL，防止 SDK 未来混入 pdb 或工具。QML 部署脚本在
-  # 所有 bundle 资源安装之后执行（见下）。
-  foreach(_panta_sdk_dir IN LISTS PANTA_RUNTIME_DEPENDENCY_DIRS)
-    cmake_path(GET _panta_sdk_dir FILENAME _panta_sdk_leaf)
-    if(_panta_sdk_leaf STREQUAL "bin")
-      install(
-        DIRECTORY "${_panta_sdk_dir}/"
-        DESTINATION bin
-        COMPONENT Runtime
-        FILES_MATCHING
-        PATTERN "*.dll")
-    endif()
-  endforeach()
 else()
   install(
     RUNTIME_DEPENDENCY_SET
