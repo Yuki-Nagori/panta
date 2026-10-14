@@ -105,10 +105,11 @@ jobs:
             throw "预期唯一的 vs_link_exe 子命令，实际找到 $($linkInvocations.Count) 个。"
           }
           $linkInvocation = $linkInvocations[0]
+          Write-Host "Windows vs_link_exe 子命令：$linkInvocation"
           $normalizedLinkInvocation = $linkInvocation.Replace('/', '\')
           if ($normalizedLinkInvocation.Contains($normalizedExpectedManifest) -or
             $linkInvocation -match '(?i)(--manifests|/MANIFESTINPUT)') {
-            throw 'Qt manifest 仍作为 /MANIFESTINPUT 传给链接器，无法绕过 lld-link 的清单合并。'
+            throw "Qt manifest 仍作为链接器输入，无法绕过 lld-link 的清单合并：$linkInvocation"
           }
           $embedCommands = @(
             $commands | Where-Object {
