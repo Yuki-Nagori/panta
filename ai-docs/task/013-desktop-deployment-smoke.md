@@ -116,6 +116,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：PR #31 的 package run 38559664491 仍出现带 `ms_asmv2:` 前缀的 PE 属性。CMake 的 `vs_link_exe` 在该链接器版本下将源 manifest 作为 `/MANIFESTINPUT` 交给链接器，未调用 `CMAKE_MT`；因此仅切换 SDK `mt.exe` 无效。改为从链接目标移除生成的 manifest 输入，由 SDK `mt.exe` 在 `POST_BUILD` 嵌入，并将 manifest 加入 `LINK_DEPENDS` 确保清单改变时重新嵌入。独立评审发现 workflow 需唯一提取实际 `vs_link_exe` 子命令，避免误判 post-link 命令并漏检链接参数；已修正，待复核与新的 package run。
 - 2026-10-14：PR #31 的 package run 38561118158 与 38561832999 中，Windows Release 构建成功，但 manifest link-input 断言失败。run 38561832999 的日志显示 `vs_link_exe` 命令没有实际 manifest 输入，只有空的 `--manifests` 参数，并保留 `/MANIFEST:NO`；失败来自断言逻辑，后续改为明确检查生成的 manifest 路径、`/MANIFESTINPUT` 与 `/MANIFEST:NO`。
 - 2026-10-14：PR #31 package run 38562885901 的 Windows、macOS arm64、Linux x86_64 package jobs 全部成功。Windows 链接阶段未接收 Qt manifest，保留 `/MANIFEST:NO`；链接后由 Windows SDK `mt.exe` 嵌入 Qt 生成的清单。package 检查从最终 PE 资源提取清单，确认 `requestedExecutionLevel` 属性无命名空间前缀且值为 `asInvoker` / `false`。PR 按用户要求保持未合并。
+- 2026-10-14：PR #31 package run 38564810367 验证 manifest 链路精简后的三平台构建全部成功。CMake 改用项目专用 `PANTA_WINDOWS_MANIFEST_TOOL`，不再覆盖全局 `CMAKE_MT`；workflow 从构建目录固定位置读取 Qt manifest，并复用 RC 同一 SDK 的 `mt.exe` 做 PE 提取。移除未命中的源码清单清理分支及对 build-script 日志文案的依赖。用户确认下载的 Windows package 可正常使用。
 - 当前范围限制：桌面 app 实际链接 VTK；OCCT/Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包。Windows 11 x64 单机安装包已启动并显示真实窗口；PR #31 当前 Windows manifest 修复已通过 GitHub Actions package 验证。Linux 安装与实机验收仍待验证；桌面 app 的 OCCT/Netgen 加载验收需待对应 consumer 接入后完成。
 
 ## 完成摘要
