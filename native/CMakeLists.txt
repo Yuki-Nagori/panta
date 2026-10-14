@@ -24,7 +24,7 @@ option(PANTA_USE_SYSTEM_TOOLS "Use explicitly selected host tools instead of Car
 set(PANTA_LLVM_VERSION
     ""
     CACHE STRING "Expected managed LLVM version")
-if(APPLE AND PANTA_ENABLE_BRIDGE_MODULE)
+if(APPLE)
   enable_language(OBJCXX)
 endif()
 

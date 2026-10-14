@@ -8,7 +8,6 @@ ApplicationWindow {
     minimumHeight: Theme.windowMinimumHeight
     visible: true
     visibility: Window.Maximized
-    title: qsTr("panta")
     color: Theme.colorBackground
 
     ColumnLayout {

@@ -15,16 +15,7 @@ Rectangle {
     signal logsRequested
 
     implicitHeight: Theme.ribbonHeight
-    gradient: Gradient {
-        GradientStop {
-            position: 0
-            color: Theme.colorRibbonTop
-        }
-        GradientStop {
-            position: 1
-            color: Theme.colorRibbonBottom
-        }
-    }
+    color: Theme.colorRibbon
 
     HorizontalToolStrip {
         id: ribbonStrip

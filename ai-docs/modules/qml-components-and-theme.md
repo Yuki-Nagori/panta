@@ -12,7 +12,7 @@
 
 029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。
 
-主窗口目前仍使用独立系统标题栏。[051 无边框外观与一体化窗口标题栏](../task/051-integrated-window-titlebar.md) 规划将现有顶部按钮融入标题栏，优先验证 Qt 扩展客户区与原生窗口控制，平台差异封装于 C++ 窗口适配层；尚未实现，不依赖不存在的 `QWindow::setTitleBar(QWidget*)`。
+主窗口标题栏融合由 [051 无边框外观与一体化窗口标题栏](../task/051-integrated-window-titlebar.md) 推进：当前使用 Qt 扩展客户区 flags，macOS 查询原生标题栏按钮矩形并对称避让，Windows/Linux 保留系统窗口控制；跨平台真实窗口验收仍未完成。`WindowChromeMetrics` 属于 Shell 平台适配，只提供原生窗口几何，不承载业务行为。该方案不依赖不存在的 `QWindow::setTitleBar(QWidget*)`。
 
 ## 页面设计工作流：HTML 先行复刻
 
@@ -34,8 +34,8 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 | 层次 | 位置 | 组件 |
 |---|---|---|
 | 主题契约 | `qml/Themes/Theme.qml` | 唯一 QML token 门面：颜色、间距、字号、条带高度、控件/图标尺寸、圆角、线宽、栏宽比例、窗口最小尺寸 |
-| 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface`、`ThemedButton`、`ThemedNumberField`、`MenuTabButton`、`ThemedCheckBox`、`ThemedRadioButton`、`ThemedComboBox`、`CheckIndicator` |
-| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（标题条渐变分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`DocumentTabBar`（130px 视口文档页签：关闭、凹弧过渡、拖拽重排，080）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭）、`DialogWindow`、`DialogFrame`、`DialogButtonRow`、`FormSection` |
+| 原子组件 | `qml/Components/Atoms/` | `ThemedLabel`、`ThemedToolButton`（icon/弱化后缀/caret/包边/选中态/禁用弱化）、`ChromeToolButton`（标题栏直角与灰色悬停/按压态）、`ThemedTextField`（主题输入和校验态）、`ThemedIcon`（模块内 SVG）、`PanelSurface`、`ThemedButton`、`ThemedNumberField`、`MenuTabButton`、`ThemedCheckBox`、`ThemedRadioButton`、`ThemedComboBox`、`CheckIndicator` |
+| 组合组件 | `qml/Components/Composites/` | `ToolGroup`（浅灰纯色标题工具分组）、`RibbonTile`、`RibbonGroup`（白底工具分组 / 底部组名）、`RibbonContent`（分组 / 工具模型渲染）、`HorizontalToolStrip`（横向滚动 / 焦点显露）、`PanelTabBar`（96px 等宽分段切换）、`DocumentTabBar`（130px 视口文档页签：关闭、凹弧过渡、拖拽重排，080）、`PaneCloseButton`、`DialogTitleBar`（无边框窗口拖动/关闭）、`DialogWindow`、`DialogFrame`、`DialogButtonRow`、`FormSection` |
 | 业务界面 | `qml/Panels/`、`qml/Dialogs/` | `TopChromePanel`、`RibbonPanel`、`SidebarPanel`、`LayersPanel`、`PlaceholderPanel`（无 Bridge 变体用）；Dialogs 持有编辑草稿、上下文快照、校验反馈及保存交互 |
 | Ribbon 页签 | `qml/Panels/Ribbon/` | `HomeRibbon`、`ResultsRibbon`、`StartLearnRibbon`：各自的工具定义、启用条件与命令映射 |
 | 页面与外壳 | `qml/App.qml`、`AppNoBridge.qml` | 布局、导航、面板装配与主题选择入口 |
@@ -46,7 +46,7 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 固定控件通过 implicit size 提供已确认的 Theme 默认尺寸；内容驱动的控件才按文本及输入参数计算，外层布局决定实际分配空间。布局拥有尺寸时，组件不要同时强制 anchors 和固定 width/height。工作区先按比例和最小值确定左栏宽度，再以 anchors 把余下空间分配给 VTK 列。点击仅发语义信号，面板再调用 ViewModel。
 
-`ThemedToolButton` 的正文与弱化后缀跟随按钮 `font.pixelSize`，默认使用 `Theme.fontBody`。Layers Dock 的按钮由 `LayersPanel` 按统一尺寸横向排列，目前只发出语义动作信号，不声明图层行为。标题工具分组保留内容所需宽度，中央标题可省略；分组变宽时同步扩展滚动范围，并在布局后重新显露当前焦点。
+`ThemedToolButton` 的正文与弱化后缀跟随按钮 `font.pixelSize`，默认使用 `Theme.fontBody`。Layers Dock 的按钮由 `LayersPanel` 按统一尺寸横向排列，目前只发出语义动作信号，不声明图层行为。标题工具分组保留内容所需宽度，中央标题可省略；分组变宽时同步扩展滚动范围，并在布局后重新显露当前焦点。顶栏工具按钮使用中性灰悬停/按压反馈，状态颜色即时切换，避免动画反复触发时闪烁。
 
 业务对话框使用 `DialogTitleBar` 组合组件时，窗口自身设置 `Qt.FramelessWindowHint`，标题栏通过 `QWindow::startSystemMove()` 发起平台移动，受限平台再使用逻辑坐标回退；关闭按钮只发组合组件信号。窗口的模态与居中由 `DialogWindow` 提供，标题和内容布局由 `DialogFrame` 装配；打开条件、关闭守卫与业务命令留在具体对话框。
 
@@ -54,7 +54,7 @@ panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 图标遵循 [SVG 图标设计规范](../standards/icons.md)：`qml/icons/<symbol-id>.svg` 与 `shell.js` 的正式 symbol 一一对应，保留源 viewBox、比例和颜色，并通过 `qt_add_resources` 登记到 `/qt/qml/Panta/Shell/icons/`。`ThemedIcon` 的 `preserveSourceColors` 显式选择加载方式：彩色资源直接从 qrc 加载；单色 utility glyph 由 `panta-icons` provider 使用 qtsvg 渲染，再按 `ThemedIcon.color` 着色。
 
-新增 Theme token 时按 `Theme.qml` 内的色彩、字体、通用间距与图标、形状与边框、通用控件、Shell、Ribbon、侧栏、文档页签、表单、日志、交互、禁用状态和各窗口约束分组归位，不在文件末尾另起重复分类。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白渐变。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
+新增 Theme token 时按 `Theme.qml` 内的色彩、字体、通用间距与图标、形状与边框、通用控件、Shell、Ribbon、侧栏、文档页签、表单、日志、交互、禁用状态和各窗口约束分组归位，不在文件末尾另起重复分类。052 同步修正标题工具分组、搜索入口、32px 面板工具条；060 按已验收的 059 底稿将 Ribbon 改为 96px 分组条带：工具最小宽 56px、高 68px，图标 26px、文字 10px，组名栏高 22px，工具区白底、右侧空白使用单色深灰背景。标题、菜单与 Ribbon 共用滚动 / 键盘焦点显露规则；分段页签保持等宽滑块，不因加粗改变尺寸。
 
 等宽字体由 Shell 模块的 C++ `PlatformFonts` 单例查询系统 FixedFont 的实际字体族，Theme 保留唯一视觉访问入口；不使用可能缺失的 Monospace 名称，也不内置字体资产。Shell 是模块名而非字体名；静态消费者导入 Shell 插件以保留 C++ 类型注册，Theme 显式导入 `Panta.Shell` 后读取单例。当前 macOS 环境查询结果为 Menlo，其他平台按系统配置解析。
 

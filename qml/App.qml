@@ -1,5 +1,4 @@
 // Shell 页面装配；页面持有 ViewModel 和对话框，面板只发语义命令信号。
-// 窗口控制由系统标题栏承接。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
@@ -10,19 +9,26 @@ ApplicationWindow {
     id: shellWindow
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
+    // 将应用顶栏绘入原生标题栏客户区，保留系统提供的窗口控制。
+    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+    topPadding: 0
+    leftPadding: 0
+    rightPadding: 0
     visible: true
     visibility: Window.Maximized
-    title: qsTr("panta")
     color: Theme.colorPanel
     onClosing: event => {
         if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
             event.accepted = false;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
+    readonly property real nativeControlsLeftInset: WindowChromeMetrics.leadingSystemControlsInset
     readonly property bool layersDockShown: layersPanel.dockOpen
     readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
     property string activeRibbonTab: "start-learn"
+
+    Component.onCompleted: WindowChromeMetrics.observeWindow(shellWindow)
 
     function selectRibbonTab(tab) {
         // 工程工具仅在打开工程后可达，开始页始终可达。
@@ -128,10 +134,13 @@ ApplicationWindow {
         spacing: 0
 
         TopChromePanel {
+            objectName: "titleChromePanel"
             Layout.fillWidth: true
             caption: shellWindow.projectOpen ? "panta 2027 · " + projectModel.currentName : viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
             projectOpen: shellWindow.projectOpen
             activeRibbonTab: shellWindow.activeRibbonTab
+            nativeControlsLeftInset: shellWindow.nativeControlsLeftInset
+            nativeControlsRightInset: shellWindow.SafeArea.margins.right
             onMenuRequested: key => shellWindow.selectRibbonTab(key)
         }
 
