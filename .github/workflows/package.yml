@@ -108,7 +108,11 @@ jobs:
           if ($manifestPath -ne $expectedManifest -or -not (Test-Path -LiteralPath $manifestPath)) {
             throw "链接命令引用的 manifest 不存在或路径错误：$manifestPath；预期：$expectedManifest"
           }
+          Write-Host "Windows 链接命令：$($linkCommands[0])"
           Write-Host "Windows 链接 manifest：$manifestPath"
+          [xml]$sourceManifest = Get-Content -Raw -LiteralPath $manifestPath
+          Write-Host 'Qt 生成的源 manifest：'
+          Write-Host $sourceManifest.OuterXml
 
       - name: Create relocatable installation tree
         shell: bash
@@ -174,7 +178,10 @@ jobs:
             $uiAccess.Value -ne 'false'
           )
           if ($hasInvalidExecutionLevel) {
-            throw "安装包 PE manifest 的 requestedExecutionLevel 不符合标准：$manifestPath"
+            $actualAttributes = @($executionLevel.Attributes | ForEach-Object {
+              "$($_.Name) {$($_.NamespaceURI)}='$($_.Value)'"
+            }) -join ', '
+            throw "安装包 PE manifest 的 requestedExecutionLevel 不符合标准：$($executionLevel.OuterXml)；属性：$actualAttributes；文件：$manifestPath"
           }
           Write-Host "PE manifest valid; package SHA256: $packagedHash"
 
