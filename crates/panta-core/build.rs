@@ -1,12 +1,8 @@
-//! 生成 `fsm/` 下有限状态机（FSM）声明的 Rust 转移元数据（073）。
-//!
-//! 输入为目录发现的 `fsm/*.pa` 集合：文件 stem 必须与状态机 `name` 一致；
-//! 目录为空、输入缺失、校验失败或生成失败都以 panic 中止构建，不回退到
-//! 残留的旧生成文件。
+//! 从 `fsm/` 声明生成 Rust 转移元数据（073）。
 
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR")
@@ -14,57 +10,87 @@ fn main() {
     let fsm_dir = PathBuf::from(manifest_dir).join("fsm");
     println!("cargo:rerun-if-changed={}", fsm_dir.display());
 
-    let inputs = collect_fsm_inputs(&fsm_dir);
-    if inputs.is_empty() {
-        panic!("no fsm inputs found under {}", fsm_dir.display());
-    }
     let out_dir = env::var("OUT_DIR").unwrap_or_else(|error| panic!("OUT_DIR: {error}"));
-    let fsm_out_dir = PathBuf::from(out_dir).join("fsm");
-    // 先整目录重建生成集合：从目录发现的输入被删除时，旧输出不再残留。
-    let _ = fs::remove_dir_all(&fsm_out_dir);
-    fs::create_dir_all(&fsm_out_dir)
-        .unwrap_or_else(|error| panic!("create {}: {error}", fsm_out_dir.display()));
+    generate_outputs(&fsm_dir, Path::new(&out_dir))
+        .unwrap_or_else(|error| panic!("generate FSM metadata: {error}"));
+}
 
+/// 从当前输入集合重新生成输出；任何失败都会先移除上一轮生成物。
+pub(crate) fn generate_outputs(fsm_dir: &Path, out_dir: &Path) -> Result<(), String> {
+    let fsm_out_dir = out_dir.join("fsm");
+    if fsm_out_dir.exists() {
+        fs::remove_dir_all(&fsm_out_dir)
+            .map_err(|error| format!("remove {}: {error}", fsm_out_dir.display()))?;
+    }
+    fs::create_dir_all(&fsm_out_dir)
+        .map_err(|error| format!("create {}: {error}", fsm_out_dir.display()))?;
+
+    let inputs = collect_fsm_inputs(fsm_dir)?;
+    if inputs.is_empty() {
+        return Err(format!("no fsm inputs found under {}", fsm_dir.display()));
+    }
+
+    let mut output_names = Vec::with_capacity(inputs.len());
+    let mut documents = Vec::with_capacity(inputs.len());
     for input in inputs {
         println!("cargo:rerun-if-changed={}", input.display());
         let stem = input
             .file_stem()
             .and_then(|value| value.to_str())
-            .unwrap_or_else(|| panic!("fsm input has no file stem: {}", input.display()));
+            .ok_or_else(|| format!("fsm input has no file stem: {}", input.display()))?;
         let source = fs::read_to_string(&input)
-            .unwrap_or_else(|error| panic!("read {}: {error}", input.display()));
+            .map_err(|error| format!("read {}: {error}", input.display()))?;
         let document = panta_dsl_core::fsm::parse(&source)
-            .unwrap_or_else(|diagnostics| panic!("invalid fsm {}: {diagnostics}", input.display()));
+            .map_err(|diagnostics| format!("invalid fsm {}: {diagnostics}", input.display()))?;
         if document.name != stem {
-            panic!(
+            return Err(format!(
                 "fsm file stem '{stem}' must match fsm name '{}'",
                 document.name
-            );
+            ));
         }
-        let code = panta_dsl_core::fsm::generate_rust(&document);
-        let target = fsm_out_dir.join(format!(
-            "{}.rs",
-            panta_dsl_core::fsm::snake_case(&document.name)
-        ));
-        fs::write(&target, &code)
-            .unwrap_or_else(|error| panic!("write {}: {error}", target.display()));
+
+        let output_name = format!("{}.rs", panta_dsl_core::fsm::snake_case(&document.name));
+        register_output_name(&mut output_names, output_name)?;
+        documents.push((input, document));
     }
+
+    for ((input, document), output_name) in documents.into_iter().zip(output_names) {
+        let target = fsm_out_dir.join(output_name);
+        let code = panta_dsl_core::fsm::generate_rust(&document);
+        fs::write(&target, code).map_err(|error| {
+            format!(
+                "write {} (from {}): {error}",
+                target.display(),
+                input.display()
+            )
+        })?;
+    }
+
+    Ok(())
 }
 
-/// 枚举 `fsm/*.pa`：从目录发现的输入集合，确定性排序保证生成顺序稳定。
-fn collect_fsm_inputs(fsm_dir: &std::path::Path) -> Vec<PathBuf> {
+/// 注册输出文件名，防止多个声明覆盖同一个生成文件。
+pub(crate) fn register_output_name(names: &mut Vec<String>, name: String) -> Result<(), String> {
+    if names.iter().any(|existing| existing == &name) {
+        return Err(format!("multiple fsm inputs map to output '{name}'"));
+    }
+    names.push(name);
+    Ok(())
+}
+
+/// 枚举 `fsm/*.pa`：目录变化负责增删追踪，文件变化负责内容重建。
+fn collect_fsm_inputs(fsm_dir: &Path) -> Result<Vec<PathBuf>, String> {
     let entries =
-        fs::read_dir(fsm_dir).unwrap_or_else(|error| panic!("read {}: {error}", fsm_dir.display()));
+        fs::read_dir(fsm_dir).map_err(|error| format!("read {}: {error}", fsm_dir.display()))?;
     let mut inputs = Vec::new();
     for entry in entries {
         let path = entry
-            .unwrap_or_else(|error| panic!("read fsm entry: {error}"))
+            .map_err(|error| format!("read fsm entry: {error}"))?
             .path();
-        let is_fsm_input = path.extension().and_then(|value| value.to_str()) == Some("pa");
-        if is_fsm_input {
+        if path.extension().and_then(|value| value.to_str()) == Some("pa") {
             inputs.push(path);
         }
     }
     inputs.sort();
-    inputs
+    Ok(inputs)
 }
