@@ -15,7 +15,9 @@ if(WIN32)
   if(NOT EXISTS "${_panta_windows_mt}")
     message(FATAL_ERROR "Windows SDK manifest 工具不存在：${_panta_windows_mt}")
   endif()
-  set(CMAKE_MT "${_panta_windows_mt}" CACHE FILEPATH "Windows SDK manifest tool" FORCE)
+  set(CMAKE_MT
+      "${_panta_windows_mt}"
+      CACHE FILEPATH "Windows SDK manifest tool" FORCE)
   set(CMAKE_MT "${_panta_windows_mt}")
   message(STATUS "Windows manifest 工具：${CMAKE_MT}")
 endif()
