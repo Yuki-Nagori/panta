@@ -1,11 +1,11 @@
 # 081 — QML 视觉语言与图标体系统一
 
-- 状态：in-progress
+- 状态：deferred
 - 阶段：应用平台扩展
 - 依赖：[029](029-qml-component-library.md)、[050](050-qml-html-page-replica.md)、[069](069-project-docks-review-and-ablation.md)、[078](078-qml-performance-benchmark-policy.md)、[080](080-qml-viewport-document-tabs.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-09
+- 创建 / 更新：2026-09-24 / 2026-10-14
 
 ## 目标与背景
 
@@ -145,4 +145,14 @@
 
 ## 完成摘要
 
-已实施图标资源迁移 / 来源审计、引用及 Qt 加载一致性检查、旧 SVG 清理与图标 CPU 测量。剩余全局 Theme / HTML / QML 视觉对照、高对比与键盘 / 无障碍、1.0 / 1.5 / 2.0 DPR 和其余组件性能映射；不能仅凭 CI 或现有局部 GUI / 基准关闭。2026-10-09 复查见 [101](101-active-task-ci-acceptance.md#2026-10-09-当前复查)，保持 in-progress。
+已实施图标资源迁移 / 来源审计、引用及 Qt 加载一致性检查、旧 SVG 清理与图标 CPU 测量。2026-10-14 为 Sidebar 页签和工程任务内容补充行为测试并验证聚合通过。全局 Theme / HTML / QML 视觉对照、高对比与键盘 / 无障碍、1.0 / 1.5 / 2.0 DPR 和其余组件性能映射尚未完成，按维护者要求暂缓；任务状态改为 deferred，恢复时继续未勾选的验收项。2026-10-09 复查见 [101](101-active-task-ci-acceptance.md#2026-10-09-当前复查)。
+
+## 本轮继续范围（2026-10-14）
+
+- 核对已有 HTML 参考与 QML 的 Tasks、Tools、Shared Views 页面状态和说明；HTML 参考已具备三个互斥页签及 Tools / Shared Views 信息框，本轮未发现需要修正的差异。
+- 为侧栏页面增加 QtTest 行为覆盖：默认 Tasks 页、空工程入口、工程打开后的 Part 与 Plan tasks、Tools / Shared Views 信息内容及页签互斥切换。
+- 本轮完成 Sidebar 行为测试及 HTML 文案核对；全局 Theme 对照、多 DPI / 无障碍 GUI 验收和其他性能场景按维护者要求 deferred，保留为恢复任务时的剩余范围。
+
+| 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
+|---|---|---|---|
+| 2026-10-14 | macOS：Sidebar 页签 QtTest；`cargo format --check`；`cargo test --locked --workspace` | 页面可见状态互斥，空工程 / 已打开工程内容符合现有 QML，HTML 信息文案一致；格式与聚合测试通过 | 新增 `sidebar_tabs_match_empty_and_open_project_states`，覆盖默认 Tasks、空工程入口、Tools / Shared Views 信息与文案、三页互斥、打开工程后 Part 和 Plan tasks。定向 CTest 通过；完整聚合通过，CTest 75/75、Rust 单测和文档测试通过。HTML 原有模板已满足本轮对照，无需改动。全局视觉、多 DPI、无障碍 GUI 与剩余性能验收仍未完成。 |

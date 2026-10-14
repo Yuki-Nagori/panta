@@ -747,6 +747,78 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(!mesh_tool->property("visible").toBool());
     }
 
+    void sidebar_tabs_match_empty_and_open_project_states() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QQuickWindow window;
+        QObject owner;
+        auto* panel = qobject_cast<QQuickItem*>(create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Panels/SidebarPanel.qml"), owner));
+        QVERIFY(panel != nullptr);
+        panel->setWidth(420);
+        panel->setHeight(520);
+        panel->setParentItem(window.contentItem());
+        window.resize(640, 600);
+        window.show();
+        QTRY_VERIFY(panel->isVisible());
+
+        auto* tabs = panel->findChild<QObject*>(QStringLiteral("panelTabs"));
+        auto* tasks = visual_item(panel, QStringLiteral("projectTasksPage"));
+        auto* tools = panel->findChild<QObject*>(QStringLiteral("toolsInformation"));
+        auto* shared = panel->findChild<QObject*>(QStringLiteral("sharedViewsInformation"));
+        QVERIFY(tabs && tasks && tools && shared);
+        QCOMPARE(tabs->property("currentIndex").toInt(), 0);
+        QVERIFY(tasks->property("visible").toBool());
+        QVERIFY(!tools->property("visible").toBool());
+        QVERIFY(!shared->property("visible").toBool());
+
+        auto* openProject = visual_item(panel, QStringLiteral("openProjectTaskAction"));
+        auto* newProject = visual_item(panel, QStringLiteral("newProjectTaskAction"));
+        auto* projectEntry = visual_item(panel, QStringLiteral("projectTaskItem"));
+        QVERIFY(openProject && newProject && projectEntry);
+        QVERIFY(openProject->property("visible").toBool());
+        QVERIFY(newProject->property("visible").toBool());
+        QVERIFY(!projectEntry->property("visible").toBool());
+
+        tabs->setProperty("currentIndex", 1);
+        QTRY_VERIFY(tools->property("visible").toBool());
+        QVERIFY(!tasks->property("visible").toBool());
+        QVERIFY(!shared->property("visible").toBool());
+        QCOMPARE(tools->property("titleText").toString(), QStringLiteral("Information"));
+        const QStringList toolMessages{
+            QStringLiteral("Use the tools above to access each tool."),
+            QStringLiteral("Open a tool's help to learn how to use it."),
+            QStringLiteral("Hold Ctrl while clicking to select multiple entities.")};
+        QCOMPARE(tools->property("messages").toStringList(), toolMessages);
+
+        tabs->setProperty("currentIndex", 2);
+        QTRY_VERIFY(shared->property("visible").toBool());
+        QVERIFY(!tasks->property("visible").toBool());
+        QVERIFY(!tools->property("visible").toBool());
+        QCOMPARE(shared->property("titleText").toString(), QStringLiteral("Information"));
+        QCOMPARE(shared->property("messages").toStringList(),
+                 QStringList{
+                     QStringLiteral("Access Shared Views from the Shared panel on the Home tab.")});
+
+        tabs->setProperty("currentIndex", 0);
+        panel->setProperty("projectOpen", true);
+        panel->setProperty("projectName", QStringLiteral("sample"));
+        panel->setProperty("importedPartNames", QStringList{QStringLiteral("part.stl")});
+        panel->setProperty("importedPartIds", QStringList{QStringLiteral("import-1")});
+        QTRY_VERIFY(projectEntry->property("visible").toBool());
+        QVERIFY(!openProject->property("visible").toBool());
+        QVERIFY(!newProject->property("visible").toBool());
+
+        QVERIFY(tasks->property("visible").toBool());
+        QVERIFY(!tools->property("visible").toBool());
+        QVERIFY(!shared->property("visible").toBool());
+        auto* planTask = visual_item(panel, QStringLiteral("planTaskItem_imported-part"));
+        auto* logsTask = visual_item(panel, QStringLiteral("planTaskAction_logs"));
+        QVERIFY(planTask && logsTask);
+        QVERIFY(planTask->property("visible").toBool());
+        QVERIFY(logsTask->property("visible").toBool());
+    }
+
     void mesh_tool_scrolls_in_narrow_dock() {
         QQmlEngine engine;
         panta::install_icon_provider(engine);
