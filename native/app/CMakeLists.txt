@@ -136,6 +136,11 @@ elseif(WIN32)
     panta_native_runtime_dependencies
     DIRECTORIES
     ${PANTA_RUNTIME_DEPENDENCY_DIRS}
+    # Windows API Set 是由系统加载器映射的虚拟 DLL，不对应可复制的文件。
+    # 在解析前排除它们，避免 CMake 将 api-ms-win-* / ext-ms-* 报为缺失依赖。
+    PRE_EXCLUDE_REGEXES
+    "^api-ms-.*\\.dll$"
+    "^ext-ms-.*\\.dll$"
     POST_EXCLUDE_REGEXES
     "^[A-Za-z]:[/\\\\]Windows[/\\\\].*"
     "^${QT_STAGING}/.*"
