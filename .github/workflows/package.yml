@@ -1,4 +1,4 @@
-# 手动生成三平台可搬迁测试包；不创建正式 Release。
+# 手动生成三平台可搬迁测试包；单个平台归档原样作为 artifact 上传，不创建正式 Release。
 name: Package desktop builds
 
 on:
@@ -93,9 +93,9 @@ jobs:
           tar -czf "$ARCHIVE_DIR/${{ matrix.archive }}" -C "$PACKAGE_DIR" .
 
       - name: Upload portable test package
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
-          name: panta-${{ matrix.platform }}
           path: target/package/archive/${{ matrix.archive }}
+          archive: false
           if-no-files-found: error
           retention-days: 1

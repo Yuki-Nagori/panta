@@ -77,6 +77,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 | 2026-10-14 | macOS；`cmake -P /tmp/panta-install-path-check.cmake`，使用 Windows 风格 SDK/Qt 路径生成并解析 CMake 安装脚本 | 通过；规范化后生成脚本中的路径为正斜杠，CMake 可正常解析。 |
 | 2026-10-14 | macOS；`cmake --install target/native/debug --prefix /tmp/panta-package-signature-check`，随后运行 `codesign --verify --deep --strict /tmp/panta-package-signature-check/panta.app` | 通过；重新生成的安装脚本先安装 licenses、provenance 与 SBOM，最后执行 Qt 部署；本地安装 bundle 的签名封印有效。 |
 | 2026-10-14 | 仓库根目录；`cargo test --locked --workspace` | 通过；Rust workspace、native CTest（75/75）与 QML 聚合测试通过。首次尝试因本地 OCCT SDK 缓存摘要不符触发重下载，受 DNS 限制未完成；重试后验证通过。 |
+| 2026-10-14 | GitHub Actions `Package desktop builds`（run 38518883590） | macOS arm64、Windows x86_64、Linux x86_64 均成功；下载 artifact 后发现平台归档又被 `upload-artifact` 包装，产生外层 ZIP。改为 `actions/upload-artifact@v7` 的单文件 `archive: false` 模式，让 artifact 直接提供平台归档，避免重复解压；待新 workflow run 验收。 |
 | 待平台验收 | Windows x64、Linux x86_64 | 尚未在各平台安装树和真实窗口验收，不宣称受支持。 |
 
 ## 风险与回退
