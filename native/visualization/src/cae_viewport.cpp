@@ -19,6 +19,7 @@ struct CaeViewport::Impl {
     RenderScene scene;
     QPointer<MeshSource> mesh_source;
     QMetaObject::Connection mesh_connection;
+    QMetaObject::Connection mesh_destroyed_connection;
     std::unique_ptr<ViewportBackend> backend;
 };
 
@@ -47,10 +48,15 @@ void CaeViewport::setMeshSource(QObject* source) {
         return;
     }
     QObject::disconnect(impl_->mesh_connection);
+    QObject::disconnect(impl_->mesh_destroyed_connection);
     impl_->mesh_source = mesh_source;
     if (mesh_source != nullptr) {
         impl_->mesh_connection =
             connect(mesh_source, &MeshSource::meshChanged, this, &CaeViewport::refresh_mesh);
+        impl_->mesh_destroyed_connection = connect(mesh_source, &QObject::destroyed, this, [this] {
+            refresh_mesh();
+            emit meshSourceChanged();
+        });
     }
     refresh_mesh();
     emit meshSourceChanged();

@@ -71,6 +71,11 @@ int main(int argc, char* argv[]) {
     }
 
     const QGuiApplication app(argc, argv);
+#ifdef Q_OS_LINUX
+    // QPA 会将空窗口标题回退到 applicationName；标题栏文字由 Shell 自绘，
+    // Linux 原生标题栏只保留系统按钮，因此不向窗口管理器追加应用显示名。
+    QGuiApplication::setApplicationDisplayName(QString{});
+#endif
     QGuiApplication::setWindowIcon(
         QIcon(QStringLiteral(":/qt/qml/Panta/Shell/branding/panta-placeholder.svg")));
 

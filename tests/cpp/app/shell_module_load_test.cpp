@@ -176,16 +176,37 @@ class ShellModuleLoadTest final : public QObject {
 
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
         const auto flags = static_cast<Qt::WindowFlags>(root->property("flags").toUInt());
+        auto* chrome = root->findChild<QObject*>(QStringLiteral("titleChromePanel"));
+        QVERIFY(chrome != nullptr);
         QVERIFY(flags.testFlag(Qt::ExpandedClientAreaHint));
         QVERIFY(flags.testFlag(Qt::NoTitleBarBackgroundHint));
+#if defined(Q_OS_WIN)
+        const bool macOS = false;
+        QVERIFY(flags.testFlag(Qt::CustomizeWindowHint));
+        QVERIFY(flags.testFlag(Qt::WindowMinimizeButtonHint));
+        QVERIFY(flags.testFlag(Qt::WindowMaximizeButtonHint));
+        QVERIFY(flags.testFlag(Qt::WindowCloseButtonHint));
+        QVERIFY(!flags.testFlag(Qt::WindowTitleHint));
+#elif defined(Q_OS_LINUX)
+        const bool macOS = false;
+        QVERIFY(flags.testFlag(Qt::CustomizeWindowHint));
+        QVERIFY(flags.testFlag(Qt::WindowTitleHint));
+        QVERIFY(flags.testFlag(Qt::WindowMinimizeButtonHint));
+        QVERIFY(flags.testFlag(Qt::WindowMaximizeButtonHint));
+        QVERIFY(flags.testFlag(Qt::WindowCloseButtonHint));
+        QVERIFY(!flags.testFlag(Qt::WindowSystemMenuHint));
+#else
+        const bool macOS = true;
+#endif
         QCOMPARE(root->property("topPadding").toDouble(), 0.0);
         QCOMPARE(root->property("leftPadding").toDouble(), 0.0);
         QCOMPARE(root->property("rightPadding").toDouble(), 0.0);
 
-        auto* chrome = root->findChild<QObject*>(QStringLiteral("titleChromePanel"));
-        QVERIFY(chrome != nullptr);
-        const bool macOS = chrome->property("macOS").toBool();
+#if defined(Q_OS_LINUX)
+        QCOMPARE(root->property("title").toString(), QString(QChar(0x200B)));
+#else
         QVERIFY(root->property("title").toString().isEmpty());
+#endif
         auto* brandTile = root->findChild<QObject*>(QStringLiteral("titleBrandTile"));
         auto* macBrandMark = root->findChild<QObject*>(QStringLiteral("titleBrandMarkMac"));
         QVERIFY(brandTile != nullptr);
@@ -200,8 +221,11 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(strip != nullptr);
         QVERIFY(search != nullptr);
         chrome->setProperty("nativeControlsLeftInset", 48.0);
-        const qreal minimumInset = macOS ? 48.0 : 0.0;
+        const qreal minimumInset = 48.0;
         QTRY_VERIFY(strip->x() >= minimumInset);
+        QTRY_VERIFY(strip->x() + strip->width() <=
+                    chrome->property("width").toReal() -
+                        chrome->property("nativeControlsRightInset").toReal());
         strip->setProperty("contentX", strip->property("contentWidth").toReal());
         QTRY_VERIFY(strip->x() >= minimumInset);
         if (macOS) {

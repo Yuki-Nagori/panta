@@ -5,7 +5,7 @@
 - 依赖：[005](005-qt-qml-shell.md)（已完成：Qt Quick 主窗口与预编译 Qt 6.11.2 就绪）、[031](031-prebuilt-native-dependencies.md)（WebGPU 硬件窗口制品已登记）
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-16 / 2026-10-02
+- 创建 / 更新：2026-09-16 / 2026-10-14
 
 ## 前置条件已解除与历史阻塞
 
@@ -61,6 +61,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 
 - [ ] 通过 `cargo run` 显示默认 Welcome 场景，并能呈现无模型的空视口状态；VTK WebGPU 渲染错误不会静默表现为“已成功”。
 - [ ] resize、高 DPI、隐藏/恢复和关闭/重开可用，记录平台与图形后端。
+- [x] MeshSource 销毁时视口发布空来源、清除旧网格快照并通知 `meshSourceChanged`；替换来源后旧对象销毁不得影响当前来源。
 - [x] VTK 对象没有从 GUI/worker 任意修改，所用平台 WebGPU/hardware-window API 已对照 release 核实。
 - [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
@@ -82,6 +83,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 2026-09-26 | Windows 11；`panta_viewport_gpu_benchmark` 真实窗口 WebGPU 帧提交（30 预热 + 3×60 帧） | 测量通过（p50/p95 约 3.04-3.41/3.89-4.34 ms，登记于任务 048）；全部用例通过后退出阶段 0xC0000005。定位收敛：崩溃恒定发生在 `vtkWebGPURenderWindow::Finalize()` 内部，且仅当 `vtkWin32RenderWindowInteractor` 曾附加才触发（Generic interactor 全程干净；interactor 先析构、HWND 先销毁等排列组合均已实测不改变结果），属 VTK 内部缺陷，Release SDK 无符号需源码级排查；基准已改为 cleanupTestCase 显式拆除资源，崩溃被限定在 cleanup 段而不污染测量与后续静态析构 |
 | 2026-09-26 | Windows 11；应用生命周期自动化验收（SendInput/Win32 驱动真实窗口） | 通过：resize 1000×700 与回原尺寸精确生效（1600×1000 被任务栏工作区钳制到 977 高，属系统行为）；最小化+恢复、隐藏+显示全程存活；WM_CLOSE 优雅关闭 exit 0（WebGPU "Device lost, reason=Destroyed" 正常日志）；重开再次创建主窗口，二次关闭 exit 0。高 DPI 变更需改显示器缩放，留待手动验收 |
 | 2026-09-26 | Windows 11；基准退出崩溃处置 A/B 与修复 | A/B 实测：Generic interactor 退出 0、Win32 interactor 崩溃，崩溃定位在 QTEST_MAIN 标准退出经历的静态析构（应用自身优雅关闭 exit 0 不受影响，析构顺序重排无效）。基准改为自定义 main + qExec 后 `std::_Exit(status)` 跳过静态析构，退出码 0、数字不变（3.1502/3.8956 ms）；已知残留 "QDxgiVSyncService not destroyed in time" 提示为跳过析构的预期伴随 |
+| 2026-10-14 | macOS；`cargo test --locked --workspace`，CTest `Qml.ViewportModuleLoads` | MeshSource 销毁后来源为空、旧网格快照释放、发出变更通知；替换来源后销毁旧来源不影响当前来源 | 通过；聚合 CTest 75/75，新增 `mesh_source_destruction_clears_scene_and_notifies` 用弱引用、信号计数及当前来源断言覆盖该状态生命周期。测试未初始化 GPU 窗口，不代表真实 GPU 场景更新验收 |
 
 ## 风险与回退
 
@@ -96,6 +98,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 - 待验收：实际窗口下 resize、高 DPI、隐藏恢复、关闭重开、输入协调和资源释放；自动化 CTest 不替代这些图形验收。
 - 2026-09-26：Windows 真实窗口交互验收发现并修复 interactor 选型缺陷；生命周期自动化验收通过 resize、最小化/恢复、隐藏/显示、关闭/重开与优雅退出（高 DPI 变更留待手动验收）。资源释放存在一项 VTK 内部缺陷已定位待源码级排查（见验证表），输入协调已随 065/007 验收完成。
 - 2026-09-28：任务 053 将默认测试球体替换为 Welcome 场景；本任务验收同步改为检查当前默认内容和无模型空视口，仍需完成真实窗口及图形生命周期验收。
+- 2026-10-14：MeshSource 销毁清理与替换来源保护通过回归及 workspace 聚合测试，并经 `gpt-6.1-sol` medium 独立 final review；未发现代码阻塞问题。offscreen 用例不覆盖真实 GPU actor 更新，平台图形验收继续按本任务范围跟踪。
 
 ## 完成摘要
 

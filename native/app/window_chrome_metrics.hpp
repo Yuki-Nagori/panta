@@ -17,6 +17,8 @@ class WindowChromeMetrics final : public QObject {
     QML_SINGLETON
     Q_PROPERTY(qreal leadingSystemControlsInset READ leadingSystemControlsInset NOTIFY
                    leadingSystemControlsInsetChanged)
+    Q_PROPERTY(qreal trailingSystemControlsInset READ trailingSystemControlsInset NOTIFY
+                   trailingSystemControlsInsetChanged)
 
   public:
     explicit WindowChromeMetrics(QObject* parent = nullptr);
@@ -27,8 +29,12 @@ class WindowChromeMetrics final : public QObject {
     /// 返回最左侧系统标题栏控件右边缘相对客户区左侧的位置。
     qreal leadingSystemControlsInset() const;
 
+    /// 返回最右侧系统标题栏控件左边缘相对客户区右侧的位置。
+    qreal trailingSystemControlsInset() const;
+
   signals:
     void leadingSystemControlsInsetChanged();
+    void trailingSystemControlsInsetChanged();
 
   private:
     bool eventFilter(QObject* watched, QEvent* event) override;
