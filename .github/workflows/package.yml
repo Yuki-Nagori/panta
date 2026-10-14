@@ -85,6 +85,11 @@ jobs:
             throw "CMakeCache.txt 中没有 CMAKE_MAKE_PROGRAM：$cachePath"
           }
           $ninja = $makeProgramEntry.Matches[0].Groups[1].Value
+          $rcCompilerEntry = Select-String -Path $cachePath -Pattern '^CMAKE_RC_COMPILER:[^=]+=([^\r\n]+)$' | Select-Object -First 1
+          if (-not $rcCompilerEntry) {
+            throw "CMakeCache.txt 中没有 CMAKE_RC_COMPILER：$cachePath"
+          }
+          $expectedManifestTool = [IO.Path]::GetFullPath((Join-Path (Split-Path $rcCompilerEntry.Matches[0].Groups[1].Value -Parent) 'mt.exe'))
           $commands = @(& $ninja -C $buildDir -t commands panta_native_app)
           if ($LASTEXITCODE -ne 0) {
             throw "无法读取 panta_native_app 的 Ninja 链接命令（退出码 $LASTEXITCODE）"
@@ -92,6 +97,18 @@ jobs:
           $linkCommands = @($commands | Where-Object { $_ -match 'vs_link_exe' })
           if ($linkCommands.Count -ne 1) {
             throw "预期一个 Windows 链接命令，实际找到 $($linkCommands.Count) 个。"
+          }
+          $manifestToolArgument = [regex]::Match($linkCommands[0], '--mt=(?:"([^"]+)"|(\S+))')
+          if (-not $manifestToolArgument.Success) {
+            throw "Windows 链接命令没有 --mt 工具：$($linkCommands[0])"
+          }
+          $manifestTool = $manifestToolArgument.Groups[1].Value
+          if (-not $manifestTool) {
+            $manifestTool = $manifestToolArgument.Groups[2].Value
+          }
+          $manifestTool = [IO.Path]::GetFullPath($manifestTool)
+          if ($manifestTool -ne $expectedManifestTool -or -not (Test-Path -LiteralPath $manifestTool)) {
+            throw "链接命令未使用 Windows SDK mt.exe：$manifestTool；预期：$expectedManifestTool"
           }
           $manifestArgument = [regex]::Match($linkCommands[0], '--manifests\s+(?:"([^"]+)"|(\S+))')
           if (-not $manifestArgument.Success) {
@@ -109,6 +126,7 @@ jobs:
             throw "链接命令引用的 manifest 不存在或路径错误：$manifestPath；预期：$expectedManifest"
           }
           Write-Host "Windows 链接命令：$($linkCommands[0])"
+          Write-Host "Windows SDK manifest 工具：$manifestTool"
           Write-Host "Windows 链接 manifest：$manifestPath"
           [xml]$sourceManifest = Get-Content -Raw -LiteralPath $manifestPath
           Write-Host 'Qt 生成的源 manifest：'

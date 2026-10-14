@@ -7,6 +7,19 @@ project(
   VERSION 0.1.0
   LANGUAGES C CXX)
 
+if(WIN32)
+  # LLVM llvm-mt 22.1.7 会给 Qt 清单的 UAC 属性添加错误的 asm.v2 前缀；
+  # 复用 CMake 已选中的 Windows SDK RC 目录中的 mt.exe 完成链接清单合并。
+  get_filename_component(_panta_windows_sdk_bin "${CMAKE_RC_COMPILER}" DIRECTORY)
+  set(_panta_windows_mt "${_panta_windows_sdk_bin}/mt.exe")
+  if(NOT EXISTS "${_panta_windows_mt}")
+    message(FATAL_ERROR "Windows SDK manifest 工具不存在：${_panta_windows_mt}")
+  endif()
+  set(CMAKE_MT "${_panta_windows_mt}" CACHE FILEPATH "Windows SDK manifest tool" FORCE)
+  set(CMAKE_MT "${_panta_windows_mt}")
+  message(STATUS "Windows manifest 工具：${CMAKE_MT}")
+endif()
+
 option(PANTA_ENABLE_FFI_TEST "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF)
 option(PANTA_ENABLE_BRIDGE_MODULE "Build and register the Panta.Bridge QML module" ON)
 option(PANTA_ENABLE_COVERAGE "Instrument native C++ targets for LLVM coverage" OFF)
