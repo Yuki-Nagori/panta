@@ -1,5 +1,5 @@
 # 桌面入口（任务 005）：链接 QML 模块与 ViewModel 模块。
-qt_add_executable(panta_native_app main.cpp)
+qt_add_executable(panta_native_app MANUAL_FINALIZATION main.cpp)
 set_target_properties(panta_native_app PROPERTIES OUTPUT_NAME panta EXPORT_NAME native-app)
 if(WIN32)
   # Qt 6.11.1+ 负责生成清单及 Windows 兼容/长路径声明，并禁用链接器默认清单。
@@ -77,6 +77,63 @@ qt_add_qml_module(
   panta_shell
   QML_FILES
   "${_panta_entry}")
+
+# 在 app 子目录显式完成 Qt executable finalization，使最终目标配置集中在 app 入口处。
+qt_finalize_executable(panta_native_app)
+if(WIN32)
+  function(_panta_validate_windows_manifest)
+    get_target_property(_panta_finalized panta_native_app _qt_is_finalized)
+    if(NOT _panta_finalized)
+      # Qt 可能将 target finalization 延后到 QML 文件生成之后；验证必须排在它之后。
+      get_property(
+        _panta_retry_count
+        DIRECTORY
+        PROPERTY _panta_manifest_validation_retries)
+      if(NOT _panta_retry_count)
+        set(_panta_retry_count 0)
+      endif()
+      if(_panta_retry_count GREATER_EQUAL 8)
+        message(FATAL_ERROR "Qt 未能完成 panta_native_app finalization，无法验证 Windows manifest")
+      endif()
+      math(EXPR _panta_retry_count "${_panta_retry_count} + 1")
+      set_property(DIRECTORY PROPERTY _panta_manifest_validation_retries "${_panta_retry_count}")
+      cmake_language(DEFER CALL _panta_validate_windows_manifest)
+      return()
+    endif()
+
+    set(_panta_windows_manifest "${CMAKE_CURRENT_BINARY_DIR}/panta.exe.manifest")
+    if(NOT EXISTS "${_panta_windows_manifest}")
+      message(FATAL_ERROR "Qt 未生成预期的 Windows 应用清单：${_panta_windows_manifest}")
+    endif()
+    get_target_property(_panta_app_sources panta_native_app SOURCES)
+    set(_panta_manifest_sources "${_panta_app_sources}")
+    list(FILTER _panta_manifest_sources INCLUDE REGEX "\\.manifest$")
+    list(LENGTH _panta_manifest_sources _panta_manifest_source_count)
+    if(NOT _panta_windows_manifest IN_LIST _panta_manifest_sources
+       OR NOT _panta_manifest_source_count EQUAL 1)
+      message(
+        FATAL_ERROR
+          "Windows 应用目标必须且只能引用二进制目录中的清单：${_panta_windows_manifest}；实际引用：${_panta_manifest_sources}")
+    endif()
+    # CMake 的 VS 链接包装会把用户清单作为 /MANIFESTINPUT 交给 LLD，
+    # 其内部合并会改写 UAC 属性命名空间。链接阶段排除清单，再由 SDK mt.exe 嵌入。
+    list(REMOVE_ITEM _panta_app_sources "${_panta_windows_manifest}")
+    set_property(TARGET panta_native_app PROPERTY SOURCES "${_panta_app_sources}")
+    # 清单是链接后的资源输入；修改应用标识或 UAC 设置时必须重链并重新嵌入。
+    set_property(
+      TARGET panta_native_app
+      APPEND
+      PROPERTY LINK_DEPENDS "${_panta_windows_manifest}")
+    add_custom_command(
+      TARGET panta_native_app
+      POST_BUILD
+      COMMAND "${PANTA_WINDOWS_MANIFEST_TOOL}" -nologo -manifest "${_panta_windows_manifest}"
+              "-outputresource:$<TARGET_FILE:panta_native_app>;#1"
+      COMMENT "嵌入 Windows 应用清单"
+      VERBATIM)
+  endfunction()
+  cmake_language(DEFER CALL _panta_validate_windows_manifest)
+endif()
 
 if(BUILD_TESTING)
   add_executable(panta_qml_shell_module_test ../../tests/cpp/app/shell_module_load_test.cpp)

@@ -7,6 +7,15 @@ project(
   VERSION 0.1.0
   LANGUAGES C CXX)
 
+if(WIN32)
+  # 使用与 Windows SDK 资源编译器同目录的 mt.exe 嵌入应用清单。
+  get_filename_component(_panta_windows_sdk_bin "${CMAKE_RC_COMPILER}" DIRECTORY)
+  set(PANTA_WINDOWS_MANIFEST_TOOL "${_panta_windows_sdk_bin}/mt.exe")
+  if(NOT EXISTS "${PANTA_WINDOWS_MANIFEST_TOOL}")
+    message(FATAL_ERROR "Windows SDK manifest 工具不存在：${PANTA_WINDOWS_MANIFEST_TOOL}")
+  endif()
+endif()
+
 option(PANTA_ENABLE_FFI_TEST "Build the CXX Rust/C++ boundary smoke test supplied by Cargo" OFF)
 option(PANTA_ENABLE_BRIDGE_MODULE "Build and register the Panta.Bridge QML module" ON)
 option(PANTA_ENABLE_COVERAGE "Instrument native C++ targets for LLVM coverage" OFF)

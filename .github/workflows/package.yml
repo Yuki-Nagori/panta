@@ -50,9 +50,128 @@ jobs:
       - name: Build release application
         run: cargo build --locked --release
 
+      - name: Verify Windows manifest embedding setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $buildDir = (Resolve-Path 'target/native/release').Path
+          $expectedManifest = [IO.Path]::GetFullPath((Join-Path $buildDir 'app/panta.exe.manifest'))
+          $cachePath = Join-Path $buildDir 'CMakeCache.txt'
+          $makeProgramEntry = Select-String -Path $cachePath -Pattern '^CMAKE_MAKE_PROGRAM:[^=]+=([^\r\n]+)$' | Select-Object -First 1
+          if (-not $makeProgramEntry) {
+            throw "CMakeCache.txt 中没有 CMAKE_MAKE_PROGRAM：$cachePath"
+          }
+          $ninja = $makeProgramEntry.Matches[0].Groups[1].Value
+          $rcCompilerEntry = Select-String -Path $cachePath -Pattern '^CMAKE_RC_COMPILER:[^=]+=([^\r\n]+)$' | Select-Object -First 1
+          if (-not $rcCompilerEntry) {
+            throw "CMakeCache.txt 中没有 CMAKE_RC_COMPILER：$cachePath"
+          }
+          $expectedManifestTool = [IO.Path]::GetFullPath((Join-Path (Split-Path $rcCompilerEntry.Matches[0].Groups[1].Value -Parent) 'mt.exe'))
+          $commands = @(& $ninja -C $buildDir -t commands panta_native_app)
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取 panta_native_app 的 Ninja 链接命令（退出码 $LASTEXITCODE）"
+          }
+          $linkCommands = @($commands | Where-Object { $_ -match 'vs_link_exe' })
+          if ($linkCommands.Count -ne 1) {
+            throw "预期一个 Windows 链接命令，实际找到 $($linkCommands.Count) 个。"
+          }
+          $normalizedExpectedManifest = $expectedManifest.Replace('/', '\')
+          $linkCommandParts = @($linkCommands[0] -split '\s+&&\s+')
+          $linkInvocations = @($linkCommandParts | Where-Object { $_ -match 'vs_link_exe' })
+          if ($linkInvocations.Count -ne 1) {
+            throw "预期唯一的 vs_link_exe 子命令，实际找到 $($linkInvocations.Count) 个。"
+          }
+          $linkInvocation = $linkInvocations[0]
+          $normalizedLinkInvocation = $linkInvocation.Replace('/', '\')
+          if ($normalizedLinkInvocation.Contains($normalizedExpectedManifest) -or
+            $linkInvocation -match '(?i)/MANIFESTINPUT' -or
+            $linkInvocation -notmatch '(?i)/MANIFEST:NO') {
+            throw '链接器必须保留 /MANIFEST:NO，且不得接收 Qt manifest 输入。'
+          }
+          $embedCommands = @(
+            $commands | Where-Object {
+              $normalizedCommand = $_.Replace('/', '\')
+              $normalizedCommand.Contains($expectedManifestTool.Replace('/', '\')) -and
+                $normalizedCommand.Contains($normalizedExpectedManifest) -and
+                $normalizedCommand.Contains('-outputresource:')
+            }
+          )
+          if ($embedCommands.Count -ne 1) {
+            throw "预期一个由 Windows SDK mt.exe 执行的 post-link manifest 嵌入命令，实际找到 $($embedCommands.Count) 个。"
+          }
+          if (-not (Test-Path -LiteralPath $expectedManifestTool) -or -not (Test-Path -LiteralPath $expectedManifest)) {
+            throw "Windows SDK mt.exe 或 Qt 生成的源 manifest 不存在：$expectedManifestTool；$expectedManifest"
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "PANTA_WINDOWS_MANIFEST_TOOL=$expectedManifestTool"
+          $null = [xml](Get-Content -Raw -LiteralPath $expectedManifest)
+
       - name: Create relocatable installation tree
         shell: bash
         run: cargo run --locked --release --package panta-launcher -- package "$PACKAGE_DIR"
+
+      - name: Verify packaged Windows manifest
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $buildDir = 'target/native/release'
+          $builtExe = @(
+            (Join-Path $buildDir 'app/panta.exe'),
+            (Join-Path $buildDir 'panta.exe')
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $builtExe) {
+            throw "native 构建产物未找到：$buildDir/app/panta.exe 或 $buildDir/panta.exe"
+          }
+          $packagedExe = Join-Path $env:PACKAGE_DIR 'bin/panta.exe'
+          $builtHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $builtExe).Hash
+          $packagedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedExe).Hash
+          if ($builtHash -ne $packagedHash) {
+            throw "安装包中的 panta.exe 与链接产物不同：$builtHash / $packagedHash"
+          }
+          $mt = $env:PANTA_WINDOWS_MANIFEST_TOOL
+          if (-not $mt -or -not (Test-Path -LiteralPath $mt)) {
+            throw "Windows SDK mt.exe 不存在：$mt"
+          }
+          $manifestPath = Join-Path $env:RUNNER_TEMP 'panta.exe.manifest'
+          & $mt "-inputresource:$packagedExe;#1" "-out:$manifestPath"
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法提取安装包 PE manifest（退出码 $LASTEXITCODE）"
+          }
+          [xml]$manifest = Get-Content -Raw -LiteralPath $manifestPath
+          $namespaces = [System.Xml.XmlNamespaceManager]::new($manifest.NameTable)
+          $namespaces.AddNamespace('asmv1', 'urn:schemas-microsoft-com:asm.v1')
+          $namespaces.AddNamespace('asmv2', 'urn:schemas-microsoft-com:asm.v2')
+          $namespaces.AddNamespace('asmv3', 'urn:schemas-microsoft-com:asm.v3')
+          $executionLevel = $manifest.SelectSingleNode('/asmv1:assembly/asmv2:trustInfo/asmv2:security/asmv2:requestedPrivileges/asmv2:requestedExecutionLevel', $namespaces)
+          if (-not $executionLevel) {
+            $executionLevel = $manifest.SelectSingleNode('/asmv1:assembly/asmv3:trustInfo/asmv3:security/asmv3:requestedPrivileges/asmv3:requestedExecutionLevel', $namespaces)
+          }
+          if (-not $executionLevel) {
+            $executionLevel = $manifest.SelectSingleNode('/asmv1:assembly/asmv2:trustInfo/asmv2:security/asmv3:requestedPrivileges/asmv3:requestedExecutionLevel', $namespaces)
+          }
+          if (-not $executionLevel) {
+            throw "安装包 PE manifest 缺少 requestedExecutionLevel：$manifestPath"
+          }
+          $level = $executionLevel.GetAttributeNode('level')
+          $uiAccess = $executionLevel.GetAttributeNode('uiAccess')
+          $namespacedExecutionAttributes = @($executionLevel.Attributes | Where-Object {
+            ($_.LocalName -eq 'level' -or $_.LocalName -eq 'uiAccess') -and $_.NamespaceURI
+          })
+          $hasInvalidExecutionLevel = (
+            -not $level -or
+            -not $uiAccess -or
+            $level.NamespaceURI -ne '' -or
+            $uiAccess.NamespaceURI -ne '' -or
+            $namespacedExecutionAttributes.Count -gt 0 -or
+            $level.Value -ne 'asInvoker' -or
+            $uiAccess.Value -ne 'false'
+          )
+          if ($hasInvalidExecutionLevel) {
+            $actualAttributes = @($executionLevel.Attributes | ForEach-Object {
+              "$($_.Name) {$($_.NamespaceURI)}='$($_.Value)'"
+            }) -join ', '
+            throw "安装包 PE manifest 的 requestedExecutionLevel 不符合标准：$($executionLevel.OuterXml)；属性：$actualAttributes；文件：$manifestPath"
+          }
+          Write-Host "PE manifest valid; package SHA256: $packagedHash"
 
       - name: Verify package layout
         shell: bash
