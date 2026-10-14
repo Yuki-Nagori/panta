@@ -38,6 +38,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set macOS SDK deployment target
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
+
       - name: Checkout pinned GoogleTest source
         uses: actions/checkout@v7
         with:
@@ -60,6 +64,8 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # 消费端要求 MSVC ABI；Windows 上 Ninja 继承的默认编译器可能是 MinGW。
             generator_args=(-G "Visual Studio 17 2022" -A x64)
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            generator_args=(-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0)
           fi
           cmake "${generator_args[@]}" -S sdk-build/googletest -B sdk-build/build \
             -DCMAKE_BUILD_TYPE=Release \
@@ -90,6 +96,7 @@ jobs:
               "commit": "063de7e9578f82b369302001269680b4b1553359"
             },
             "build_type": "Release",
+            "macos_deployment_target": ${{ matrix.sdk_triple == 'macos-arm64' && '"13.0"' || 'null' }},
             "cxx_standard": 17,
             "shared": false,
             "windows_shared_crt": true,
@@ -155,7 +162,7 @@ jobs:
           if gh release view sdk-googletest-1.18.0 --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release edit sdk-googletest-1.18.0 \
               --repo "$GITHUB_REPOSITORY" \
-              --title "GoogleTest 1.18.0 static SDKs" \
+              --title "GoogleTest 1.18.0 静态 SDK" \
               --notes-file tools/sdk/releases/googletest-1.18.0.md
             gh release view sdk-googletest-1.18.0 --repo "$GITHUB_REPOSITORY" --json assets \
               --jq '.assets[].name' | while IFS= read -r asset; do
@@ -165,7 +172,7 @@ jobs:
           else
             gh release create sdk-googletest-1.18.0 \
               --repo "$GITHUB_REPOSITORY" \
-              --title "GoogleTest 1.18.0 static SDKs" \
+              --title "GoogleTest 1.18.0 静态 SDK" \
               --notes-file tools/sdk/releases/googletest-1.18.0.md
           fi
           gh release upload sdk-googletest-1.18.0 sdk-build/dist/* --clobber \

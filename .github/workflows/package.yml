@@ -43,6 +43,10 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
+      - name: Set macOS deployment target
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
+
       - name: Build release application
         run: cargo build --locked --release
 

@@ -1,15 +1,17 @@
 # 070 — GoogleTest 三平台 SDK 制品 CI
 
-- 状态：done
+- 状态：in-progress
 - 阶段：验证基础
 - 依赖：[019 GTest 测试配置与规则](019-gtest-native-testing.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)、[038 native SDK 制品生产](038-native-sdk-artifact-production.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-24
+- 创建 / 更新：2026-09-24 / 2026-10-14
 
 ## 目标与背景
 
 GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 commit。Git 历史克隆在网络慢或受限环境中会拖住 Cargo 聚合构建。上游 GitHub Release 提供源码归档而非各平台可直接链接的二进制库；本任务增加仓库自己的受信 CI，在 macOS arm64、Ubuntu x86_64、Windows x86_64 分别构建并打包静态 GoogleTest SDK，完成包自检后上传 Actions artifacts，并支持由维护者显式发布到固定 GitHub Release。后续消费者 run `35992062001` 发现 Windows 产物实际由 MinGW 构建，与消费端 MSVC ABI 不兼容；此前生产自检使用了同一默认编译器，因此通过自检并未验证消费者 ABI，Windows 制品需重产。
+
+2026-10-14 维护者要求 macOS 依赖最低部署版本统一为 13.0。producer workflow 已设置该版本，但现有 macOS Release SDK 是旧基线，必须重产、替换资产并更新 071 manifest SHA 后才能完成本轮验收。
 
 本任务仅交付 SDK 生产管线和可验证制品，不切换普通构建中的 GoogleTest 消费路径。等三平台资产发布并取得真实 URL/SHA256 后，再由独立消费任务更新 `sdk-provision` manifest 与 `BUILD_TESTING` 集成。
 
@@ -28,6 +30,7 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 ## 范围与非目标
 
 - 新增手动触发的 SDK workflow，固定 GoogleTest tag commit `063de7e9578f82b369302001269680b4b1553359`，矩阵覆盖 macOS arm64、Ubuntu x86_64、Windows x86_64。
+- macOS arm64 使用 13.0 作为最低部署目标，并将该值写入制品 metadata；重产后的 Release 资产需与 manifest SHA 同步。
 - 使用上游 CMake 安装规则生产静态库、headers 与 `GTestConfig.cmake`，保留 BSD-3-Clause license，写入来源、版本、目标平台和 ABI 元数据。
 - 对每个平台执行真实 `find_package(GTest CONFIG)`、imported target 检查和小型编译/链接/运行自检，失败时不得打包或发布。
 - 复用仓库 SDK package 规则上传每个平台归档及 SHA256；提供可选的单 job GitHub Release 发布入口，重产时统一清理旧资产后上传。
@@ -71,6 +74,7 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 - [x] Windows consumer build 与 sanitizer 在 MSVC ABI 下链接并测试通过。
 - [x] Release 默认不发布；启用发布时由单一 job 全量替换 `sdk-googletest-1.18.0` 资产。
 - [x] 普通 CI 和当前本地 Cargo 测试入口行为保持不变；资产摘要已在任务 071 登记并经消费者 CI 验证。
+- [ ] GoogleTest SDK 按 macOS 13.0 部署目标重产并通过三平台自检；Release 资产和任务 071 manifest 中所有平台的 SHA 已同步（metadata 变化也会改变 Linux/Windows 归档摘要）。
 - [x] 本任务和索引记录真实 workflow/本地验证结果，CI-only 限制如实注明。
 
 ## 验证计划与结果

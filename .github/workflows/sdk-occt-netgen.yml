@@ -53,6 +53,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set macOS SDK deployment target
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
+
       - name: Produce OCCT and Netgen SDKs
         shell: bash
         run: |
@@ -121,7 +125,7 @@ jobs:
           if gh release view sdk-occt-netgen-8.0.1-6.2.2604 --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release edit sdk-occt-netgen-8.0.1-6.2.2604 \
               --repo "$GITHUB_REPOSITORY" \
-              --title "OCCT 8.0.1 + Netgen v6.2.2604 prebuilt SDKs" \
+              --title "OCCT 8.0.1 + Netgen 6.2.2604 配套 SDK" \
               --notes-file tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md
             gh release view sdk-occt-netgen-8.0.1-6.2.2604 --repo "$GITHUB_REPOSITORY" --json assets \
               --jq '.assets[].name' | while IFS= read -r asset; do
@@ -131,7 +135,7 @@ jobs:
           else
             gh release create sdk-occt-netgen-8.0.1-6.2.2604 \
               --repo "$GITHUB_REPOSITORY" \
-              --title "OCCT 8.0.1 + Netgen v6.2.2604 prebuilt SDKs" \
+              --title "OCCT 8.0.1 + Netgen 6.2.2604 配套 SDK" \
               --notes-file tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md
           fi
           gh release upload sdk-occt-netgen-8.0.1-6.2.2604 sdk-build/dist/* --clobber \

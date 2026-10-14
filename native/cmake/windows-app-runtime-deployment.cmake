@@ -14,8 +14,8 @@
 #    用目录，仅 System32 可见时 LoadLibraryEx 报 Error 87、WebGPU 设备创
 #    建失败并 SEH 崩溃。
 #
-# 调用：panta_deploy_windows_app_runtime(<target> <qmldir>)
-function(panta_deploy_windows_app_runtime target qml_dir)
+# 调用：panta_deploy_windows_app_runtime(<target> <qmldir> <d3dcompiler-dll>)
+function(panta_deploy_windows_app_runtime target qml_dir d3dcompiler_dll)
   if(NOT WIN32)
     return()
   endif()
@@ -73,8 +73,7 @@ function(panta_deploy_windows_app_runtime target qml_dir)
   add_custom_command(
     TARGET ${target}
     POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy "$ENV{windir}/System32/d3dcompiler_47.dll"
-            "$<TARGET_FILE_DIR:${target}>"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${d3dcompiler_dll}" "$<TARGET_FILE_DIR:${target}>"
     COMMENT "拷贝 d3dcompiler_47.dll 到 $<TARGET_FILE_NAME:${target}> 目录"
     VERBATIM)
 endfunction()
