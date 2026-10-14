@@ -1,6 +1,6 @@
 # 013 — 桌面安装布局与部署冒烟
 
-- 状态：ready
+- 状态：in-progress
 - 阶段：交付基础
 - 依赖：[011](011-test-quality-entrypoints.md)（已完成）
 - 优先级：P1
@@ -9,9 +9,9 @@
 
 ## 目标与背景
 
-验证 install 产物可独立启动，发现 Qt/QML 和 native 运行时依赖缺口。
+验证安装产物可独立启动，发现并修复 Qt/QML 和 native 运行时依赖缺口。
 
-本任务尚未实施；拟改路径不代表文件已存在，执行前核对依赖任务的实际产物。
+本任务先完成 macOS arm64 主平台安装部署基础设施。当前 app 只链接 VTK；OCCT/Netgen 由几何、网格测试目标消费，因此桌面 app 的 OCCT/Netgen 加载验收仍未满足，不能靠无用地复制动态库伪装通过。
 
 ## 必读
 
@@ -38,7 +38,8 @@
 1. 确定主平台安装布局，将 Qt 部署机制接入 install，并补齐非 Qt 依赖与资源。
 2. 记录运行时动态库定位、插件和 QML 模块来源，移除开发机绝对路径依赖。
 3. 在不暴露开发工具路径的测试环境启动安装产物，检查窗口/视口和适配器冒烟。
-4. 整理第三方许可文件、版本清单、已知限制；更新构建文档中的实际安装命令。
+4. 整理第三方许可文件、版本清单、已知限制；增加 Cargo 桌面安装入口并更新 README 和构建文档。
+5. 添加手动 GitHub Actions workflow，为三平台生成短期保留的可搬迁测试包。
 
 ## 预计改动
 
@@ -50,10 +51,10 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 
 ## 验收标准
 
-- [ ] 安装产物在独立位置启动，基础窗口/VTK 可用，OCCT/Netgen 库加载成功。
-- [ ] 关闭开发环境变量后仍可定位资源与依赖，记录测试环境和局限。
-- [ ] 存在清晰依赖/许可清单，尚未验证的平台不标为支持。
-- [ ] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
+- [ ] 安装产物在独立位置启动，基础窗口/VTK 可用；app 实际链接的 native 动态依赖可加载。OCCT/Netgen 接入桌面 app 后补加载验收。
+- [x] macOS arm64 清理开发环境变量后仍可定位资源与依赖；记录平台和验证范围。
+- [x] 安装树含 SDK 许可、版本 provenance 与 Qt SBOM 清单；未验证的平台没有标记为支持。
+- [x] 已同步 Cargo 安装命令、README、构建说明和当前架构事实，task-index 保持 in-progress。
 
 - [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
@@ -63,7 +64,12 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
-| — | 尚未执行 | 无实现证据 |
+| 2026-10-14 | macOS arm64；`cargo build --locked` | 通过；生成 `target/native/debug/app/panta.app`，bundle 内 executable 为 `panta`。本机构建信息：Apple clang 17、Qt 6.11.2、VTK 9.7.0。 |
+| 2026-10-14 | macOS arm64；`cmake --install target/native/debug --prefix /tmp/panta-013-install` | 通过；生成独立 `.app`，部署 Qt/QML 插件、VTK 动态库、SDK 许可和 provenance、Qt SBOM。 |
+| 2026-10-14 | macOS arm64；`cargo panta-package /tmp/panta-package-final` | 通过；Cargo 桌面安装入口生成可搬迁目录，Qt 部署日志未报告 unresolved dependency。 |
+| 2026-10-14 | 清除开发环境变量后运行安装 app 内的 executable；CUA 绑定安装目录 `.app` 检查真实窗口 | 通过；可见应用主窗口及 viewport。AX 检查确认安装版运行。 |
+| 2026-10-14 | `otool -L` 与 `otool -l` 检查安装 app executable 和打包动态库（166 个） | 通过；无仓库、用户目录或 `/tmp` 绝对依赖路径，也无非系统绝对 RPATH。 |
+| 待平台验收 | Windows x64、Linux x86_64 | 尚未在各平台安装树和真实窗口验收，不宣称受支持。 |
 
 ## 风险与回退
 
@@ -72,8 +78,13 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施。
-- 待记录：实际方案、版本依据、失败原因、范围调整与后续任务。
+- 2026-10-14：开始实施前盘点确认：当前 app install 规则只安装 `panta-native`；基础库及 CMake export 单独安装。Windows 的 `windeployqt` 和 SDK DLL 复制仅挂在 app 的 `POST_BUILD`，用于 `target/native/<profile>/app` 裸启，不构成安装部署。任务继续覆盖安装树独立启动、Qt/QML 与运行库定位、许可清单及平台证据；先按 macOS arm64 主平台实现并验收，其他平台只有实际完成同等验证后才记录支持。VTK 窗口的 macOS 限制按 007 的实测现状记录，不以构建成功代替窗口验收。
+- 2026-10-14：所有平台的应用 executable 统一命名为 `panta`（Windows 为 `panta.exe`）；macOS bundle 为 `panta.app`。新增 `Panta.App` 入口包装 Shell 页，Qt 部署脚本据此扫描传递的 QML imports。CMake 安装阶段部署 Qt/QML、应用链接闭包内的 native 动态库，并随包保存 SDK 许可/provenance 与 Qt SPDX/CycloneDX SBOM。launcher 按平台定位 executable。独立安装位置、清洁环境启动和真实窗口验收通过；166 个 app/打包动态库的 Mach-O 依赖/RPATH 检查没有发现开发机绝对路径。统一命名变更后的重建与安装验证待复验。
+- 2026-10-14：独立评审确认 Windows Dawn 通过 `LoadLibrary` 动态加载 `d3dcompiler_47.dll`，CMake 依赖扫描无法发现；新增 Windows install 规则，从 `%WINDIR%/System32` 将 DLL 放到安装 `bin`。同时将 Qt SBOM 安装移出 Bridge 条件，确保 `--no-default-features` 的 Qt Shell 变体也有清单。Qt 部署脚本延后到 native 运行库复制之后，让 macdeployqt 能修正完整 app 链接闭包的 `@rpath`。以上 Windows 行为未在本机实测，等待 Windows CI/实机验收。
+- 2026-10-14：新增手动 `Package desktop builds` workflow，三平台分别构建 Release、通过 `cargo run --locked --release --package panta-launcher -- package "$PACKAGE_DIR"` 执行安装并上传 1 天有效的测试归档。workflow 配置已本地检查，三平台结果须在 GitHub Actions 手动运行后记录；Linux 测试机需满足 README 所列系统运行时要求。
+- 2026-10-14：将维护者提供的 Welcome tab CSS 视觉临时实现为 SVG，加入 app 窗口图标并替换 Welcome 页签上的文字 P。它作为临时品牌资源单独打包，不加入操作图标 symbol 清单。
+- 当前范围限制：桌面 app 实际只链接 VTK。OCCT 和 Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包；第一条验收保持未完成，需在桌面功能正式接入后补库加载验收。Windows/Linux 安装与实机验收也未完成。
 
 ## 完成摘要
 
-未完成。完成时填写实现行为、验证证据、剩余限制和后续 task；全部验收有证据后才标 done。
+部分完成：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收。OCCT/Netgen 尚无桌面 app consumer，Windows/Linux 尚未实机验收；任务保持 in-progress，后续接入这些库或补齐平台证据后再评估完成。

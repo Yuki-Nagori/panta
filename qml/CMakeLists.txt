@@ -114,6 +114,8 @@ file(
   "${CMAKE_CURRENT_SOURCE_DIR}/icons/*.svg")
 qt_add_resources(panta_shell "panta_shell_icons" PREFIX "/qt/qml/Panta/Shell" FILES
                  ${PANTA_SHELL_ICON_FILES})
+qt_add_resources(panta_shell "panta_shell_branding" PREFIX "/qt/qml/Panta/Shell" FILES
+                 branding/panta-placeholder.svg)
 
 if(BUILD_TESTING)
   add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)

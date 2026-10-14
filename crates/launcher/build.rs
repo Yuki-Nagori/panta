@@ -100,7 +100,7 @@ fn orchestrate() -> Result<PathBuf, String> {
     if !sanitizer.is_empty() {
         native_profile = format!("{native_profile}-sanitizer-{}", sanitizer.replace(',', "-"));
     }
-    let binary_dir = target_root.join("native").join(native_profile);
+    let binary_dir = target_root.join("native").join(&native_profile);
     let deps_root = target_root.join("panta-deps");
 
     // i18n（任务 034）：解析 resources/i18n/*.pa 并把语言字典写成构建树
@@ -255,11 +255,19 @@ fn orchestrate() -> Result<PathBuf, String> {
     }));
     provision::database::write(&quality_dir.join("cppcheck.json"), &cppcheck)?;
 
-    let exe_name = if cfg!(windows) {
-        "panta-native.exe"
-    } else {
-        "panta-native"
-    };
+    let package_prefix = target_root.join("package").join(&native_profile);
+    println!("cargo:rustc-env=PANTA_CMAKE_EXECUTABLE={}", cmake.display());
+    println!(
+        "cargo:rustc-env=PANTA_NATIVE_BUILD_DIR={}",
+        binary_dir.display()
+    );
+    println!(
+        "cargo:rustc-env=PANTA_PACKAGE_PREFIX={}",
+        package_prefix.display()
+    );
+    println!("cargo:rustc-env=PANTA_NATIVE_BUILD_TYPE={build_type}");
+
+    let exe_name = if cfg!(windows) { "panta.exe" } else { "panta" };
     locate_product(&binary_dir, build_type, exe_name)
 }
 
@@ -269,6 +277,11 @@ fn locate_product(binary_dir: &Path, build_type: &str, exe_name: &str) -> Result
     // app/<Config>/ 或 <Config>/；部分 clang-cl/Ninja 组合直接写入构建树根部。
     // 所有候选都在 target/native/<profile> 下，不能把系统目录当作回退位置。
     let candidates = [
+        app_dir
+            .join("panta.app")
+            .join("Contents")
+            .join("MacOS")
+            .join(exe_name),
         app_dir.join(exe_name),
         app_dir.join(build_type).join(exe_name),
         binary_dir.join(build_type).join(exe_name),

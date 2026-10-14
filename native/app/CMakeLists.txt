@@ -1,6 +1,15 @@
 # 桌面入口（任务 005）：链接 QML 模块与 ViewModel 模块。
-add_executable(panta_native_app main.cpp)
-set_target_properties(panta_native_app PROPERTIES OUTPUT_NAME panta-native EXPORT_NAME native-app)
+qt_add_executable(panta_native_app main.cpp)
+set_target_properties(panta_native_app PROPERTIES OUTPUT_NAME panta EXPORT_NAME native-app)
+if(APPLE)
+  # Qt 的 macOS 安装部署入口要求标准 .app 布局；开发期也从 bundle 内启动，
+  # 让 cargo run 与安装后启动使用相同的可执行文件相对资源结构。
+  set_target_properties(
+    panta_native_app
+    PROPERTIES MACOSX_BUNDLE TRUE
+               MACOSX_BUNDLE_GUI_IDENTIFIER "com.yuki-nagori.panta"
+               MACOSX_BUNDLE_BUNDLE_NAME "Panta")
+endif()
 panta_native_defaults(panta_native_app)
 target_link_libraries(
   panta_native_app
@@ -32,12 +41,29 @@ if(PANTA_ENABLE_BRIDGE_MODULE)
   target_link_libraries(panta_native_app PRIVATE panta::visualization)
   target_link_libraries(panta_native_app PRIVATE panta_bridgeplugin panta_visualizationplugin)
   target_compile_definitions(panta_native_app PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
+  set(_panta_app_entry_file "${CMAKE_CURRENT_SOURCE_DIR}/../../qml/AppEntry.qml")
+else()
+  set(_panta_app_entry_file "${CMAKE_CURRENT_SOURCE_DIR}/../../qml/AppNoBridgeEntry.qml")
 endif()
+get_filename_component(_panta_app_entry_alias "${_panta_app_entry_file}" NAME)
+set_source_files_properties("${_panta_app_entry_file}" PROPERTIES QT_RESOURCE_ALIAS
+                                                                  "${_panta_app_entry_alias}")
 
-# 开启 Panta.Bridge 时，其静态 plugin 由 main.cpp 中的
-# Q_IMPORT_QML_PLUGIN 显式保留；关闭时使用无 Bridge 的 Shell fallback。
-# App.qml 或 AppNoBridge.qml 已作为 Panta.Shell 模块资源编译，app 目标没有可供 qmlimportscanner
-# 扫描的源文件；调用扫描器只会产生空结果，并要求工具额外加载平台 ICU。
+# 应用入口包装 Shell 的实际页面。独立应用模块让 Qt 部署扫描从应用目标追踪
+# Shell 及 QtQuick imports，不需要另外维护一份手写的 QML 依赖清单。
+qt_add_qml_module(
+  panta_native_app
+  URI
+  Panta.App
+  VERSION
+  1.0
+  RESOURCE_PREFIX
+  /qt/qml
+  DEPENDENCIES
+  TARGET
+  panta_shell
+  QML_FILES
+  "${_panta_app_entry_file}")
 
 if(BUILD_TESTING)
   add_executable(panta_qml_shell_module_test ../../tests/cpp/app/shell_module_load_test.cpp)
@@ -76,4 +102,73 @@ endif()
 install(
   TARGETS panta_native_app
   EXPORT pantaNativeTargets
-  RUNTIME DESTINATION bin)
+  RUNTIME_DEPENDENCY_SET panta_native_runtime_dependencies
+  BUNDLE DESTINATION . COMPONENT Runtime
+  RUNTIME DESTINATION bin COMPONENT Runtime)
+
+# QML 模块已静态编入程序；安装时只需复制扫描所得的运行期 QML imports 与插件。
+# 动态库由 CMake dependency set 按 SDK 搜索路径解析并复制，确保 app 实际链接的
+# native 依赖离开开发机路径后仍可加载。
+qt_generate_deploy_qml_app_script(TARGET panta_native_app OUTPUT_SCRIPT
+                                  panta_native_qml_deploy_script NO_TRANSLATIONS)
+if(APPLE)
+  install(
+    RUNTIME_DEPENDENCY_SET
+    panta_native_runtime_dependencies
+    DIRECTORIES
+    ${PANTA_RUNTIME_DEPENDENCY_DIRS}
+    POST_EXCLUDE_REGEXES
+    "^/System/Library/.*"
+    "^/usr/lib/.*"
+    "^${QT_STAGING}/.*"
+    FRAMEWORK
+    DESTINATION
+    panta.app/Contents/Frameworks
+    COMPONENT
+    Runtime
+    LIBRARY
+    DESTINATION
+    panta.app/Contents/Frameworks
+    COMPONENT
+    Runtime)
+elseif(WIN32)
+  install(
+    RUNTIME_DEPENDENCY_SET
+    panta_native_runtime_dependencies
+    DIRECTORIES
+    ${PANTA_RUNTIME_DEPENDENCY_DIRS}
+    POST_EXCLUDE_REGEXES
+    "^[A-Za-z]:[/\\\\]Windows[/\\\\].*"
+    "^${QT_STAGING}/.*"
+    RUNTIME
+    DESTINATION
+    bin
+    COMPONENT
+    Runtime)
+  # Dawn 动态加载 D3DCompiler，依赖扫描无法发现它；沿用开发部署的系统 DLL 来源。
+  install(
+    FILES "$ENV{windir}/System32/d3dcompiler_47.dll"
+    DESTINATION bin
+    COMPONENT Runtime)
+else()
+  install(
+    RUNTIME_DEPENDENCY_SET
+    panta_native_runtime_dependencies
+    DIRECTORIES
+    ${PANTA_RUNTIME_DEPENDENCY_DIRS}
+    POST_EXCLUDE_REGEXES
+    "^/lib/.*"
+    "^/lib64/.*"
+    "^/usr/lib/.*"
+    "^/usr/lib64/.*"
+    "^${QT_STAGING}/.*"
+    LIBRARY
+    DESTINATION
+    lib
+    COMPONENT
+    Runtime)
+endif()
+
+# macdeployqt 需要看到先复制进 bundle 的 native SDK 库，才能修正它们及 app
+# 的 @rpath 引用；因此 Qt 部署步骤放在 runtime dependency set 之后执行。
+install(SCRIPT "${panta_native_qml_deploy_script}" COMPONENT Runtime)

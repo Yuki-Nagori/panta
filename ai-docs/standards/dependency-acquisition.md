@@ -59,9 +59,9 @@
 
 当前流程（004 已接通调度；Qt 预编译供给由 005 落地，VTK/OCCT/Netgen 预编译供给由 031 负责，工具二进制由 020 负责）：
 
-1. 按 [README 环境要求](../../README.md#环境要求) 安装平台前置（macOS：Apple CLT；Linux：C 编译器与 OpenGL 前置；Windows：MSVC）与 rustup；CMake/Ninja/Qt/VTK/OCCT/Netgen 由固定预编译供给处理。
+1. 按 [README 系统要求](../../README.md#系统要求) 安装平台前置（macOS：Apple CLT；Linux：C 编译器与 OpenGL 前置；Windows：MSVC）与 rustup；CMake/Ninja/Qt/VTK/OCCT/Netgen 由固定预编译供给处理。
 2. 在仓库内执行 `rustup toolchain install 1.98.1`（或首次 cargo 命令时按 rustup 提示安装）。
-3. `cargo build --locked`：launcher 的 build.rs 调度 CMake/Ninja，消费构建树内固定的预编译依赖（缺失或 ABI 不匹配时立即失败并给出诊断）；`cargo run` 启动 `panta-native` 并转发参数与退出码。VTK/OCCT/Netgen SDK 由 031 manifest 供应用例引擎消费；GoogleTest v1.18.0 也已在 `native/cmake/sdk-provision.cmake` 登记，仅构建测试时从 Release 下载并强校验，统一缓存于 `target/panta-deps/sdk/`。
+3. `cargo build --locked`：launcher 的 build.rs 调度 CMake/Ninja，消费构建树内固定的预编译依赖（缺失或 ABI 不匹配时立即失败并给出诊断）；`cargo run` 启动 `panta`（Windows 为 `panta.exe`）并转发参数与退出码。VTK/OCCT/Netgen SDK 由 031 manifest 供应用例引擎消费；GoogleTest v1.18.0 也已在 `native/cmake/sdk-provision.cmake` 登记，仅构建测试时从 Release 下载并强校验，统一缓存于 `target/panta-deps/sdk/`。
 
 验证入口见 [构建与开发](../architecture/build-and-development.md)；每项依赖的集成验证任务见固定清单最后一列。
 

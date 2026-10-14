@@ -1,4 +1,6 @@
 [alias]
+# 安装当前 Cargo profile 对应的桌面运行目录（不是平台安装器）。
+panta-package = "run --locked --package panta-launcher -- package"
 # 根目录跨语言质量入口；实现位于 tests/，避免 shell/Node 运行时分叉。
 performance = "run -q --locked --package panta-tests -- performance"
 quality = "run -q --locked --package panta-tests -- quality"

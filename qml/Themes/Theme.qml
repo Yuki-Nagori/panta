@@ -33,7 +33,6 @@ QtObject {
     readonly property color colorDocumentBandLine: "#c8c4c0"
     readonly property color colorDocumentHover: "#f0eeec"
     readonly property color colorDocumentClosePressed: "#d5e3ef"
-    readonly property color colorDocumentWelcomeIcon: "#a83e47"
     readonly property color colorDialogPrimary: "#e5f1fb"
     readonly property color colorDialogPrimaryBorder: "#5d9fc7"
 

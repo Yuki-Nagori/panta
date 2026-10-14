@@ -34,8 +34,8 @@
 
 - Rust、C++、QML 功能测试和行为回归统一运行 `cargo test --locked --workspace`；该命令会构建并运行 Rust/native 测试，聚合 `qmllint` 与 CTest。常规构建和质量检查使用 `cargo build`、`cargo format --check`、`cargo lint`。定向 crate 测试、CTest 或单项 lint 用于定位问题，最终结果以适用的 Cargo 聚合入口为准。
 - CPU/GPU 性能基准由对应任务单独运行，不纳入常规单测或 CI 时间门禁。
-- 需要真实窗口验收时先运行 `cargo build --locked`，再启动 `target/native/debug/panta-native`（Windows 为 `panta-native.exe`）。macOS 上若 computer use 无法绑定裸二进制，在忽略目录 `target/native/debug/app/PantaPreview.app` 建临时 app wrapper：`Info.plist` 将 `CFBundleExecutable` 指向启动脚本，脚本切到仓库根目录并执行上述二进制；随后用 `cua.getApp` 绑定 `.app`，并调用 `getAXStateAndScreenshot()` 检查真实窗口。每次 UI 操作后刷新 `getAXState()`，按最新状态定位控件。
-- 验收结束时关闭应用并删除临时 wrapper。不要为验收先连接 VS Code，也不要把无头 QML/CTest 或仅启动进程当作真实 GPU 窗口通过。Linux / Windows 使用窗口清单中的实际窗口 ID 绑定。图形会话不可用时记录具体限制；用户人工验收可作为独立证据。
+- 需要真实窗口验收时先运行 `cargo build --locked`。macOS 绑定 `target/native/debug/app/panta.app`，或启动其 `Contents/MacOS/panta`；Windows/Linux 启动 `target/native/debug/app/panta.exe` 或 `target/native/debug/app/panta`。macOS 用 `cua.getApp` 绑定 `.app` 并调用 `getAXStateAndScreenshot()` 检查真实窗口。每次 UI 操作后刷新 `getAXState()`，按最新状态定位控件。
+- 验收结束时关闭应用。不要为验收先连接 VS Code，也不要把无头 QML/CTest 或仅启动进程当作真实 GPU 窗口通过。Linux / Windows 使用窗口清单中的实际窗口 ID 绑定。图形会话不可用时记录具体限制；用户人工验收可作为独立证据。
 
 ## Subagent 使用规则
 
