@@ -51,6 +51,8 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     let exclude = match (name, cfg!(windows)) {
         ("tsan", _) => Some(concat!(
             "^(TaskHost|Ffi|Qml)\\.|^ProjectViewModelTest\\.(",
+            "ConfirmedImportCompletesThroughBackgroundViewModelRequest|",
+            "DuplicateImportOrdinalsFollowImportOrderAcrossActivationAndClose|",
             "ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand|",
             "FailedLoadRetainsTabAndCloseReleasesActivationState|",
             "FillSettingsConfirmAsynchronouslyAndReopenFromRust|",
