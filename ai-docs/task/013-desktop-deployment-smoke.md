@@ -69,6 +69,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 | 2026-10-14 | macOS arm64；`cargo panta-package /tmp/panta-package-final` | 通过；Cargo 桌面安装入口生成可搬迁目录，Qt 部署日志未报告 unresolved dependency。 |
 | 2026-10-14 | 清除开发环境变量后运行安装 app 内的 executable；CUA 绑定安装目录 `.app` 检查真实窗口 | 通过；可见应用主窗口及 viewport。AX 检查确认安装版运行。 |
 | 2026-10-14 | `otool -L` 与 `otool -l` 检查安装 app executable 和打包动态库（166 个） | 通过；无仓库、用户目录或 `/tmp` 绝对依赖路径，也无非系统绝对 RPATH。 |
+| 2026-10-14 | GitHub Actions `Package desktop builds`（run 38503461890） | macOS arm64 与 Linux x86_64 安装树和归档通过；Windows x86_64 在运行库收集阶段失败，CMake 将 Windows API Set 虚拟 DLL 报为未解析依赖。修复已加入预排除规则，等待 CI 复验。 |
 | 待平台验收 | Windows x64、Linux x86_64 | 尚未在各平台安装树和真实窗口验收，不宣称受支持。 |
 
 ## 风险与回退
@@ -82,6 +83,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：所有平台的应用 executable 统一命名为 `panta`（Windows 为 `panta.exe`）；macOS bundle 为 `panta.app`。新增 `Panta.App` 入口包装 Shell 页，Qt 部署脚本据此扫描传递的 QML imports。CMake 安装阶段部署 Qt/QML、应用链接闭包内的 native 动态库，并随包保存 SDK 许可/provenance 与 Qt SPDX/CycloneDX SBOM。launcher 按平台定位 executable。独立安装位置、清洁环境启动和真实窗口验收通过；166 个 app/打包动态库的 Mach-O 依赖/RPATH 检查没有发现开发机绝对路径。统一命名变更后的重建与安装验证待复验。
 - 2026-10-14：独立评审确认 Windows Dawn 通过 `LoadLibrary` 动态加载 `d3dcompiler_47.dll`，CMake 依赖扫描无法发现；新增 Windows install 规则，从 `%WINDIR%/System32` 将 DLL 放到安装 `bin`。同时将 Qt SBOM 安装移出 Bridge 条件，确保 `--no-default-features` 的 Qt Shell 变体也有清单。Qt 部署脚本延后到 native 运行库复制之后，让 macdeployqt 能修正完整 app 链接闭包的 `@rpath`。以上 Windows 行为未在本机实测，等待 Windows CI/实机验收。
 - 2026-10-14：新增手动 `Package desktop builds` workflow，三平台分别构建 Release、通过 `cargo run --locked --release --package panta-launcher -- package "$PACKAGE_DIR"` 执行安装并上传 1 天有效的测试归档。workflow 配置已本地检查，三平台结果须在 GitHub Actions 手动运行后记录；Linux 测试机需满足 README 所列系统运行时要求。
+- 2026-10-14：首次手动打包中 macOS arm64 与 Linux x86_64 成功；Windows x86_64 的 `file(GET_RUNTIME_DEPENDENCIES)` 将 `api-ms-win-*` API Set 虚拟 DLL 报为未解析依赖。Windows 安装规则在扫描前排除 `api-ms-*` 和 `ext-ms-*` 系统名称。独立评审确认正则只匹配这两类 API Set；修复效果仍须由 Windows Actions 复验。
 - 2026-10-14：将维护者提供的 Welcome tab CSS 视觉临时实现为 SVG，加入 app 窗口图标并替换 Welcome 页签上的文字 P。它作为临时品牌资源单独打包，不加入操作图标 symbol 清单。
 - 当前范围限制：桌面 app 实际只链接 VTK。OCCT 和 Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包；第一条验收保持未完成，需在桌面功能正式接入后补库加载验收。Windows/Linux 安装与实机验收也未完成。
 
