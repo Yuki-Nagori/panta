@@ -41,13 +41,12 @@ if(PANTA_ENABLE_BRIDGE_MODULE)
   target_link_libraries(panta_native_app PRIVATE panta::visualization)
   target_link_libraries(panta_native_app PRIVATE panta_bridgeplugin panta_visualizationplugin)
   target_compile_definitions(panta_native_app PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
-  set(_panta_app_entry_file "${CMAKE_CURRENT_SOURCE_DIR}/../../qml/AppEntry.qml")
+  set(_panta_entry "${CMAKE_CURRENT_SOURCE_DIR}/../../qml/AppEntry.qml")
 else()
-  set(_panta_app_entry_file "${CMAKE_CURRENT_SOURCE_DIR}/../../qml/AppNoBridgeEntry.qml")
+  set(_panta_entry "${CMAKE_CURRENT_SOURCE_DIR}/../../qml/AppNoBridgeEntry.qml")
 endif()
-get_filename_component(_panta_app_entry_alias "${_panta_app_entry_file}" NAME)
-set_source_files_properties("${_panta_app_entry_file}" PROPERTIES QT_RESOURCE_ALIAS
-                                                                  "${_panta_app_entry_alias}")
+get_filename_component(_panta_alias "${_panta_entry}" NAME)
+set_source_files_properties("${_panta_entry}" PROPERTIES QT_RESOURCE_ALIAS "${_panta_alias}")
 
 # 应用入口包装 Shell 的实际页面。独立应用模块让 Qt 部署扫描从应用目标追踪
 # Shell 及 QtQuick imports，不需要另外维护一份手写的 QML 依赖清单。
@@ -63,7 +62,7 @@ qt_add_qml_module(
   TARGET
   panta_shell
   QML_FILES
-  "${_panta_app_entry_file}")
+  "${_panta_entry}")
 
 if(BUILD_TESTING)
   add_executable(panta_qml_shell_module_test ../../tests/cpp/app/shell_module_load_test.cpp)
