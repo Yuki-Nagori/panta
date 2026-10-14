@@ -24,7 +24,7 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 
 | 平台 | 需要预装 |
 |---|---|
-| macOS（arm64；目标基线 13.0，SDK 已重产，消费端 CI 待验收） | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
+| macOS（arm64；目标基线 13.0） | git、[rustup](https://rustup.rs)、Apple 命令行工具（`xcode-select --install`） |
 | Linux | git、[rustup](https://rustup.rs)、C 编译器及 OpenGL/Wayland 前置；Debian/Ubuntu 需要 `pkg-config`、`libgl-dev`、`libegl1`、`libxkbcommon0`、`libxkbcommon-dev`、`libwayland-dev`、`wayland-protocols`，运行 QML 另需 `libgl1-mesa-dri`。Qt 预编译包要求 glibc ≥ 2.34。 |
 | Windows | git、[rustup](https://rustup.rs)、Visual Studio Build Tools 2022（MSVC） |
 
@@ -46,7 +46,7 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 | `cargo run --locked --package panta-tests -- toolchain` | 检查 Cargo 托管的编译、格式和构建工具。 |
 | `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典；`format --check` 检查格式。 |
 
-`cargo panta-package` 通过 Qt 部署脚本收集 Qt/QML 运行时，并由 CMake 安装 app 实际链接的 native 动态依赖及许可清单；不会带上 native 开发用静态库、头文件和 CMake 导出。它生成安装目录，不生成 DMG、MSI 或 DEB 安装器，也不执行签名或公证。macOS arm64 安装目录已做独立启动和真实窗口检查；Windows/Linux 的安装目录和目标机窗口仍待验收。
+`cargo panta-package` 通过 Qt 部署脚本收集 Qt/QML 运行时，并由 CMake 安装 app 实际链接的 native 动态依赖及许可清单；不会带上 native 开发用静态库、头文件和 CMake 导出。它生成安装目录，不生成 DMG、MSI 或 DEB 安装器，也不做 Developer ID 签名或公证。macOS arm64 的本地安装目录已做独立启动和真实窗口检查；下载的 CI 测试包会校验 app 资源签名完整性，但未公证，首次启动时 macOS 可能显示安全确认。Windows/Linux 的安装目录和目标机窗口仍待验收。
 
 GitHub Actions 的 **Package desktop builds** workflow 可手动触发，为 macOS arm64、Windows x86_64 和 Linux x86_64 分别构建测试包，并将归档作为保留 1 天的 workflow artifact 上传。下载后可转发给测试者；Linux 仍需满足[系统要求](#系统要求)。这些是便于测试的可搬迁目录，不是正式发行安装器。
 

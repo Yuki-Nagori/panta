@@ -60,6 +60,7 @@ jobs:
           case "$RUNNER_OS" in
             macOS)
               test -x "$PACKAGE_DIR/panta.app/Contents/MacOS/panta"
+              codesign --verify --deep --strict "$PACKAGE_DIR/panta.app"
               ;;
             Windows)
               test -f "$PACKAGE_DIR/bin/panta.exe"

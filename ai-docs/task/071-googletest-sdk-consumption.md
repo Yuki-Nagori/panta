@@ -1,6 +1,6 @@
 # 071 — GoogleTest SDK 消费接入
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[070 GoogleTest 三平台 SDK 制品 CI](070-googletest-sdk-ci.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)
 - 优先级：P1
@@ -74,7 +74,7 @@
 - [x] `cargo test --locked --workspace` 在当前 macOS 平台通过；native CTest 中各 GoogleTest suite 全绿。
 - [x] SDK 归档二次复用不下载；损坏 marker/哈希时按现有 provision 契约重建或拒绝。
 - [x] 三平台消费 CI 使用固定资产完成构建与测试；task / index / 固定清单已同步。
-- [ ] 消费端 CI 使用 2026-10-14 重产的三平台资产及新 manifest 完成构建与测试；macOS 13.0 部署基线复验通过。
+- [x] 消费端 CI 使用 2026-10-14 重产的三平台资产及新 manifest 完成构建与测试；macOS 13.0 部署基线复验通过。
 
 ## 验证计划与结果
 
@@ -90,8 +90,9 @@
 | 2026-09-24 | macOS：更新三平台摘要后运行 `cargo test --locked --workspace` | staging 用新 manifest 摘要下载/接受当前平台 SDK，native 与 Rust 测试通过 | 通过；staging marker SHA256 为 `654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`，native CTest 56/56 |
 | 2026-09-24 | GitHub Actions run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964) | 三平台 consumer CI 使用新 Release 摘要通过 | 该 run 的 commit `262ad8b` 尚未包含新 SHA；Windows 比较旧期望值与新资产 digest 后按设计拒绝，不能视为新 manifest 的消费者失败。下一次 push CI 待复验 |
 | 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | macOS arm64、Linux x86_64、Windows x86_64 使用新 manifest 完成 build/test；Windows sanitizer 与固定 ABI 校验通过 | 全绿。三平台 Cargo build/test 均成功，Windows MSVC sanitizer 成功；Release API 的三个归档 digest 与 manifest SHA256 一致 |
-| 2026-10-14 | `/tmp` 下载三平台全部 SDK 归档和 sidecar；逐包计算 SHA256、核对 sidecar/manifest，并运行 `tar -tzf` | 12 个归档的字节摘要与 sidecar、manifest 一致，归档目录表可读取 | 通过；VTK、OCCT、Netgen、GoogleTest 共 12 个归档全部匹配；新摘要消费端 CI 待运行 |
-| 2026-10-14 | macOS：`CARGO_TARGET_DIR=/tmp/panta-sdk-validation-target cargo test --locked --workspace` | 更新后的 manifest 消费 GoogleTest SDK，Rust、native 与 QML 聚合测试通过 | 通过；75/75 native CTest、Rust workspace 与 QML 检查通过。Linux/Windows 新摘要 consumer CI 待运行；临时 target 已清理 |
+| 2026-10-14 | `/tmp` 下载三平台全部 SDK 归档和 sidecar；逐包计算 SHA256、核对 sidecar/manifest，并运行 `tar -tzf` | 12 个归档的字节摘要与 sidecar、manifest 一致，归档目录表可读取 | 通过；VTK、OCCT、Netgen、GoogleTest 共 12 个归档全部匹配；消费端构建与测试后由 run 38516903553 验收通过 |
+| 2026-10-14 | macOS：`CARGO_TARGET_DIR=/tmp/panta-sdk-validation-target cargo test --locked --workspace` | 更新后的 manifest 消费 GoogleTest SDK，Rust、native 与 QML 聚合测试通过 | 通过；75/75 native CTest、Rust workspace 与 QML 检查通过；临时 target 已清理 |
+| 2026-10-14 | GitHub Actions main CI run [38516903553](https://github.com/Yuki-Nagori/panta/actions/runs/38516903553)，commit `d11442e` | 三平台消费更新后的 SDK manifest；Cargo 构建与测试、Rust/native/QML 及适用质量门禁通过 | 全绿；macOS arm64、Linux x86_64、Windows x86_64 均通过构建和 `cargo test --locked --workspace`。Windows 安装包阶段另有失败，属于任务 013 的部署规则，不影响 GoogleTest 消费验收 |
 
 ## 风险与回退
 
@@ -109,4 +110,4 @@ SDK 的静态库 ABI 必须匹配消费者的系统标准库和 Windows CRT。�
 
 ## 完成摘要
 
-GoogleTest 静态 SDK 通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。之前的消费闭环由 run 36001859191 验证；2026-10-14 三平台资产按 macOS 13.0 目标重产，当前摘要已同步，等待新摘要的消费端 CI 复验。
+GoogleTest 静态 SDK 通过固定 URL/SHA256 manifest 供给；移除 FetchContent；仅支持 macOS arm64、Linux x86_64、Windows x86_64。2026-10-14 三平台资产按 macOS 13.0 目标重产后，main CI run 38516903553 已通过三平台构建和聚合测试，消费接入验收完成。桌面安装包的 Windows 路径问题由任务 013 跟进。

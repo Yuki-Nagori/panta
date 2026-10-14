@@ -115,6 +115,9 @@ install(
 # native 依赖离开开发机路径后仍可加载。
 qt_generate_deploy_qml_app_script(TARGET panta_native_app OUTPUT_SCRIPT
                                   panta_native_qml_deploy_script NO_TRANSLATIONS)
+set(PANTA_NATIVE_QML_DEPLOY_SCRIPT
+    "${panta_native_qml_deploy_script}"
+    PARENT_SCOPE)
 if(APPLE)
   install(
     RUNTIME_DEPENDENCY_SET
@@ -177,7 +180,3 @@ else()
     COMPONENT
     Runtime)
 endif()
-
-# macdeployqt 需要看到先复制进 bundle 的 native SDK 库，才能修正它们及 app
-# 的 @rpath 引用；因此 Qt 部署步骤放在 runtime dependency set 之后执行。
-install(SCRIPT "${panta_native_qml_deploy_script}" COMPONENT Runtime)

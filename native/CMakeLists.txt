@@ -166,6 +166,9 @@ if(PANTA_ENABLE_BRIDGE_MODULE)
     get_property(_panta_sdk_version GLOBAL PROPERTY "panta_sdk_version_${_panta_sdk}")
     set(_panta_sdk_root
         "${PANTA_SDK_PROVISION_DIR}/${_panta_sdk}/${_panta_sdk_version}/${_panta_runtime_triple}")
+    # install() 会把源路径写入 cmake_install.cmake；将 Windows 反斜杠转成
+    # CMake 路径分隔符，避免 `\a`、`\t` 等被安装脚本当作转义序列。
+    string(REPLACE "\\" "/" _panta_sdk_root "${_panta_sdk_root}")
     if(EXISTS "${_panta_sdk_root}/share/licenses")
       install(
         DIRECTORY "${_panta_sdk_root}/share/licenses/"
@@ -188,8 +191,9 @@ if(APPLE)
 else()
   set(_panta_runtime_resource_dir "share/panta")
 endif()
+string(REPLACE "\\" "/" _panta_qt_staging "${QT_STAGING}")
 install(
-  DIRECTORY "${QT_STAGING}/sbom/"
+  DIRECTORY "${_panta_qt_staging}/sbom/"
   DESTINATION "${_panta_runtime_resource_dir}/sbom"
   COMPONENT Runtime
   FILES_MATCHING
@@ -213,6 +217,10 @@ install(
 install(FILES "${CMAKE_BINARY_DIR}/cmake/panta-native-config.cmake"
               "${CMAKE_BINARY_DIR}/cmake/panta-native-config-version.cmake"
         DESTINATION "${PANTA_NATIVE_INSTALL_CONFIG_DIR}")
+
+# Qt 部署脚本必须在全部 bundle 资源安装后执行。macOS 的部署工具会签名 app；
+# 若许可证或 SBOM 随后再写入 bundle，资源封印会失效，Gatekeeper 将拒绝启动。
+install(SCRIPT "${PANTA_NATIVE_QML_DEPLOY_SCRIPT}" COMPONENT Runtime)
 
 # 等 Qt 的延迟目标创建完成后审计，包括 plugin_init/resource object targets。
 cmake_language(DEFER CALL panta_verify_msvc_abi "${CMAKE_CURRENT_SOURCE_DIR}")
