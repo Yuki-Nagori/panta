@@ -54,6 +54,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - [ ] 安装产物在独立位置启动，基础窗口/VTK 可用；app 实际链接的 native 动态依赖可加载。OCCT/Netgen 接入桌面 app 后补加载验收。
 - [x] macOS arm64 清理开发环境变量后仍可定位资源与依赖；记录平台和验证范围。
 - [x] 安装树含 SDK 许可、版本 provenance 与 Qt SBOM 清单；未验证的平台没有标记为支持。
+- [ ] macOS 归档中的 app 在全部资源安装完成后签名完整，`codesign --verify --deep --strict` 通过。
 - [x] 已同步 Cargo 安装命令、README、构建说明和当前架构事实，task-index 保持 in-progress。
 
 - [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
@@ -67,10 +68,15 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 | 2026-10-14 | macOS arm64；`cargo build --locked` | 通过；生成 `target/native/debug/app/panta.app`，bundle 内 executable 为 `panta`。本机构建信息：Apple clang 17、Qt 6.11.2、VTK 9.7.0。 |
 | 2026-10-14 | macOS arm64；`cmake --install target/native/debug --prefix /tmp/panta-013-install` | 通过；生成独立 `.app`，部署 Qt/QML 插件、VTK 动态库、SDK 许可和 provenance、Qt SBOM。 |
 | 2026-10-14 | macOS arm64；`cargo panta-package /tmp/panta-package-final` | 通过；Cargo 桌面安装入口生成可搬迁目录，Qt 部署日志未报告 unresolved dependency。 |
+| 2026-10-14 | macOS；检查用户下载的 `panta.app`，运行 `codesign --verify --deep --strict` 并从 executable 启动 | 失败；Qt 部署脚本先签名 app，随后安装的 SDK licenses、provenance 与 Qt SBOM 被报告为 sealed resource missing/invalid，直接启动退出码 137。已将 Qt 部署脚本移至所有资源安装之后，并在 package workflow 加签名完整性检查；等待 CI 复验。 |
 | 2026-10-14 | 清除开发环境变量后运行安装 app 内的 executable；CUA 绑定安装目录 `.app` 检查真实窗口 | 通过；可见应用主窗口及 viewport。AX 检查确认安装版运行。 |
 | 2026-10-14 | `otool -L` 与 `otool -l` 检查安装 app executable 和打包动态库（166 个） | 通过；无仓库、用户目录或 `/tmp` 绝对依赖路径，也无非系统绝对 RPATH。 |
 | 2026-10-14 | GitHub Actions `Package desktop builds`（run 38503461890） | macOS arm64 与 Linux x86_64 安装树和归档通过；Windows x86_64 在运行库收集阶段失败，CMake 将 Windows API Set 虚拟 DLL 报为未解析依赖。修复已加入预排除规则，等待 CI 复验。 |
 | 2026-10-14 | GitHub Actions `Package desktop builds`（run 38505719386） | macOS arm64 与 Linux x86_64 安装树和归档通过；Windows x86_64 越过 API Set 扫描后，在安装 `d3dcompiler_47.dll` 时失败：`C:\Windows` 被写入 `cmake_install.cmake` 后触发非法 `\W` 转义。安装与开发部署路径均改为共享的正斜杠路径，等待 Windows CI 复验。 |
+| 2026-10-14 | GitHub Actions `Package desktop builds`（run 38516920066，job 115697697724） | macOS arm64 与 Linux x86_64 安装树和归档通过；Windows x86_64 已完成 Qt 部署和 `d3dcompiler_47.dll` 安装，随后在安装 VTK 许可证目录时失败：SDK 源路径 `D:\a\...` 被写入 `cmake_install.cmake`，其中 `\a` 被当作非法转义。修复为生成 install 规则前规范化 SDK 与 Qt SBOM 源路径，待 Windows CI 复验。 |
+| 2026-10-14 | macOS；`cmake -P /tmp/panta-install-path-check.cmake`，使用 Windows 风格 SDK/Qt 路径生成并解析 CMake 安装脚本 | 通过；规范化后生成脚本中的路径为正斜杠，CMake 可正常解析。 |
+| 2026-10-14 | macOS；`cmake --install target/native/debug --prefix /tmp/panta-package-signature-check`，随后运行 `codesign --verify --deep --strict /tmp/panta-package-signature-check/panta.app` | 通过；重新生成的安装脚本先安装 licenses、provenance 与 SBOM，最后执行 Qt 部署；本地安装 bundle 的签名封印有效。 |
+| 2026-10-14 | 仓库根目录；`cargo test --locked --workspace` | 通过；Rust workspace、native CTest（75/75）与 QML 聚合测试通过。首次尝试因本地 OCCT SDK 缓存摘要不符触发重下载，受 DNS 限制未完成；重试后验证通过。 |
 | 待平台验收 | Windows x64、Linux x86_64 | 尚未在各平台安装树和真实窗口验收，不宣称受支持。 |
 
 ## 风险与回退
@@ -87,6 +93,9 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：首次手动打包中 macOS arm64 与 Linux x86_64 成功；Windows x86_64 的 `file(GET_RUNTIME_DEPENDENCIES)` 将 `api-ms-win-*` API Set 虚拟 DLL 报为未解析依赖。Windows 安装规则在扫描前排除 `api-ms-*` 和 `ext-ms-*` 系统名称。独立评审确认正则只匹配这两类 API Set；修复效果仍须由 Windows Actions 复验。
 - 2026-10-14：Windows package run 38505719386 确认 API Set 预排除已生效；新失败来自 `install(FILES "$ENV{windir}/...")` 将 `C:\Windows` 写入生成的 CMake 安装脚本，`\W` 触发解析错误。安装规则与开发期拷贝共用 `PANTA_D3DCOMPILER_47_DLL`，配置时先把 Windows 系统根目录转换为 CMake 正斜杠格式；等待 Windows Actions 复验。
 - 2026-10-14：将 app、CXX bridge、VTK/Dawn、OCCT、Netgen、GoogleTest 的 macOS 构建最低版本统一为 13.0；Qt 6.11.2 已支持 13.0。更新三个 SDK Release 说明为中文并移除重复一级标题。VTK/Dawn、OCCT/Netgen、GoogleTest 三个平台归档已按新基线重产，Release 与 manifest SHA 已更新；消费端 CI 和 app 安装验收仍待复验。
+- 2026-10-14：Windows package run 38516920066/job 115697697724 确认前次路径修复有效；新错误位于 SDK 许可证安装规则，`PANTA_SDK_PROVISION_DIR` 的 Windows 反斜杠使 `cmake_install.cmake` 把 `\a` 解析为非法转义。规范化 SDK install 源路径及 Qt SBOM 源路径，等待 Windows package 复验。
+- 2026-10-14：检查用户下载的 macOS `.app`，发现 Qt 部署签名后才安装 SDK licenses、provenance 与 Qt SBOM，导致 sealed resources 失效并使启动被系统终止。将 Qt 部署脚本安排在全部 install 资源之后，并在 package workflow 中运行 `codesign --verify --deep --strict`，等待打包 CI 验证。
+- 2026-10-14：独立只读评审检查完整 diff 及 native install 源路径，未发现遗漏的 Windows 反斜杠路径或文档验收问题；Windows package 复验仍待运行。
 - 2026-10-14：将维护者提供的 Welcome tab CSS 视觉临时实现为 SVG，加入 app 窗口图标并替换 Welcome 页签上的文字 P。它作为临时品牌资源单独打包，不加入操作图标 symbol 清单。
 - 当前范围限制：桌面 app 实际只链接 VTK。OCCT 和 Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包；第一条验收保持未完成，需在桌面功能正式接入后补库加载验收。Windows/Linux 安装与实机验收也未完成。
 
