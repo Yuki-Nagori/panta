@@ -121,9 +121,11 @@ struct VtkViewport::Impl {
     vtkSmartPointer<vtkWebGPURenderer> renderer;
     vtkSmartPointer<vtkRenderWindowInteractor> interactor;
     vtkSmartPointer<vtkActor> primitive_actor;
+    vtkSmartPointer<vtkActor> gate_actor;
     vtkWeakPointer<vtkObject> previous_mapper;
     vtkWeakPointer<vtkObject> webgpu_configuration;
     vtkWeakPointer<vtkObject> retired_actor;
+    vtkWeakPointer<vtkObject> retired_gate_actor;
     vtkWeakPointer<vtkObject> retired_interactor;
     vtkWeakPointer<vtkObject> retired_render_window;
     vtkWeakPointer<vtkObject> retired_hardware_window;
@@ -215,6 +217,7 @@ bool VtkViewport::test_interaction_observers_registered() const {
 
 bool VtkViewport::test_previous_window_resources_released() const {
     return impl_->retired_actor.GetPointer() == nullptr &&
+           impl_->retired_gate_actor.GetPointer() == nullptr &&
            impl_->retired_interactor.GetPointer() == nullptr &&
            impl_->retired_render_window.GetPointer() == nullptr &&
            impl_->retired_hardware_window.GetPointer() == nullptr &&
@@ -371,10 +374,12 @@ void VtkViewport::ensure_render_window() {
     impl_->renderer->SetBackground2(0.98, 0.98, 0.98);
     impl_->renderer->GradientBackgroundOn();
     impl_->primitive_actor = vtkSmartPointer<vtkActor>::New();
+    impl_->gate_actor = vtkSmartPointer<vtkActor>::New();
 
     update_mesh_actor();
     impl_->applied_mesh = impl_->pending.mesh;
     impl_->renderer->AddActor(impl_->primitive_actor);
+    impl_->renderer->AddActor(impl_->gate_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
 
 #if defined(Q_OS_MACOS)
@@ -438,7 +443,11 @@ void VtkViewport::update_mesh_actor() {
 
     vtkMapper* previous_mapper = impl_->primitive_actor->GetMapper();
     impl_->previous_mapper = previous_mapper;
-    replace_primitive_geometry(impl_->primitive_actor, impl_->render_window, impl_->pending.mesh);
+    replace_primitive_geometry(impl_->primitive_actor, impl_->render_window, impl_->pending.mesh,
+                               impl_->pending.playback_time);
+    if (impl_->gate_actor != nullptr) {
+        replace_gate_geometry(impl_->gate_actor, impl_->render_window, impl_->pending.mesh);
+    }
 }
 
 void VtkViewport::handle_interaction_event(unsigned long event_id,
@@ -658,6 +667,7 @@ void VtkViewport::destroy_render_window() {
     impl_->pointer_dragging = false;
     impl_->cube_pressed = false;
     impl_->retired_actor = impl_->primitive_actor;
+    impl_->retired_gate_actor = impl_->gate_actor;
     impl_->retired_interactor = impl_->interactor;
     impl_->retired_render_window = impl_->render_window;
     impl_->retired_hardware_window = impl_->hardware_window.get();
@@ -682,6 +692,7 @@ void VtkViewport::destroy_render_window() {
     impl_->renderer = nullptr;
     impl_->interactor = nullptr;
     impl_->primitive_actor = nullptr;
+    impl_->gate_actor = nullptr;
     impl_->applied_mesh.reset();
     if (impl_->hardware_window != nullptr) {
         impl_->hardware_window->Destroy();

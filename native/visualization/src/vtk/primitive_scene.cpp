@@ -91,7 +91,28 @@ void replace_primitive_geometry(vtkActor* actor, vtkRenderWindow* window,
         material->SetColor(0.72, 0.82, 0.94);
         material->SetEdgeVisibility(mesh->show_edges);
         material->SetEdgeColor(0.12, 0.17, 0.24);
+    } else {
+        // Welcome 字标与导入网格共用 actor；分析网格打开边线后必须关掉，
+        // 否则三角字标会残留网线。
+        material->SetEdgeVisibility(0);
     }
+}
+
+// 浇口标记独立于网格 actor：只有激活浇口子方案时才显示，颜色与云图图例的红端一致。
+void replace_gate_geometry(vtkActor* actor, vtkRenderWindow* window,
+                           const std::shared_ptr<const SurfaceMeshSnapshot>& mesh) {
+    const bool show_gates = mesh != nullptr && mesh->show_gates && !mesh->gate_points.empty();
+    vtkNew<vtkPolyDataMapper> mapper;
+    if (show_gates) {
+        mapper->SetInputData(make_gate_poly_data(*mesh));
+    }
+    auto* previous_mapper = actor->GetMapper();
+    if (previous_mapper != nullptr && window != nullptr) {
+        previous_mapper->ReleaseGraphicsResources(window);
+    }
+    actor->SetMapper(mapper);
+    actor->SetVisibility(show_gates ? 1 : 0);
+    actor->GetProperty()->SetColor(215.0 / 255.0, 49.0 / 255.0, 46.0 / 255.0);
 }
 
 } // namespace panta::visualization

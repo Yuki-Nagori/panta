@@ -47,6 +47,7 @@ class OffscreenVtkRenderer final {
         m_renderer->SetBackground2(0.98, 0.98, 0.98);
         m_renderer->GradientBackgroundOn();
         m_renderer->AddActor(m_actor);
+        m_renderer->AddActor(m_gate_actor);
         m_window->AddRenderer(m_renderer);
         m_orientation.attach(m_window);
         m_welcome.attach(m_window);
@@ -95,7 +96,9 @@ class OffscreenVtkRenderer final {
 
   private:
     void update_geometry(const panta::visualization::RenderScene& scene) {
-        panta::visualization::replace_primitive_geometry(m_actor, m_window, scene.mesh);
+        panta::visualization::replace_primitive_geometry(m_actor, m_window, scene.mesh,
+                                                         scene.playback_time);
+        panta::visualization::replace_gate_geometry(m_gate_actor, m_window, scene.mesh);
         const double aspect = static_cast<double>(m_pixels.width()) / m_pixels.height();
         panta::visualization::configure_default_camera(m_renderer, m_actor, aspect,
                                                        scene.mesh ? 1.25 : 2.25);
@@ -108,6 +111,7 @@ class OffscreenVtkRenderer final {
     vtkSmartPointer<vtkWebGPURenderWindow> m_window = vtkSmartPointer<vtkWebGPURenderWindow>::New();
     vtkSmartPointer<vtkWebGPURenderer> m_renderer = vtkSmartPointer<vtkWebGPURenderer>::New();
     vtkSmartPointer<vtkActor> m_actor = vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> m_gate_actor = vtkSmartPointer<vtkActor>::New();
     panta::visualization::ViewportOrientation m_orientation;
     panta::visualization::WelcomeScene m_welcome;
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_mesh;

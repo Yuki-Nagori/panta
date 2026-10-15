@@ -15,6 +15,10 @@ struct SurfaceMeshSnapshot;
 void replace_primitive_geometry(vtkActor* actor, vtkRenderWindow* window,
                                 const std::shared_ptr<const SurfaceMeshSnapshot>& mesh,
                                 double playback_time);
+/// 按 mesh 的 show_gates 与 gate_points 更新浇口标记：有推荐位置时显示红色球形，
+/// 其余情况隐藏并释放旧几何。GUI 线程调用；actor 非空；window 可空（仅 CPU 场景）。
+void replace_gate_geometry(vtkActor* actor, vtkRenderWindow* window,
+                           const std::shared_ptr<const SurfaceMeshSnapshot>& mesh);
 /// 使用 actor 的有效包围盒配置透视相机；aspect 和 fit_margin 必须为正。
 void configure_default_camera(vtkWebGPURenderer* renderer, vtkActor* actor, double aspect,
                               double fit_margin);

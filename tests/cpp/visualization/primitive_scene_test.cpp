@@ -16,6 +16,7 @@
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
+#include <vtkType.h>
 #include <vtkWeakPointer.h>
 #include <vtkWebGPURenderer.h>
 
@@ -46,6 +47,7 @@ class PrimitiveSceneTest final : public QObject {
         QCOMPARE(bounds[3], 20.0);
         panta::visualization::replace_primitive_geometry(actor, nullptr, {}, 0.0);
         QCOMPARE(actor->GetOrientation()[1], -18.0);
+        QCOMPARE(actor->GetProperty()->GetEdgeVisibility(), 0);
     }
     void fits_camera_to_aspect_and_margin() {
         vtkNew<vtkActor> actor;
@@ -98,6 +100,33 @@ class PrimitiveSceneTest final : public QObject {
         QVERIFY(pressure_data != nullptr);
         QVERIFY(pressure_data->GetPointData()->GetScalars() != nullptr);
         QCOMPARE(pressure_data->GetNumberOfPolys(), vtkIdType{1});
+    }
+    void toggles_gate_markers_with_snapshot_flags() {
+        vtkNew<vtkActor> actor;
+        panta::visualization::replace_gate_geometry(actor, nullptr, {});
+        QCOMPARE(actor->GetVisibility(), 0);
+        const auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        mesh->vertices = {{{0, 0, 0}}, {{10, 0, 0}}, {{0, 20, 0}}};
+        mesh->gate_points = {{{1.0, 2.0, 0.0}}};
+        mesh->show_gates = true;
+        panta::visualization::replace_gate_geometry(actor, nullptr, mesh);
+        QCOMPARE(actor->GetVisibility(), 1);
+        auto* mapper = vtkPolyDataMapper::SafeDownCast(actor->GetMapper());
+        QVERIFY(mapper != nullptr);
+        auto* markers = mapper->GetInput();
+        QVERIFY(markers != nullptr);
+        QVERIFY(markers->GetNumberOfPolys() > 0);
+        double bounds[6];
+        markers->GetBounds(bounds);
+        // 球形标记半径 2.5 mm，包围盒中心对准推荐浇口点。球源按 float 计算，且
+        // phi 采样不含赤道，横向宽度略小于直径，只约束中心与量级。
+        QVERIFY(std::abs((bounds[0] + bounds[1]) / 2 - 1.0) < 1e-6);
+        QVERIFY(std::abs((bounds[2] + bounds[3]) / 2 - 2.0) < 1e-6);
+        QVERIFY(bounds[1] - bounds[0] > 4.9 && bounds[1] - bounds[0] <= 5.0 + 1e-6);
+        QCOMPARE(actor->GetProperty()->GetColor()[0], 215.0 / 255.0);
+        mesh->show_gates = false;
+        panta::visualization::replace_gate_geometry(actor, nullptr, mesh);
+        QCOMPARE(actor->GetVisibility(), 0);
     }
 };
 QTEST_GUILESS_MAIN(PrimitiveSceneTest)
