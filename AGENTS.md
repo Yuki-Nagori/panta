@@ -32,7 +32,8 @@
 
 ## 构建、测试与窗口验收
 
-- Rust、C++、QML 功能测试和行为回归统一运行 `cargo test --locked --workspace`；该命令会构建并运行 Rust/native 测试，聚合 `qmllint` 与 CTest。常规构建和质量检查使用 `cargo build`、`cargo format --check`、`cargo lint`。定向 crate 测试、CTest 或单项 lint 用于定位问题，最终结果以适用的 Cargo 聚合入口为准。
+- 本地日常开发先运行 `cargo test-plan` 查看影响范围，再用 `cargo test-scope l1` 验证直接受影响的 Rust package，或用 `cargo test-scope l2` 验证其消费者闭包及相关 native/QML 测试；选择器遇到空输入、未知路径或公共构建边界时会自动升级为完整范围。修改后和评审修复后优先重跑受影响范围，不重复运行 workspace 全量测试。
+- `cargo test --locked --workspace` 是完整 Rust/native/QML 聚合测试入口，适用于明确要求全量验收、影响无法安全缩小的改动，以及 nightly CI；日常开发无需每次重复运行。常规构建和质量检查使用 `cargo build`、`cargo format --check`、`cargo lint`，并按改动范围执行相应检查。
 - CPU/GPU 性能基准由对应任务单独运行，不纳入常规单测或 CI 时间门禁。
 - 需要真实窗口验收时先运行 `cargo build --locked`。macOS 绑定 `target/native/debug/app/panta.app`，或启动其 `Contents/MacOS/panta`；Windows/Linux 启动 `target/native/debug/app/panta.exe` 或 `target/native/debug/app/panta`。macOS 用 `cua.getApp` 绑定 `.app` 并调用 `getAXStateAndScreenshot()` 检查真实窗口。每次 UI 操作后刷新 `getAXState()`，按最新状态定位控件。
 - 验收结束时关闭应用。不要为验收先连接 VS Code，也不要把无头 QML/CTest 或仅启动进程当作真实 GPU 窗口通过。Linux / Windows 使用窗口清单中的实际窗口 ID 绑定。图形会话不可用时记录具体限制；用户人工验收可作为独立证据。
@@ -55,7 +56,7 @@
 
 - 委派说明列明目标、范围、相关路径、验收条件、需要运行的检查，以及只读评审或获准修改。独立评审默认只读，不让评审者顺手重写被评代码。
 - 评审报告应提供可操作的问题、文件与行号、触发条件和影响。没有发现问题时也要说明检查范围与限制。主代理判断发现是否成立，负责修复、验证和更新文档，并将评审结果记录在所属任务中；不把评审结论直接当作通过证明。
-- 等待评审时，主代理继续处理不依赖评审结论的工作。修复评审发现后，重跑受影响测试及完整交付门禁；必要时请评审者复核。
+- 等待评审时，主代理继续处理不依赖评审结论的工作。修复评审发现后，重跑受影响测试及适用的交付门禁；只有影响无法安全缩小或明确要求完整验收时才运行全量测试，必要时请评审者复核。
 - Subagent 不自行提交、推送、创建或合并 PR，也不代表用户对外沟通，除非用户明确授权。
 
 ## 分支、GitHub 与提交

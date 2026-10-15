@@ -166,12 +166,18 @@ function(panta_add_qml_test name target)
   if(_panta_sanitizers)
     set(_panta_qml_timeout 120)
   endif()
+  set(_panta_qml_labels qml)
+  if(ARGC GREATER 2)
+    list(APPEND _panta_qml_labels "${ARGV2}")
+  endif()
   add_test(NAME ${name} COMMAND ${target})
   set_tests_properties(
     ${name}
     PROPERTIES
       TIMEOUT
       ${_panta_qml_timeout}
+      LABELS
+      "${_panta_qml_labels}"
       ENVIRONMENT
       "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;QT_QUICK_CONTROLS_STYLE=Basic;QT_PLUGIN_PATH=${QT_STAGING}/plugins;QML_IMPORT_PATH=${QT_STAGING}/qml"
   )

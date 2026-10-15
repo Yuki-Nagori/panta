@@ -9,6 +9,7 @@ mod miri;
 mod paths;
 mod performance;
 mod sanitize;
+mod test_scope;
 mod toolchain;
 
 use std::error::Error;
@@ -20,6 +21,8 @@ fn main() -> ExitCode {
         Some("quality") => quality(),
         Some("performance") => performance::run(arguments.collect()),
         Some("test") => build::test_all(),
+        Some("test-plan") => test_scope::print_plan(arguments.collect()),
+        Some("test-scope") => test_scope::run_scope(arguments.collect()),
         Some("format") => {
             let mut rest: Vec<String> = arguments.collect();
             let check = take_check_flag(&mut rest);
@@ -41,12 +44,12 @@ fn main() -> ExitCode {
             lint::lint(rest.first().map(String::as_str), check)
         }
         Some(command) => Err(format!(
-            "未知命令 '{command}'；可用：quality、test、audit、lint、format、coverage、sanitize、\
+            "未知命令 '{command}'；可用：quality、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、\
              ub-check、toolchain、performance"
         )
         .into()),
         None => Err(
-            "缺少命令；可用：quality、test、audit、lint、format、coverage、sanitize、ub-check、\
+            "缺少命令；可用：quality、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、ub-check、\
                  toolchain、performance"
                 .into(),
         ),

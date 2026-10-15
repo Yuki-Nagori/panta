@@ -1,6 +1,6 @@
 # 测试目录与入口规范
 
-更新日期：2026-10-08。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
+更新日期：2026-10-16。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
 
 ## 目录职责
 
@@ -46,18 +46,24 @@ tests/
 
 ## 命令与 CI
 
-PR 测试耗时优化由[任务 120](../task/120-pr-affected-test-selection.md)优先实施：L1 运行变更范围内的快速局部验证，L2 沿 Cargo、CMake、CXX/FFI 与 QML 消费边扩展到受影响测试；公共接口、构建图与无法分类的变更升级到完整矩阵。无法可靠解析依赖闭包时，回退对应语言完整测试集。具体命令与升级条件由任务 120 根据真实依赖和测试标签验收。此策略仅用于 PR；main 保留现有完整门禁，nightly 保留现有 Miri、sanitizer 与 CPU performance 诊断套件。
+PR 测试耗时优化由[任务 120](../task/120-pr-affected-test-selection.md)实施：CI L1 运行直接受影响的 Rust package，L2 沿 Cargo 与跨语言消费边运行受影响的 Rust/native/QML 测试；它们是测试范围，不是[架构分层](layering.md)的层号。选择逻辑由 `panta-tests` Rust 实现，CI 与本地 `cargo test-plan` / `cargo test-scope l1|l2|all` 共用。公共接口、构建图、共享夹具与无法分类的变更升级到完整矩阵。PR 与 main push 都按影响范围运行测试，同时保留三平台 workspace 检查/构建和相关 lint；完整 workspace 测试、Rust/native coverage 与全量 lint 由 nightly 定时执行并归档覆盖率报告。
 
 本地日常入口：
 
 ```sh
 cargo test --locked --workspace   # workspace Rust + 根 tests/integration/native.rs
+cargo test-plan                   # 显示当前工作树的受影响 L1/L2 范围
+cargo test-scope l1               # 执行直接受影响的 Rust package 测试
+cargo test-scope l2               # 执行受影响消费者及 native/QML 测试
+cargo test-scope all              # 执行 L1、L2 与 native/QML 受影响测试
 cargo performance # 性能辅助正确性测试 → CPU → GPU，不纳入 CI 时间门禁
 cargo format     # Rust、C++/CXX、QML 格式
 cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner、Cppcheck
 cargo audit      # cargo-deny 依赖、许可证和 RustSec 审计
 cargo coverage   # cargo-llvm-cov Rust 覆盖率门禁
 ```
+
+`cargo test-scope` 默认将工作树与 `origin/main` 的 merge-base 比较；可传 `--base <ref>` 选择其他基线。运行 native 范围时，命令会先准备 launcher/native 构建树，再只构建并执行所选 CTest labels。
 
 `cargo lint <tool>` 用于单项定位。CI 对构建、测试、格式、每个 lint 工具、依赖审计和覆盖率分别建检查；CI 命令追加 `--locked`，确保 `Cargo.lock` 与 manifests 漂移时立即失败。`cargo quality` 只作为本地全量聚合入口，不作为 CI 的唯一检查名。
 

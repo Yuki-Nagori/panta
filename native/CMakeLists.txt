@@ -90,6 +90,7 @@ if(BUILD_TESTING)
       "${CMAKE_COMMAND}" "-DTEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/abi-policy-test"
       "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}" "-DTEST_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-abi.cmake")
+  set_tests_properties(Build.MsvcAbiPolicy PROPERTIES LABELS "build")
   # SDK 供给逻辑（031）用 fixture 归档驱动：不联网（file://）、不编译
   # （consumer 为 project NONE），三平台 CI 与本地同路径。
   add_test(
@@ -100,6 +101,7 @@ if(BUILD_TESTING)
       "-DPANTA_SDK_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk-provision.cmake"
       "-DCONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/sdk/consumer" -P
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/check-sdk-provision.cmake")
+  set_tests_properties(Build.SdkProvision PROPERTIES LABELS "build")
   # GoogleTest v1.18.0 通过固定 manifest 下载并缓存到共享 SDK 根目录。
   # 只消费 gtest targets；gmock 待模块边界场景出现时按对应 task 打开。
   panta_require_sdk(googletest PANTA_GOOGLETEST_STAGING)

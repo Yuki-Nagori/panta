@@ -2,23 +2,40 @@
 # .github/actions/*：changed-paths（路径分类门控）、panta-toolchain、
 # linux-gl-prereqs、panta-cache-restore / panta-cache-save（缓存两键，
 # 仅 check 在 main push 保存，其余 job 只恢复）。
-# - changes：按变更路径拆分触发，未知路径一律保守触发全量检查；
-# - check：唯一跨平台 job；每个平台都执行 check、build、测试套件与工具核验；
+# - changes：按变更路径拆分触发，未知路径一律保守触发全量检查并输出测试闭包；
+# - check：唯一跨平台 job；每个平台执行 check/build/工具核验和受影响测试；
 # - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位，按域触发；
 # - format：Ubuntu 上通过 cargo format --check 检查 Rust、C++/CXX、CMake、QML 和 `.pa`；
 # - dependency-audit：仅在依赖清单/审计配置变更时运行；
-# - coverage：Ubuntu 上分别执行 Rust 门禁与 native C++ 插桩报告与 QML 行为测试；
-# - 动态内存/UB 检查与性能采样由 nightly.yml 每日运行，避免将长时任务
-#   叠加到每次变更；定时结果作为诊断，不是 PR 阻断门禁。
+# - 完整 Rust/native coverage 与长时动态检查由 nightly.yml 每日运行；
+#   PR 与 main push 都按影响范围测试；nightly 独占完整测试与 coverage。
 name: CI
 
 on:
-  # 仅 Markdown 变更不创建 run；混合变更继续由 changes 分类。
+  # 纯文档变更不创建 run；代码目录内的 Markdown 夹具仍须触发测试。
   push:
     branches: [main]
-    paths-ignore: ["**/*.md"]
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "crates/**/*.md"
+      - "tests/**/*.md"
+      - "native/**/*.md"
+      - "qml/**/*.md"
+      - "resources/**/*.md"
+      - ".github/**/*.md"
+      - ".cargo/**/*.md"
   pull_request:
-    paths-ignore: ["**/*.md"]
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "crates/**/*.md"
+      - "tests/**/*.md"
+      - "native/**/*.md"
+      - "qml/**/*.md"
+      - "resources/**/*.md"
+      - ".github/**/*.md"
+      - ".cargo/**/*.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,13 +45,18 @@ jobs:
   changes:
     name: detect changed paths (ubuntu)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       code: ${{ steps.filter.outputs.code }}
       cargo_deps: ${{ steps.filter.outputs.cargo_deps }}
       rust: ${{ steps.filter.outputs.rust }}
       native: ${{ steps.filter.outputs.native }}
       qml: ${{ steps.filter.outputs.qml }}
+      test_packages: ${{ steps.filter.outputs.test_packages }}
+      test_packages_l1: ${{ steps.filter.outputs.test_packages_l1 }}
+      test_packages_l2: ${{ steps.filter.outputs.test_packages_l2 }}
+      native_labels: ${{ steps.filter.outputs.native_labels }}
+      full_tests: ${{ steps.filter.outputs.full_tests }}
     steps:
       # 本地 composite action 的解析依赖工作区已有仓库，checkout 必须在
       # 调用前完成；分类需要全量历史取 merge-base/before diff。
@@ -64,14 +86,36 @@ jobs:
         shell: bash
         run: cargo audit
 
-  lint:
+  lint-clippy:
+    name: cargo lint (clippy, ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+        with:
+          components: "rustfmt,clippy"
+
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Run Clippy
+        shell: bash
+        run: cargo lint clippy --check
+
+  lint-native:
     name: cargo lint (${{ matrix.tool }}, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.native == 'true'
     strategy:
       fail-fast: false
       matrix:
-        tool: [clippy, clang-tidy, includes, cppcheck]
+        tool: [clang-tidy, includes, cppcheck]
     runs-on: ubuntu-latest
     # 冷启动需供给 LLVM/Qt 并构建 native 树；上限防传输停滞拖满平台上限。
     timeout-minutes: 60
@@ -136,7 +180,7 @@ jobs:
   lint-qmllint:
     name: cargo lint (qmllint, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.qml == 'true' || needs.changes.outputs.native == 'true'
+    if: needs.changes.outputs.qml == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.native_labels != '[]' || needs.changes.outputs.full_tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -171,71 +215,6 @@ jobs:
       - name: Run aggregated cargo format check (Rust, C++/CXX, CMake and QML)
         shell: bash
         run: cargo format --check
-
-  coverage:
-    name: rust coverage gate (ubuntu)
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-
-      # llvm-tools-preview 提供 llvm-profdata/llvm-cov（覆盖率合并所需）。
-      - uses: ./.github/actions/panta-toolchain
-        with:
-          components: "llvm-tools-preview"
-
-      - uses: ./.github/actions/panta-cache-restore
-
-      # 全局阶段下限，不等于逐模块/逐提交防下降；具体边界见
-      # ai-docs/modules/quality-tooling.md。launcher 暂不纳入 Rust 插桩链。
-      # 使用与固定 rustc 配套的 llvm-tools-preview；branch 数据尚未采集。
-      - name: Coverage gate
-        shell: bash
-        run: cargo coverage
-
-      - name: Upload Rust coverage reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-coverage
-          path: target/rust-coverage/
-          if-no-files-found: error
-
-  native-coverage:
-    name: native C++ coverage and QML tests (ubuntu)
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/panta-toolchain
-
-      # 除链接期 GL 头文件外，QML 行为测试运行还需 libEGL/libxkbcommon
-      # 运行库与软件渲染驱动。
-      - if: runner.os == 'Linux'
-        uses: ./.github/actions/linux-gl-prereqs
-
-      - uses: ./.github/actions/panta-cache-restore
-
-      - name: Run native tests and report with managed LLVM
-        shell: bash
-        run: cargo coverage native
-
-      - name: Upload native coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-coverage
-          path: |
-            target/native-coverage/summary.txt
-            target/native-coverage/line-coverage.txt
-            target/native-coverage/product-summary.txt
-            target/native-coverage/product-line-coverage.txt
-            target/native-coverage/html/
-          if-no-files-found: error
 
   check:
     name: cargo check and build (${{ matrix.os }})
@@ -272,8 +251,66 @@ jobs:
         shell: bash
         run: cargo run --locked --package panta-tests -- toolchain
 
-      - name: Test
-        run: cargo test --locked --workspace
+      - name: Test L1 Rust packages
+        shell: bash
+        env:
+          TEST_PACKAGES: ${{ needs.changes.outputs.test_packages_l1 }}
+        run: |
+          selected=()
+          test_runner=false
+          while IFS= read -r -d '' package; do
+            [[ -n "$package" ]] || continue
+            if [[ "$package" == "panta-tests" ]]; then
+              test_runner=true
+            else
+              selected+=(--package "$package")
+            fi
+            printf 'Selected L1 Rust package: %s\n' "$package"
+          done < <(jq -j '.[] | ., "\u0000"' <<< "$TEST_PACKAGES")
+          if (( ${#selected[@]} > 0 )); then
+            cargo test --locked "${selected[@]}"
+          fi
+          if $test_runner; then
+            cargo test --locked --package panta-tests --bin panta-tests
+          fi
+
+      - name: Test L2 Rust consumers
+        shell: bash
+        env:
+          TEST_PACKAGES: ${{ needs.changes.outputs.test_packages_l2 }}
+        run: |
+          selected=()
+          test_runner=false
+          while IFS= read -r -d '' package; do
+            [[ -n "$package" ]] || continue
+            if [[ "$package" == "panta-tests" ]]; then
+              test_runner=true
+            else
+              selected+=(--package "$package")
+            fi
+            printf 'Selected L2 Rust package: %s\n' "$package"
+          done < <(jq -j '.[] | ., "\u0000"' <<< "$TEST_PACKAGES")
+          if (( ${#selected[@]} > 0 )); then
+            cargo test --locked "${selected[@]}"
+          fi
+          if $test_runner; then
+            cargo test --locked --package panta-tests --bin panta-tests
+          fi
+
+      - name: Test affected native and QML cases
+        if: needs.changes.outputs.native_labels != '[]'
+        shell: bash
+        env:
+          NATIVE_LABELS: ${{ needs.changes.outputs.native_labels }}
+          PANTA_TEST_QML_LINT: "false"
+        run: |
+          if [[ "${{ needs.changes.outputs.full_tests }}" == "true" ]]; then
+            cargo test --locked --package panta-tests --test native
+          else
+            labels="$(jq -r 'join("|")' <<< "$NATIVE_LABELS")"
+            export PANTA_TEST_CTEST_LABELS="^(${labels})$"
+            cargo test --locked --package panta-tests --test native
+          fi
 
       - uses: ./.github/actions/panta-cache-save
 

@@ -14,7 +14,7 @@
 ## 范围
 
 - 当前范围：Rust/Cargo、C++/CMake/GTest、QML/Qt 与 CMake 脚本。Python/Node 工具仅在仓库实际引入对应工具链后纳入，不预建空配置。
-- Rust 目标为函数 / 行各 85% 的全局下限；取消 100% 目标、逐文件阈值和差异覆盖率门禁。当前 Rust 统计保留内联测试，排除 `panta-launcher`、`panta-tests`、`panta-build`；排除理由和口径记录在 [质量工具链](../modules/quality-tooling.md)。
+- Rust 保留函数 / 行各 85% 的全局下限；取消 100% 目标、逐文件阈值和差异覆盖率门禁。当前 Rust 统计保留内联测试，排除 `panta-launcher`、`panta-tests`、`panta-build`；排除理由和口径记录在 [质量工具链](../modules/quality-tooling.md)。
 - C++ 与 QML 后续评估函数 / 行 85% 全局下限；先确认产品源码统计范围、工具支持和结果稳定性，不把现有 native 报告或 QML 行为测试写成源码覆盖率门禁。
 - nightly 对 `panta-core`、`panta-dsl-core` 运行 `cargo-mutants` 并归档报告，仅用于诊断，不阻断常规 CI。
 - 对 DSL parse/format 往返与路径规范化使用 `proptest` 验证公开行为和不变量。
@@ -30,26 +30,27 @@
 - [ ] DSL parse/format 往返和路径规范化通过 `proptest` 检验公开不变量。
 - [ ] Rust、C++、QML 的关键错误路径、状态/绑定、线程/所有权和生命周期有行为测试；真实窗口/图形冒烟单独记录。
 - [ ] 依赖与未使用代码/资源检查在实际目录运行；工具缺失、空测试、意外跳过和受控阈值失败均不能误报通过。
-- [ ] macOS/Linux/Windows CI 上传带 commit、工具版本和排除口径的覆盖率报告；跨平台差异有验证记录。
+- [ ] nightly 上传带 commit、工具版本和排除口径的 Rust/native 覆盖率报告；跨平台功能测试与差异有验证记录。
 - [ ] 任务、规范、CI 和入口命令一致；无重复脚本、失效配置或未登记排除项。
 
 ## 当前实现与待办
 
-- 统一质量入口及 Rust 89% / 92% gate 已运行；Rust 覆盖率报告包含 JSON、crate 汇总、元数据和 CI artifact。
+- 统一质量入口及 Rust 89% / 92% gate 曾运行；Rust 覆盖率报告包含 JSON、crate 汇总、元数据和 CI artifact。2026-10-16 起 Rust 当前门槛为函数 / 行各 85%。
 - `cargo coverage` 生成函数/行完整 JSON、可搜索的未覆盖行文本及 HTML 源码视图；报告使用 gate 收集的同一批 profile。
-- `cargo coverage native` 合并 CTest profile 并生成汇总、逐行执行计数文本和 HTML 报告；额外生成排除 `tests/` 的产品源码汇总与逐行报告，CI 上传全部报告 artifact。2026-10-10 macOS arm64 最新报告的行覆盖为 84.51%、分支 46.10%，该汇总包含测试源码；产品 native 源码报告为行 74.84%、分支 55.99%，仅作为本机诊断基线。LLVM 22 的 `llvm-cov report` 不提供 missing-lines 选项，因此 native 文本报告保留所有源码行计数。当前 native job 只生成 artifact，尚无覆盖率阈值门禁；跨平台稳定口径与基线仍待确认。
-- 尚待完成：Issue #11 提出的 Rust 门槛调整、测试命名与行为断言整理、属性测试、nightly mutation 报告，以及 C++ / QML 覆盖统计口径评估。当前配置仍为 Rust 函数 89%、行 92%；本 task 保持 deferred，未因本次规划更新声称配置或测试已改变。
+- `cargo coverage native` 合并 CTest profile 并生成汇总、逐行执行计数文本和 HTML 报告；额外生成排除 `tests/` 的产品源码汇总与逐行报告，nightly 上传全部报告 artifact。2026-10-10 macOS arm64 最新报告的行覆盖为 84.51%、分支 46.10%，该汇总包含测试源码；产品 native 源码报告为行 74.84%、分支 55.99%，仅作为本机诊断基线。LLVM 22 的 `llvm-cov report` 不提供 missing-lines 选项，因此 native 文本报告保留所有源码行计数。当前 native job 只生成 artifact，尚无覆盖率阈值门禁；跨平台稳定口径与基线仍待确认。
+- 尚待完成：测试命名与行为断言整理、属性测试、nightly mutation 报告，以及 C++ / QML 覆盖统计口径评估。Rust 函数 / 行 85% 全局门槛已配置；本 task 整体保持 deferred，不代表其余规划已完成。
 - 实施时逐项审计稳定可达的生产行为，只为有清晰契约的缺口补测试或小幅重构；若缺口只来自重复实例、不可稳定观察的崩溃路径或手动性能基准，记录证据并保留待办，不为覆盖率数字改变生产行为。
-- CI 调度优化（2026-10-13）：保留每次变更的构建、功能测试、覆盖率与 lint；Miri 和三平台 sanitizer 改由每日 workflow 执行。性能任务 048 的 CPU 套件每日运行并上传日志 artifact，不设浮动阈值；GPU 基准仍需可识别硬件/图形会话，暂不放入通用 runner。
+- CI 调度优化（2026-10-13 起）：PR 保留受影响范围测试、三平台构建检查和相关 lint。2026-10-16 起 PR 与 main push 都按 L1/L2 影响范围测试；完整 workspace 测试、Rust/native coverage 与全量 lint 移到每日 workflow，覆盖率报告上传 artifact；Miri、三平台 sanitizer 与 CPU 性能采样也由每日 workflow 执行。GPU 基准仍需可识别硬件/图形会话，暂不放入通用 runner。nightly 失败用于维护诊断，不替代 PR 必需检查。
 
 ## 验证与证据
 
 | 日期 / 证据 | 结果 |
 |---|---|
-| 2026-10-13：GitHub Issue #11 规划更新 | [Issue #11](https://github.com/Yuki-Nagori/panta/issues/11) 的建议已并入本 task：Rust 全局函数 / 行 85%、取消 100% 与逐文件目标、行为测试清理、属性测试及 nightly mutation 报告。本次仅更新规划；状态保持 `deferred`，未实施代码或修改现行质量门禁。 |
+| 2026-10-13：GitHub Issue #11 规划更新 | [Issue #11](https://github.com/Yuki-Nagori/panta/issues/11) 的建议已并入本 task：Rust 全局函数 / 行 85%、取消 100% 与逐文件目标、行为测试清理、属性测试及 nightly mutation 报告。本次仅更新规划；状态保持 `deferred`。 |
+| 2026-10-16：Rust 覆盖率门槛调整 | 按维护者要求将阻断门槛从函数 89% / 行 92% 改为各 85%；`032` 整体仍为 `deferred`，其余跨语言质量门禁未因此完成。 |
 | 2026-10-13：CI 动态检查定时化 | `actionlint .github/workflows/ci.yml .github/workflows/nightly.yml` 与 `git diff --check` 通过。Miri、sanitizer 和 CPU 性能采样已拆到每日 workflow；实际 workflow/artifact 结果待 CI 验收，不把静态检查记为运行通过。 |
 | 2026-09-18 至 21：质量入口、工具门禁、Miri | Rust/C++/QML/CMake 适用工具和聚合入口逐步接入；空测试、失败测试与阈值夹具曾验证非零退出。Miri 仅跑适用的纯 Rust crate；Pest 容量压力用例因解释执行成本在 Miri 忽略，常规测试仍覆盖。 |
-| 2026-09-24：macOS gate、[CI run 36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191) | 修复后函数 402/445（90.34%）、行 4270/4545（93.95%）；三平台当前 89% / 92% gate 全绿，不代表 100% 或 C++ line/branch 已达成。 |
+| 2026-09-24：macOS gate、[CI run 36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191) | 修复后函数 402/445（90.34%）、行 4270/4545（93.95%）；三平台当时 89% / 92% gate 全绿，不代表 C++ line/branch 已达成。 |
 | 2026-10-02：coverage artifact、[CI run 37010051058](https://github.com/Yuki-Nagori/panta/actions/runs/37010051058) | `rust-coverage` 与 `native-coverage` 上传成功；证明 artifact 路径可用，不表示逐模块门禁已存在。 |
 | 2026-10-10：Rust crate 行为覆盖跟进 | 对 core、DSL、import、FFI 等可确定的业务行为补测试；逐项审阅剩余 LLVM 缺口，区分测试实例/泛型计数、不可达防御路径与不安全故障注入。内置材料解析抽为纯函数并覆盖 malformed JSON 和不支持 schema；独立 `gpt-6.1-sol` medium review 通过。`panta-dsl-core`、`panta-import` 等 crate 函数覆盖 100%，全局尚未达到。 |
 | 2026-10-10：coverage 报告优化（macOS arm64） | 首次 `cargo coverage`：函数 803/842（95.37%）、行 9296/9687（95.96%）；生成 crate 汇总、完整 JSON、`uncovered-lines.txt` 与 HTML。`cargo coverage native` 的 CTest 72/72 通过，生成 summary、逐行计数与 HTML；LLVM 22 `llvm-cov report` 不支持 missing-lines 选项，改用 `llvm-cov show`。 |

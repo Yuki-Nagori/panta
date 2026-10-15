@@ -36,7 +36,8 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_qt_adapter_standard_paths_test)
   target_link_libraries(panta_qt_adapter_standard_paths_test PRIVATE panta::qt_adapter
                                                                      GTest::gtest_main)
-  gtest_discover_tests(panta_qt_adapter_standard_paths_test DISCOVERY_MODE POST_BUILD)
+  gtest_discover_tests(panta_qt_adapter_standard_paths_test DISCOVERY_MODE POST_BUILD
+                       PROPERTIES LABELS qt-adapter)
 
   add_executable(panta_qt_adapter_translation_test
                  ../../tests/cpp/qt-adapter/translation_catalog_test.cpp)
@@ -44,4 +45,5 @@ if(BUILD_TESTING)
   target_link_libraries(panta_qt_adapter_translation_test PRIVATE panta::qt_adapter panta::i18n
                                                                   Qt6::Test)
   add_test(NAME QtAdapter.TranslationCatalog COMMAND panta_qt_adapter_translation_test)
+  set_tests_properties(QtAdapter.TranslationCatalog PROPERTIES LABELS "qt-adapter")
 endif()

@@ -154,7 +154,7 @@ if(BUILD_TESTING)
                                           panta_visualizationplugin)
     target_compile_definitions(panta_qml_shell_module_test PRIVATE PANTA_ENABLE_BRIDGE_MODULE=1)
   endif()
-  panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test)
+  panta_add_qml_test(Qml.ShellModuleLoads panta_qml_shell_module_test app)
 
   if(PANTA_ENABLE_BRIDGE_MODULE)
     # 默认验证模块加载与条目析构；真实 GPU 生命周期用例需显式启用，
@@ -165,7 +165,7 @@ if(BUILD_TESTING)
     target_link_libraries(
       panta_qml_viewport_module_test PRIVATE panta::visualization panta_visualizationplugin
                                              Qt6::Gui Qt6::Qml Qt6::Test)
-    panta_add_qml_test(Qml.ViewportModuleLoads panta_qml_viewport_module_test)
+    panta_add_qml_test(Qml.ViewportModuleLoads panta_qml_viewport_module_test app)
   endif()
 endif()
 

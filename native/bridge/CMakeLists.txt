@@ -63,19 +63,21 @@ if(BUILD_TESTING)
   # DISCOVERY_TIMEOUT：sanitizer（TSan）运行时初始化数秒，默认 5s 会在并行
   # discovery 时超时。
   gtest_discover_tests(panta_bridge_shell_view_model_test DISCOVERY_MODE POST_BUILD
-                       DISCOVERY_TIMEOUT 120)
+                       DISCOVERY_TIMEOUT 120 PROPERTIES LABELS bridge)
 
   add_executable(panta_bridge_task_host_test ../../tests/cpp/bridge/task_host_test.cpp)
   panta_native_defaults(panta_bridge_task_host_test)
   target_link_libraries(panta_bridge_task_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
-  gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
+  gtest_discover_tests(panta_bridge_task_host_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120
+                       PROPERTIES LABELS bridge)
 
   # 路径宿主（023）覆盖标准目录注入、cwd 无关、拒绝矩阵、file URL 与
   # 非 Unicode 策略；symlink 用例仅在 Unix 编译（Windows junction 记录待测）。
   add_executable(panta_bridge_path_host_test ../../tests/cpp/bridge/path_host_test.cpp)
   panta_native_defaults(panta_bridge_path_host_test)
   target_link_libraries(panta_bridge_path_host_test PRIVATE panta::bridge GTest::gtest Qt6::Test)
-  gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
+  gtest_discover_tests(panta_bridge_path_host_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120
+                       PROPERTIES LABELS bridge)
 
   add_executable(panta_bridge_project_view_model_test
                  ../../tests/cpp/bridge/project_view_model_test.cpp)
@@ -83,7 +85,7 @@ if(BUILD_TESTING)
   target_link_libraries(panta_bridge_project_view_model_test PRIVATE panta::bridge GTest::gtest
                                                                      Qt6::Test)
   gtest_discover_tests(panta_bridge_project_view_model_test DISCOVERY_MODE POST_BUILD
-                       DISCOVERY_TIMEOUT 120)
+                       DISCOVERY_TIMEOUT 120 PROPERTIES LABELS bridge)
 
   add_executable(panta_bridge_settings_test ../../tests/cpp/bridge/settings_test.cpp)
   panta_native_defaults(panta_bridge_settings_test)
@@ -91,5 +93,5 @@ if(BUILD_TESTING)
   # 该行为测试加载 QML 引擎，按 QML 测试注册：任务 042 已登记的 TSan 与
   # Windows ASan QML 第三方运行时边界会过滤 Qml.*；QtTest/add_test 也避免
   # 构建期 GTest discovery 在 Windows sanitizer 下提前启动 QML DLL。
-  panta_add_qml_test(Qml.SettingsLanguageSwitch panta_bridge_settings_test)
+  panta_add_qml_test(Qml.SettingsLanguageSwitch panta_bridge_settings_test bridge)
 endif()

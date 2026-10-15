@@ -1,4 +1,4 @@
-# 长时动态检查与非门禁性能采样（任务 032/048）。
+# 完整测试、质量检查、覆盖率与长时动态检查（任务 032/048/120）。
 name: Nightly diagnostics
 
 on:
@@ -14,6 +14,113 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  full-tests:
+    name: full workspace tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Run complete Rust, native and QML test suites
+        shell: bash
+        run: cargo test --locked --workspace
+
+  full-lint:
+    name: full quality checks (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+        with:
+          components: "rustfmt,clippy"
+
+      - uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Run full format, lint and dependency audit
+        shell: bash
+        run: |
+          cargo format --check
+          cargo lint --check
+          cargo audit
+
+  rust-coverage:
+    name: full Rust coverage gate (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+        with:
+          components: "llvm-tools-preview"
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Run Rust coverage gate
+        shell: bash
+        run: cargo coverage
+
+      - name: Upload Rust coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/rust-coverage/
+          if-no-files-found: error
+          retention-days: 30
+
+  native-coverage:
+    name: full native coverage report (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Run native coverage and full QML/native tests
+        shell: bash
+        run: cargo coverage native
+
+      - name: Upload native coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/native-coverage/summary.txt
+            target/native-coverage/line-coverage.txt
+            target/native-coverage/product-summary.txt
+            target/native-coverage/product-line-coverage.txt
+            target/native-coverage/html/
+          if-no-files-found: error
+          retention-days: 30
+
   miri:
     name: rust miri UB checks (ubuntu)
     runs-on: ubuntu-latest
