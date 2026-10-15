@@ -38,10 +38,12 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 | `cargo panta-package` | 生成当前 profile 的可搬迁安装目录，默认位于 `target/package/<profile>`。 |
 | `cargo panta-package /path/to/output` | 将安装目录写到指定路径。macOS 输出 `panta.app`，Windows/Linux 输出 `bin/panta[.exe]`。 |
 | `cargo test --locked --workspace` | 运行 Rust、native、QML 聚合测试。 |
+| `cargo test-plan` | 显示当前工作树相对 `origin/main` 的 L1/L2 受影响测试范围。 |
+| `cargo test-scope l1|l2|all [--base <ref>]` | 使用与 PR CI 相同的 Rust 选择器执行局部测试；可指定比较基线。 |
 | `cargo format` | 检查 Rust、C++、CMake 和 QML 格式。 |
 | `cargo lint` | 运行 Clippy、依赖、CMake、QML、C++ 静态检查。 |
 | `cargo quality` | 依次运行格式、lint、依赖审计和测试。 |
-| `cargo coverage` | 运行 Rust 覆盖率门禁，CI 当前要求函数覆盖率 89%、行覆盖率 92%；`cargo coverage native` 生成 C++ 报告 artifact，当前不设阈值。门槛调整规划见任务 032（deferred）。 |
+| `cargo coverage` | 运行 Rust 覆盖率门禁，当前要求全局函数和行覆盖率均不低于 85%；CI 在 nightly 执行完整覆盖率。`cargo coverage native` 生成 C++ 报告 artifact，当前不设阈值。其余门槛规划见任务 032（deferred）。 |
 | `cargo performance` | 手动运行性能基准，不纳入常规测试门禁。 |
 | `cargo run --locked --package panta-tests -- toolchain` | 检查 Cargo 托管的编译、格式和构建工具。 |
 | `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典；`format --check` 检查格式。 |

@@ -34,5 +34,5 @@ if(BUILD_TESTING)
   # DISCOVERY_TIMEOUT：sanitizer（TSan）运行时初始化数秒，默认 5s 会在并行
   # discovery 时超时。
   gtest_discover_tests(panta_geometry_step_import_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT
-                       120)
+                       120 PROPERTIES LABELS geometry)
 endif()

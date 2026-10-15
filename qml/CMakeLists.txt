@@ -157,4 +157,5 @@ if(BUILD_TESTING)
       "${CMAKE_COMMAND}" "-DQMLFMT=${PANTA_QMLFORMAT_EXECUTABLE}"
       "-DQML_DIR=${CMAKE_CURRENT_SOURCE_DIR}" -P
       "${CMAKE_CURRENT_SOURCE_DIR}/../native/cmake/tests/check-qml-format.cmake")
+  set_tests_properties(Qml.FormatCheck PROPERTIES LABELS "qml")
 endif()

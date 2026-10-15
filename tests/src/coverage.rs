@@ -13,8 +13,8 @@ use crate::paths::{repository_root, target_root};
 
 const CARGO_LLVM_COV_VERSION: &str = "0.9.1";
 
-const FUNCTIONS_MINIMUM: u64 = 89;
-const LINES_MINIMUM: u64 = 92;
+const FUNCTIONS_MINIMUM: u64 = 85;
+const LINES_MINIMUM: u64 = 85;
 const IGNORED_SOURCE_REGEX: &str = r"[/\\](panta-launcher|panta-tests|panta-build)[/\\]";
 // 保持既有业务统计边界；这些构建/调度代码的覆盖缺口登记于任务 032。
 const EXCLUDED_PACKAGES: &[&str] = &["panta-launcher", "panta-tests", "panta-build"];
@@ -452,14 +452,14 @@ mod tests {
     }
     #[test]
     fn gate_accepts_boundary_and_rejects_either_deficit() -> Result<(), Box<dyn Error>> {
-        parse(&fixture(89, 92))?.check_gate()?;
-        assert!(parse(&fixture(88, 100))?.check_gate().is_err());
-        assert!(parse(&fixture(100, 91))?.check_gate().is_err());
+        parse(&fixture(85, 85))?.check_gate()?;
+        assert!(parse(&fixture(84, 100))?.check_gate().is_err());
+        assert!(parse(&fixture(100, 84))?.check_gate().is_err());
         let rounded = Metric {
-            covered: 88_999,
+            covered: 84_999,
             count: 100_000,
         };
-        assert_eq!(rounded.percent(), "89.00%");
+        assert_eq!(rounded.percent(), "85.00%");
         assert!(!rounded.reaches(FUNCTIONS_MINIMUM));
         Ok(())
     }

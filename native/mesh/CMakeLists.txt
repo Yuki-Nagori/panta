@@ -83,6 +83,8 @@ if(BUILD_TESTING)
   # 在构建后生成稳定的 CTest 用例清单（与 foundation 同型，见 native/CMakeLists.txt）。
   # DISCOVERY_TIMEOUT：sanitizer（TSan）运行时初始化数秒，默认 5s 会在并行
   # discovery 时超时。
-  gtest_discover_tests(panta_mesh_ir_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
-  gtest_discover_tests(panta_mesh_netgen_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120)
+  gtest_discover_tests(panta_mesh_ir_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120
+                       PROPERTIES LABELS mesh)
+  gtest_discover_tests(panta_mesh_netgen_test DISCOVERY_MODE POST_BUILD DISCOVERY_TIMEOUT 120
+                       PROPERTIES LABELS mesh)
 endif()

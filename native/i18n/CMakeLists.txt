@@ -76,5 +76,6 @@ if(BUILD_TESTING)
   panta_native_defaults(panta_i18n_qm_test)
   target_link_libraries(panta_i18n_qm_test PRIVATE panta_i18n Qt6::Core Qt6::Test)
   add_test(NAME I18n.CompiledQmLoads COMMAND panta_i18n_qm_test)
-  set_tests_properties(I18n.CompiledQmLoads PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  set_tests_properties(I18n.CompiledQmLoads PROPERTIES LABELS "i18n" ENVIRONMENT
+                                                       "QT_QPA_PLATFORM=offscreen")
 endif()
