@@ -4,6 +4,7 @@ mod build;
 mod command;
 mod coverage;
 mod format;
+mod layering;
 mod lint;
 mod miri;
 mod paths;
@@ -19,6 +20,7 @@ fn main() -> ExitCode {
     let mut arguments = std::env::args().skip(1);
     let result = match arguments.next().as_deref() {
         Some("quality") => quality(),
+        Some("verify-changed") => verify_changed(),
         Some("performance") => performance::run(arguments.collect()),
         Some("test") => build::test_all(),
         Some("test-plan") => test_scope::print_plan(arguments.collect()),
@@ -26,7 +28,8 @@ fn main() -> ExitCode {
         Some("format") => {
             let mut rest: Vec<String> = arguments.collect();
             let check = take_check_flag(&mut rest);
-            format::format_all(check, &rest)
+            let changed = take_flag(&mut rest, "--changed");
+            format::format_all(check, changed, &rest)
         }
         Some("audit") => audit(),
         Some("coverage") => match arguments.next().as_deref() {
@@ -41,15 +44,18 @@ fn main() -> ExitCode {
         Some("lint") => {
             let mut rest: Vec<String> = arguments.collect();
             let check = take_check_flag(&mut rest);
-            lint::lint(rest.first().map(String::as_str), check)
+            let changed = take_flag(&mut rest, "--changed");
+            let tool = rest.first().map(String::as_str);
+            let tool_args = rest.get(1..).unwrap_or_default();
+            lint::lint(tool, check, changed, tool_args)
         }
         Some(command) => Err(format!(
-            "未知命令 '{command}'；可用：quality、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、\
+            "未知命令 '{command}'；可用：quality、verify-changed、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、\
              ub-check、toolchain、performance"
         )
         .into()),
         None => Err(
-            "缺少命令；可用：quality、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、ub-check、\
+            "缺少命令；可用：quality、verify-changed、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、ub-check、\
                  toolchain、performance"
                 .into(),
         ),
@@ -71,11 +77,24 @@ fn take_check_flag(arguments: &mut Vec<String>) -> bool {
     check
 }
 
+fn take_flag(arguments: &mut Vec<String>, flag: &str) -> bool {
+    let present = arguments.iter().any(|argument| argument == flag);
+    arguments.retain(|argument| argument != flag);
+    present
+}
+
 fn quality() -> Result<(), Box<dyn Error>> {
-    format::format_all(true, &[])?;
-    lint::lint(None, true)?;
+    format::format_all(true, false, &[])?;
+    lint::lint(None, true, false, &[])?;
     audit()?;
     build::test_all()
+}
+
+fn verify_changed() -> Result<(), Box<dyn Error>> {
+    format::format_all(true, true, &[])?;
+    lint::lint(None, true, true, &[])?;
+    // L1 包自身与 L2 消费者闭包都要运行，避免没有消费者的直接变更漏测。
+    test_scope::run_scope(vec!["all".to_owned()])
 }
 
 fn audit() -> Result<(), Box<dyn Error>> {

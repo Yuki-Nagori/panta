@@ -5,6 +5,7 @@ use std::error::Error;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use serde_json::Value;
 
@@ -49,6 +50,7 @@ struct Plan {
     packages_l2: BTreeSet<String>,
     native_labels: BTreeSet<String>,
     full: bool,
+    full_quality: bool,
 }
 
 impl Plan {
@@ -71,6 +73,7 @@ impl Plan {
         println!("test_packages_l2={packages_l2}");
         println!("native_labels={native_labels}");
         println!("full_tests={}", self.full);
+        println!("full_quality={}", self.full_quality);
         Ok(())
     }
 }
@@ -103,6 +106,7 @@ pub(super) fn print_plan(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         make_plan(&paths, &root)?
     };
     plan.print_github_outputs()?;
+    println!("changed_paths={}", serde_json::to_string(&paths)?);
     eprintln!(
         "测试选择：L1={}；L2={}；CTest labels={}；完整回退={}",
         display_set(&plan.packages_l1),
@@ -111,6 +115,84 @@ pub(super) fn print_plan(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         plan.full
     );
     Ok(())
+}
+
+/// Returns changed paths from CI's shared selector output or the local Git diff.
+pub(super) fn changed_paths() -> Result<Vec<String>, Box<dyn Error>> {
+    if let Some(paths) = std::env::var_os("PANTA_CHANGED_PATHS_JSON") {
+        let paths: Vec<String> = serde_json::from_str(&paths.to_string_lossy())?;
+        if paths.iter().any(|path| path.is_empty()) {
+            return Err("变更路径列表包含空路径".into());
+        }
+        return Ok(paths);
+    }
+    local_changed_paths(&repository_root()?, "origin/main")
+}
+
+pub(super) fn force_full_scope() -> bool {
+    static FULL_QUALITY: OnceLock<bool> = OnceLock::new();
+    *FULL_QUALITY.get_or_init(|| {
+        if let Ok(value) = std::env::var("PANTA_FORCE_FULL") {
+            return value.eq_ignore_ascii_case("true");
+        }
+        let Ok(root) = repository_root() else {
+            return true;
+        };
+        let Ok(paths) = changed_paths() else {
+            return true;
+        };
+        if paths.is_empty() {
+            return false;
+        }
+        make_plan(&paths, &root).map_or(true, |plan| plan.full_quality)
+    })
+}
+
+/// Returns the Cargo package closure affected by changed Rust code.
+pub(super) fn changed_lint_packages() -> Result<BTreeSet<String>, Box<dyn Error>> {
+    let root = repository_root()?;
+    let paths = changed_paths()?;
+    if force_full_scope() {
+        return Ok(cargo_packages(&root)?.keys().cloned().collect());
+    }
+    if !paths.iter().any(|path| is_rust_package_path(path)) {
+        return Ok(BTreeSet::new());
+    }
+    Ok(make_plan(&paths, &root)?.packages())
+}
+
+/// Returns directly changed Cargo packages for source-only formatting.
+pub(super) fn changed_format_packages() -> Result<BTreeSet<String>, Box<dyn Error>> {
+    let root = repository_root()?;
+    let paths = changed_paths()?;
+    if force_full_scope() {
+        return Ok(cargo_packages(&root)?.keys().cloned().collect());
+    }
+    if paths.is_empty() {
+        return Ok(BTreeSet::new());
+    }
+    if !paths.iter().any(|path| is_rust_package_path(path)) {
+        return Ok(BTreeSet::new());
+    }
+    let plan = make_plan(&paths, &root)?;
+    if plan.full {
+        Ok(plan.packages())
+    } else {
+        Ok(plan.packages_l1)
+    }
+}
+
+fn is_rust_package_path(path: &str) -> bool {
+    path.starts_with("crates/")
+        || path.starts_with("tests/rust/")
+        || path.starts_with("tests/src/")
+        || path.starts_with("tests/integration/")
+        || matches!(
+            path,
+            "Cargo.toml" | "Cargo.lock" | "rust-toolchain.toml" | "rustfmt.toml" | ".rustfmt.toml"
+        )
+        || path.starts_with(".cargo/")
+        || path.ends_with("/Cargo.toml")
 }
 
 pub(super) fn run_scope(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
@@ -245,6 +327,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
     let mut changed_packages = BTreeSet::new();
     let all_native_labels = all_native_labels();
     plan.full = paths.is_empty();
+    plan.full_quality = paths.is_empty();
     if paths.is_empty() {
         plan.cargo_deps = true;
         plan.rust = true;
@@ -256,12 +339,20 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         if is_document_path(path) {
             continue;
         }
+        if matches!(
+            Path::new(path).file_name().and_then(|name| name.to_str()),
+            Some(".clang-format" | ".clang-tidy" | ".cmake-format.py")
+        ) {
+            // 工具配置变更会影响对应域中的所有文件，不能按普通单文件处理。
+            plan.full_quality = true;
+        }
         if path == "Cargo.toml"
             || path == "Cargo.lock"
             || path == "rust-toolchain.toml"
             || path.starts_with(".cargo/")
         {
             plan.full = true;
+            plan.full_quality = true;
             plan.rust = true;
             plan.native = true;
             plan.qml = true;
@@ -273,6 +364,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             continue;
         }
         if path == "tests/Cargo.toml" {
+            plan.full_quality = true;
             plan.cargo_deps = true;
             plan.rust = true;
             plan.native = true;
@@ -310,6 +402,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         }
         if path.starts_with("tests/src/") {
             plan.full = true;
+            plan.full_quality = true;
             plan.rust = true;
             plan.native = true;
             plan.qml = true;
@@ -358,6 +451,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         }
         if path.starts_with("tests/fixtures/") || path.starts_with("tests/support/") {
             plan.full = true;
+            plan.full_quality = true;
             plan.rust = true;
             plan.native = true;
             plan.qml = true;
@@ -374,6 +468,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         }
         if path.starts_with("resources/") {
             plan.full = true;
+            plan.full_quality = true;
             plan.rust = true;
             plan.native = true;
             plan.qml = true;
@@ -383,6 +478,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         }
         // 新增/未登记路径保守回退，避免选择器落后时 CI 假绿。
         plan.full = true;
+        plan.full_quality = true;
         plan.rust = true;
         plan.native = true;
         plan.qml = true;
@@ -764,6 +860,28 @@ mod tests {
                 "qml".into(),
             ])
         );
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_paths_force_full_quality_but_known_cmake_scopes_do_not() -> Result<(), Box<dyn Error>>
+    {
+        let root = repository_root()?;
+        let unknown = make_plan(&[".clang-format".into()], &root)?;
+        assert!(unknown.full_quality);
+
+        let cmake = make_plan(&["native/CMakeLists.txt".into()], &root)?;
+        assert!(!cmake.full_quality);
+
+        for path in [
+            "tests/cpp/geometry/.clang-tidy",
+            "tests/cpp/mesh/.clang-tidy",
+        ] {
+            assert!(make_plan(&[path.into()], &root)?.full_quality, "{path}");
+        }
+
+        let cargo_config = make_plan(&["Cargo.toml".into()], &root)?;
+        assert!(cargo_config.full_quality);
         Ok(())
     }
 }

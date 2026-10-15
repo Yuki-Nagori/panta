@@ -3,13 +3,15 @@
 #   cargo_deps —— Cargo 清单或 deny.toml 变更
 #   rust / native / qml —— 对应域是否有变更
 #   test_packages / native_labels —— PR 受影响测试选择；无法计算时回退全量
+#   changed_paths —— 统一的变更路径 JSON，供文件级格式与 lint 复用
+#   full_quality —— 公共工具配置、空 CI diff 或未知范围时启用完整质量检查
 # 保守默认：未识别路径一律视为代码触发全量检查；纯文档是唯一可整场跳过的类别。
 # .gitattributes 影响检出字节，保留在全量检查类别。
 # 基线：PR 对 base 分支取 merge-base diff，push 对 event.before 取累计 diff；
 # 新分支/强推/空 diff 回退全量。调用方必须先 checkout 且 fetch-depth: 0
 #（本地 composite action 的解析本身依赖工作区已有仓库）。
 name: Changed path categories
-description: 按变更路径输出 code/cargo_deps/rust/native/qml 分类结果
+description: 按变更路径输出代码域、测试范围和变更文件清单
 outputs:
   code:
     value: ${{ steps.filter.outputs.code }}
@@ -31,6 +33,10 @@ outputs:
     value: ${{ steps.filter.outputs.native_labels }}
   full_tests:
     value: ${{ steps.filter.outputs.full_tests }}
+  full_quality:
+    value: ${{ steps.filter.outputs.full_quality }}
+  changed_paths:
+    value: ${{ steps.filter.outputs.changed_paths }}
 runs:
   using: composite
   steps:
