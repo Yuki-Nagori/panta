@@ -2,10 +2,12 @@
 use super::model::{next_revision, validate_name};
 use super::storage::write_manifest;
 use super::{
-    ActivationAttempt, IMPORT_RECORD_VERSION, ImportRecord, MIN_SUPPORTED_PROJECT_SCHEMA_VERSION,
-    Outcome, PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError,
-    ProjectManifest, ProjectSnapshot, ProjectState, StlImportSession, SurfaceMeshCache,
-    analysis_sequence, gate_location, material, preview, process_settings, storage,
+    ActivationAttempt, ActivationResultKind, DocumentDiagnostic, DocumentWorkspace,
+    IMPORT_RECORD_VERSION, ImportRecord, MIN_SUPPORTED_PROJECT_SCHEMA_VERSION, Outcome,
+    PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError, ProjectManifest,
+    ProjectSnapshot, ProjectState, StlImportSession, SurfaceMeshCache, WorkspaceActivationRequest,
+    WorkspaceSnapshot, activation_error_message_key, analysis_sequence, gate_location, material,
+    preview, process_settings, storage,
 };
 use panta_import::default_display_name;
 use panta_mesh::SurfaceMesh;
@@ -35,11 +37,14 @@ pub struct ProjectService {
     pub(super) pending_import: Option<super::import::PendingImport>,
     pub(super) import_request: u64,
     pub(super) execution: crate::execution::ProjectExecution,
+    pub(super) workspace: DocumentWorkspace,
 }
 
 impl ProjectService {
     pub fn new() -> Self {
-        Self::default()
+        let mut service = Self::default();
+        service.workspace = DocumentWorkspace::new("Welcome");
+        service
     }
 
     // 后台候选已冻结；消费结果前，任何工程写入都会与候选清单竞争。
@@ -122,6 +127,7 @@ impl ProjectService {
         self.mesh_cache.clear();
         self.activation_attempts.clear();
         self.activation.advance_generation();
+        self.reset_document_workspace("Welcome");
         self.snapshot()
     }
 
@@ -175,6 +181,7 @@ impl ProjectService {
         self.activation_attempts.clear();
         self.clear_stl_preview();
         self.activation.advance_generation();
+        self.reset_document_workspace("Welcome");
         self.snapshot()
     }
 
@@ -333,6 +340,171 @@ impl ProjectService {
     /// 活动文档切到 Welcome / 空白时取消 Mesh pin，再按预算回收缓存。
     pub fn deactivate_mesh_document(&mut self) {
         self.mesh_cache.deactivate();
+    }
+
+    /// 重置运行期页签，并取消其未完成的激活任务。
+    pub fn reset_document_workspace(&mut self, welcome_title: &str) {
+        let old_documents = self.workspace.snapshot().documents;
+        let attempts = self.workspace.reset(welcome_title);
+        for attempt in attempts {
+            self.cancel_asset_activation(attempt);
+        }
+        for document in old_documents {
+            if document.kind == super::DocumentKind::Import {
+                self.release_mesh_document(&document.id);
+            }
+        }
+        self.deactivate_mesh_document();
+    }
+
+    pub fn document_workspace(&self) -> WorkspaceSnapshot {
+        let mut snapshot = self.workspace.snapshot();
+        if let Some(state) = &self.current {
+            for document in &mut snapshot.documents {
+                if document.kind != super::DocumentKind::Import {
+                    continue;
+                }
+                let Some(import_index) = state
+                    .imports
+                    .iter()
+                    .position(|record| record.id == document.id)
+                else {
+                    continue;
+                };
+                let display_name = &state.imports[import_index].display_name;
+                document.display_count = state
+                    .imports
+                    .iter()
+                    .filter(|record| record.display_name == *display_name)
+                    .count() as u64;
+                document.display_ordinal = state.imports[..=import_index]
+                    .iter()
+                    .filter(|record| record.display_name == *display_name)
+                    .count() as u64;
+            }
+        }
+        snapshot
+    }
+
+    /// 打开或重试一个 STL 文档；异步读取仍由现有 ProjectService 执行。
+    pub fn open_import_document(&mut self, import_id: &str, title: &str) {
+        self.workspace.open_import(import_id, title);
+        let request = self.workspace.activation_request(import_id);
+        self.apply_workspace_activation_request(request);
+    }
+
+    /// 将刚导入且已在缓存中的网格登记为活动文档。
+    pub fn publish_import_document(&mut self, import_id: &str, title: &str) {
+        if self.workspace.open_ready_import(import_id, title) {
+            self.activate_mesh_document(import_id);
+            self.sync_workspace_residency();
+        }
+    }
+
+    pub fn activate_workspace_document(&mut self, document_id: &str) {
+        let request = self.workspace.activation_request(document_id);
+        self.apply_workspace_activation_request(request);
+    }
+
+    pub fn close_workspace_document(&mut self, document_id: &str) {
+        let Some(result) = self.workspace.close(document_id) else {
+            return;
+        };
+        if let Some(attempt) = result.cancel_attempt {
+            self.cancel_asset_activation(attempt);
+        }
+        if result.release_import {
+            self.release_mesh_document(document_id);
+        }
+        if !result.active_changed {
+            return;
+        }
+        if let Some(next) = result.activate_document {
+            self.activate_workspace_document(&next);
+        } else if let Some(next) = result.load_document {
+            self.begin_workspace_activation(&next);
+        } else {
+            self.deactivate_mesh_document();
+        }
+        self.sync_workspace_residency();
+    }
+
+    pub fn move_workspace_document(&mut self, from: usize, to: usize) {
+        self.workspace.move_document(from, to);
+    }
+
+    pub fn sync_workspace_residency(&mut self) -> bool {
+        let resident_ids = self.mesh_cache.resident_ids();
+        self.workspace
+            .sync_residency(resident_ids.iter().map(String::as_str))
+    }
+
+    /// 激活完成由服务校验 attempt 并更新工作区，不让桥接层合并业务状态。
+    pub fn resolve_workspace_activation(
+        &mut self,
+        import_id: &str,
+        attempt: u64,
+        result: ActivationResultKind,
+        diagnostic: DocumentDiagnostic,
+    ) -> bool {
+        let message_key = if result == ActivationResultKind::Failed {
+            activation_error_message_key(&diagnostic.code)
+        } else {
+            ""
+        };
+        let changed =
+            self.workspace
+                .resolve_activation(import_id, attempt, result, message_key, diagnostic);
+        if changed && result == ActivationResultKind::Succeeded {
+            self.activate_mesh_document(import_id);
+        }
+        if changed {
+            self.sync_workspace_residency();
+        }
+        changed
+    }
+
+    fn apply_workspace_activation_request(&mut self, request: WorkspaceActivationRequest) {
+        match request {
+            WorkspaceActivationRequest::Ignore => {}
+            WorkspaceActivationRequest::ActivateWelcome => {
+                self.deactivate_mesh_document();
+                self.sync_workspace_residency();
+            }
+            WorkspaceActivationRequest::ActivateImport(import_id) => {
+                if self.activate_mesh_document(&import_id) {
+                    self.workspace.set_active(&import_id);
+                    self.sync_workspace_residency();
+                } else {
+                    self.workspace.mark_unloaded(&import_id);
+                    let request = self.workspace.activation_request(&import_id);
+                    self.apply_workspace_activation_request(request);
+                }
+            }
+            WorkspaceActivationRequest::LoadImport(import_id) => {
+                self.begin_workspace_activation(&import_id);
+            }
+        }
+    }
+
+    fn begin_workspace_activation(&mut self, import_id: &str) {
+        match self.begin_asset_activation(import_id) {
+            Ok(attempt) => {
+                self.workspace
+                    .set_activation_attempt(import_id, attempt.attempt);
+            }
+            Err(error) => {
+                self.workspace.fail_document(
+                    import_id,
+                    activation_error_message_key(error.code()),
+                    DocumentDiagnostic {
+                        code: error.code().to_owned(),
+                        category: error.category().to_owned(),
+                        detail: error.detail(),
+                    },
+                );
+            }
+        }
     }
 
     /// 最近一次成功导入或激活的网格；供 Rust 工程服务测试读取。

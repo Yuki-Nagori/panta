@@ -55,23 +55,27 @@ use project::activation_outcome_to_bridge;
 #[cfg(test)]
 use project::project_service_inspect_stl;
 use project::{
-    analysis_sequence_catalog, default_material, default_mesh_type, mesh_type_catalog,
-    project_service_activate_mesh_document, project_service_begin_asset_activation,
-    project_service_begin_fill_settings_confirmation,
+    analysis_sequence_catalog, default_material, default_mesh_type, format_project_dimensions,
+    mesh_type_catalog, project_error_message_key, project_service_activate_mesh_document,
+    project_service_begin_asset_activation, project_service_begin_fill_settings_confirmation,
     project_service_begin_gate_location_settings_confirmation,
     project_service_begin_material_confirmation,
     project_service_begin_stl_import as begin_stl_import, project_service_cancel_asset_activation,
     project_service_cancel_stl_import as cancel_stl_import, project_service_create,
     project_service_current, project_service_deactivate_mesh_document,
-    project_service_drain_asset_activations, project_service_execute,
-    project_service_finish_fill_settings_confirmation,
+    project_service_drain_asset_activations, project_service_drain_workspace_activations,
+    project_service_execute, project_service_finish_fill_settings_confirmation,
     project_service_finish_gate_location_settings_confirmation,
     project_service_finish_material_confirmation, project_service_finish_stl_import,
     project_service_import_stl, project_service_imports, project_service_mesh_snapshot_for_import,
     project_service_new, project_service_open, project_service_plan_settings,
     project_service_release_mesh_document, project_service_resident_mesh_ids, project_service_save,
-    project_service_set_analysis_sequence, stl_import_preview, validate_fill_settings_draft,
-    validate_gate_location_settings_draft, validate_holding_profile_draft,
+    project_service_set_analysis_sequence, project_service_workspace_activate,
+    project_service_workspace_close, project_service_workspace_move,
+    project_service_workspace_open_import, project_service_workspace_publish_import,
+    project_service_workspace_reset, project_service_workspace_snapshot, stl_import_preview,
+    validate_fill_settings_draft, validate_gate_location_settings_draft,
+    validate_holding_profile_draft,
 };
 mod mesh;
 use mesh::{mesh_coordinates, mesh_validate_tet};
@@ -174,6 +178,27 @@ pub mod bridge {
         pub size_x: f64,
         pub size_y: f64,
         pub size_z: f64,
+    }
+
+    /// Rust 工程文档工作区的批量显示快照；文档顺序与活动 ID 由 Rust 决定。
+    #[derive(Default)]
+    pub struct WorkspaceDocument {
+        pub id: String,
+        pub kind: String,
+        pub state: String,
+        pub title: String,
+        pub message_key: String,
+        pub diagnostic_code: String,
+        pub diagnostic_category: String,
+        pub diagnostic_detail: String,
+        pub display_ordinal: u64,
+        pub display_count: u64,
+    }
+
+    #[derive(Default)]
+    pub struct WorkspaceSnapshot {
+        pub documents: Vec<WorkspaceDocument>,
+        pub active_document_id: String,
     }
 
     struct ChoiceDefinition {
@@ -530,6 +555,23 @@ pub mod bridge {
         ) -> ProjectImportResult;
         #[rust_name = "project_service_imports_response"]
         fn project_service_imports(service: &ProjectService) -> ProjectImportsResult;
+        fn project_service_workspace_snapshot(service: &ProjectService) -> WorkspaceSnapshot;
+        fn project_service_workspace_reset(service: &mut ProjectService, welcome_title: String);
+        fn project_service_workspace_open_import(
+            service: &mut ProjectService,
+            import_id: &str,
+            title: &str,
+        );
+        fn project_service_workspace_publish_import(
+            service: &mut ProjectService,
+            import_id: &str,
+            title: &str,
+        );
+        fn project_service_workspace_activate(service: &mut ProjectService, document_id: &str);
+        fn project_service_workspace_close(service: &mut ProjectService, document_id: &str);
+        fn project_service_workspace_move(service: &mut ProjectService, from: u64, to: u64);
+        fn project_error_message_key(code: &str) -> String;
+        fn format_project_dimensions(size_x: f64, size_y: f64, size_z: f64, unit: &str) -> String;
         fn analysis_sequence_catalog() -> Vec<ChoiceDefinition>;
         fn mesh_type_catalog() -> Vec<ChoiceDefinition>;
         fn default_mesh_type() -> String;
@@ -647,6 +689,9 @@ pub mod bridge {
             attempt: u64,
         ) -> bool;
         fn project_service_drain_asset_activations(
+            service: &mut ProjectService,
+        ) -> Vec<ActivationOutcome>;
+        fn project_service_drain_workspace_activations(
             service: &mut ProjectService,
         ) -> Vec<ActivationOutcome>;
         fn mesh_validate_tet(data: TetMeshData) -> TetMeshValidation;

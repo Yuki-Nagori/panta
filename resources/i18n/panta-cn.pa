@@ -788,6 +788,74 @@ welcome:
   src: Welcome
   tr: 欢迎
 
+valid-project-name:
+  src: Enter a valid project name.
+  tr: 请输入有效的工程名称。
+
+absolute-project-location:
+  src: Choose an absolute project location.
+  tr: 请选择绝对路径作为工程位置。
+
+project-location-create-failed:
+  src: The project location could not be created.
+  tr: 无法创建工程位置。
+
+project-file-missing:
+  src: The selected project file does not exist.
+  tr: 所选工程文件不存在。
+
+invalid-project-file:
+  src: Choose a .panta project file.
+  tr: 请选择 .panta 工程文件。
+
+nonlocal-project-file:
+  src: Choose a project file on this device.
+  tr: 请选择此设备上的工程文件。
+
+project-already-exists:
+  src: A project with this name already exists.
+  tr: 同名工程已存在。
+
+unsupported-project-file:
+  src: The selected project file is not supported.
+  tr: 所选工程文件不受支持。
+
+no-project-open:
+  src: Open or create a project first.
+  tr: 请先打开或创建工程。
+
+invalid-project-change:
+  src: The project change is not valid.
+  tr: 工程更改无效。
+
+import-file-missing:
+  src: The selected STL file does not exist.
+  tr: 所选 STL 文件不存在。
+
+invalid-import-file:
+  src: Choose an STL file to import.
+  tr: 请选择要导入的 STL 文件。
+
+invalid-import-options:
+  src: Choose valid STL import options.
+  tr: 请选择有效的 STL 导入选项。
+
+import-source-changed:
+  src: The STL file changed after preview. Select it again.
+  tr: 预览后 STL 文件已更改，请重新选择。
+
+import-read-failed:
+  src: The selected STL file could not be read.
+  tr: 无法读取所选 STL 文件。
+
+import-copy-failed:
+  src: The STL file could not be copied into the project.
+  tr: 无法将 STL 文件复制到工程中。
+
+project-operation-failed:
+  src: The project operation could not be completed.
+  tr: 无法完成工程操作。
+
 [DocumentTabBar]
 open-documents:
   src: Open documents
@@ -812,6 +880,26 @@ mesh-data-released:
 failed-to-load:
   src: Failed to load
   tr: 加载失败
+
+saved-stl-missing:
+  src: The saved STL asset is missing from the project package.
+  tr: 工程包中缺少已保存的 STL 资产。
+
+saved-stl-unsupported-format:
+  src: The saved STL asset format is not supported.
+  tr: 不支持已保存 STL 资产的格式。
+
+saved-stl-unsupported-units:
+  src: The saved STL asset uses unsupported units.
+  tr: 已保存 STL 资产使用了不支持的单位。
+
+saved-stl-read-failed:
+  src: The saved STL asset could not be read.
+  tr: 无法读取已保存的 STL 资产。
+
+saved-stl-open-failed:
+  src: The saved STL asset could not be opened.
+  tr: 无法打开已保存的 STL 资产。
 
 [AnalysisSequenceDialog]
 title:

@@ -788,6 +788,74 @@ welcome:
   src: Welcome
   tr: Welcome
 
+valid-project-name:
+  src: Enter a valid project name.
+  tr: Enter a valid project name.
+
+absolute-project-location:
+  src: Choose an absolute project location.
+  tr: Choose an absolute project location.
+
+project-location-create-failed:
+  src: The project location could not be created.
+  tr: The project location could not be created.
+
+project-file-missing:
+  src: The selected project file does not exist.
+  tr: The selected project file does not exist.
+
+invalid-project-file:
+  src: Choose a .panta project file.
+  tr: Choose a .panta project file.
+
+nonlocal-project-file:
+  src: Choose a project file on this device.
+  tr: Choose a project file on this device.
+
+project-already-exists:
+  src: A project with this name already exists.
+  tr: A project with this name already exists.
+
+unsupported-project-file:
+  src: The selected project file is not supported.
+  tr: The selected project file is not supported.
+
+no-project-open:
+  src: Open or create a project first.
+  tr: Open or create a project first.
+
+invalid-project-change:
+  src: The project change is not valid.
+  tr: The project change is not valid.
+
+import-file-missing:
+  src: The selected STL file does not exist.
+  tr: The selected STL file does not exist.
+
+invalid-import-file:
+  src: Choose an STL file to import.
+  tr: Choose an STL file to import.
+
+invalid-import-options:
+  src: Choose valid STL import options.
+  tr: Choose valid STL import options.
+
+import-source-changed:
+  src: The STL file changed after preview. Select it again.
+  tr: The STL file changed after preview. Select it again.
+
+import-read-failed:
+  src: The selected STL file could not be read.
+  tr: The selected STL file could not be read.
+
+import-copy-failed:
+  src: The STL file could not be copied into the project.
+  tr: The STL file could not be copied into the project.
+
+project-operation-failed:
+  src: The project operation could not be completed.
+  tr: The project operation could not be completed.
+
 [DocumentTabBar]
 open-documents:
   src: Open documents
@@ -812,6 +880,26 @@ mesh-data-released:
 failed-to-load:
   src: Failed to load
   tr: Failed to load
+
+saved-stl-missing:
+  src: The saved STL asset is missing from the project package.
+  tr: The saved STL asset is missing from the project package.
+
+saved-stl-unsupported-format:
+  src: The saved STL asset format is not supported.
+  tr: The saved STL asset format is not supported.
+
+saved-stl-unsupported-units:
+  src: The saved STL asset uses unsupported units.
+  tr: The saved STL asset uses unsupported units.
+
+saved-stl-read-failed:
+  src: The saved STL asset could not be read.
+  tr: The saved STL asset could not be read.
+
+saved-stl-open-failed:
+  src: The saved STL asset could not be opened.
+  tr: The saved STL asset could not be opened.
 
 [AnalysisSequenceDialog]
 title:

@@ -75,7 +75,7 @@ Item {
             return qsTr("Loading");
         }
         if (document.state === "failed") {
-            return document.message ?? qsTr("Failed to load");
+            return qsTranslate("DocumentTabBar", document.message ?? qsTr("Failed to load"));
         }
         if (document.state === "unloaded") {
             return qsTr("Mesh data released; activate to reload");

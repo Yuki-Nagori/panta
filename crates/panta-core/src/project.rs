@@ -9,6 +9,7 @@ mod mesh_cache;
 mod model;
 mod repository;
 mod service;
+mod workspace;
 pub use error::ProjectError;
 use mesh_cache::SurfaceMeshCache;
 pub use model::{ProjectCommand, ProjectSnapshot};
@@ -18,6 +19,12 @@ pub use panta_import::{
     StlImportPreview, default_display_name,
 };
 pub use service::ProjectService;
+pub use workspace::{
+    ActivationRequest as WorkspaceActivationRequest, ActivationResultKind, CloseDocumentResult,
+    DocumentDiagnostic, DocumentKind, DocumentState, DocumentWorkspace, WorkspaceDocument,
+    WorkspaceSnapshot, activation_error_message_key,
+    format_dimensions as format_project_dimensions, project_error_message_key,
+};
 
 mod analysis_sequence;
 pub use analysis_sequence::{ANALYSIS_SEQUENCES, AnalysisSequenceDefinition};
@@ -51,7 +58,7 @@ mod temp_directory;
 #[cfg(test)]
 mod tests {
     use super::model::validate_name;
-    use super::{ProjectError, ProjectService, SurfaceMeshCache, temp_directory};
+    use super::{DocumentState, ProjectError, ProjectService, SurfaceMeshCache, temp_directory};
     use crate::fsm::open_saved_stl::{ActivationCoordinator, ActivationRequest, OUTCOME_CAPACITY};
     use panta_import::ImportRecord;
     use panta_mesh::SurfaceMesh;
@@ -213,6 +220,149 @@ mod tests {
         ));
         assert!(service.activation_attempts.is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn workspace_display_ordinals_include_closed_import_records()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "Duplicate names")?;
+        let state = service
+            .current
+            .as_mut()
+            .ok_or("created project state missing")?;
+        for id in ["import-1", "import-2"] {
+            state.imports.push(ImportRecord {
+                record_version: super::IMPORT_RECORD_VERSION,
+                parser_version: super::STL_IMPORT_PARSER_VERSION,
+                id: id.to_owned(),
+                display_name: "model_a".to_owned(),
+                source_name: "model_a.stl".to_owned(),
+                source_digest: None,
+                asset: format!("assets/{id}.stl"),
+                format: "stl".to_owned(),
+                mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+                units: "millimeters".to_owned(),
+                show_import_log: false,
+                triangle_count: 0,
+                dimensions: [0.0; 3],
+            });
+        }
+        assert!(service.workspace.open_import("import-2", "model_a"));
+
+        let snapshot = service.document_workspace();
+        let document = snapshot
+            .documents
+            .iter()
+            .find(|document| document.id == "import-2")
+            .ok_or("open import missing from workspace snapshot")?;
+        assert_eq!(document.display_ordinal, 2);
+        assert_eq!(document.display_count, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn opening_saved_import_starts_a_loading_attempt() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "Open saved import")?;
+        service
+            .current
+            .as_mut()
+            .ok_or("created project state missing")?
+            .imports
+            .push(ImportRecord {
+                record_version: super::IMPORT_RECORD_VERSION,
+                parser_version: super::STL_IMPORT_PARSER_VERSION,
+                id: "saved-import".to_owned(),
+                display_name: "part".to_owned(),
+                source_name: "part.stl".to_owned(),
+                source_digest: None,
+                asset: "assets/missing.stl".to_owned(),
+                format: "stl".to_owned(),
+                mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+                units: "millimeters".to_owned(),
+                show_import_log: false,
+                triangle_count: 1,
+                dimensions: [1.0, 1.0, 0.0],
+            });
+
+        service.open_import_document("saved-import", "part");
+
+        assert!(service.activation_attempts.contains_key("saved-import"));
+        let document = service
+            .document_workspace()
+            .documents
+            .into_iter()
+            .find(|document| document.id == "saved-import")
+            .ok_or("opened import missing from workspace")?;
+        assert_eq!(document.state, DocumentState::Loading);
+        Ok(())
+    }
+
+    #[test]
+    fn synchronous_workspace_activation_failure_uses_saved_asset_message()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "Invalid saved asset")?;
+        service
+            .current
+            .as_mut()
+            .ok_or("created project state missing")?
+            .imports
+            .push(ImportRecord {
+                record_version: super::IMPORT_RECORD_VERSION,
+                parser_version: super::STL_IMPORT_PARSER_VERSION,
+                id: "invalid-saved-import".to_owned(),
+                display_name: "part".to_owned(),
+                source_name: "part.stl".to_owned(),
+                source_digest: None,
+                asset: "../outside.stl".to_owned(),
+                format: "stl".to_owned(),
+                mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+                units: "millimeters".to_owned(),
+                show_import_log: false,
+                triangle_count: 1,
+                dimensions: [1.0, 1.0, 0.0],
+            });
+
+        service.open_import_document("invalid-saved-import", "part");
+
+        let document = service
+            .document_workspace()
+            .documents
+            .into_iter()
+            .find(|document| document.id == "invalid-saved-import")
+            .ok_or("opened import missing from workspace")?;
+        assert_eq!(document.state, DocumentState::Failed);
+        assert_eq!(document.diagnostic.code, "project.manifest_invalid");
+        assert_eq!(
+            document.message_key,
+            "The saved STL asset could not be opened."
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn deactivating_over_budget_mesh_updates_workspace_residency() {
+        let mut service = ProjectService::with_mesh_cache_budget(0);
+        service.reset_document_workspace("Welcome");
+        assert!(service.workspace.open_ready_import("large", "large"));
+        service.cache_activated_mesh("large".to_owned(), mesh(1));
+        service.sync_workspace_residency();
+        assert_eq!(
+            service.document_workspace().documents[1].state,
+            DocumentState::Ready
+        );
+
+        service.activate_workspace_document("welcome");
+
+        assert_eq!(
+            service.document_workspace().documents[1].state,
+            DocumentState::Unloaded
+        );
     }
 
     #[test]
