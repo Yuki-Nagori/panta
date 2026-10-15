@@ -55,7 +55,7 @@
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-10-16 | `cargo format --check`、`cargo lint clippy --check`、`cargo test --locked --package panta-tests --bin panta-tests test_scope::tests`、`cargo test --locked --workspace`、`actionlint .github/workflows/ci.yml .github/workflows/nightly.yml`、`git diff --check HEAD`；直接输入 launcher build script、未知路径、空输入、README、FFI C++ 与 QML 路径运行 `cargo test-plan --ci` | 选择范围和触发域与输入一致；未知/空输入完整回退，纯文档跳过；完整聚合测试、lint、格式和 workflow 语法通过 | 初次 Clippy 发现新增代码使用 `unwrap/expect`，已改为错误向上传递并重跑通过。选择器回归 9/9、native 聚合测试 3/3 通过；workspace 聚合测试通过，CTest 76/76 通过；Clippy、actionlint、格式与 diff 检查通过。探测确认 `crates/launcher/build.rs` 和未知/空输入均输出 `code/cargo_deps/rust/native/qml=true`、全部 Cargo 包及 CTest 标签；README 仅文档跳过；FFI C++ 命中 `panta-ffi`、launcher 与 native labels；QML 命中 qml/bridge labels。独立 `gpt-6.1-sol` medium 只读复核最终 diff，未发现剩余可操作问题。真实三平台 GitHub Actions 尚待 PR 验收。 |
+| 2026-10-16 | `cargo format --check`、`cargo lint clippy --check`、选择器 9 项与 native 聚合测试、`cargo test --locked --workspace`、`actionlint`、`git diff --check`；直接输入 launcher build script、未知路径、空输入、README、FFI C++ 与 QML 路径运行 `cargo test-plan --ci`；实跑 `mesh|ffi` CTest 标签 | 选择范围和触发域与输入一致；未知/空输入完整回退，纯文档跳过；完整聚合测试、lint、格式、workflow 语法与受影响 CTest 通过 | 选择器回归 9/9、native 聚合测试 3/3、完整 workspace 测试通过，CTest 76/76；Clippy、actionlint、格式与 diff 检查通过。输入探测确认 `crates/launcher/build.rs` 和未知/空输入均输出 `code/cargo_deps/rust/native/qml=true`、全部 Cargo 包及 CTest 标签；README 仅文档跳过；FFI C++ 命中 `panta-ffi`、launcher 与 native labels；QML 命中 qml/bridge labels。代表性 `mesh|ffi` 实跑只构建相关目标并通过 16 个 CTest，用时 1.91 秒。PR #41 的三平台构建、L1/L2、native/QML 与 lint 全部通过（[run 38800066250](https://github.com/Yuki-Nagori/panta/actions/runs/38800066250)）。首次 Windows CI 暴露 JSON 行尾污染 Cargo package 名的问题，已改为 NUL 分隔并通过重跑。独立 `gpt-6.1-sol` medium 只读评审最终代码 diff，未发现剩余可操作问题。 |
 
 ## 风险与回退
 
@@ -73,7 +73,8 @@
 - 2026-10-16：独立 `gpt-6.1-sol` medium 最终只读评审完整 diff；修复 i18n→QtAdapter 与测试 manifest 的漏选、macOS Bash 3.2 `mapfile` 不兼容、全量 CTest 标签遗漏和 Markdown 夹具触发问题后复核通过。评审未发现剩余可操作问题；真实三平台 Actions 尚未运行。
 - 2026-10-16：严格复核 selector 最终快照，独立评审提出的 launcher build script 后置升级漏开依赖域已修复并以直接输入确认；选择器 9 项回归、完整 workspace 聚合测试（CTest 76/76）、actionlint、格式和 diff 检查均通过。实际三平台 Actions 仍是剩余验收项。
 - 2026-10-16：Clippy 发现选择器与 placeholder 测试中的 `unwrap/expect`，已改为 `Result` 错误传播；Clippy、选择器回归、native 聚合测试和完整 workspace 聚合测试重新通过。
+- 2026-10-16：PR #41 的三平台 Actions 全部通过。Windows L2 曾因 Git Bash/JQ 行尾将 CR 混入 Cargo 包名而失败；改为 NUL 分隔解析后重跑通过，且全量回退 native/QML 测试通过。当前等待 PR 合并，再将任务和索引标为 done。
 
 ## 完成摘要
 
-未完成。
+实现、本地验收和 PR 三平台 CI 已通过；PR #41 尚未合并，合并后再同步任务状态为 done。
