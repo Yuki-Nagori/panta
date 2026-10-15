@@ -8,6 +8,7 @@
 |---|---|---|
 | Rust 领域与 C++ 重库边界 | [适配边界与 crate 规划](native-domain-boundaries.md) | 本仓库；当前审计与目标 |
 | 目录与模块归属 | [目录规划](repository-layout.md) | 本仓库 |
+| Rust 应用命令层 | [GUI / CLI 共享命令设计](command-layer.md) | 当前服务边界与后续实施 |
 | Cargo/CMake、运行与部署 | [构建与开发](build-and-development.md) | 本仓库 |
 | QML、ViewModel 与交互 | [界面与桥接](ui-and-bridge.md) | 本仓库 |
 | STEP、拓扑与 OCCT | [几何模型](geometry.md) | 本仓库 |

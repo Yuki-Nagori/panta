@@ -46,6 +46,8 @@ tests/
 
 ## 命令与 CI
 
+PR 测试耗时优化由[任务 120](../task/120-pr-affected-test-selection.md)优先实施：L1 运行变更范围内的快速局部验证，L2 沿 Cargo、CMake、CXX/FFI 与 QML 消费边扩展到受影响测试；公共接口、构建图与无法分类的变更升级到完整矩阵。无法可靠解析依赖闭包时，回退对应语言完整测试集。具体命令与升级条件由任务 120 根据真实依赖和测试标签验收。此策略仅用于 PR；main 保留现有完整门禁，nightly 保留现有 Miri、sanitizer 与 CPU performance 诊断套件。
+
 本地日常入口：
 
 ```sh

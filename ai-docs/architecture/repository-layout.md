@@ -78,6 +78,22 @@ panta/
 
 `.pa` 源文件由 `panta-dsl-core` 统一解析，按 `kind` 聚合成 language、theme 或 variables Artifact；`panta-dslc` 编排 check、format/format --check 和 TS 输出。格式化复用核心 AST，写回前通过临时文件同步并替换；国际化构建树中的临时 TS 由 quick-xml 生成、QM 由预编译 QtTools 生成，源码目录不保存这两类产物。格式化/校验规则和 fixtures 归 035，不能在各业务目录复制 parser。
 
+## 当前依赖分组
+
+依赖方向以 `Cargo.toml` workspace metadata、各 native target 的直接链接关系和 QML module 为准；详细允许表及 adapter 边界见[分层标准](../standards/layering.md)。
+
+| 分组 | 当前成员与职责 |
+|---|---|
+| Rust 基础/构建 | `panta-foundation` 进程设施；`panta-build` 工具供给与构建调度；`panta-dsl-core` DSL 解析 / 生成核心 |
+| Rust 领域 | `panta-mesh` 网格 IR；`panta-import` 格式导入编排；`panta-core` 工程与服务。现有依赖是 `core → import/mesh/dsl-core`、`import → mesh` |
+| Rust 工具入口 | `panta-dslc → panta-dsl-core`；`panta-launcher` 组合 Rust 服务与 native 产品；`panta-tests` 承载质量/测试调度 |
+| FFI | `panta-ffi` 通过 CXX 暴露并转发 Rust 服务，不承载领域算法 |
+| Native adapter | `foundation`、`geometry`、`mesh`、`qt-adapter`、`i18n`、`visualization` 按职责封装 OS、OCCT、Netgen、Qt、VTK；当前 adapter 间没有自有库直接依赖 |
+| Bridge 与 UI | `native/bridge` 适配 Rust FFI、Qt 与 native 显示/平台服务；`qml/` 构成 `Panta.Shell`，通过 Bridge 暴露对象交互 |
+| 组合根与测试 | `native/app` 组装 native 库、插件与 QML；`tests/` 和性能 target 消费被测模块，不进入生产依赖图 |
+
+规划中的独立 `panta-geom`、材料、工作流等领域 crate 尚未建立。Rust 应用命令层的当前状态和 GUI/CLI 共享边界见[命令层设计](command-layer.md)。
+
 ## 新增文件原则
 
 按职责放置文件，避免按语言把所有业务堆进一个桥接层。访问私有实现的单元测试贴近源码；公开 API 的 Rust 黑盒测试放根 `tests/rust/` 并由所属 crate 注册，native/QML 测试和回归夹具按[测试规范](../standards/testing.md)归档。测试资产应小且能合法分发，大型 CAD/结果数据通过受控的外部资产机制管理。
