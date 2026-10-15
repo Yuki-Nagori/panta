@@ -16,6 +16,38 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 
 这是目标职责，不代表五个规划领域 crate 已建立。当前 STEP 摘要仍是 native 适配冒烟；Netgen Mesh IR 已由 067 接入 Rust 权威模型与校验。
 
+## 当前分层与允许方向
+
+以下层级依据当前 `Cargo.toml` workspace dependencies、native `target_link_libraries` 与 QML module 声明核对。层号分别在 Rust 图和 Native 图内解释；Rust staticlib、CXX、Qt/QML 是显式跨边界连接，不用层号伪装成同一种依赖。表内“→”表示左侧依赖右侧。测试 target 可依赖被测 target 与测试框架，不反向进入生产依赖图。
+
+### Rust 层级
+
+| 层级 | 当前成员 | 允许的仓库内依赖 | 说明 |
+|---|---|---|---|
+| Rust L1：基础与叶子库 | `panta-foundation`、`panta-build`、`panta-dsl-core`、`panta-mesh` | 不依赖其他 workspace crate | 基础设施、构建工具、DSL 核心与网格 IR/解析 |
+| Rust L2：领域适配与工具入口 | `panta-import`、`panta-dslc` | `panta-import → panta-mesh`；`panta-dslc → panta-dsl-core` | 导入格式适配与 DSL 命令行工具；`panta-dslc` 是独立工具入口，不因此成为应用组合根 |
+| Rust L3：应用 / 工程服务 | `panta-core` | `panta-core → panta-import, panta-mesh, panta-dsl-core` | 编排工程状态、资产和领域服务 |
+| Rust L4：语言边界 | `panta-ffi` | `panta-ffi → panta-core, panta-mesh, panta-foundation, panta-build` | DTO、错误、句柄转换与服务转发，不承载领域算法 |
+| Rust L5：桌面启动组合根 | `panta-launcher` | `panta-launcher → panta-ffi, panta-build, panta-dsl-core` | 组装并启动 native app |
+| 测试工具（生产层外） | `panta-tests`、`tests/` | `panta-tests → panta-build`；测试可依赖被测 crate | 只作为验证消费者，不得被生产 crate 依赖 |
+
+### Native 层级
+
+| 层级 | 当前成员 | 允许的 Native target 依赖 | 跨语言边界 |
+|---|---|---|---|
+| Native L1：适配与基础服务 | `panta_foundation`、`panta_geometry`、`panta_mesh`、`panta_qt_adapter`、`panta_i18n`、`panta_visualization` | 这些 target 之间当前无直接自有 native 库链接；各自可依赖职责范围内的 Qt、OCCT、Netgen、VTK 或平台库 | `panta_mesh` 还链接 Rust FFI staticlib，属于显式 Rust/C++ 边界，不据此建立 Native L1 内部反向层级 |
+| Native L2：UI bridge 与 QML | `panta_bridge` / `panta::bridge`、`panta_shell` / `Panta.Shell` | Bridge → `panta::visualization`、`panta::qt_adapter`；QML module 启用 Bridge 时 → `panta_bridge`、`panta_visualization` | Bridge 调用 Rust FFI；QML 只经 ViewModel/Bridge 使用服务 |
+| Native L3：应用组合根 | `panta_native_app` | → `panta::foundation`、`panta::shell`、`panta_shellplugin`、`panta::i18n`；启用 Bridge 时还 → `panta::visualization`、Bridge/Visualization plugins | 直接链接 Rust FFI staticlib，并通过 Qt/CXX 连接运行时 |
+| 测试与性能（生产层外） | native test、benchmark targets | 可依赖被测生产 target，不进入生产依赖图 | 性能基准由单独入口运行 |
+
+Rust/CMake/QML 的当前允许边据实际清单核对；新增边须先更新分层归属和相应任务，lint 尚未更新时不得用“当前能构建”替代架构评审。跨语言链接须登记在边界表中，不能以新增反向依赖消除构建问题。
+
+Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；CMake 表针对自有 target 的直接链接边，QML module dependency 单独标出，第三方 imported target 按 adapter 边界归类。新增仓库内边需先判断职责归属；允许表或 lint 尚未更新时不得用“当前能构建”替代架构评审。任务 119 实现自动边检查，任务 120 独立实现测试影响范围选择。
+
+### 应用命令层
+
+命令 / 查询的输入、领域校验、编排、结果与稳定错误由 Qt 无关的 Rust 应用服务提供。GUI 通过 `panta-ffi`/Bridge 适配 Qt 值和展示；CLI 将参数适配为同一命令，不复制业务规则。当前 `panta-core::ProjectService` 已是 Rust 服务入口，`panta-dslc` 是 DSL 工具 CLI；仓库尚无面向应用领域的通用 `panta-cli`，不能把 build script 或两个调用方共用一个解析函数误记为共享命令。首个具体共享操作和 CLI 接入由任务 121 根据现有服务确定。
+
 ## 领域、适配与桥接
 
 - Rust 拥有业务逻辑、领域数据、单位 / 引用 / 修订校验、轻量算法与任务编排。OCCT / Netgen 的几何和网格核心算法必须通过 C++ adapter 实际调用重库，不在 Rust 或 adapter 重写。

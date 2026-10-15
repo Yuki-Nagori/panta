@@ -108,6 +108,8 @@ git config core.hooksPath .githooks
 
 ## 架构评估与后续实施
 
+任务 118 对照当前 `cargo metadata`、native target links 与 QML module 梳理实际 L1+ 层级及跨语言边。本任务只定义设计与事实；PR 测试分层与影响范围选择优先由 [120](../task/120-pr-affected-test-selection.md) 落地，Rust/CMake 依赖 lint 后续由 [119](../task/119-rust-cmake-layering-lint.md) 落地。当前 CI 的 `changes` 已区分 rust/native/qml 域并据此拆 lint job；任一代码变更仍触发跨平台 workspace 构建/测试和 coverage。任务 120 只缩小 PR 验证范围，不改变 main 分支现有门禁或 nightly 的 Miri、sanitizer 与 CPU performance 诊断套件。
+
 Cargo 统一用户入口、CMake 管理 native 图、CXX 管理 Rust/C++ 边界，以及 `tests/cpp` / `tests/qml` 分类是合理基础。工具种类已覆盖当前语言的主要需求，无需继续堆叠 Cppclean 或尚无 Node 源码需求的 knip。
 
 当前 CAE 依赖仍由 031/038 逐步交付，VTK/OCCT/Netgen 的全平台供给和消费验证不能因 CMake 接口已存在就标完成。cargo-deny 只审计 Cargo 依赖图，Qt 和 native SDK 的许可证、漏洞与制品来源仍需独立清单和更新机制。

@@ -2,6 +2,8 @@
 
 [任务索引](../task-index.md) · [架构总览](../architecture/README.md) · [技术规范](../standards/README.md)
 
+当前 crate、native target 与 QML 的依赖分组见[分层标准](../standards/layering.md)和[仓库布局](../architecture/repository-layout.md)；Rust 应用命令入口及 GUI/CLI 边界见[命令层设计](../architecture/command-layer.md)。
+
 本目录保存跨任务的重要模块设计：职责、数据流、生命周期、方案取舍与演进门槛。架构文档维护全局分层；规范维护通用约束；实施进展与验证证据仍以 task 为准，不在这里复制状态表。
 
 本目录同时记录已实现基础和后续规划。跨平台路径层（023）、静态 QML 模块注册（026）、原子 / 组合组件（029）及 `.pa` parser / formatter（034/035）已落地；Rust FSM 已接入只读 STL 视口资源激活。运行时、变量 DSL、主题 DSL、UI 重载及增量更新等后续能力仍按对应任务推进，具体边界见各模块说明与实现。
