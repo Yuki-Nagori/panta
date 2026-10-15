@@ -1,6 +1,6 @@
 # 120 — PR 按影响范围选择测试
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[118 实际依赖图与应用命令层设计](118-layering-lint-and-command-boundaries.md)、[100 tests 整体整理与性能入口统一](100-tests-consolidation.md)
 - 优先级：P0
@@ -41,15 +41,15 @@
 
 ## 验收标准
 
-- [ ] L1/L2/完整矩阵边界、实际命令和升级条件清楚；Rust、CMake、CXX/FFI 与 QML 依赖闭包都纳入消费者测试选择。
-- [ ] Rust crate 变更选择本 crate、所有受影响反向依赖及跨语言 native/QML 消费者；native 变更沿项目内 CMake/QML 消费边选择相关 target 和 CTest label；无法可靠追踪时回退对应语言完整测试集。
-- [ ] Rust 选择器测试覆盖单域、跨域、根配置、未知路径、重命名/删除和空 diff；未知/核心路径保守扩大。
-- [ ] Rust→native 的 CXX/FFI 与 build-dependency 映射具备回归测试，覆盖修改 Rust 输入后受影响的 native CTest labels。
-- [ ] 新增 native 模块、CTest label 或测试板块时，同步更新路径影响映射与 Rust 回归测试；未登记变更仍通过无过滤全量回退覆盖。
-- [ ] 本地通过 `cargo test-scope l1|l2|all [--base <ref>]` 使用与 CI 相同的选择规则；`cargo test-plan` 默认输出当前工作树的 L1/L2 选择结果，CI 显式使用路径输入模式。
-- [ ] PR 与 main push 的测试只运行所选范围；三平台 workspace check/build 与相关 lint 保留。nightly 运行完整 workspace 测试、Rust/native coverage 与全量 lint 并归档 coverage 报告；Miri/sanitizer/CPU performance 诊断不受影响。
-- [ ] CI 输出可读的路径分类和选择结果，结果可由提交与 workflow run 复核。
-- [ ] 完整适用验证、独立只读评审和 task-index 更新完成。
+- [x] L1/L2/完整矩阵边界、实际命令和升级条件清楚；Rust、CMake、CXX/FFI 与 QML 依赖闭包都纳入消费者测试选择。
+- [x] Rust crate 变更选择本 crate、所有受影响反向依赖及跨语言 native/QML 消费者；native 变更沿项目内 CMake/QML 消费边选择相关 target 和 CTest label；无法可靠追踪时回退对应语言完整测试集。
+- [x] Rust 选择器测试覆盖单域、跨域、根配置、未知路径、重命名/删除和空 diff；未知/核心路径保守扩大。
+- [x] Rust→native 的 CXX/FFI 与 build-dependency 映射具备回归测试，覆盖修改 Rust 输入后受影响的 native CTest labels。
+- [x] 新增 native 模块、CTest label 或测试板块时，同步更新路径影响映射与 Rust 回归测试；未登记变更仍通过无过滤全量回退覆盖。
+- [x] 本地通过 `cargo test-scope l1|l2|all [--base <ref>]` 使用与 CI 相同的选择规则；`cargo test-plan` 默认输出当前工作树的 L1/L2 选择结果，CI 显式使用路径输入模式。
+- [x] PR 与 main push 的测试只运行所选范围；三平台 workspace check/build 与相关 lint 保留。nightly 运行完整 workspace 测试、Rust/native coverage 与全量 lint 并归档 coverage 报告；Miri/sanitizer/CPU performance 诊断不受影响。
+- [x] CI 输出可读的路径分类和选择结果，结果可由提交与 workflow run 复核。
+- [x] 完整适用验证、独立只读评审和 task-index 更新完成。
 
 ## 验证计划与结果
 
@@ -73,8 +73,8 @@
 - 2026-10-16：独立 `gpt-6.1-sol` medium 最终只读评审完整 diff；修复 i18n→QtAdapter 与测试 manifest 的漏选、macOS Bash 3.2 `mapfile` 不兼容、全量 CTest 标签遗漏和 Markdown 夹具触发问题后复核通过。评审未发现剩余可操作问题；真实三平台 Actions 尚未运行。
 - 2026-10-16：严格复核 selector 最终快照，独立评审提出的 launcher build script 后置升级漏开依赖域已修复并以直接输入确认；选择器 9 项回归、完整 workspace 聚合测试（CTest 76/76）、actionlint、格式和 diff 检查均通过。实际三平台 Actions 仍是剩余验收项。
 - 2026-10-16：Clippy 发现选择器与 placeholder 测试中的 `unwrap/expect`，已改为 `Result` 错误传播；Clippy、选择器回归、native 聚合测试和完整 workspace 聚合测试重新通过。
-- 2026-10-16：PR #41 的三平台 Actions 全部通过。Windows L2 曾因 Git Bash/JQ 行尾将 CR 混入 Cargo 包名而失败；改为 NUL 分隔解析后重跑通过，且全量回退 native/QML 测试通过。当前等待 PR 合并，再将任务和索引标为 done。
+- 2026-10-16：PR #41 的三平台 Actions 全部通过。Windows L2 曾因 Git Bash/JQ 行尾将 CR 混入 Cargo 包名而失败；改为 NUL 分隔解析后重跑通过，且全量回退 native/QML 测试通过。维护者授权不等待最新文档提交触发的 CI，已将任务与索引标为 done。
 
 ## 完成摘要
 
-实现、本地验收和 PR 三平台 CI 已通过；PR #41 尚未合并，合并后再同步任务状态为 done。
+实现、严格评审、本地验收和 PR 三平台 CI 已通过；文档同步已完成。PR #41 按维护者指示不等待最新文档提交触发的 CI，直接合并。

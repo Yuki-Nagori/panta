@@ -130,7 +130,7 @@ ai-docs/
 | 117 | [Rust 工程文档工作区状态](task/117-rust-project-document-workspace.md) | Rust 架构整理 | 067, 080, 107 | done |
 | 118 | [实际依赖图与应用命令层设计](task/118-layering-lint-and-command-boundaries.md) | Rust 架构整理 | 106, 111 | done |
 | 119 | [Rust 与 CMake 分层依赖 lint](task/119-rust-cmake-layering-lint.md) | Rust 架构整理 | 118 | planned |
-| 120 | [PR 按影响范围选择测试](task/120-pr-affected-test-selection.md) | 验证基础 | 100, 118 | in-progress |
+| 120 | [PR 按影响范围选择测试](task/120-pr-affected-test-selection.md) | 验证基础 | 100, 118 | done |
 | 121 | [GUI 与 CLI 共享 Rust 命令入口](task/121-rust-gui-cli-command-layer.md) | Rust 架构整理 | 107, 118 | planned |
 
 ## 验证与质量扩展队列
