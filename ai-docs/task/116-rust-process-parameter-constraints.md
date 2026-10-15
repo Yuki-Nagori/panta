@@ -1,6 +1,6 @@
 # 116 — Rust 工艺参数约束统一暴露
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：094, 095, 099
 - 优先级：P1
@@ -41,6 +41,7 @@
 | 2026-10-16 | macOS arm64；`cargo test --locked --workspace` | Rust、native、QML 聚合测试通过 | 通过；CTest 76/76，其中 QML 与 ViewModel 约束回归通过 |
 | 2026-10-16 | `cargo build --locked -p panta-launcher --no-default-features`；`ctest --test-dir target/native/debug -R Qml.ThemeComponentParameters --output-on-failure` | Bridge 关闭时 QML 组件测试可编译并运行 | 通过；CMake 确认 `PANTA_ENABLE_BRIDGE_MODULE=OFF`，组件测试通过 |
 | 2026-10-16 | `cargo format --check`; `cargo lint --check` | Rust、C++、QML 格式与质量检查通过 | 通过；Clippy、依赖/CMake 检查、构建/QML lint、clang-tidy、include-cleaner、cppcheck 均通过 |
+| 2026-10-16 | [PR #37 GitHub Actions](https://github.com/Yuki-Nagori/panta/actions/runs/38777197289) | macOS、Linux、Windows 构建与质量门禁通过 | 通过；所有必需检查均 pass，cargo audit 按 workflow 条件跳过 |
 | 2026-10-16 | 工艺 QML 边界扫描与 `git diff --check` | 目标对话框无重复业务边界，差异无空白错误 | 通过；原有范围值只定义在 `panta-core` 约束中 |
 
 ## 清理与兼容例外
@@ -54,8 +55,8 @@
 - 2026-10-16：三个 QML 对话框从投影绑定输入范围、单位、范围文案、曲线归一化与确认状态；验证器不支持的开区间由 Rust 草稿验证处理，浇口数小数原样传入验证。
 - 2026-10-16：独立评审发现备用空行提示、压缩曲线索引映射和边界存在标志传播不完整；已修复并增加回归测试。保压范围文案支持仅有上界。
 - 2026-10-16：final review 发现无 Bridge 诊断构建的 QML 测试依赖未受 feature guard 保护；已增加条件编译和明确跳过，并验证 Bridge OFF 与默认 ON 两种测试路径。复核通过，无未解决发现。
-- 2026-10-16：`cargo test --locked --workspace`（CTest 76/76）、Bridge OFF 目标构建/测试、`cargo lint --check` 通过。分支尚未推送，CI 验收待运行。
+- 2026-10-16：`cargo test --locked --workspace`（CTest 76/76）、Bridge OFF 目标构建/测试、`cargo lint --check` 通过；PR #37 的 macOS、Linux、Windows CI 与质量检查全部通过。
 
 ## 完成摘要
 
-实现、本机验证和独立评审完成；尚未取得 CI 结果，保持 in-progress。
+实现、本机验证、独立评审和 PR #37 跨平台 CI 验收全部完成。
