@@ -182,6 +182,7 @@ pub(super) fn project_service_plan_settings(
             fill_settings_confirmed: settings.fill_settings_confirmed,
             gate_location_settings: gate_location_settings_dto(settings.gate_location_settings),
             gate_location_settings_confirmed: settings.gate_location_settings_confirmed,
+            process_constraints: process_constraints_dto(),
         },
         None => bridge::PlanSettings {
             project_path: String::new(),
@@ -198,7 +199,107 @@ pub(super) fn project_service_plan_settings(
                 panta_core::project::GateLocationSettings::default(),
             ),
             gate_location_settings_confirmed: false,
+            process_constraints: process_constraints_dto(),
         },
+    }
+}
+
+fn numeric_constraint_dto(
+    constraint: panta_core::project::NumericConstraint,
+) -> bridge::NumericConstraint {
+    bridge::NumericConstraint {
+        minimum: constraint.minimum,
+        maximum: constraint.maximum,
+        has_minimum: constraint.has_minimum,
+        has_maximum: constraint.has_maximum,
+        minimum_inclusive: constraint.minimum_inclusive,
+        maximum_inclusive: constraint.maximum_inclusive,
+        integer: constraint.integer,
+        unit: constraint.unit.to_owned(),
+    }
+}
+
+fn process_constraints_dto() -> bridge::ProcessConstraints {
+    bridge::ProcessConstraints {
+        temperature: numeric_constraint_dto(panta_core::project::TEMPERATURE_CONSTRAINT),
+        flow_rate: numeric_constraint_dto(panta_core::project::FLOW_RATE_CONSTRAINT),
+        switch_over_volume: numeric_constraint_dto(
+            panta_core::project::SWITCH_OVER_VOLUME_CONSTRAINT,
+        ),
+        holding_duration: numeric_constraint_dto(panta_core::project::HOLDING_DURATION_CONSTRAINT),
+        holding_pressure: numeric_constraint_dto(panta_core::project::HOLDING_PRESSURE_CONSTRAINT),
+        number_of_gates: numeric_constraint_dto(panta_core::project::NUMBER_OF_GATES_CONSTRAINT),
+        holding_profile_max_points: panta_core::project::HOLDING_PROFILE_MAX_POINTS as u64,
+    }
+}
+
+pub(super) fn validate_fill_settings_draft(
+    settings: bridge::FillSettings,
+) -> bridge::ProcessDraftValidation {
+    let errors = panta_core::project::FillSettings {
+        mold_temperature_celsius: settings.mold_temperature_celsius,
+        melt_temperature_celsius: settings.melt_temperature_celsius,
+        flow_rate_cm3_per_second: settings.flow_rate_cm3_per_second,
+        switch_over_volume_percent: settings.switch_over_volume_percent,
+        fiber_orientation: settings.fiber_orientation,
+        crystallization: settings.crystallization,
+        holding_profile: settings
+            .holding_profile
+            .into_iter()
+            .map(|point| panta_core::project::HoldingProfilePoint {
+                duration_seconds: point.duration_seconds,
+                pressure_percent: point.pressure_percent,
+            })
+            .collect(),
+    }
+    .validation_errors();
+    bridge::ProcessDraftValidation {
+        valid: errors.is_empty(),
+        errors,
+    }
+}
+
+pub(super) fn validate_holding_profile_draft(
+    holding_profile: Vec<bridge::HoldingProfilePoint>,
+) -> bridge::ProcessDraftValidation {
+    let settings = panta_core::project::FillSettings {
+        holding_profile: holding_profile
+            .into_iter()
+            .map(|point| panta_core::project::HoldingProfilePoint {
+                duration_seconds: point.duration_seconds,
+                pressure_percent: point.pressure_percent,
+            })
+            .collect(),
+        ..panta_core::project::FillSettings::default()
+    };
+    let errors = settings
+        .validation_errors()
+        .into_iter()
+        .filter(|key| key == "holdingProfile" || key.starts_with("holdingProfile."))
+        .collect::<Vec<_>>();
+    bridge::ProcessDraftValidation {
+        valid: errors.is_empty(),
+        errors,
+    }
+}
+
+pub(super) fn validate_gate_location_settings_draft(
+    mold_temperature_celsius: f64,
+    melt_temperature_celsius: f64,
+    number_of_gates: f64,
+    machine_id: String,
+) -> bridge::ProcessDraftValidation {
+    let errors = panta_core::project::GateLocationSettings {
+        machine_id,
+        mold_temperature_celsius,
+        melt_temperature_celsius,
+        algorithm: panta_core::project::GateLocatorAlgorithm::AdvancedGateLocator,
+        number_of_gates: 0,
+    }
+    .validation_errors_for_gate_count(number_of_gates);
+    bridge::ProcessDraftValidation {
+        valid: errors.is_empty(),
+        errors,
     }
 }
 
@@ -552,10 +653,38 @@ mod tests {
     use crate::{
         activation_outcome_to_bridge, bridge, project_service_create, project_service_current,
         project_service_execute, project_service_mesh_snapshot_for_import, project_service_new,
-        project_service_open, project_service_resident_mesh_ids, project_service_save,
+        project_service_open, project_service_plan_settings, project_service_resident_mesh_ids,
+        project_service_save, validate_fill_settings_draft, validate_gate_location_settings_draft,
+        validate_holding_profile_draft,
     };
     use std::fs;
     use std::path::PathBuf;
+
+    #[test]
+    fn plan_settings_exposes_core_constraints_and_draft_validation_errors() {
+        let service = project_service_new();
+        let settings = project_service_plan_settings(&service, "");
+        assert_eq!(settings.process_constraints.temperature.minimum, -273.15);
+        assert!(!settings.process_constraints.flow_rate.minimum_inclusive);
+        assert_eq!(settings.process_constraints.holding_pressure.maximum, 200.0);
+        assert!(settings.process_constraints.number_of_gates.integer);
+
+        let mut fill = settings.fill_settings;
+        fill.flow_rate_cm3_per_second = 0.0;
+        let validation = validate_fill_settings_draft(fill);
+        assert!(!validation.valid);
+        assert_eq!(validation.errors, ["flowRate"]);
+
+        let validation = validate_holding_profile_draft(vec![bridge::HoldingProfilePoint {
+            duration_seconds: 0.0,
+            pressure_percent: 201.0,
+        }]);
+        assert_eq!(validation.errors, ["holdingProfile.0.pressure"]);
+
+        let validation =
+            validate_gate_location_settings_draft(40.0, 230.0, 1.5, "default-machine".into());
+        assert_eq!(validation.errors, ["numberOfGates"]);
+    }
     fn wait_confirmation(
         service: &mut crate::ProjectService,
         finish: fn(&mut crate::ProjectService) -> Result<bool, panta_core::project::ProjectError>,

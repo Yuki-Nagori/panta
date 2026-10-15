@@ -70,7 +70,8 @@ use project::{
     project_service_import_stl, project_service_imports, project_service_mesh_snapshot_for_import,
     project_service_new, project_service_open, project_service_plan_settings,
     project_service_release_mesh_document, project_service_resident_mesh_ids, project_service_save,
-    project_service_set_analysis_sequence, stl_import_preview,
+    project_service_set_analysis_sequence, stl_import_preview, validate_fill_settings_draft,
+    validate_gate_location_settings_draft, validate_holding_profile_draft,
 };
 mod mesh;
 use mesh::{mesh_coordinates, mesh_validate_tet};
@@ -218,6 +219,32 @@ pub mod bridge {
         number_of_gates: u32,
     }
 
+    struct NumericConstraint {
+        minimum: f64,
+        maximum: f64,
+        has_minimum: bool,
+        has_maximum: bool,
+        minimum_inclusive: bool,
+        maximum_inclusive: bool,
+        integer: bool,
+        unit: String,
+    }
+
+    struct ProcessConstraints {
+        temperature: NumericConstraint,
+        flow_rate: NumericConstraint,
+        switch_over_volume: NumericConstraint,
+        holding_duration: NumericConstraint,
+        holding_pressure: NumericConstraint,
+        number_of_gates: NumericConstraint,
+        holding_profile_max_points: u64,
+    }
+
+    struct ProcessDraftValidation {
+        valid: bool,
+        errors: Vec<String>,
+    }
+
     struct PlanSettings {
         project_path: String,
         revision: u64,
@@ -231,6 +258,7 @@ pub mod bridge {
         fill_settings_confirmed: bool,
         gate_location_settings: GateLocationSettings,
         gate_location_settings_confirmed: bool,
+        process_constraints: ProcessConstraints,
     }
 
     /// 源文件尚未复制时供导入弹窗展示的 STL 元数据。
@@ -547,6 +575,16 @@ pub mod bridge {
             service: &ProjectService,
             preferred_import_id: &str,
         ) -> PlanSettings;
+        fn validate_fill_settings_draft(settings: FillSettings) -> ProcessDraftValidation;
+        fn validate_holding_profile_draft(
+            holding_profile: Vec<HoldingProfilePoint>,
+        ) -> ProcessDraftValidation;
+        fn validate_gate_location_settings_draft(
+            mold_temperature_celsius: f64,
+            melt_temperature_celsius: f64,
+            number_of_gates: f64,
+            machine_id: String,
+        ) -> ProcessDraftValidation;
         #[rust_name = "project_service_set_analysis_sequence_response"]
         fn project_service_set_analysis_sequence(
             service: &mut ProjectService,

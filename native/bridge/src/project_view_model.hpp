@@ -173,9 +173,18 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_INVOKABLE bool setFillSettings(const QString& projectPath, quint64 revision,
                                      const QString& importId, const QVariantMap& settings);
 
+    /// 使用 Rust 领域约束同步验证当前 Fill 草稿，返回 valid 与稳定字段错误键。
+    Q_INVOKABLE QVariantMap validateFillSettingsDraft(const QVariantMap& settings) const;
+
+    /// 使用 Rust 领域约束同步验证保压曲线草稿。
+    Q_INVOKABLE QVariantMap validateHoldingProfileDraft(const QVariantList& points) const;
+
     /// 启动 Rust 后台浇口定位确认；失败保留旧配置，完成由信号通知。
     Q_INVOKABLE bool setGateLocationSettings(const QString& projectPath, quint64 revision,
                                              const QString& importId, const QVariantMap& settings);
+
+    /// 使用 Rust 领域约束同步验证当前 Gate Location 草稿。
+    Q_INVOKABLE QVariantMap validateGateLocationSettingsDraft(const QVariantMap& settings) const;
 
     /// 激活一个就绪文档（Welcome 或已就绪导入页签）；Loading/Failed 文档
     /// 不可激活。同步 UI 操作，不经 Rust Flow。

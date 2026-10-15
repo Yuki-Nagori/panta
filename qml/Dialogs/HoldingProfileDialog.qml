@@ -9,25 +9,27 @@ DialogWindow {
     objectName: "holdingProfileDialog"
     property bool plotVisible: false
     property int editRevision: 0
-    readonly property var points: {
-        // ListModel 的字段变更不会自动重算 JS 循环，显式用编辑版本触发投影。
+    property var validationModel: null
+    property var constraints: ({})
+    readonly property var draftPoints: {
         const revision = editRevision;
         const result = [];
         for (let i = 0; i < rows.count; ++i) {
             const row = rows.get(i);
             if (row.durationText === "" && row.pressureText === "")
                 continue;
-            const duration = Number(row.durationText);
-            const pressure = Number(row.pressureText);
-            if (row.durationText === "" || row.pressureText === "" || !Number.isFinite(duration) || !Number.isFinite(pressure) || duration < 0 || pressure < 0 || pressure > 200)
-                return [];
             result.push({
-                duration: duration,
-                pressure: pressure
+                duration: draftNumber(row.durationText),
+                pressure: draftNumber(row.pressureText)
             });
         }
         return result;
     }
+    readonly property var draftValidation: validationModel ? validationModel.validateHoldingProfileDraft(draftPoints) : ({
+            valid: false,
+            errors: []
+        })
+    readonly property var points: draftValidation.valid ? draftPoints : []
     signal profileAccepted(var points)
     width: Theme.holdingProfileDialogWidth
     height: Theme.holdingProfileDialogHeight
@@ -55,10 +57,43 @@ DialogWindow {
         table.forceActiveFocus();
     }
     function acceptProfile() {
-        if (!visible || points.length === 0)
+        if (!visible || !draftValidation.valid)
             return;
-        profileAccepted(points);
+        profileAccepted(draftPoints);
         close();
+    }
+    function draftNumber(text) {
+        return text.trim().length === 0 ? NaN : Number(text);
+    }
+    function minimumBound(constraint, fallback) {
+        return constraint?.hasMinimum ? constraint.minimum : fallback;
+    }
+    function maximumBound(constraint, fallback) {
+        return constraint?.hasMaximum ? constraint.maximum : fallback;
+    }
+    function draftPointIndex(rowIndex) {
+        const current = rows.get(rowIndex);
+        if (current.durationText === "" && current.pressureText === "")
+            return -1;
+        let pointIndex = 0;
+        for (let index = 0; index < rowIndex; ++index) {
+            const row = rows.get(index);
+            if (row.durationText !== "" || row.pressureText !== "")
+                ++pointIndex;
+        }
+        return pointIndex;
+    }
+    function hasProfileFieldError(rowIndex, field) {
+        const pointIndex = draftPointIndex(rowIndex);
+        return pointIndex >= 0 && draftValidation.errors.indexOf("holdingProfile." + pointIndex + "." + field) >= 0;
+    }
+    function rangeText(constraint) {
+        if (!constraint)
+            return "";
+        const minimum = constraint.hasMinimum ? (constraint.minimumInclusive ? "≥ " : "> ") + constraint.minimum : "";
+        const maximum = constraint.hasMaximum ? (constraint.hasMinimum ? " " : "") + (constraint.maximumInclusive ? "≤ " : "< ") + constraint.maximum : "";
+        const bounds = minimum + maximum;
+        return bounds.length > 0 ? constraint.unit + " · " + bounds : constraint.unit;
     }
     onPointsChanged: plot.requestPaint()
     ListModel {
@@ -104,12 +139,12 @@ DialogWindow {
                             ThemedLabel {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: 0
-                                text: qsTranslate("HoldingProfile", "Duration") + "\n" + qsTranslate("HoldingProfile", "s · ≥ 0")
+                                text: qsTranslate("HoldingProfile", "Duration") + "\n" + dialog.rangeText(dialog.constraints.holdingDuration)
                             }
                             ThemedLabel {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: 0
-                                text: qsTranslate("HoldingProfile", "Filling pressure") + "\n% · 0–200"
+                                text: qsTranslate("HoldingProfile", "Filling pressure") + "\n" + dialog.rangeText(dialog.constraints.holdingPressure)
                             }
                             Item {
                                 Layout.preferredWidth: Theme.controlHeight
@@ -150,11 +185,12 @@ DialogWindow {
                                         selectByMouse: true
                                         Accessible.name: qsTranslate("HoldingProfile", "Step %1 duration in seconds").arg(row.index + 1)
                                         validator: DoubleValidator {
-                                            bottom: 0
+                                            bottom: dialog.minimumBound(dialog.constraints.holdingDuration, -Number.MAX_VALUE)
+                                            top: dialog.maximumBound(dialog.constraints.holdingDuration, Number.MAX_VALUE)
                                             locale: "C"
                                             notation: DoubleValidator.StandardNotation
                                         }
-                                        invalid: (text.length > 0 && !acceptableInput) || (text.length === 0 && row.pressureText.length > 0)
+                                        invalid: (row.durationText.length > 0 && !acceptableInput) || dialog.hasProfileFieldError(row.index, "duration")
                                         onTextEdited: {
                                             rows.setProperty(row.index, "durationText", text);
                                             dialog.editRevision++;
@@ -169,12 +205,12 @@ DialogWindow {
                                         selectByMouse: true
                                         Accessible.name: qsTranslate("HoldingProfile", "Step %1 filling pressure in percent").arg(row.index + 1)
                                         validator: DoubleValidator {
-                                            bottom: 0
-                                            top: 200
+                                            bottom: dialog.minimumBound(dialog.constraints.holdingPressure, -Number.MAX_VALUE)
+                                            top: dialog.maximumBound(dialog.constraints.holdingPressure, Number.MAX_VALUE)
                                             locale: "C"
                                             notation: DoubleValidator.StandardNotation
                                         }
-                                        invalid: (text.length > 0 && !acceptableInput) || (text.length === 0 && row.durationText.length > 0)
+                                        invalid: (row.pressureText.length > 0 && !acceptableInput) || dialog.hasProfileFieldError(row.index, "pressure")
                                         onTextEdited: {
                                             rows.setProperty(row.index, "pressureText", text);
                                             dialog.editRevision++;
@@ -204,6 +240,7 @@ DialogWindow {
                     contentPadding: Theme.spacingLarge
                     implicitWidth: Math.max(Theme.dialogActionWidth, contentItem.implicitWidth + leftPadding + rightPadding)
                     text: qsTranslate("HoldingProfile", "Add Step")
+                    enabled: rows.count < (dialog.constraints.holdingProfileMaxPoints ?? 0)
                     onClicked: {
                         rows.append({
                             durationText: "",
@@ -258,7 +295,8 @@ DialogWindow {
                     dialog.points.forEach((point, index) => {
                         time += point.duration;
                         const x = inset + time / (total || 1) * (width - 2 * inset);
-                        const y = height - inset - point.pressure / 200 * (height - 2 * inset);
+                        const maximumPressure = dialog.constraints.holdingPressure?.maximum ?? 1;
+                        const y = height - inset - point.pressure / maximumPressure * (height - 2 * inset);
                         if (index === 0)
                             ctx.moveTo(x, y);
                         else
@@ -277,7 +315,7 @@ DialogWindow {
                     objectName: "holdingProfileAccept"
 
                     text: qsTranslate("DialogAction", "OK")
-                    enabled: dialog.points.length > 0
+                    enabled: dialog.draftValidation.valid
                     primaryAction: true
                     onClicked: dialog.acceptProfile()
                 }

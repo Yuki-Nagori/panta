@@ -99,6 +99,43 @@ TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
     EXPECT_TRUE(empty.errorDetail().isEmpty());
 }
 
+TEST(ProjectViewModelTest, ExposesRustProcessConstraintsAndPerFieldDraftErrors) {
+    ProjectViewModel view_model;
+    const auto plan = view_model.planSettings();
+    const auto constraints = plan.value(QStringLiteral("processConstraints")).toMap();
+    const auto temperature = constraints.value(QStringLiteral("temperature")).toMap();
+    const auto flow = constraints.value(QStringLiteral("flowRate")).toMap();
+    const auto pressure = constraints.value(QStringLiteral("holdingPressure")).toMap();
+    const auto gate_count = constraints.value(QStringLiteral("numberOfGates")).toMap();
+    EXPECT_DOUBLE_EQ(temperature.value(QStringLiteral("minimum")).toDouble(), -273.15);
+    EXPECT_FALSE(flow.value(QStringLiteral("minimumInclusive")).toBool());
+    EXPECT_DOUBLE_EQ(pressure.value(QStringLiteral("maximum")).toDouble(), 200.0);
+    EXPECT_TRUE(gate_count.value(QStringLiteral("integer")).toBool());
+
+    auto fill = plan.value(QStringLiteral("fillSettings")).toMap();
+    fill.insert(QStringLiteral("flowRate"), 0.0);
+    const auto fill_result = view_model.validateFillSettingsDraft(fill);
+    EXPECT_FALSE(fill_result.value(QStringLiteral("valid")).toBool());
+    EXPECT_TRUE(fill_result.value(QStringLiteral("errors"))
+                    .toStringList()
+                    .contains(QStringLiteral("flowRate")));
+
+    auto gate = plan.value(QStringLiteral("gateLocationSettings")).toMap();
+    gate.insert(QStringLiteral("numberOfGates"), 1.5);
+    const auto gate_result = view_model.validateGateLocationSettingsDraft(gate);
+    EXPECT_FALSE(gate_result.value(QStringLiteral("valid")).toBool());
+    EXPECT_TRUE(gate_result.value(QStringLiteral("errors"))
+                    .toStringList()
+                    .contains(QStringLiteral("numberOfGates")));
+
+    const auto profile_result = view_model.validateHoldingProfileDraft(
+        {QVariantMap{{QStringLiteral("duration"), 0.0}, {QStringLiteral("pressure"), 201.0}}});
+    EXPECT_FALSE(profile_result.value(QStringLiteral("valid")).toBool());
+    EXPECT_TRUE(profile_result.value(QStringLiteral("errors"))
+                    .toStringList()
+                    .contains(QStringLiteral("holdingProfile.0.pressure")));
+}
+
 TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAndViewport) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
