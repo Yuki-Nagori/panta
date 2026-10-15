@@ -82,6 +82,20 @@ class PrimitiveSceneTest final : public QObject {
         QCOMPARE(fill_data->GetNumberOfPolys(), vtkIdType{3});
         double first_bounds[6];
         fill_data->GetBounds(first_bounds);
+        // 未充填区域保持整面，包围盒不变；前沿沿底边从 0.5 推到 0.9。
+        auto front_x = [](vtkDataSet* data) {
+            double found = -1.0;
+            for (vtkIdType index = 0; index < data->GetNumberOfPoints(); ++index) {
+                double point[3];
+                data->GetPoint(index, point);
+                if (std::abs(point[1]) < 1e-9 && std::abs(point[2]) < 1e-9 && point[0] > 1e-6 &&
+                    point[0] < 1.0 - 1e-6) {
+                    found = point[0];
+                }
+            }
+            return found;
+        };
+        QCOMPARE(front_x(fill_data), 0.5);
         panta::visualization::replace_primitive_geometry(actor, nullptr, mesh, 0.9);
         mapper = vtkPolyDataMapper::SafeDownCast(actor->GetMapper());
         QVERIFY(mapper != nullptr);
@@ -90,6 +104,7 @@ class PrimitiveSceneTest final : public QObject {
         for (int i = 0; i < 6; ++i) {
             QCOMPARE(later_bounds[i], first_bounds[i]);
         }
+        QCOMPARE(front_x(mapper->GetInput()), 0.9);
 
         mesh->pressure_visible = true;
         mesh->pressures = {0.0, 0.5, 1.0};
@@ -100,6 +115,26 @@ class PrimitiveSceneTest final : public QObject {
         QVERIFY(pressure_data != nullptr);
         QVERIFY(pressure_data->GetPointData()->GetScalars() != nullptr);
         QCOMPARE(pressure_data->GetNumberOfPolys(), vtkIdType{1});
+    }
+    void playback_time_rebuilds_geometry_without_refitting_camera() {
+        const auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        const auto other = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        const auto unchanged =
+            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.5);
+        QVERIFY(!unchanged.rebuild);
+        QVERIFY(!unchanged.refit_camera);
+        const auto time_only =
+            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.9);
+        QVERIFY(time_only.rebuild);
+        QVERIFY(!time_only.refit_camera);
+        const auto mesh_only =
+            panta::visualization::primitive_geometry_update(mesh, 0.5, other, 0.5);
+        QVERIFY(mesh_only.rebuild);
+        QVERIFY(mesh_only.refit_camera);
+        const auto replaced =
+            panta::visualization::primitive_geometry_update(nullptr, 0.0, mesh, 1.0);
+        QVERIFY(replaced.rebuild);
+        QVERIFY(replaced.refit_camera);
     }
     void toggles_gate_markers_with_snapshot_flags() {
         vtkNew<vtkActor> actor;

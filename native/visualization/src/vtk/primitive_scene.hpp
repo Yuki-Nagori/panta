@@ -10,6 +10,20 @@ class vtkWebGPURenderer;
 namespace panta::visualization {
 struct SurfaceMeshSnapshot;
 
+/// 播放时间参与充填裁剪。网格指针或时间变化都要重建表面；只有网格换掉才重配相机。
+struct PrimitiveGeometryUpdate {
+    bool rebuild = false;
+    bool refit_camera = false;
+};
+
+inline PrimitiveGeometryUpdate primitive_geometry_update(
+    const std::shared_ptr<const SurfaceMeshSnapshot>& applied_mesh, double applied_time,
+    const std::shared_ptr<const SurfaceMeshSnapshot>& pending_mesh, double pending_time) {
+    const bool mesh_changed = applied_mesh != pending_mesh;
+    const bool time_changed = applied_time != pending_time;
+    return {mesh_changed || time_changed, mesh_changed};
+}
+
 /// GUI 线程调用；actor 非空；window 可空（仅 CPU 场景）。有窗口时先释放旧 mapper 的图形资源；空
 /// mesh 使用欢迎字样。
 void replace_primitive_geometry(vtkActor* actor, vtkRenderWindow* window,

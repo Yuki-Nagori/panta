@@ -79,8 +79,10 @@ class OffscreenVtkRenderer final {
     [[nodiscard]] auto render(const panta::visualization::RenderScene& scene) -> VtkRenderTiming {
         QElapsedTimer clock;
         clock.start();
-        if (!m_hasGeometry || m_mesh != scene.mesh) {
-            update_geometry(scene);
+        const auto update = panta::visualization::primitive_geometry_update(
+            m_mesh, m_playback_time, scene.mesh, scene.playback_time);
+        if (!m_hasGeometry || update.rebuild) {
+            update_geometry(scene, !m_hasGeometry || update.refit_camera);
         }
         m_actor->SetVisibility(scene.primitive_visible);
         m_welcome.sync(m_window, scene.primitive_visible, scene.mesh != nullptr);
@@ -95,14 +97,17 @@ class OffscreenVtkRenderer final {
     }
 
   private:
-    void update_geometry(const panta::visualization::RenderScene& scene) {
+    void update_geometry(const panta::visualization::RenderScene& scene, bool refit_camera) {
         panta::visualization::replace_primitive_geometry(m_actor, m_window, scene.mesh,
                                                          scene.playback_time);
-        panta::visualization::replace_gate_geometry(m_gate_actor, m_window, scene.mesh);
-        const double aspect = static_cast<double>(m_pixels.width()) / m_pixels.height();
-        panta::visualization::configure_default_camera(m_renderer, m_actor, aspect,
-                                                       scene.mesh ? 1.25 : 2.25);
+        if (refit_camera) {
+            panta::visualization::replace_gate_geometry(m_gate_actor, m_window, scene.mesh);
+            const double aspect = static_cast<double>(m_pixels.width()) / m_pixels.height();
+            panta::visualization::configure_default_camera(m_renderer, m_actor, aspect,
+                                                           scene.mesh ? 1.25 : 2.25);
+        }
         m_mesh = scene.mesh;
+        m_playback_time = scene.playback_time;
         m_hasGeometry = true;
     }
     VtkErrorCapture m_errors;
@@ -115,6 +120,7 @@ class OffscreenVtkRenderer final {
     panta::visualization::ViewportOrientation m_orientation;
     panta::visualization::WelcomeScene m_welcome;
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_mesh;
+    double m_playback_time = 0;
     QSize m_pixels;
     std::string m_backend;
     bool m_hasGeometry = false;

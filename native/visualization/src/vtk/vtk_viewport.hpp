@@ -43,11 +43,13 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     void ensure_render_window();
     void schedule_refresh();
     void watch_ancestors();
-    void update_mesh_actor();
+    void update_mesh_actor(bool update_gates = true);
+    /// 网格或播放时间变化时重建表面。返回 true 表示网格换了，调用方应重配相机。
+    bool commit_pending_geometry();
     void handle_interaction_event(unsigned long event_id, vtkRenderWindowInteractor* interactor);
     void advance_camera_transition();
     void stop_camera_transition();
-    /// 排队刷新时同步原生区域，仅状态/像素尺寸改变或恢复显示时提交帧。
+    /// 排队刷新时同步原生区域。背景、可见性、网格或播放时间变化，以及恢复显示时提交帧。
     void sync_native_surface();
     void destroy_render_window();
     /// 测试只读生命周期状态，不转移 VTK 对象所有权。
@@ -59,6 +61,8 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
     bool test_camera_transition_active() const;
     bool test_camera_transition_timer_active() const;
     QSize test_applied_pixel_size() const;
+    /// 充填前沿与 x 轴的交点；没有时返回 -1。仅供真实窗口回归读取。
+    double test_fill_front_x() const;
     /// 当前没有 render window、hardware window、interactor 或已接入的原生 view。
     bool test_render_resources_absent() const;
     /// 下次初始化用 Dawn 不提供的 backend 预检 adapter，走 device 失败清理。

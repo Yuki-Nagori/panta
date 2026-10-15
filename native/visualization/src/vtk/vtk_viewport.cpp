@@ -28,6 +28,7 @@
 #include <QtGlobal>
 #include <QtLogging>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <panta/visualization/render_scene.hpp>
@@ -35,6 +36,7 @@
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkCommand.h>
+#include <vtkDataSet.h>
 #include <vtkHardwareWindow.h>
 #include <vtkMapper.h>
 #include <vtkNew.h>
@@ -145,6 +147,7 @@ struct VtkViewport::Impl {
     bool creation_warning_emitted = false;
     bool fail_webgpu_device = false;
     std::shared_ptr<const SurfaceMeshSnapshot> applied_mesh;
+    double applied_playback_time = 0;
     bool pointer_dragging = false;
     bool cube_pressed = false;
     int last_pointer_x = 0;
@@ -234,6 +237,25 @@ bool VtkViewport::test_camera_transition_timer_active() const {
 
 QSize VtkViewport::test_applied_pixel_size() const { return impl_->applied_pixel_size; }
 
+double VtkViewport::test_fill_front_x() const {
+    if (impl_->primitive_actor == nullptr || impl_->primitive_actor->GetMapper() == nullptr) {
+        return -1.0;
+    }
+    vtkDataSet* data = impl_->primitive_actor->GetMapper()->GetInput();
+    if (data == nullptr) {
+        return -1.0;
+    }
+    for (vtkIdType index = 0; index < data->GetNumberOfPoints(); ++index) {
+        double point[3];
+        data->GetPoint(index, point);
+        if (std::abs(point[1]) < 1e-9 && std::abs(point[2]) < 1e-9 && point[0] > 1e-6 &&
+            point[0] < 1.0 - 1e-6) {
+            return point[0];
+        }
+    }
+    return -1.0;
+}
+
 bool VtkViewport::test_render_resources_absent() const {
     return impl_->render_window == nullptr && impl_->hardware_window == nullptr &&
            impl_->interactor == nullptr && impl_->renderer == nullptr &&
@@ -259,9 +281,12 @@ void VtkViewport::apply_state(const RenderScene& state) {
     if (state.revision < impl_->pending.revision) {
         return;
     }
+    // 充填前沿按播放时间裁剪。时间变化要重建几何并提交帧，相机只在网格换掉时重配。
+    const PrimitiveGeometryUpdate update = primitive_geometry_update(
+        impl_->pending.mesh, impl_->pending.playback_time, state.mesh, state.playback_time);
     impl_->scene_dirty |= state.background != impl_->pending.background ||
                           state.primitive_visible != impl_->pending.primitive_visible ||
-                          state.mesh != impl_->pending.mesh;
+                          update.rebuild;
     impl_->pending = state;
     schedule_refresh();
 }
@@ -378,6 +403,7 @@ void VtkViewport::ensure_render_window() {
 
     update_mesh_actor();
     impl_->applied_mesh = impl_->pending.mesh;
+    impl_->applied_playback_time = impl_->pending.playback_time;
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->renderer->AddActor(impl_->gate_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
@@ -436,7 +462,7 @@ void VtkViewport::schedule_refresh() {
     });
 }
 
-void VtkViewport::update_mesh_actor() {
+void VtkViewport::update_mesh_actor(bool update_gates) {
     if (impl_->primitive_actor == nullptr) {
         return;
     }
@@ -445,9 +471,25 @@ void VtkViewport::update_mesh_actor() {
     impl_->previous_mapper = previous_mapper;
     replace_primitive_geometry(impl_->primitive_actor, impl_->render_window, impl_->pending.mesh,
                                impl_->pending.playback_time);
-    if (impl_->gate_actor != nullptr) {
+    if (update_gates && impl_->gate_actor != nullptr) {
         replace_gate_geometry(impl_->gate_actor, impl_->render_window, impl_->pending.mesh);
     }
+}
+
+bool VtkViewport::commit_pending_geometry() {
+    if (impl_->primitive_actor == nullptr) {
+        return false;
+    }
+    const PrimitiveGeometryUpdate update =
+        primitive_geometry_update(impl_->applied_mesh, impl_->applied_playback_time,
+                                  impl_->pending.mesh, impl_->pending.playback_time);
+    if (!update.rebuild) {
+        return false;
+    }
+    update_mesh_actor(update.refit_camera);
+    impl_->applied_mesh = impl_->pending.mesh;
+    impl_->applied_playback_time = impl_->pending.playback_time;
+    return update.refit_camera;
 }
 
 void VtkViewport::handle_interaction_event(unsigned long event_id,
@@ -610,12 +652,9 @@ void VtkViewport::sync_native_surface() {
     set_native_surface_visible(impl_->native_surface, visible);
     if (!visible || impl_->render_window == nullptr) {
         stop_camera_transition();
-        if (impl_->render_window != nullptr && impl_->primitive_actor != nullptr &&
-            impl_->pending.mesh != impl_->applied_mesh) {
-            // 文档可能在视口隐藏期间关闭；替换 actor 管线并释放旧快照，不等到
-            // surface 再次显示才清理其 CPU 与 VTK 数据。
-            update_mesh_actor();
-            impl_->applied_mesh = impl_->pending.mesh;
+        if (impl_->render_window != nullptr && commit_pending_geometry()) {
+            // 文档可能在视口隐藏期间关闭；网格换掉后释放旧快照，不等到 surface
+            // 再次显示才清理其 CPU 与 VTK 数据。播放时间变化不重置像素尺寸。
             impl_->applied_pixel_size = {};
         }
         return;
@@ -625,12 +664,8 @@ void VtkViewport::sync_native_surface() {
     qCDebug(viewport_log) << "surface synchronized";
     const qreal scale = window()->devicePixelRatio();
     const QSize pixel_size(qMax(1, qRound(width() * scale)), qMax(1, qRound(height() * scale)));
-    bool resized = pixel_size != impl_->applied_pixel_size;
-    if (impl_->primitive_actor != nullptr && impl_->pending.mesh != impl_->applied_mesh) {
-        update_mesh_actor();
-        impl_->applied_mesh = impl_->pending.mesh;
-        resized = true;
-    }
+    const bool mesh_changed = commit_pending_geometry();
+    bool resized = pixel_size != impl_->applied_pixel_size || mesh_changed;
     if (!impl_->scene_dirty && !resized) {
         return;
     }
@@ -694,6 +729,7 @@ void VtkViewport::destroy_render_window() {
     impl_->primitive_actor = nullptr;
     impl_->gate_actor = nullptr;
     impl_->applied_mesh.reset();
+    impl_->applied_playback_time = 0;
     if (impl_->hardware_window != nullptr) {
         impl_->hardware_window->Destroy();
         impl_->hardware_window.reset();
