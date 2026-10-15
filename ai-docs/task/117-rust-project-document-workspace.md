@@ -1,6 +1,6 @@
 # 117 — 将工程文档工作区状态迁移到 Rust
 
-- 状态：in-progress
+- 状态：done
 - 阶段：Rust 架构整理
 - 依赖：[067 Rust 网格领域迁移](067-rust-mesh-domain-migration.md)、[080 QML 视口文档页签](080-qml-viewport-document-tabs.md)、[107 Rust 工程服务边界](107-rust-service-boundaries-and-revisions.md)
 - 优先级：P1
@@ -73,6 +73,7 @@
 | 2026-10-16 | macOS 26.2 arm64、Qt 6.11.2、Release；`panta_bridge_project_stl_activation_cpu_benchmark`；合成 10k/20k 三角面资产，各 31 次热缓存重载 | 激活、页签切换、关闭释放正常；观察迁移后耗时与内存 | 通过；62 次切换 call/ready p95 均 0.403 ms；重载 p95 分别 11.772 / 12.370 ms；缓存估算 2.06 MiB，关闭后归零。当前无同负载迁移前基线，不能据此声称完成前后回归比较。 |
 | 2026-10-16 | `cargo format --check`、`cargo lint --check` | 格式与八阶段质量检查通过 | 通过；lint 八阶段全部退出成功，包含 Clippy、Cargo unused-deps、CMake、native/QML metadata、qmllint、clang-tidy、include-cleaner 和 cppcheck。构建过程提示 `native/mesh/src/netgen/netgen_mesher.cpp:91` 有一条既有 signedness 警告。 |
 | 2026-10-16 | macOS 26.2 arm64 调试窗口，重建后通过 CUA 无障碍树操作 | 检查真实窗口中的页签打开、关闭、拖动排序和失败提示 | 通过：成功打开工程并导入 STL；同名导入显示序号，关闭导入页签后工程记录仍保留。用户在真实窗口手动确认拖动排序正常。再打开仅位于 `/tmp` 的验证工程，其资产路径指向缺失文件；失败页签无障碍描述为 `The saved STL asset could not be opened.`，并能读出标题及关闭按钮。首次捕捉遇到 `SCStreamErrorDomain Code=-3811`，本次重试成功；窗口与 AX 状态均可复核。 |
+| 2026-10-16 | PR #38 CI（macOS、Ubuntu、Windows） | 跨平台构建、测试、覆盖率与 lint 通过 | 通过：macOS、Ubuntu、Windows 构建，Rust/native/QML 测试、coverage、格式及适用 lint 全部通过；`cargo audit` 按工作流配置跳过。CI 首轮发现 Linux `uint64_t` 到 `QVariant` 转换歧义，改用显式 `QVariant::fromValue<qulonglong>` 后复跑通过。 |
 
 ## 风险与回退
 
@@ -85,7 +86,8 @@
 - 2026-10-16：根据 issue #35 创建实施任务；采用 `panta-core` 纯 Rust 工作区模型，由现有 `ProjectService` 协调激活与缓存，C++ 只保留 Qt 适配和异步定时调度。
 - 2026-10-16：独立评审发现首次打开文档未启动激活及缓存逐出后页签驻留未同步；已修复并新增服务级回归测试，评审者确认修复正确。
 - 2026-10-16：真实窗口验收重试成功；用户确认拖动排序正常。失败资产页签显示 saved-asset 错误文案。复评发现同步激活失败的 message key 应使用 saved-asset 翻译上下文；已修复并增加 `project.manifest_invalid` 回归测试，复评确认修复及断言充分。
+- 2026-10-16：PR #38 跨平台 CI 首轮暴露 Linux 对 `std::uint64_t` 到 `QVariant` 的重载歧义；改为显式 `qulonglong` QVariant 后，本地聚合验证、独立复评及 macOS/Ubuntu/Windows CI 均通过。
 
 ## 完成摘要
 
-实现、独立评审、Cargo 聚合测试、质量检查、性能基准和真实窗口页签验收已完成。性能记录说明缺少可比的迁移前基线。任务仍保持 in-progress，待最终验证及后续分支/PR/CI 流程完成后再关闭。
+实现、独立评审、Cargo 聚合测试、质量检查、性能基准、真实窗口验收及 PR #38 跨平台 CI 均已完成。性能记录说明缺少可比的迁移前基线；CI 中 `cargo audit` 按配置跳过。任务验收完成。
