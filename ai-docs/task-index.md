@@ -126,6 +126,7 @@ ai-docs/
 | 113 | [Tools 工具栏内容](task/113-tools-ribbon.md) | 应用平台扩展 | 050, 062, 096 | done |
 | 114 | [View 工具栏内容](task/114-view-ribbon.md) | 应用平台扩展 | 060, 062, 064, 080 | done |
 | 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 048 | planned |
+| 116 | [Rust 工艺参数约束统一暴露](task/116-rust-process-parameter-constraints.md) | 应用平台扩展 | 094, 095, 099 | in-progress |
 
 ## 验证与质量扩展队列
 

@@ -43,6 +43,32 @@ QString format_dimensions(double sizeX, double sizeY, double sizeZ, const QStrin
     return unit.isEmpty() ? values : values + QLatin1Char(' ') + unit;
 }
 
+QVariantMap numeric_constraint_map(const panta::ffi::NumericConstraint& constraint) {
+    return {{QStringLiteral("minimum"), constraint.minimum},
+            {QStringLiteral("maximum"), constraint.maximum},
+            {QStringLiteral("hasMinimum"), constraint.has_minimum},
+            {QStringLiteral("hasMaximum"), constraint.has_maximum},
+            {QStringLiteral("minimumInclusive"), constraint.minimum_inclusive},
+            {QStringLiteral("maximumInclusive"), constraint.maximum_inclusive},
+            {QStringLiteral("integer"), constraint.integer},
+            {QStringLiteral("unit"), QString::fromUtf8(constraint.unit)}};
+}
+
+QVariantMap draft_validation_map(const panta::ffi::ProcessDraftValidation& result) {
+    QStringList errors;
+    errors.reserve(static_cast<qsizetype>(result.errors.size()));
+    for (const auto& error : result.errors) {
+        errors.push_back(QString::fromUtf8(error));
+    }
+    return {{QStringLiteral("valid"), result.valid}, {QStringLiteral("errors"), errors}};
+}
+
+double draft_number(const QVariantMap& values, const QString& key) {
+    bool ok = false;
+    const double value = values.value(key).toDouble(&ok);
+    return ok ? value : std::numeric_limits<double>::quiet_NaN();
+}
+
 // 激活结果已分别携带稳定码与上下文，用户摘要只按稳定码选择。
 QString activation_message_for(const QString& code) {
     if (code == QStringLiteral("project.asset_missing")) {
@@ -239,6 +265,17 @@ void ProjectViewModel::refreshPlanSettings() {
         {QStringLiteral("moldTemperature"), gate.mold_temperature_celsius},
         {QStringLiteral("meltTemperature"), gate.melt_temperature_celsius},
         {QStringLiteral("numberOfGates"), gate.number_of_gates}};
+    const auto& constraints = settings.process_constraints;
+    const QVariantMap processConstraints{
+        {QStringLiteral("temperature"), numeric_constraint_map(constraints.temperature)},
+        {QStringLiteral("flowRate"), numeric_constraint_map(constraints.flow_rate)},
+        {QStringLiteral("switchOverVolume"),
+         numeric_constraint_map(constraints.switch_over_volume)},
+        {QStringLiteral("holdingDuration"), numeric_constraint_map(constraints.holding_duration)},
+        {QStringLiteral("holdingPressure"), numeric_constraint_map(constraints.holding_pressure)},
+        {QStringLiteral("numberOfGates"), numeric_constraint_map(constraints.number_of_gates)},
+        {QStringLiteral("holdingProfileMaxPoints"),
+         QVariant::fromValue(constraints.holding_profile_max_points)}};
     const QVariantMap next{
         {QStringLiteral("projectPath"), QString::fromUtf8(settings.project_path)},
         {QStringLiteral("revision"), QVariant::fromValue(settings.revision)},
@@ -251,6 +288,7 @@ void ProjectViewModel::refreshPlanSettings() {
         {QStringLiteral("gateLocationSettings"), gateSettings},
         {QStringLiteral("gateLocationSettingsConfirmed"),
          settings.gate_location_settings_confirmed},
+        {QStringLiteral("processConstraints"), processConstraints},
         {QStringLiteral("materialId"), QString::fromUtf8(settings.material_id)},
         {QStringLiteral("materialSourceText"), QString::fromUtf8(settings.material_source_text)}};
     if (next != m_planSettings) {
@@ -369,6 +407,32 @@ bool ProjectViewModel::setFillSettings(const QString& projectPath, quint64 revis
     return true;
 }
 
+QVariantMap ProjectViewModel::validateFillSettingsDraft(const QVariantMap& settings) const {
+    panta::ffi::FillSettings candidate;
+    candidate.mold_temperature_celsius = draft_number(settings, QStringLiteral("moldTemperature"));
+    candidate.melt_temperature_celsius = draft_number(settings, QStringLiteral("meltTemperature"));
+    candidate.flow_rate_cm3_per_second = draft_number(settings, QStringLiteral("flowRate"));
+    candidate.switch_over_volume_percent = draft_number(settings, QStringLiteral("switchVolume"));
+    candidate.fiber_orientation = settings.value(QStringLiteral("fiberOrientation")).toBool();
+    candidate.crystallization = settings.value(QStringLiteral("crystallization")).toBool();
+    for (const auto& value : settings.value(QStringLiteral("holdingProfile")).toList()) {
+        const auto point = value.toMap();
+        candidate.holding_profile.push_back({draft_number(point, QStringLiteral("duration")),
+                                             draft_number(point, QStringLiteral("pressure"))});
+    }
+    return draft_validation_map(panta::ffi::validate_fill_settings_draft(std::move(candidate)));
+}
+
+QVariantMap ProjectViewModel::validateHoldingProfileDraft(const QVariantList& points) const {
+    rust::Vec<panta::ffi::HoldingProfilePoint> profile;
+    for (const auto& value : points) {
+        const auto point = value.toMap();
+        profile.push_back({draft_number(point, QStringLiteral("duration")),
+                           draft_number(point, QStringLiteral("pressure"))});
+    }
+    return draft_validation_map(panta::ffi::validate_holding_profile_draft(std::move(profile)));
+}
+
 bool ProjectViewModel::setGateLocationSettings(const QString& projectPath, quint64 revision,
                                                const QString& importId,
                                                const QVariantMap& settings) {
@@ -417,6 +481,14 @@ bool ProjectViewModel::setGateLocationSettings(const QString& projectPath, quint
         emit gateLocationSettingsConfirmationFinished(true);
     }
     return true;
+}
+
+QVariantMap ProjectViewModel::validateGateLocationSettingsDraft(const QVariantMap& settings) const {
+    return draft_validation_map(panta::ffi::validate_gate_location_settings_draft(
+        draft_number(settings, QStringLiteral("moldTemperature")),
+        draft_number(settings, QStringLiteral("meltTemperature")),
+        draft_number(settings, QStringLiteral("numberOfGates")),
+        settings.value(QStringLiteral("machineId")).toString().toStdString()));
 }
 
 void ProjectViewModel::set_pending_confirmation(ConfirmationKind kind) {

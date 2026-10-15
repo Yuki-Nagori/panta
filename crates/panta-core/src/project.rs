@@ -24,9 +24,13 @@ pub use analysis_sequence::{ANALYSIS_SEQUENCES, AnalysisSequenceDefinition};
 mod plan_settings;
 pub use plan_settings::PlanSettings;
 mod process_settings;
-pub use process_settings::{FillSettings, HoldingProfilePoint};
+pub use process_settings::{
+    FLOW_RATE_CONSTRAINT, FillSettings, HOLDING_DURATION_CONSTRAINT, HOLDING_PRESSURE_CONSTRAINT,
+    HOLDING_PROFILE_MAX_POINTS, HoldingProfilePoint, NumericConstraint,
+    SWITCH_OVER_VOLUME_CONSTRAINT, TEMPERATURE_CONSTRAINT,
+};
 mod gate_location;
-pub use gate_location::{GateLocationSettings, GateLocatorAlgorithm};
+pub use gate_location::{GateLocationSettings, GateLocatorAlgorithm, NUMBER_OF_GATES_CONSTRAINT};
 mod material;
 pub use material::{MaterialDefinition, MaterialProperty, default_material};
 mod import;

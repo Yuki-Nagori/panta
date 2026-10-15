@@ -1,6 +1,9 @@
 // QML 组件的主题参数、资源解析及 Ribbon 页签组合边界回归。
 #include "../support/qml/analysis_sequence_helpers.hpp"
 #include "../support/qml/quick_item_helpers.hpp"
+#if defined(PANTA_TEST_WITH_BRIDGE)
+#include "project_view_model.hpp"
+#endif
 #include <QColor>
 #include <QDir>
 #include <QDirIterator>
@@ -405,6 +408,9 @@ class ThemeComponentTest final : public QObject {
     }
 
     void fill_settings_drafts_profile_rows_and_button_geometry() {
+#if !defined(PANTA_TEST_WITH_BRIDGE)
+        QSKIP("Process draft validation requires the enabled Bridge module");
+#else
         const auto listProperty = [](QObject* object, const char* name) {
             const auto value = object->property(name);
             return value.metaType() == QMetaType::fromType<QJSValue>()
@@ -418,6 +424,7 @@ class ThemeComponentTest final : public QObject {
             engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Dialogs/FillProcessSettingsDialog.qml"),
             owner);
         QVERIFY(dialog != nullptr);
+        panta::bridge::ProjectViewModel validationModel;
         const QVariantList profile{
             QVariantMap{{QStringLiteral("duration"), 0.0}, {QStringLiteral("pressure"), 100.0}},
             QVariantMap{{QStringLiteral("duration"), 10.0}, {QStringLiteral("pressure"), 100.0}}};
@@ -426,16 +433,28 @@ class ThemeComponentTest final : public QObject {
             {QStringLiteral("flowRate"), 94.7},         {QStringLiteral("switchVolume"), 99.0},
             {QStringLiteral("fiberOrientation"), true}, {QStringLiteral("crystallization"), false},
             {QStringLiteral("holdingProfile"), profile}};
-        const QVariantMap target{{QStringLiteral("projectPath"), QStringLiteral("/test.panta")},
-                                 {QStringLiteral("revision"), 7},
-                                 {QStringLiteral("importId"), QStringLiteral("import-1")},
-                                 {QStringLiteral("sequenceId"), QStringLiteral("fill")},
-                                 {QStringLiteral("fillSettings"), fill}};
+        const QVariantMap target{
+            {QStringLiteral("projectPath"), QStringLiteral("/test.panta")},
+            {QStringLiteral("revision"), 7},
+            {QStringLiteral("importId"), QStringLiteral("import-1")},
+            {QStringLiteral("sequenceId"), QStringLiteral("fill")},
+            {QStringLiteral("fillSettings"), fill},
+            {QStringLiteral("processConstraints"),
+             validationModel.planSettings().value(QStringLiteral("processConstraints"))}};
+        dialog->setProperty("validationModel", QVariant::fromValue(&validationModel));
         dialog->setProperty("planSettings", target);
         QSignalSpy requested(dialog, SIGNAL(settingsRequested(QString, double, QString, QVariant)));
         QVERIFY(requested.isValid());
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
         QCOMPARE(dialog->property("height").toInt(), 600);
+        auto* fillWindow = qobject_cast<QQuickWindow*>(dialog);
+        QVERIFY(fillWindow != nullptr);
+        auto* flowRate = visual_item(fillWindow->contentItem(), QStringLiteral("fillFlowRate"));
+        QVERIFY(flowRate != nullptr);
+        flowRate->setProperty("text", QStringLiteral("0"));
+        QTRY_VERIFY(!dialog->property("canConfirm").toBool());
+        flowRate->setProperty("text", QStringLiteral("94.7"));
+        QTRY_VERIFY(dialog->property("canConfirm").toBool());
         auto* accept = dialog->findChild<QObject*>(QStringLiteral("fillSettingsAccept"));
         QVERIFY(accept != nullptr);
         QTRY_COMPARE(accept->property("width").toInt(), 92);
@@ -452,6 +471,60 @@ class ThemeComponentTest final : public QObject {
         auto* third = visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration2"));
         QVERIFY(duration && pressure && third);
         QCOMPARE(third->property("text").toString(), QString{});
+        QVERIFY(!third->property("invalid").toBool());
+
+        auto* blankDuration =
+            visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration1"));
+        auto* blankPressure =
+            visual_item(profileWindow->contentItem(), QStringLiteral("profilePressure1"));
+        auto* shiftedDuration =
+            visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration2"));
+        auto* shiftedPressure =
+            visual_item(profileWindow->contentItem(), QStringLiteral("profilePressure2"));
+        QVERIFY(blankDuration && blankPressure && shiftedDuration && shiftedPressure);
+        blankDuration->setProperty("text", QString{});
+        QVERIFY(QMetaObject::invokeMethod(blankDuration, "textEdited"));
+        blankPressure->setProperty("text", QString{});
+        QVERIFY(QMetaObject::invokeMethod(blankPressure, "textEdited"));
+        QTRY_VERIFY(!blankDuration->property("invalid").toBool());
+        QVERIFY(!blankPressure->property("invalid").toBool());
+        shiftedDuration->setProperty("text", QStringLiteral("20"));
+        QVERIFY(QMetaObject::invokeMethod(shiftedDuration, "textEdited"));
+        shiftedPressure->setProperty("text", QStringLiteral("250"));
+        QVERIFY(QMetaObject::invokeMethod(shiftedPressure, "textEdited"));
+        QCOMPARE(listProperty(profileDialog, "draftPoints").size(), 2);
+        QVariant shiftedPressureError;
+        QVERIFY(QMetaObject::invokeMethod(
+            profileDialog, "hasProfileFieldError", Q_RETURN_ARG(QVariant, shiftedPressureError),
+            Q_ARG(QVariant, QVariant::fromValue(2)),
+            Q_ARG(QVariant, QVariant::fromValue(QStringLiteral("pressure")))));
+        QVERIFY(shiftedPressureError.toBool());
+
+        QVariant upperBoundRange;
+        const QVariantMap maximumOnlyConstraint{{QStringLiteral("unit"), QStringLiteral("s")},
+                                                {QStringLiteral("hasMinimum"), false},
+                                                {QStringLiteral("hasMaximum"), true},
+                                                {QStringLiteral("maximum"), 8.0},
+                                                {QStringLiteral("maximumInclusive"), false}};
+        QVERIFY(QMetaObject::invokeMethod(
+            profileDialog, "rangeText", Q_RETURN_ARG(QVariant, upperBoundRange),
+            Q_ARG(QVariant, QVariant::fromValue(maximumOnlyConstraint))));
+        QCOMPARE(upperBoundRange.toString(), QStringLiteral("s · < 8"));
+
+        QVariant unboundedMinimum;
+        const QVariantMap unboundedConstraint{{QStringLiteral("hasMinimum"), false},
+                                              {QStringLiteral("minimum"), 5.0}};
+        QVERIFY(QMetaObject::invokeMethod(dialog, "minimumBound",
+                                          Q_RETURN_ARG(QVariant, unboundedMinimum),
+                                          Q_ARG(QVariant, QVariant::fromValue(unboundedConstraint)),
+                                          Q_ARG(QVariant, QVariant::fromValue(-123.0))));
+        QCOMPARE(unboundedMinimum.toDouble(), -123.0);
+
+        QVERIFY(QMetaObject::invokeMethod(profileDialog, "open", Q_ARG(QVariant, profile)));
+        duration = visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration0"));
+        pressure = visual_item(profileWindow->contentItem(), QStringLiteral("profilePressure0"));
+        third = visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration2"));
+        QVERIFY(duration && pressure && third);
         QTRY_VERIFY(qAbs(duration->property("width").toDouble() -
                          pressure->property("width").toDouble()) < 1.0);
         duration->setProperty("text", QStringLiteral("5"));
@@ -492,6 +565,58 @@ class ThemeComponentTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
         QCOMPARE(listProperty(dialog, "profile"), profile);
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+#endif
+    }
+
+    void gate_location_confirmation_uses_rust_numeric_constraints() {
+#if !defined(PANTA_TEST_WITH_BRIDGE)
+        QSKIP("Process draft validation requires the enabled Bridge module");
+#else
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        auto* dialog = create_component(
+            engine,
+            QStringLiteral("qrc:/qt/qml/Panta/Shell/Dialogs/GateLocationSettingsDialog.qml"),
+            owner);
+        QVERIFY(dialog != nullptr);
+        panta::bridge::ProjectViewModel validationModel;
+        const auto plan = validationModel.planSettings();
+        const QVariantMap gate{
+            {QStringLiteral("machineId"), QStringLiteral("default-machine")},
+            {QStringLiteral("algorithmId"), QStringLiteral("advanced-gate-locator")},
+            {QStringLiteral("moldTemperature"), 40.0},
+            {QStringLiteral("meltTemperature"), 230.0},
+            {QStringLiteral("numberOfGates"), 1}};
+        const QVariantMap target{{QStringLiteral("projectPath"), QStringLiteral("/test.panta")},
+                                 {QStringLiteral("revision"), 7},
+                                 {QStringLiteral("importId"), QStringLiteral("import-1")},
+                                 {QStringLiteral("sequenceId"), QStringLiteral("gate-location")},
+                                 {QStringLiteral("gateLocationSettings"), gate},
+                                 {QStringLiteral("processConstraints"),
+                                  plan.value(QStringLiteral("processConstraints"))}};
+        dialog->setProperty("validationModel", QVariant::fromValue(&validationModel));
+        dialog->setProperty("planSettings", target);
+        QSignalSpy requested(dialog, SIGNAL(settingsRequested(QString, double, QString, QVariant)));
+        QVERIFY(requested.isValid());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QTRY_VERIFY(dialog->property("canConfirm").toBool());
+
+        auto* window = qobject_cast<QQuickWindow*>(dialog);
+        QVERIFY(window != nullptr);
+        auto* gates = visual_item(window->contentItem(), QStringLiteral("gateNumberOfGates"));
+        QVERIFY(gates != nullptr);
+        gates->setProperty("text", QStringLiteral("11"));
+        QTRY_VERIFY(!dialog->property("canConfirm").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSettings"));
+        QCOMPARE(requested.count(), 0);
+
+        gates->setProperty("text", QStringLiteral("10"));
+        QTRY_VERIFY(dialog->property("canConfirm").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSettings"));
+        QCOMPARE(requested.count(), 1);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+#endif
     }
 
     void analysis_sequence_confirmation_and_cancel() {

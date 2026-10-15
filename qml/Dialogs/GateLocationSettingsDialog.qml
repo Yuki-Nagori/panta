@@ -8,11 +8,22 @@ DialogWindow {
     id: dialog
     objectName: "gateLocationSettingsDialog"
     property var planSettings: ({})
+    property var validationModel: null
     property var openedSettings: ({})
     property bool saving: false
     property string errorText: ""
     signal settingsRequested(string projectPath, double revision, string importId, var settings)
-    readonly property bool canConfirm: !saving && !!openedSettings.importId && moldTemperature.acceptableInput && meltTemperature.acceptableInput && numberOfGates.acceptableInput
+    readonly property var constraints: planSettings.processConstraints ?? ({})
+    readonly property var draftValidation: validationModel ? validationModel.validateGateLocationSettingsDraft({
+        machineId: openedSettings.gateLocationSettings?.machineId ?? "",
+        moldTemperature: draftNumber(moldTemperature.text),
+        meltTemperature: draftNumber(meltTemperature.text),
+        numberOfGates: draftNumber(numberOfGates.text)
+    }) : ({
+            valid: false,
+            errors: []
+        })
+    readonly property bool canConfirm: !saving && !!openedSettings.importId && draftValidation.valid && moldTemperature.acceptableInput && meltTemperature.acceptableInput && numberOfGates.acceptableInput
     width: Theme.gateLocationSettingsDialogWidth
     height: Theme.gateLocationSettingsDialogHeight
     minimumWidth: Theme.gateLocationSettingsDialogMinimumWidth
@@ -46,6 +57,24 @@ DialogWindow {
             meltTemperature: Number(meltTemperature.text),
             numberOfGates: Number(numberOfGates.text)
         });
+    }
+    function draftNumber(text) {
+        return text.trim().length === 0 ? NaN : Number(text);
+    }
+    function minimumBound(constraint, fallback) {
+        return constraint?.hasMinimum ? constraint.minimum : fallback;
+    }
+    function maximumBound(constraint, fallback) {
+        return constraint?.hasMaximum ? constraint.maximum : fallback;
+    }
+    function rangeText(constraint) {
+        if (!constraint)
+            return "";
+        if (constraint.hasMinimum && constraint.minimumInclusive && constraint.hasMaximum && constraint.maximumInclusive)
+            return "%1–%2".arg(constraint.minimum).arg(constraint.maximum);
+        const minimum = constraint.hasMinimum ? (constraint.minimumInclusive ? "≥ " : "> ") + constraint.minimum : "";
+        const maximum = constraint.hasMaximum ? (constraint.maximumInclusive ? " ≤ " : " < ") + constraint.maximum : "";
+        return minimum + maximum;
     }
     DialogFrame {
         window: dialog
@@ -118,14 +147,16 @@ DialogWindow {
                                 Layout.fillWidth: true
                                 objectName: "gateMoldTemperature"
                                 Accessible.name: qsTranslate("FillSettings", "Mold surface temperature")
+                                invalid: !acceptableInput || dialog.draftValidation.errors.indexOf("moldTemperature") >= 0
                                 validator: DoubleValidator {
-                                    bottom: -273.15
+                                    bottom: dialog.minimumBound(dialog.constraints.temperature, -Number.MAX_VALUE)
+                                    top: dialog.maximumBound(dialog.constraints.temperature, Number.MAX_VALUE)
                                     locale: "C"
                                     notation: DoubleValidator.StandardNotation
                                 }
                             }
                             ThemedLabel {
-                                text: "°C"
+                                text: dialog.constraints.temperature?.unit ?? ""
                                 textColor: Theme.colorTextMuted
                             }
                         }
@@ -137,14 +168,16 @@ DialogWindow {
                                 Layout.fillWidth: true
                                 objectName: "gateMeltTemperature"
                                 Accessible.name: qsTranslate("FillSettings", "Melt temperature")
+                                invalid: !acceptableInput || dialog.draftValidation.errors.indexOf("meltTemperature") >= 0
                                 validator: DoubleValidator {
-                                    bottom: -273.15
+                                    bottom: dialog.minimumBound(dialog.constraints.temperature, -Number.MAX_VALUE)
+                                    top: dialog.maximumBound(dialog.constraints.temperature, Number.MAX_VALUE)
                                     locale: "C"
                                     notation: DoubleValidator.StandardNotation
                                 }
                             }
                             ThemedLabel {
-                                text: "°C"
+                                text: dialog.constraints.temperature?.unit ?? ""
                                 textColor: Theme.colorTextMuted
                             }
                         }
@@ -182,14 +215,15 @@ DialogWindow {
                                     Layout.fillWidth: true
                                     objectName: "gateNumberOfGates"
                                     Accessible.name: qsTranslate("GateLocationSettings", "Number of gates")
+                                    invalid: !acceptableInput || dialog.draftValidation.errors.indexOf("numberOfGates") >= 0
                                     validator: IntValidator {
-                                        bottom: 1
-                                        top: 10
+                                        bottom: dialog.minimumBound(dialog.constraints.numberOfGates, -2147483648)
+                                        top: dialog.maximumBound(dialog.constraints.numberOfGates, 2147483647)
                                         locale: "C"
                                     }
                                 }
                                 ThemedLabel {
-                                    text: "1–10"
+                                    text: dialog.rangeText(dialog.constraints.numberOfGates)
                                     textColor: Theme.colorTextMuted
                                 }
                             }

@@ -93,6 +93,7 @@ ApplicationWindow {
         id: gateLocationSettingsDialog
         ownerWindow: shellWindow
         planSettings: projectModel.planSettings
+        validationModel: projectModel
         saving: projectModel.gateLocationSettingsConfirmationPending
         errorText: projectModel.error
         onSettingsRequested: (path, revision, importId, settings) => projectModel.setGateLocationSettings(path, revision, importId, settings)
@@ -102,6 +103,7 @@ ApplicationWindow {
         id: fillSettingsDialog
         ownerWindow: shellWindow
         planSettings: projectModel.planSettings
+        validationModel: projectModel
         saving: projectModel.fillSettingsConfirmationPending
         errorText: projectModel.error
         onSettingsRequested: (path, revision, importId, settings) => {

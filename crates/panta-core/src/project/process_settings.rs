@@ -5,6 +5,90 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
+/// QML 与领域校验共同使用的数值约束元数据。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NumericConstraint {
+    pub minimum: f64,
+    pub maximum: f64,
+    pub has_minimum: bool,
+    pub has_maximum: bool,
+    pub minimum_inclusive: bool,
+    pub maximum_inclusive: bool,
+    pub integer: bool,
+    pub unit: &'static str,
+}
+
+impl NumericConstraint {
+    pub fn accepts(self, value: f64) -> bool {
+        value.is_finite()
+            && (!self.has_minimum
+                || if self.minimum_inclusive {
+                    value >= self.minimum
+                } else {
+                    value > self.minimum
+                })
+            && (!self.has_maximum
+                || if self.maximum_inclusive {
+                    value <= self.maximum
+                } else {
+                    value < self.maximum
+                })
+            && (!self.integer || value.fract() == 0.0)
+    }
+}
+
+pub const TEMPERATURE_CONSTRAINT: NumericConstraint = NumericConstraint {
+    minimum: -273.15,
+    maximum: 0.0,
+    has_minimum: true,
+    has_maximum: false,
+    minimum_inclusive: true,
+    maximum_inclusive: false,
+    integer: false,
+    unit: "°C",
+};
+pub const FLOW_RATE_CONSTRAINT: NumericConstraint = NumericConstraint {
+    minimum: 0.0,
+    maximum: 0.0,
+    has_minimum: true,
+    has_maximum: false,
+    minimum_inclusive: false,
+    maximum_inclusive: false,
+    integer: false,
+    unit: "cm³/s",
+};
+pub const SWITCH_OVER_VOLUME_CONSTRAINT: NumericConstraint = NumericConstraint {
+    minimum: 0.0,
+    maximum: 100.0,
+    has_minimum: true,
+    has_maximum: true,
+    minimum_inclusive: true,
+    maximum_inclusive: true,
+    integer: false,
+    unit: "%",
+};
+pub const HOLDING_DURATION_CONSTRAINT: NumericConstraint = NumericConstraint {
+    minimum: 0.0,
+    maximum: 0.0,
+    has_minimum: true,
+    has_maximum: false,
+    minimum_inclusive: true,
+    maximum_inclusive: false,
+    integer: false,
+    unit: "s",
+};
+pub const HOLDING_PRESSURE_CONSTRAINT: NumericConstraint = NumericConstraint {
+    minimum: 0.0,
+    maximum: 200.0,
+    has_minimum: true,
+    has_maximum: true,
+    minimum_inclusive: true,
+    maximum_inclusive: true,
+    integer: false,
+    unit: "%",
+};
+pub const HOLDING_PROFILE_MAX_POINTS: usize = 4096;
+
 /// 分段持续时间（秒）和填充压力百分比；时间累计用于曲线横轴。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -51,35 +135,55 @@ impl Default for FillSettings {
 }
 
 impl FillSettings {
-    fn validate(&self) -> Result<(), ProjectError> {
-        let temperature_valid = |value: f64| value.is_finite() && value >= -273.15;
-        let percentage_valid =
-            |value: f64, max: f64| value.is_finite() && (0.0..=max).contains(&value);
-        // 曲线有明确上限，避免元数据和 UI 快照随输入无限增长。
-        if !temperature_valid(self.mold_temperature_celsius)
-            || !temperature_valid(self.melt_temperature_celsius)
-            || !self.flow_rate_cm3_per_second.is_finite()
-            || self.flow_rate_cm3_per_second <= 0.0
-            || !percentage_valid(self.switch_over_volume_percent, 100.0)
-            || self.holding_profile.is_empty()
-            || self.holding_profile.len() > 4096
-            || self.holding_profile.iter().any(|point| {
-                !point.duration_seconds.is_finite()
-                    || point.duration_seconds < 0.0
-                    || !percentage_valid(point.pressure_percent, 200.0)
-            })
-            || !self
-                .holding_profile
-                .iter()
-                .map(|point| point.duration_seconds)
-                .sum::<f64>()
-                .is_finite()
-        {
-            return Err(ProjectError::CommandInvalid(
-                "invalid fill process settings".to_owned(),
-            ));
+    /// 按稳定字段键报告草稿错误；提交校验复用同一结果。
+    pub fn validation_errors(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+        if !TEMPERATURE_CONSTRAINT.accepts(self.mold_temperature_celsius) {
+            errors.push("moldTemperature".to_owned());
         }
-        Ok(())
+        if !TEMPERATURE_CONSTRAINT.accepts(self.melt_temperature_celsius) {
+            errors.push("meltTemperature".to_owned());
+        }
+        if !FLOW_RATE_CONSTRAINT.accepts(self.flow_rate_cm3_per_second) {
+            errors.push("flowRate".to_owned());
+        }
+        if !SWITCH_OVER_VOLUME_CONSTRAINT.accepts(self.switch_over_volume_percent) {
+            errors.push("switchVolume".to_owned());
+        }
+        // 曲线有明确上限，避免元数据和 UI 快照随输入无限增长。
+        if self.holding_profile.is_empty()
+            || self.holding_profile.len() > HOLDING_PROFILE_MAX_POINTS
+        {
+            errors.push("holdingProfile".to_owned());
+        }
+        for (index, point) in self.holding_profile.iter().enumerate() {
+            if !HOLDING_DURATION_CONSTRAINT.accepts(point.duration_seconds) {
+                errors.push(format!("holdingProfile.{index}.duration"));
+            }
+            if !HOLDING_PRESSURE_CONSTRAINT.accepts(point.pressure_percent) {
+                errors.push(format!("holdingProfile.{index}.pressure"));
+            }
+        }
+        if !self
+            .holding_profile
+            .iter()
+            .map(|point| point.duration_seconds)
+            .sum::<f64>()
+            .is_finite()
+        {
+            errors.push("holdingProfile".to_owned());
+        }
+        errors
+    }
+
+    fn validate(&self) -> Result<(), ProjectError> {
+        if self.validation_errors().is_empty() {
+            Ok(())
+        } else {
+            Err(ProjectError::CommandInvalid(
+                "invalid fill process settings".to_owned(),
+            ))
+        }
     }
 }
 
@@ -136,5 +240,62 @@ impl ProjectService {
     /// 非阻塞消费工艺确认结果；成功发布已写盘状态，失败解除写入锁。
     pub fn finish_fill_settings_confirmation(&mut self) -> Result<bool, ProjectError> {
         self.finish_metadata_write(storage::MetadataWriteKind::FillSettings)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        FLOW_RATE_CONSTRAINT, FillSettings, HOLDING_DURATION_CONSTRAINT,
+        HOLDING_PRESSURE_CONSTRAINT, HoldingProfilePoint, SWITCH_OVER_VOLUME_CONSTRAINT,
+        TEMPERATURE_CONSTRAINT,
+    };
+
+    #[test]
+    fn process_numeric_constraints_accept_closed_edges_and_reject_open_flow_edge() {
+        assert!(TEMPERATURE_CONSTRAINT.accepts(-273.15));
+        assert!(!TEMPERATURE_CONSTRAINT.accepts(-273.150_001));
+        assert!(!FLOW_RATE_CONSTRAINT.accepts(0.0));
+        assert!(FLOW_RATE_CONSTRAINT.accepts(f64::MIN_POSITIVE));
+        assert!(SWITCH_OVER_VOLUME_CONSTRAINT.accepts(0.0));
+        assert!(SWITCH_OVER_VOLUME_CONSTRAINT.accepts(100.0));
+        assert!(!SWITCH_OVER_VOLUME_CONSTRAINT.accepts(100.000_001));
+        assert!(HOLDING_DURATION_CONSTRAINT.accepts(0.0));
+        assert!(HOLDING_PRESSURE_CONSTRAINT.accepts(200.0));
+        assert!(!HOLDING_PRESSURE_CONSTRAINT.accepts(200.000_001));
+    }
+
+    #[test]
+    fn fill_draft_errors_are_per_field_and_match_domain_validation() {
+        let mut profile = FillSettings::default().holding_profile;
+        profile[0].pressure_percent = 201.0;
+        let settings = FillSettings {
+            flow_rate_cm3_per_second: 0.0,
+            holding_profile: profile,
+            ..FillSettings::default()
+        };
+
+        assert_eq!(
+            settings.validation_errors(),
+            ["flowRate", "holdingProfile.0.pressure"]
+        );
+        assert!(settings.validate().is_err());
+
+        let valid = FillSettings {
+            flow_rate_cm3_per_second: 1.0,
+            holding_profile: vec![
+                HoldingProfilePoint {
+                    duration_seconds: 0.0,
+                    pressure_percent: 200.0,
+                },
+                HoldingProfilePoint {
+                    duration_seconds: 10.0,
+                    pressure_percent: 100.0,
+                },
+            ],
+            ..FillSettings::default()
+        };
+        assert!(valid.validation_errors().is_empty());
+        assert!(valid.validate().is_ok());
     }
 }
