@@ -258,14 +258,15 @@ jobs:
         run: |
           selected=()
           test_runner=false
-          while IFS= read -r package; do
+          while IFS= read -r -d '' package; do
             [[ -n "$package" ]] || continue
             if [[ "$package" == "panta-tests" ]]; then
               test_runner=true
             else
               selected+=(--package "$package")
             fi
-          done < <(jq -r '.[]' <<< "$TEST_PACKAGES")
+            printf 'Selected L1 Rust package: %s\n' "$package"
+          done < <(jq -j '.[] | ., "\u0000"' <<< "$TEST_PACKAGES")
           if (( ${#selected[@]} > 0 )); then
             cargo test --locked "${selected[@]}"
           fi
@@ -280,14 +281,15 @@ jobs:
         run: |
           selected=()
           test_runner=false
-          while IFS= read -r package; do
+          while IFS= read -r -d '' package; do
             [[ -n "$package" ]] || continue
             if [[ "$package" == "panta-tests" ]]; then
               test_runner=true
             else
               selected+=(--package "$package")
             fi
-          done < <(jq -r '.[]' <<< "$TEST_PACKAGES")
+            printf 'Selected L2 Rust package: %s\n' "$package"
+          done < <(jq -j '.[] | ., "\u0000"' <<< "$TEST_PACKAGES")
           if (( ${#selected[@]} > 0 )); then
             cargo test --locked "${selected[@]}"
           fi
