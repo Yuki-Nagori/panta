@@ -1,6 +1,6 @@
 # 119 — Rust 与 CMake 分层依赖 lint
 
-- 状态：in-progress
+- 状态：done
 - 阶段：Rust 架构整理
 - 依赖：[118 实际依赖图与应用命令层设计](118-layering-lint-and-command-boundaries.md)
 - 优先级：P1
@@ -50,7 +50,7 @@
 | 2026-10-16 | `cargo test --locked --package panta-tests` | 分层、选择器与聚合测试通过 | 通过：22 项单元测试、3 项 native 集成测试，CTest 76/76。 |
 | 2026-10-16 | `cargo format --changed --check`、`git diff --check` | 变更格式与 diff 空白检查通过 | 均通过。 |
 | 2026-10-16 | `cargo verify-changed` | 运行变更范围质量与 L1/L2 测试；未知/根配置变更完整回退 | 通过；完整质量检查与 L2 workspace 测试通过，CTest 76/76。 |
-| 2026-10-16 | CI（PR） | 运行受影响范围测试与质量检查 | 待 PR CI 完成。 |
+| 2026-10-16 | [PR #43 CI](https://github.com/Yuki-Nagori/panta/actions/runs/38809494521) | 运行受影响范围测试与质量检查 | 全部检查通过：macOS、Linux、Windows 构建和测试，格式、Clippy、CMake、layering、QML、C++ 静态检查及依赖审计均通过。 |
 
 ## 风险与回退
 
@@ -61,8 +61,8 @@
 - 2026-10-16：从 issue #36 拆分；任务 118 与任务 120 已完成，开始实现实际 Cargo metadata 与配置后 CMake target graph 检查。
 - 2026-10-16：加入 `cargo verify-changed` 本地聚合入口与 CI 变更范围；复核发现后修复 L1 测试遗漏、完整质量回退传递、工具配置路径漏检及 CMake 生成表达式 target/alias 解析，并补充回归。
 - 2026-10-16：最终独立评审发现普通仓库 target 的登记检查缺口及 changed lint 重复构建；现已拒绝未登记的可链接仓库 target、略过不参与链接图的 CMake utility target，并复用一次 launcher 构建。`gpt-6.1-sol` medium 复核完整 diff 未发现剩余可操作问题。
-- 2026-10-16：全部本地验收项、独立评审及索引更新完成；任务保持 `in-progress`，等待 PR CI 通过后再标记完成。
+- 2026-10-16：全部本地验收项、独立评审、索引更新与 PR CI 完成，任务验收通过。
 
 ## 完成摘要
 
-本地分层与测试聚合验证、格式检查和独立只读评审通过；CI 验收待执行。
+本地验证、独立只读评审与 PR CI 均通过；PR #43 等待合并。
