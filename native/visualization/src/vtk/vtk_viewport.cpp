@@ -282,8 +282,9 @@ void VtkViewport::apply_state(const RenderScene& state) {
         return;
     }
     // 充填前沿按播放时间裁剪。时间变化要重建几何并提交帧，相机只在网格换掉时重配。
-    const PrimitiveGeometryUpdate update = primitive_geometry_update(
-        impl_->pending.mesh, impl_->pending.playback_time, state.mesh, state.playback_time);
+    const PrimitiveGeometryUpdate update =
+        primitive_geometry_update(impl_->pending.mesh, impl_->pending.playback_time, state.mesh,
+                                  state.playback_time, playback_affects_surface(state.mesh));
     impl_->scene_dirty |= state.background != impl_->pending.background ||
                           state.primitive_visible != impl_->pending.primitive_visible ||
                           update.rebuild;
@@ -480,9 +481,9 @@ bool VtkViewport::commit_pending_geometry() {
     if (impl_->primitive_actor == nullptr) {
         return false;
     }
-    const PrimitiveGeometryUpdate update =
-        primitive_geometry_update(impl_->applied_mesh, impl_->applied_playback_time,
-                                  impl_->pending.mesh, impl_->pending.playback_time);
+    const PrimitiveGeometryUpdate update = primitive_geometry_update(
+        impl_->applied_mesh, impl_->applied_playback_time, impl_->pending.mesh,
+        impl_->pending.playback_time, playback_affects_surface(impl_->pending.mesh));
     if (!update.rebuild) {
         return false;
     }

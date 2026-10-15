@@ -11,6 +11,22 @@ pub(super) fn analysis_service_new() -> Box<AnalysisService> {
     )))
 }
 
+pub(super) fn analysis_bind(service: &mut AnalysisService, output: &str) -> bridge::AnalysisCache {
+    let view = service.0.bind(std::path::Path::new(output));
+    bridge::AnalysisCache {
+        root: view.root,
+        has_mesh: view.has_mesh,
+        has_gate: view.has_gate,
+        has_fill: view.has_fill,
+        coordinates: view.coordinates,
+        fill_times: view.fill_times,
+        pressures: view.pressures,
+        gate_points: view.gate_points,
+        fill_time: view.fill_time,
+        peak_pressure: view.peak_pressure,
+    }
+}
+
 pub(super) fn analysis_start(
     service: &mut AnalysisService,
     operation: &str,
@@ -37,6 +53,7 @@ pub(super) fn analysis_drain(service: &mut AnalysisService) -> Vec<bridge::Analy
                 panta_solver::EventKind::Completed => bridge::AnalysisEventKind::Completed,
                 panta_solver::EventKind::Failed => bridge::AnalysisEventKind::Failed,
                 panta_solver::EventKind::Cancelled => bridge::AnalysisEventKind::Cancelled,
+                panta_solver::EventKind::Restored => bridge::AnalysisEventKind::Restored,
             },
             message: event.message,
             progress: event.progress,
@@ -48,6 +65,11 @@ pub(super) fn analysis_drain(service: &mut AnalysisService) -> Vec<bridge::Analy
             fill_times: event.mesh.fill_times,
             pressures: event.mesh.pressures,
             gate_points: event.mesh.gate_points,
+            scope: event.scope,
+            from_cache: event.from_cache,
+            has_mesh: event.has_mesh,
+            has_gate: event.has_gate,
+            has_fill: event.has_fill,
         })
         .collect()
 }

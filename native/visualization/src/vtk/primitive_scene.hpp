@@ -2,25 +2,34 @@
 #pragma once
 
 #include <memory>
+#include <panta/visualization/mesh_source.hpp>
 
 class vtkActor;
 class vtkRenderWindow;
 class vtkWebGPURenderer;
 
 namespace panta::visualization {
-struct SurfaceMeshSnapshot;
 
-/// 播放时间参与充填裁剪。网格指针或时间变化都要重建表面；只有网格换掉才重配相机。
+/// 只有充填时间云图会按播放时间裁剪。压力云图和普通网格不因时间变化重建表面。
+inline bool playback_affects_surface(const std::shared_ptr<const SurfaceMeshSnapshot>& mesh) {
+    return mesh != nullptr && mesh->fields_visible && !mesh->pressure_visible &&
+           mesh->fill_duration > 0.0 && !mesh->fill_times.empty() &&
+           mesh->fill_times.size() == mesh->vertices.size();
+}
+
+/// 网格指针变化要重建并重配相机。播放时间只在它真的裁剪表面时触发重建。
 struct PrimitiveGeometryUpdate {
     bool rebuild = false;
     bool refit_camera = false;
 };
 
-inline PrimitiveGeometryUpdate primitive_geometry_update(
-    const std::shared_ptr<const SurfaceMeshSnapshot>& applied_mesh, double applied_time,
-    const std::shared_ptr<const SurfaceMeshSnapshot>& pending_mesh, double pending_time) {
+inline PrimitiveGeometryUpdate
+primitive_geometry_update(const std::shared_ptr<const SurfaceMeshSnapshot>& applied_mesh,
+                          double applied_time,
+                          const std::shared_ptr<const SurfaceMeshSnapshot>& pending_mesh,
+                          double pending_time, bool playback_affects_surface) {
     const bool mesh_changed = applied_mesh != pending_mesh;
-    const bool time_changed = applied_time != pending_time;
+    const bool time_changed = playback_affects_surface && applied_time != pending_time;
     return {mesh_changed || time_changed, mesh_changed};
 }
 

@@ -85,6 +85,22 @@ class AnalysisModel : public panta::visualization::MeshSource {
     void start(const QString& operation, double edgeLength);
     void poll();
     void updateRun(const QString& text);
+    /// 用规范化分析目录上的缓存恢复网格、浇口和充填。不改当前日志。
+    void publishCached(const rust::String& root, bool hasMesh, bool hasGate, bool hasFill,
+                       const rust::Vec<double>& coordinates, const rust::Vec<double>& fillTimes,
+                       const rust::Vec<double>& pressures, const rust::Vec<double>& gatePoints,
+                       double fillTime);
+    /// 该上下文还没有日志时写一条恢复记录。已有日志则按缓存刷新结果分组。
+    void noteRestored(double peakPressure);
+    void attachFillResults();
+    /// 按当前缓存刷新该上下文最近一条运行记录的结果分组。
+    void refreshCachedResults();
+    /// 离屏终态写回对应范围的运行记录，不改当前视图。
+    void finishScopedRun(int index, const panta::ffi::AnalysisEvent& event);
+    [[nodiscard]] int currentRunIndex() const;
+    [[nodiscard]] int runIndexForScope(const QString& scope) const;
+    [[nodiscard]] bool contextHasLog() const;
+    [[nodiscard]] bool foreignScope(const rust::String& scope) const;
     QPointer<ProjectViewModel> m_project;
     QString m_context;
     QString m_importId;
@@ -95,9 +111,13 @@ class AnalysisModel : public panta::visualization::MeshSource {
     QString m_console;
     QString m_summary;
     QString m_outputDir;
+    /// Rust `bind` 返回的规范化分析目录。事件范围与它比较；不能与 QDir 原路径比较。
+    QString m_scope;
     QVariantList m_logRuns;
     QVariantList m_studies;
     bool m_busy = false;
+    /// 已取消的作业还要继续拉取，直到终态回收线程。
+    bool m_awaitingWorker = false;
     bool m_meshReady = false;
     bool m_gateReady = false;
     bool m_resultReady = false;

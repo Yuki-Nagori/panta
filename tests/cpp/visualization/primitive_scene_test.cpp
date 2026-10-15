@@ -120,21 +120,44 @@ class PrimitiveSceneTest final : public QObject {
         const auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
         const auto other = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
         const auto unchanged =
-            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.5);
+            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.5, true);
         QVERIFY(!unchanged.rebuild);
         QVERIFY(!unchanged.refit_camera);
         const auto time_only =
-            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.9);
+            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.9, true);
         QVERIFY(time_only.rebuild);
         QVERIFY(!time_only.refit_camera);
+        const auto ignored =
+            panta::visualization::primitive_geometry_update(mesh, 0.5, mesh, 0.9, false);
+        QVERIFY(!ignored.rebuild);
+        QVERIFY(!ignored.refit_camera);
         const auto mesh_only =
-            panta::visualization::primitive_geometry_update(mesh, 0.5, other, 0.5);
+            panta::visualization::primitive_geometry_update(mesh, 0.5, other, 0.5, false);
         QVERIFY(mesh_only.rebuild);
         QVERIFY(mesh_only.refit_camera);
         const auto replaced =
-            panta::visualization::primitive_geometry_update(nullptr, 0.0, mesh, 1.0);
+            panta::visualization::primitive_geometry_update(nullptr, 0.0, mesh, 1.0, true);
         QVERIFY(replaced.rebuild);
         QVERIFY(replaced.refit_camera);
+    }
+    void playback_affects_only_the_fill_time_surface() {
+        const auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+        QVERIFY(!panta::visualization::playback_affects_surface(mesh));
+        mesh->vertices = {{{0, 0, 0}}, {{1, 0, 0}}, {{0, 1, 0}}};
+        mesh->fill_times = {0.0, 0.5, 1.0};
+        mesh->fill_duration = 1.0;
+        mesh->fields_visible = true;
+        mesh->pressure_visible = false;
+        QVERIFY(panta::visualization::playback_affects_surface(mesh));
+        mesh->pressure_visible = true;
+        QVERIFY(!panta::visualization::playback_affects_surface(mesh));
+        mesh->pressure_visible = false;
+        mesh->fields_visible = false;
+        QVERIFY(!panta::visualization::playback_affects_surface(mesh));
+        mesh->fields_visible = true;
+        mesh->fill_times.pop_back();
+        QVERIFY(!panta::visualization::playback_affects_surface(mesh));
+        QVERIFY(!panta::visualization::playback_affects_surface(nullptr));
     }
     void toggles_gate_markers_with_snapshot_flags() {
         vtkNew<vtkActor> actor;

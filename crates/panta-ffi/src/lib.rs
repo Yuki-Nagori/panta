@@ -51,7 +51,9 @@ use path::{
 mod analysis;
 mod project;
 pub use analysis::AnalysisService;
-use analysis::{analysis_cancel, analysis_drain, analysis_service_new, analysis_start};
+use analysis::{
+    analysis_bind, analysis_cancel, analysis_drain, analysis_service_new, analysis_start,
+};
 pub use project::ProjectService;
 #[cfg(test)]
 use project::activation_outcome_to_bridge;
@@ -407,9 +409,11 @@ pub mod bridge {
         Completed,
         Failed,
         Cancelled,
+        Restored,
     }
 
     /// 求解器事件以轻量 DTO 跨过 CXX；网格坐标为 mm，结果字段使用物理单位。
+    /// `scope` 是规范化后的分析目录，界面只应用与当前零件一致的事件。
     pub struct AnalysisEvent {
         pub kind: AnalysisEventKind,
         pub message: String,
@@ -422,11 +426,31 @@ pub mod bridge {
         pub fill_times: Vec<f64>,
         pub pressures: Vec<f64>,
         pub gate_points: Vec<f64>,
+        pub scope: String,
+        pub from_cache: bool,
+        pub has_mesh: bool,
+        pub has_gate: bool,
+        pub has_fill: bool,
+    }
+
+    /// 绑定分析目录时返回的已解析显示数据。`root` 是规范化路径。
+    pub struct AnalysisCache {
+        pub root: String,
+        pub has_mesh: bool,
+        pub has_gate: bool,
+        pub has_fill: bool,
+        pub coordinates: Vec<f64>,
+        pub fill_times: Vec<f64>,
+        pub pressures: Vec<f64>,
+        pub gate_points: Vec<f64>,
+        pub fill_time: f64,
+        pub peak_pressure: f64,
     }
 
     extern "Rust" {
         type AnalysisService;
         fn analysis_service_new() -> Box<AnalysisService>;
+        fn analysis_bind(service: &mut AnalysisService, output: &str) -> AnalysisCache;
         fn analysis_start(
             service: &mut AnalysisService,
             operation: &str,

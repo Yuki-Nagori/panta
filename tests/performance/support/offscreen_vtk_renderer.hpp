@@ -80,7 +80,8 @@ class OffscreenVtkRenderer final {
         QElapsedTimer clock;
         clock.start();
         const auto update = panta::visualization::primitive_geometry_update(
-            m_mesh, m_playback_time, scene.mesh, scene.playback_time);
+            m_mesh, m_playback_time, scene.mesh, scene.playback_time,
+            panta::visualization::playback_affects_surface(scene.mesh));
         if (!m_hasGeometry || update.rebuild) {
             update_geometry(scene, !m_hasGeometry || update.refit_camera);
         }
