@@ -943,8 +943,10 @@ void ProjectViewModel::refresh_workspace(bool forceActiveNotification) {
                         {QStringLiteral("title"), QString::fromUtf8(document.title)},
                         {QStringLiteral("message"), QString::fromUtf8(document.message_key)},
                         {QStringLiteral("diagnostic"), diagnostic},
-                        {QStringLiteral("displayOrdinal"), document.display_ordinal},
-                        {QStringLiteral("displayCount"), document.display_count}});
+                        {QStringLiteral("displayOrdinal"),
+                         QVariant::fromValue<qulonglong>(document.display_ordinal)},
+                        {QStringLiteral("displayCount"),
+                         QVariant::fromValue<qulonglong>(document.display_count)}});
     }
 
     const bool documentsChangedValue = m_openDocuments != nextDocuments;
