@@ -122,6 +122,79 @@ pub(super) fn project_service_imports(
         .map(|imports| imports.into_iter().map(project_import).collect())
 }
 
+pub(super) fn project_service_workspace_snapshot(
+    service: &ProjectService,
+) -> bridge::WorkspaceSnapshot {
+    let snapshot = service.service.document_workspace();
+    bridge::WorkspaceSnapshot {
+        documents: snapshot
+            .documents
+            .into_iter()
+            .map(|document| bridge::WorkspaceDocument {
+                id: document.id,
+                kind: document.kind.as_str().to_owned(),
+                state: document.state.as_str().to_owned(),
+                title: document.title,
+                message_key: document.message_key,
+                diagnostic_code: document.diagnostic.code,
+                diagnostic_category: document.diagnostic.category,
+                diagnostic_detail: document.diagnostic.detail,
+                display_ordinal: document.display_ordinal,
+                display_count: document.display_count,
+            })
+            .collect(),
+        active_document_id: snapshot.active_document_id,
+    }
+}
+
+pub(super) fn project_service_workspace_reset(service: &mut ProjectService, welcome_title: String) {
+    service.service.reset_document_workspace(&welcome_title);
+}
+
+pub(super) fn project_service_workspace_open_import(
+    service: &mut ProjectService,
+    import_id: &str,
+    title: &str,
+) {
+    service.service.open_import_document(import_id, title);
+}
+
+pub(super) fn project_service_workspace_publish_import(
+    service: &mut ProjectService,
+    import_id: &str,
+    title: &str,
+) {
+    service.service.publish_import_document(import_id, title);
+}
+
+pub(super) fn project_service_workspace_activate(service: &mut ProjectService, document_id: &str) {
+    service.service.activate_workspace_document(document_id);
+}
+
+pub(super) fn project_service_workspace_close(service: &mut ProjectService, document_id: &str) {
+    service.service.close_workspace_document(document_id);
+}
+
+pub(super) fn project_service_workspace_move(service: &mut ProjectService, from: u64, to: u64) {
+    let (Ok(from), Ok(to)) = (usize::try_from(from), usize::try_from(to)) else {
+        return;
+    };
+    service.service.move_workspace_document(from, to);
+}
+
+pub(super) fn project_error_message_key(code: &str) -> String {
+    panta_core::project::project_error_message_key(code).to_owned()
+}
+
+pub(super) fn format_project_dimensions(
+    size_x: f64,
+    size_y: f64,
+    size_z: f64,
+    unit: &str,
+) -> String {
+    panta_core::project::format_project_dimensions(size_x, size_y, size_z, unit)
+}
+
 pub(super) fn mesh_type_catalog() -> Vec<bridge::ChoiceDefinition> {
     panta_core::project::MESH_TYPES
         .iter()
@@ -414,17 +487,71 @@ pub(super) fn project_service_cancel_asset_activation(
 pub(super) fn project_service_drain_asset_activations(
     service: &mut ProjectService,
 ) -> Vec<bridge::ActivationOutcome> {
+    drain_asset_activations(service, true)
+}
+
+pub(super) fn project_service_drain_workspace_activations(
+    service: &mut ProjectService,
+) -> Vec<bridge::ActivationOutcome> {
+    drain_asset_activations(service, false)
+}
+
+fn drain_asset_activations(
+    service: &mut ProjectService,
+    include_coordinates: bool,
+) -> Vec<bridge::ActivationOutcome> {
     service
         .service
         .drain_asset_activations()
         .into_iter()
-        .map(|outcome| activation_outcome_to_bridge(&mut service.service, outcome))
+        .map(|outcome| {
+            let bridge_outcome = activation_outcome_to_bridge_with_payload(
+                &mut service.service,
+                outcome,
+                include_coordinates,
+            );
+            let result = match bridge_outcome.kind {
+                bridge::ActivationOutcomeKind::Succeeded => {
+                    panta_core::project::ActivationResultKind::Succeeded
+                }
+                bridge::ActivationOutcomeKind::Failed => {
+                    panta_core::project::ActivationResultKind::Failed
+                }
+                bridge::ActivationOutcomeKind::Cancelled => {
+                    panta_core::project::ActivationResultKind::Cancelled
+                }
+                bridge::ActivationOutcomeKind::Expired => {
+                    panta_core::project::ActivationResultKind::Expired
+                }
+                _ => panta_core::project::ActivationResultKind::Expired,
+            };
+            service.service.resolve_workspace_activation(
+                &bridge_outcome.import_id,
+                bridge_outcome.attempt,
+                result,
+                panta_core::project::DocumentDiagnostic {
+                    code: bridge_outcome.error.code.clone(),
+                    category: bridge_outcome.error.category.clone(),
+                    detail: bridge_outcome.error.detail.clone(),
+                },
+            );
+            bridge_outcome
+        })
         .collect()
 }
 
+#[cfg(test)]
 pub(super) fn activation_outcome_to_bridge(
     service: &mut panta_core::project::ProjectService,
     outcome: panta_core::project::Outcome,
+) -> bridge::ActivationOutcome {
+    activation_outcome_to_bridge_with_payload(service, outcome, true)
+}
+
+fn activation_outcome_to_bridge_with_payload(
+    service: &mut panta_core::project::ProjectService,
+    outcome: panta_core::project::Outcome,
+    include_coordinates: bool,
 ) -> bridge::ActivationOutcome {
     let (kind, error, coordinates) = match outcome.kind {
         panta_core::project::OutcomeKind::Succeeded
@@ -438,9 +565,23 @@ pub(super) fn activation_outcome_to_bridge(
             )
         }
         panta_core::project::OutcomeKind::Succeeded => match outcome.mesh {
+            Some(mesh) if !include_coordinates => {
+                if service.cache_activation_result(&outcome.import_id, outcome.attempt, mesh) {
+                    (
+                        bridge::ActivationOutcomeKind::Succeeded,
+                        bridge::ProjectDiagnostic::default(),
+                        Vec::new(),
+                    )
+                } else {
+                    (
+                        bridge::ActivationOutcomeKind::Expired,
+                        bridge::ProjectDiagnostic::default(),
+                        Vec::new(),
+                    )
+                }
+            }
             Some(mesh) => match mesh_coordinates(&mesh) {
                 Ok(coordinates) => {
-                    // DTO 由当前 outcome 的 Mesh 构造；缓存提交再次校验 attempt。
                     if service.cache_activation_result(&outcome.import_id, outcome.attempt, mesh) {
                         (
                             bridge::ActivationOutcomeKind::Succeeded,

@@ -5,8 +5,6 @@
 #pragma once
 
 #include "panta_ffi.h"
-#include <QMap>
-#include <QSet>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -113,7 +111,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] QVariantList analysisSequences() const; // Rust 目录：ID 与英文源文案。
     [[nodiscard]] QVariantMap planSettings() const;       // Rust 当前方案快照。
 
-    [[nodiscard]] QVariantList openDocuments() const; // 视口文档的只读投影。
+    [[nodiscard]] QVariantList openDocuments() const; // Rust 工作区快照的 Qt 投影。
     [[nodiscard]] QString activeDocumentId() const;
     [[nodiscard]] QString activeDocumentTitle() const;
     [[nodiscard]] bool placeholder_visible() const override;
@@ -225,16 +223,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void activeDocumentChanged();
 
   private:
-    /// 打开的视口文档条目；Welcome 与导入记录共用一套生命周期。
-    struct DocumentEntry {
-        QString id;
-        QString kind;  // "welcome" | "import"
-        QString state; // "ready" | "loading" | "failed" | "unloaded"
-        QString title;
-        QString message;          // Failed 态的用户可读原因
-        QVariantMap diagnostic{}; // code / category / detail，非失败态为空
-    };
-
     bool fail(const panta::ffi::ProjectDiagnostic& diagnostic);
     bool fail(const QString& code, const QString& category = QStringLiteral("validation"),
               const QString& detail = {});
@@ -252,18 +240,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     };
     void finish_metadata_confirmation();
     void set_pending_confirmation(ConfirmationKind kind);
-    static QString userMessageFor(const QString& errorCode);
     static bool toBoundaryText(const QString& text, std::string* out, QString* error);
 
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
     pull_service_mesh(const QString& importId) const;
-    int document_index(const QString& documentId) const;
-    bool activate_ready_document(
-        int index,
-        std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> loadedMesh = nullptr);
-    bool sync_mesh_residency();
+    void refresh_workspace(bool forceActiveNotification = false);
     void reset_documents();
-    void begin_import_activation(const QString& recordId);
     void drain_activations();
     void sync_activation_poll();
     void finish_import_preview();
@@ -296,13 +278,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_importPreviewTriangleCount = 0;
     quint64 m_importRequest = 0;
     bool m_importPending = false;
-    QVector<DocumentEntry> m_documents;
+    QVariantList m_openDocuments;
     QString m_activeDocumentId;
     /// Rust 当前方案快照的 Qt 投影，不拥有独立领域选择。
     QVariantMap m_planSettings;
     /// 当前活动文档的 C++ 显示 DTO；Rust ProjectService 拥有所有驻留 Mesh 与缓存策略。
     std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> m_activeMesh;
-    QMap<QString, quint64> m_activationAttempts;
     QTimer m_importPreviewPoll;
     QTimer m_stlImportPoll;
     quint64 m_previewRequest = 0;

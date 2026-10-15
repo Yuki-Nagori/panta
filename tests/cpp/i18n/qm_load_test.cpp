@@ -57,6 +57,11 @@ void QmLoadTest::zhCnDictionaryTranslates() {
              QStringLiteral("模型（第 2 个导入）"));
     QCOMPARE(translator.translate("DocumentTabBar", "Loading"), QStringLiteral("正在加载"));
     QCOMPARE(translator.translate("DocumentTabBar", "Failed to load"), QStringLiteral("加载失败"));
+    QCOMPARE(translator.translate("DocumentTabBar",
+                                  "The saved STL asset is missing from the project package."),
+             QStringLiteral("工程包中缺少已保存的 STL 资产。"));
+    QCOMPARE(translator.translate("ProjectViewModel", "Enter a valid project name."),
+             QStringLiteral("请输入有效的工程名称。"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {
@@ -82,6 +87,11 @@ void QmLoadTest::enBaselineDictionaryLoads() {
     QCOMPARE(translator.translate("DocumentTabBar", "Loading"), QStringLiteral("Loading"));
     QCOMPARE(translator.translate("DocumentTabBar", "Failed to load"),
              QStringLiteral("Failed to load"));
+    QCOMPARE(translator.translate("DocumentTabBar",
+                                  "The saved STL asset is missing from the project package."),
+             QStringLiteral("The saved STL asset is missing from the project package."));
+    QCOMPARE(translator.translate("ProjectViewModel", "Enter a valid project name."),
+             QStringLiteral("Enter a valid project name."));
 }
 
 QTEST_GUILESS_MAIN(QmLoadTest)
