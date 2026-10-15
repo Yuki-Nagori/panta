@@ -39,7 +39,8 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 | `cargo panta-package /path/to/output` | 将安装目录写到指定路径。macOS 输出 `panta.app`，Windows/Linux 输出 `bin/panta[.exe]`。 |
 | `cargo test --locked --workspace` | 运行 Rust、native、QML 聚合测试。 |
 | `cargo test-plan` | 显示当前工作树相对 `origin/main` 的 L1/L2 受影响测试范围。 |
-| `cargo test-scope l1|l2|all [--base <ref>]` | 使用与 PR CI 相同的 Rust 选择器执行局部测试；可指定比较基线。 |
+| `cargo test-scope l1\|l2\|all [--base <ref>]` | 使用与 PR CI 相同的 Rust 选择器执行局部测试；可指定比较基线。 |
+| `cargo verify-changed` | 聚合运行变更文件格式检查、受影响 lint，以及 L1 和 L2 测试。 |
 | `cargo format` | 检查 Rust、C++、CMake 和 QML 格式。 |
 | `cargo lint` | 运行 Clippy、依赖、CMake、QML、C++ 静态检查。 |
 | `cargo quality` | 依次运行格式、lint、依赖审计和测试。 |

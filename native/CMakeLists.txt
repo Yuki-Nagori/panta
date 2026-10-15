@@ -29,6 +29,7 @@ if(APPLE)
 endif()
 
 include(cmake/build-policy.cmake)
+include(cmake/layering.cmake)
 
 # include(CTest) 定义 BUILD_TESTING 选项（默认 ON）并启用测试；OFF 时不供给
 # GoogleTest SDK、不注册测试，供 004 的发布链关闭测试面。
@@ -235,3 +236,4 @@ install(SCRIPT "${PANTA_NATIVE_QML_DEPLOY_SCRIPT}" COMPONENT Runtime)
 
 # 等 Qt 的延迟目标创建完成后审计，包括 plugin_init/resource object targets。
 cmake_language(DEFER CALL panta_verify_msvc_abi "${CMAKE_CURRENT_SOURCE_DIR}")
+cmake_language(DEFER CALL panta_verify_layering)

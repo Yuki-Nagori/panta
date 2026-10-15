@@ -8,13 +8,20 @@ use std::process::Command;
 use crate::command::{cargo, cargo_command, run, run_scanner};
 use crate::paths::{repository_root, target_root};
 
-pub(super) fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Error>> {
+pub(super) fn format_all(
+    check: bool,
+    changed: bool,
+    rest: &[String],
+) -> Result<(), Box<dyn Error>> {
     if let Some(unexpected) = rest.first() {
         return Err(format!(
             "format 不接受位置参数 '{unexpected}'；修复为缺省行为，\
                             --check 只验证不改动"
         )
         .into());
+    }
+    if changed {
+        return format_changed(check);
     }
     if check {
         cargo("fmt", ["--all", "--", "--check"])?;
@@ -33,18 +40,118 @@ pub(super) fn format_all(check: bool, rest: &[String]) -> Result<(), Box<dyn Err
     Ok(())
 }
 
-/// 所有仓库 `.pa` 源文件共享同一个 parser 和 formatter 规范。
-fn run_pa_format(check: bool) -> Result<(), Box<dyn Error>> {
+fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
+    if crate::test_scope::force_full_scope() {
+        return format_all(check, false, &[]);
+    }
     let root = repository_root()?;
-    let mut files = Vec::new();
-    for directory in ["crates", "resources"] {
-        files.extend(pa_sources(&root.join(directory))?);
+    let paths = crate::test_scope::changed_paths()?;
+    if paths.is_empty() {
+        println!("变更格式检查：没有待检查的文件");
+        return Ok(());
     }
-    if files.is_empty() {
-        return Err(".pa 源文件清单为空".into());
-    }
-    files.sort();
 
+    let rust_packages = crate::test_scope::changed_format_packages()?;
+    for package in rust_packages {
+        let mut command = Command::new("cargo");
+        command.arg("fmt").arg("--package").arg(&package);
+        if check {
+            command.args(["--", "--check"]);
+        }
+        command.current_dir(root);
+        run(&format!("cargo fmt ({package})"), command)?;
+    }
+
+    let changed_files = paths
+        .iter()
+        .map(|path| root.join(path))
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    let pa_files = files_with_extensions(&changed_files, &["pa"])
+        .into_iter()
+        .filter(|path| {
+            path.starts_with(root.join("crates")) || path.starts_with(root.join("resources"))
+        })
+        .collect::<Vec<_>>();
+    if !pa_files.is_empty() {
+        run_pa_formatter(check, &pa_files)?;
+    }
+    let cpp_files = files_with_extensions(&changed_files, &["cpp", "cc", "cxx", "h", "hpp"])
+        .into_iter()
+        .filter(|path| {
+            [
+                "native",
+                "tests/cpp",
+                "tests/qml",
+                "tests/performance",
+                "tests/support",
+                "crates/panta-ffi/src",
+                "crates/panta-ffi/include",
+            ]
+            .iter()
+            .any(|directory| path.starts_with(root.join(directory)))
+        })
+        .collect::<Vec<_>>();
+    if !cpp_files.is_empty() {
+        format_cpp_files(check, &cpp_files)?;
+    }
+    let cmake_files = changed_files
+        .iter()
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name == "CMakeLists.txt")
+                || path
+                    .extension()
+                    .is_some_and(|extension| extension == "cmake")
+        })
+        .filter(|path| {
+            ["native", "qml", "tools"]
+                .iter()
+                .any(|directory| path.starts_with(root.join(directory)))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if !cmake_files.is_empty() {
+        let mut command = panta_build::python::command(target_root(), root, "cmake-format")?;
+        if check {
+            command.args(["--check"]);
+        } else {
+            command.args(["--in-place"]);
+        }
+        command.args(&cmake_files);
+        run(
+            &format!("cmake-format（{} 个变更文件）", cmake_files.len()),
+            command,
+        )?;
+    }
+    let qml_files = files_with_extensions(&changed_files, &["qml"])
+        .into_iter()
+        .filter(|path| {
+            ["qml", "tests/qml", "tests/fixtures/qml"]
+                .iter()
+                .any(|directory| path.starts_with(root.join(directory)))
+        })
+        .collect::<Vec<_>>();
+    if !qml_files.is_empty() {
+        format_qml_files(check, &qml_files)?;
+    }
+    println!("变更文件格式检查通过");
+    Ok(())
+}
+
+fn files_with_extensions(files: &[PathBuf], extensions: &[&str]) -> Vec<PathBuf> {
+    files
+        .iter()
+        .filter(|path| {
+            path.extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extensions.contains(&extension))
+        })
+        .cloned()
+        .collect()
+}
+
+fn run_pa_formatter(check: bool, files: &[PathBuf]) -> Result<(), Box<dyn Error>> {
     let (description, mut build) = cargo_command("build", ["--locked", "--package", "panta-dslc"])?;
     build.arg("--target").arg(env!("PANTA_TEST_HOST"));
     run(&description, build)?;
@@ -59,17 +166,84 @@ fn run_pa_format(check: bool) -> Result<(), Box<dyn Error>> {
     if !binary.is_file() {
         return Err(format!("panta-dslc 不存在：{}", binary.display()).into());
     }
-
     for file in files {
         let mut command = Command::new(&binary);
         command.arg("format");
         if check {
             command.arg("--check");
         }
-        command.arg(&file);
+        command.arg(file);
         run(&format!("panta-dslc format {}", file.display()), command)?;
     }
     Ok(())
+}
+
+fn format_cpp_files(check: bool, files: &[PathBuf]) -> Result<(), Box<dyn Error>> {
+    let llvm = panta_build::resolve_llvm_compilers(target_root())?;
+    if !llvm.clang_format.is_file() {
+        return Err(format!("clang-format 不存在：{}", llvm.clang_format.display()).into());
+    }
+    let mut command = Command::new(&llvm.clang_format);
+    if check {
+        command.args(["--dry-run", "-Werror"]);
+    } else {
+        command.arg("-i");
+    }
+    command.args(files);
+    run(
+        &format!("clang-format（{} 个变更文件）", files.len()),
+        command,
+    )
+}
+
+fn format_qml_files(check: bool, files: &[PathBuf]) -> Result<(), Box<dyn Error>> {
+    let root = repository_root()?;
+    let target_root = target_root();
+    let qmlformat = qmlformat_path(target_root);
+    if !qmlformat.is_file() {
+        provision_qml_format(root, target_root)?;
+    }
+    for file in files {
+        let mut command = Command::new(&qmlformat);
+        if check {
+            let output = command
+                .arg(file)
+                .output()
+                .map_err(|error| format!("qmlformat 启动失败（{}）：{error}", file.display()))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "qmlformat 失败：{}\n{}",
+                    file.display(),
+                    String::from_utf8_lossy(&output.stderr)
+                )
+                .into());
+            }
+            let formatted = String::from_utf8_lossy(&output.stdout).replace("\r\n", "\n");
+            let current = fs::read_to_string(file)?.replace("\r\n", "\n");
+            if formatted != current {
+                return Err(format!("QML 文件需要格式化：{}", file.display()).into());
+            }
+        } else {
+            command.arg("-i").arg(file);
+            run(&format!("qmlformat {}", file.display()), command)?;
+        }
+    }
+    Ok(())
+}
+
+/// 所有仓库 `.pa` 源文件共享同一个 parser 和 formatter 规范。
+fn run_pa_format(check: bool) -> Result<(), Box<dyn Error>> {
+    let root = repository_root()?;
+    let mut files = Vec::new();
+    for directory in ["crates", "resources"] {
+        files.extend(pa_sources(&root.join(directory))?);
+    }
+    if files.is_empty() {
+        return Err(".pa 源文件清单为空".into());
+    }
+    files.sort();
+
+    run_pa_formatter(check, &files)
 }
 
 fn pa_sources(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -88,42 +262,15 @@ fn pa_sources(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
 
 fn run_qml_format(check: bool) -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
-    let target_root = target_root();
-    let qmlformat = qmlformat_path(target_root);
-    if !qmlformat.is_file() {
-        provision_qml_format(root, target_root)?;
+    let mut files = Vec::new();
+    for directory in ["qml", "tests/qml", "tests/fixtures/qml"] {
+        files.extend(qml_sources(&root.join(directory))?);
     }
-    let qmlformat = qmlformat_path(target_root);
-    if !qmlformat.is_file() {
-        return Err(format!("qmlformat 不存在：{}", qmlformat.display()).into());
+    files.sort();
+    if files.is_empty() {
+        return Err("QML 源文件清单为空".into());
     }
-    if !check {
-        // 修复模式：直接就地格式化；文件清单与检查脚本（check-qml-format.cmake
-        // 按 QML_DIR 递归）保持同一来源。
-        let mut files = qml_sources(&root.join("qml"))?;
-        files.extend(qml_sources(&root.join("tests/qml"))?);
-        files.extend(qml_sources(&root.join("tests/fixtures/qml"))?);
-        files.sort();
-        for file in files {
-            let mut command = Command::new(&qmlformat);
-            command.arg("-i").arg(&file);
-            run(&format!("qmlformat {}", file.display()), command)?;
-        }
-        return Ok(());
-    }
-    let cmake = panta_build::resolve_cmake(target_root)?;
-    let script = root.join("native/cmake/tests/check-qml-format.cmake");
-    let mut command = Command::new(cmake);
-    command.arg(format!(
-        "-DQMLFMT={}",
-        qmlformat.to_str().ok_or("qmlformat 路径不是 UTF-8")?
-    ));
-    command.arg(format!(
-        "-DQML_DIR={}",
-        root.join("qml").to_str().ok_or("QML 路径不是 UTF-8")?
-    ));
-    command.args(["-P", script.to_str().ok_or("QML 格式脚本路径不是 UTF-8")?]);
-    run("qmlformat", command)
+    format_qml_files(check, &files)
 }
 
 fn qml_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {

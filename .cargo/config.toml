@@ -3,10 +3,11 @@
 panta-package = "run --locked --package panta-launcher -- package"
 # 根目录跨语言质量入口；实现位于 tests/，避免 shell/Node 运行时分叉。
 performance = "run -q --locked --package panta-tests -- performance"
-# 本地与 PR CI 共用 Rust 影响范围选择器；test-scope 从 origin/main 与工作树计算变更。
+# 本地与 PR CI 共用 Rust 影响范围选择器；test-scope 和 verify-changed 从 origin/main 与工作树计算变更。
 test-plan = "run -q --locked --package panta-tests -- test-plan"
 test-scope = "run -q --locked --package panta-tests -- test-scope"
 quality = "run -q --locked --package panta-tests -- quality"
+verify-changed = "run -q --locked --package panta-tests -- verify-changed"
 lint = "run -q --locked --package panta-tests -- lint"
 format = "run -q --locked --package panta-tests -- format"
 audit = "run -q --locked --package panta-tests -- audit"

@@ -57,6 +57,8 @@ jobs:
       test_packages_l2: ${{ steps.filter.outputs.test_packages_l2 }}
       native_labels: ${{ steps.filter.outputs.native_labels }}
       full_tests: ${{ steps.filter.outputs.full_tests }}
+      full_quality: ${{ steps.filter.outputs.full_quality }}
+      changed_paths: ${{ steps.filter.outputs.changed_paths }}
     steps:
       # 本地 composite action 的解析依赖工作区已有仓库，checkout 必须在
       # 调用前完成；分类需要全量历史取 merge-base/before diff。
@@ -106,7 +108,10 @@ jobs:
 
       - name: Run Clippy
         shell: bash
-        run: cargo lint clippy --check
+        env:
+          PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
+          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
+        run: cargo lint clippy --changed --check
 
   lint-native:
     name: cargo lint (${{ matrix.tool }}, ubuntu)
@@ -135,7 +140,10 @@ jobs:
 
       - name: Run selected lint
         shell: bash
-        run: cargo lint "${{ matrix.tool }}" --check
+        env:
+          PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
+          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
+        run: cargo lint "${{ matrix.tool }}" --changed --check
 
   # machete 只读 Rust 清单与源码，不进 native 构建图：按 rust 域触发，
   # 且不需要托管工具/依赖缓存。
@@ -174,7 +182,29 @@ jobs:
 
       - name: Run cmake lint
         shell: bash
-        run: cargo lint cmake --check
+        env:
+          PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
+          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
+        run: cargo lint cmake --changed --check
+
+  lint-layering:
+    name: cargo lint (layering, ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.cargo_deps == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/linux-gl-prereqs
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Check Rust and configured CMake dependency layers
+        shell: bash
+        run: cargo lint layering --check
 
   # qmllint 消费 Qt 供给与 QML/bridge 输出：按 qml 或 native 域触发。
   lint-qmllint:
@@ -212,9 +242,12 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
-      - name: Run aggregated cargo format check (Rust, C++/CXX, CMake and QML)
+      - name: Run changed-file format checks (Rust, C++/CXX, CMake and QML)
         shell: bash
-        run: cargo format --check
+        env:
+          PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
+          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
+        run: cargo format --changed --check
 
   check:
     name: cargo check and build (${{ matrix.os }})
