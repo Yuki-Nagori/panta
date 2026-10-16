@@ -25,16 +25,18 @@
 #include <system_error>
 #include <vector>
 
+#if !defined(Q_OS_WIN)
+#include <sys/resource.h>
+#endif
+
 #if defined(Q_OS_MACOS)
 #include <mach/kern_return.h>
 #include <mach/mach_init.h>
 #include <mach/message.h>
 #include <mach/task.h>
 #include <mach/task_info.h>
-#include <sys/resource.h>
 #elif defined(Q_OS_LINUX)
 #include <fstream>
-#include <sys/resource.h>
 #include <unistd.h>
 #elif defined(Q_OS_WIN)
 #include <psapi.h>
