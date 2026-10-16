@@ -18,7 +18,15 @@
 #include <icon_provider.hpp>
 #include <panta/foundation/version.hpp>
 #include <rust/cxx.h>
+#include <string>
 #include <string_view>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <limits>
+#include <windows.h>
+#endif
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
 
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
@@ -44,6 +52,36 @@ void print_version() {
     std::printf("panta %d.%d.%d\n", version.major, version.minor, version.patch);
 }
 
+/// 将 UTF-8 诊断写到 stderr；Windows 控制台需要 UTF-16 控制台 API，重定向时
+/// 保留 UTF-8 字节流，避免依赖当前活动代码页。
+void write_stderr_utf8(std::string_view message) {
+#ifdef _WIN32
+    const HANDLE output = GetStdHandle(STD_ERROR_HANDLE);
+    DWORD console_mode = 0;
+    if (output != nullptr && output != INVALID_HANDLE_VALUE &&
+        GetConsoleMode(output, &console_mode) != 0 &&
+        message.size() <= static_cast<std::size_t>((std::numeric_limits<int>::max)())) {
+        const int byte_count = static_cast<int>(message.size());
+        const int wide_count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, message.data(),
+                                                   byte_count, nullptr, 0);
+        if (wide_count > 0) {
+            std::wstring wide_message(static_cast<std::size_t>(wide_count), L'\0');
+            const int converted = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, message.data(),
+                                                      byte_count, wide_message.data(), wide_count);
+            if (converted == wide_count) {
+                DWORD written = 0;
+                if (WriteConsoleW(output, wide_message.data(), static_cast<DWORD>(wide_count),
+                                  &written, nullptr) != 0 &&
+                    written == static_cast<DWORD>(wide_count)) {
+                    return;
+                }
+            }
+        }
+    }
+#endif
+    (void)std::fwrite(message.data(), sizeof(char), message.size(), stderr);
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -52,7 +90,10 @@ int main(int argc, char* argv[]) {
     try {
         panta::ffi::install_crash_handler(rust::String(""));
     } catch (const rust::Error& error) {
-        std::fprintf(stderr, "panta: 崩溃日志初始化失败：%s\n", error.what());
+        std::string diagnostic = "panta: 崩溃日志初始化失败：";
+        diagnostic.append(error.what());
+        diagnostic.push_back('\n');
+        write_stderr_utf8(diagnostic);
     }
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument = argv[index];

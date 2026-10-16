@@ -56,6 +56,8 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - [x] 安装树含 SDK 许可、版本 provenance 与 Qt SBOM 清单；未验证的平台没有标记为支持。
 - [ ] macOS 归档中的 app 在全部资源安装完成后签名完整，`codesign --verify --deep --strict` 通过。
 - [x] 已同步 Cargo 安装命令、README、构建说明和当前架构事实，task-index 保持 in-progress。
+- [ ] Windows `cargo run` 的启动诊断在控制台正确显示中文；WebGPU adapter 预检和 VTK 实际初始化均固定使用 D3D12，不尝试加载未选用的 Vulkan backend。
+- [ ] Windows CI 通过 C++/Rust 工程服务的 Unicode 路径创建与打开回归；该测试验证程序文件操作链，不替代用户机器上的 ACL / 杀毒软件验收。
 
 - [ ] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
 
@@ -65,6 +67,9 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
+| 2026-10-16 | PR #45 CI 复验（run 38869986612） | macOS、Linux、Windows 构建与测试通过；Windows native/QML CTest 全部通过（75/75），包括 Unicode 路径创建/打开回归；format、clang-tidy、cmake、cppcheck、includes、layering、qmllint 全部通过。Clippy、machete、audit 按选择器跳过。CI 未运行带 GPU 的真实窗口，控制台中文字显示与 Vulkan 日志消失仍需 Windows 实机确认。 |
+| 2026-10-16 | PR #45 Windows CI（run 38868760786） | 构建成功；74/75 CTest 通过。新增 Unicode 工程创建/打开测试也成功打开工程，但路径字符串直接比较因 Windows 分隔符表示差异失败；改为比较 canonical path，待 CI 重跑。 |
+| 2026-10-16 | macOS arm64；修正后执行 `cargo format --changed`、`cargo test-scope all` | 通过；native/QML CTest 77/77，含比较 canonical path 的 `ProjectViewModelTest.CreatesAndOpensProjectThroughUnicodeFilesystemPaths`。Windows 控制台编码与 D3D12 初始化分支仍需 Windows CI/实机确认。 |
 | 2026-10-14 | macOS arm64；`cargo build --locked` | 通过；生成 `target/native/debug/app/panta.app`，bundle 内 executable 为 `panta`。本机构建信息：Apple clang 17、Qt 6.11.2、VTK 9.7.0。 |
 | 2026-10-14 | macOS arm64；`cmake --install target/native/debug --prefix /tmp/panta-013-install` | 通过；生成独立 `.app`，部署 Qt/QML 插件、VTK 动态库、SDK 许可和 provenance、Qt SBOM。 |
 | 2026-10-14 | macOS arm64；`cargo panta-package /tmp/panta-package-final` | 通过；Cargo 桌面安装入口生成可搬迁目录，Qt 部署日志未报告 unresolved dependency。 |
@@ -117,6 +122,8 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：PR #31 的 package run 38561118158 与 38561832999 中，Windows Release 构建成功，但 manifest link-input 断言失败。run 38561832999 的日志显示 `vs_link_exe` 命令没有实际 manifest 输入，只有空的 `--manifests` 参数，并保留 `/MANIFEST:NO`；失败来自断言逻辑，后续改为明确检查生成的 manifest 路径、`/MANIFESTINPUT` 与 `/MANIFEST:NO`。
 - 2026-10-14：PR #31 package run 38562885901 的 Windows、macOS arm64、Linux x86_64 package jobs 全部成功。Windows 链接阶段未接收 Qt manifest，保留 `/MANIFEST:NO`；链接后由 Windows SDK `mt.exe` 嵌入 Qt 生成的清单。package 检查从最终 PE 资源提取清单，确认 `requestedExecutionLevel` 属性无命名空间前缀且值为 `asInvoker` / `false`。PR 按用户要求保持未合并。
 - 2026-10-14：PR #31 package run 38564810367 验证 manifest 链路精简后的三平台构建全部成功。CMake 改用项目专用 `PANTA_WINDOWS_MANIFEST_TOOL`，不再覆盖全局 `CMAKE_MT`；workflow 从构建目录固定位置读取 Qt manifest，并复用 RC 同一 SDK 的 `mt.exe` 做 PE 提取。移除未命中的源码清单清理分支及对 build-script 日志文案的依赖。用户确认下载的 Windows package 可正常使用。
+- 2026-10-16：Windows 开发启动输出出现中文乱码与 Dawn Vulkan 动态加载警告；将 stderr 诊断改为控制台 Unicode 写入、Windows Dawn 预检与 VTK 初始化固定使用 D3D12，并补工程 Unicode 路径创建/打开的跨语言回归。PR #45 的首轮 Windows 构建成功，测试发现 Windows 路径字符串分隔符表示不同导致断言失败；现改为比较 canonical path，等待 Windows CI 重跑。本机文件夹权限差异仍需 Windows 实机证据。
+- 2026-10-16：首轮 CI 断言修正经 `gpt-6.1-sol medium` 独立只读复审通过；修正后 macOS `cargo test-scope all` 77/77，Windows CI 复验待完成。
 - 当前范围限制：桌面 app 实际链接 VTK；OCCT/Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包。Windows 11 x64 单机安装包已启动并显示真实窗口；PR #31 当前 Windows manifest 修复已通过 GitHub Actions package 验证。Linux 安装与实机验收仍待验证；桌面 app 的 OCCT/Netgen 加载验收需待对应 consumer 接入后完成。
 
 ## 完成摘要
