@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_TEMPORARY: AtomicU64 = AtomicU64::new(0);
 
-/// 迁移重试可复用内容完全相同的孤立候选；不同内容仍不得覆盖不可变路径。
+/// 崩溃后重试可复用内容完全相同的孤立 sidecar；不同内容不得覆盖不可变路径。
 pub(super) fn write_surface_mesh_asset_or_reuse(
     path: &Path,
     mesh: &SurfaceMesh,

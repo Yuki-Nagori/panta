@@ -5,7 +5,7 @@
 - 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[086](086-qt-platform-adapter.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-02
+- 创建 / 更新：2026-09-24 / 2026-10-17
 
 ## 目标与背景
 
@@ -195,6 +195,7 @@
 
 ## 决策与工作记录
 
+- **2026-10-17：存储边界同步。** 088 将首次加载数据源由 `.panta` 内保存的 STL 文件改为工程内压缩 Mesh sidecar；来源 STL 路径只作为追溯元数据，不参与工程重开或页签激活。080 的页签身份、激活、关闭释放及运行期快照契约保持不变。
 - **2026-09-24–26：产品语义与边界。** 以浏览器式页签替换视口底部 `Model / Mesh / Results` 分类；工程会话默认打开 Welcome，全部关闭后留白。以 ImportRecord ID + session generation 标识文档；073 负责已保存 STL 的异步读取、取消和迟到结果校验，QML 只表达意图，C++ ViewModel 持有 Qt 页签状态与显示快照，Rust 保持领域权威。全页签共用一个 `CaeViewport`；就绪页签暂保留 CPU 快照，缓存上限待代表性测量。
 - **2026-09-25–26：原型与实现契约。** HTML 原型完成切换、关闭、固定宽度与水平拖动。冻结 Loading / Ready / Failed 状态、稳定身份去重、失败保留旧视口、关闭 Loading 时取消、工程代次变化丢弃迟到结果；打开工程不同步重载旧网格。
 - **2026-09-28：交互和视口修复。** 稳定委托与槽位坐标修正拖动跟手、释放归位和左右圆弧；关闭按钮补 hover / active 背景，Welcome 图标文字及光标恢复问题均补回归。针对用户提供的 `mug.stl`，确认“先关 Welcome 再双击树项”会激活页签但不显示；调整网格 actor 可见性与相机裁剪顺序后，真窗口显示恢复并获用户确认。该日完整评审清理死代码、修正激活 attempt 相关性并收敛 CI 问题。

@@ -17,6 +17,15 @@ cargo performance all --project /path/to/model.panta --samples 31
 
 默认通过正式工程服务生成 10,000 / 20,000 个合成平面三角形的 STL 工程，保留在 `target/performance/fixture-*`；用于入口与生命周期重复验证，不代表生产模型。`--project` 可选择实际工程；Rust STL 单文件基准另可通过 `PANTA_BENCH_STL` 指定输入，未设置时使用合成 STL。`--samples` 只影响工程激活 / 页签切换基准，其他场景仍使用各自固定的预热 / 采样策略。
 
+需要在工程级基准中加入真实 STL 时，可直接向夹具程序追加一个或多个输入路径；源 STL 只作为导入输入，不复制到工程：
+
+```sh
+target/native/release/performance/panta_performance_fixture \
+  "$PWD/target/performance/fixture-real" /path/to/model.stl
+target/native/release/performance/panta_bridge_project_stl_activation_cpu_benchmark \
+  "$PWD/target/performance/fixture-real/Benchmark/Benchmark.panta" 31
+```
+
 native 基准采用当前 runner 配置（缺省 Debug），Rust 网格微基准及后台执行容量基准显式使用 Release；输出和比较须区分配置。默认命令需要完整 bridge / VTK 构建；GPU 需要硬件图形会话，初始化失败不当作通过。Qt Quick 默认渲染到硬件纹理；VTK 默认使用隐藏的原生硬件 surface，仍需要平台图形会话。原生窗口模式保留独立指标。
 
 CPU 套件还运行 `panta-core` 的 `background_execution` example（源码 `tests/performance/cpu/background_execution.rs`）：合成 5 万 / 50 万三角面的 binary STL，分别提交 1 / 4 / 8 / 64 个预检请求，输出输入字节、整批耗时及请求完成延迟 p50 / p95。通过公开工程服务驱动，完成即释放来源快照；固定负载不受 `--samples` 或 `--project` 控制。可单独用 `cargo run --locked --release -p panta-core --example background_execution` 定位；不纳入功能测试或 CI 时间门禁。容量及峰值内存证据见 [109](../task/109-bounded-background-execution.md)。
@@ -29,7 +38,7 @@ PANTA_BENCH_STL=/path/to/model.stl \
   supplied_stl_and_sidecar_costs -- --ignored --nocapture
 ```
 
-该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量，并同时报告进程 RSS 与估算 Mesh 常驻量。Mesh sidecar v2 保留 f64 三角顶点语义并用 Zstandard 压缩 payload；压缩后大小和编解码耗时依赖具体数据。完整工程首次激活、缓存命中和 RSS 仍需使用对应工程级基准，不由微基准推断。
+该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量。工程级结果包括 manifest 打开 / 原子保存耗时、manifest 与 sidecar 字节、首次激活与关闭重载耗时、缓存切换、各阶段进程 CPU 时间、进程 RSS / 高水位，以及 Mesh DTO 常驻容量估算。进程 CPU 时间累计用户态与内核态时间（macOS/Linux 使用 `getrusage`，Windows 使用 `GetProcessTimes`）。打开计时覆盖新建 `ProjectViewModel`、读取并校验 manifest，不加载 sidecar；激活到 ready 覆盖 Rust sidecar 读盘、摘要校验、解压 / 解码、领域校验及 FFI 快照投影，不包含 VTK、GPU 上传或真实窗口呈现。RSS 是进程级采样；关闭后 Mesh 快照弱引用必须失效，RSS 不保证立即下降，因为分配器可能保留已释放内存。所有磁盘读取均使用暖 OS 页缓存，除非另有标记。Mesh sidecar v2 保留 f64 三角顶点语义并用 Zstandard 压缩 payload；压缩后大小和编解码耗时依赖具体数据。
 
 ## 定位与边界
 
