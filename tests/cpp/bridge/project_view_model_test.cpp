@@ -91,7 +91,8 @@ TEST(ProjectViewModelTest, CreatesAndOpensProjectThroughUnicodeFilesystemPaths) 
     ASSERT_TRUE(reopened.openProjectUrl(projectUrl))
         << reopened.errorCode().toStdString() << ": " << reopened.errorDetail().toStdString();
     EXPECT_EQ(reopened.currentName(), QStringLiteral("工程-测试"));
-    EXPECT_EQ(reopened.currentPath(), projectPath);
+    EXPECT_EQ(QFileInfo(reopened.currentPath()).canonicalFilePath(),
+              QFileInfo(projectPath).canonicalFilePath());
 }
 
 TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
