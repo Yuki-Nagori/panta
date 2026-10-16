@@ -43,7 +43,7 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 | `cargo test-scope l1\|l2\|all [--base <ref>]` | 使用与 PR CI 相同的 Rust 选择器执行局部测试；可指定比较基线。 |
 | `cargo verify-changed` | 聚合运行变更文件格式检查、受影响 lint，以及 L1 和 L2 测试。 |
 | `cargo format` | 检查 Rust、C++、CMake 和 QML 格式。 |
-| `cargo lint` | 运行 Clippy、依赖、CMake、QML、C++ 静态检查。 |
+| `cargo lint` | 运行 Clippy、依赖、CMake、Rust/CMake 分层、QML、C++ 静态检查。 |
 | `cargo quality` | 依次运行格式、lint、依赖审计和测试。 |
 | `cargo coverage` | 运行 Rust 覆盖率门禁，当前要求全局函数和行覆盖率均不低于 85%；CI 在 nightly 执行完整覆盖率。`cargo coverage native` 生成 C++ 报告 artifact，当前不设阈值。其余门槛规划见任务 032（deferred）。 |
 | `cargo performance` | 手动运行性能基准，不纳入常规测试门禁。 |
