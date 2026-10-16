@@ -1,11 +1,11 @@
 # 088 — Mesh 资产旁置存储与按需加载
 
-- 状态：in-progress
+- 状态：done
 - 阶段：CAE 领域模块迁移
 - 依赖：[063](063-stl-import-and-mesh-workspace.md)、[067](067-rust-mesh-domain-migration.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[080](080-qml-viewport-document-tabs.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-29 / 2026-10-16
+- 创建 / 更新：2026-09-29 / 2026-10-17
 
 ## 目标与背景
 
@@ -100,12 +100,12 @@ Mesh sidecar 的确定收益是工程保存独立于外部来源文件，并以�
 - [x] Surface / Volume Mesh 持久化往返后领域值、单位、连接关系、分组和 revision 一致，校验结果可复现。
 - [x] Sidecar 头部先于 payload 校验，声明压缩长度与文件长度一致；单文件不设 2 GiB 上限。预计解压后的网格数据超过 2 GiB 时，确认导入前显示耗时、内存和磁盘空间非阻断提醒。
 - [x] Zstandard 编码 / 解码保持 Surface 与 Tet Mesh 领域值，压缩摘要校验、未知 codec、截断流及多余解压内容均有回归；解码不构造完整解压 payload 副本。
-- [ ] 代表性测量覆盖保存、打开工程、首次激活、缓存命中及关闭释放；给出解析 / 解码时延、磁盘字节、CPU/RSS峰值与测量边界。
-- [ ] Cargo 构建、workspace 测试、格式、lint、CMake/native 测试和适用的真窗口加载验收通过；所有 task 与架构说明一致。
+- [x] 代表性测量覆盖保存、打开工程、首次激活、缓存命中及关闭释放；给出解析 / 解码时延、磁盘字节、CPU/RSS峰值与测量边界。
+- [x] Cargo 构建、workspace 测试、格式、lint、CMake/native 测试和适用的真窗口加载验收通过；所有 task 与架构说明一致。
 
 ## 验证计划与结果
 
-实施已覆盖功能和架构验收。真实 `cover.STL` 与 608,218 面的 `Large_Earth_Elemental.stl` 编解码基准已通过；压缩后体积显著低于 STL，但大型模型的 sidecar 解码慢于 STL 解析。还需工程级首次激活、缓存命中和 RSS 测量。CPU / 磁盘性能基准不作为普通 CI 时间门禁。
+实施已覆盖功能和架构验收。真实 `cover.STL` 与 608,218 面的 `Large_Earth_Elemental.stl` 编解码及工程级激活基准均已通过；压缩后体积显著低于 STL，但大型模型的 sidecar 解码慢于 STL 解析。工程级基准测量 manifest 打开 / 保存、首次激活、缓存命中、关闭释放、包内字节、进程 CPU 时间与 RSS；具体范围和限制见 [性能测试说明](../modules/performance.md)。CPU / 磁盘性能基准不作为普通 CI 时间门禁。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
@@ -115,11 +115,14 @@ Mesh sidecar 的确定收益是工程保存独立于外部来源文件，并以�
 | 2026-10-16 | `cargo test --locked --offline -p panta-mesh --release --test mesh_performance supplied_stl_and_sidecar_costs -- --ignored --nocapture` | 验证 zstd 对合成网格压缩、往返和编解码代价 | 100k 合成 binary STL：源 5,000,084 B，展开 sidecar 估算 7,200,064 B，zstd sidecar 340,685 B（展开尺寸的 4.73%）；解析 p50 0.582 ms、编码 7.133 ms、解码 4.425 ms、热盘读+解码 4.477 ms、首次写入+sync 6.050 ms。此规则网格高度可压缩，不代表一般 STL。 |
 | 2026-10-16 | macOS arm64 Release；`PANTA_BENCH_STL=/Users/yuki/Downloads/cover.STL cargo test --locked --offline -p panta-mesh --release --test mesh_performance supplied_stl_and_sidecar_costs -- --ignored --nocapture` | 使用真实 STL 验证 v2 编解码值相同，并测量压缩体积和耗时 | `cover.STL` 164 面，源 8,284 B，展开 sidecar 估算 11,872 B，压缩 sidecar 1,268 B（展开尺寸的 10.68%，源文件的 15.31%）；解析 p50 0.003 ms、编码 0.059 ms、解码 0.029 ms、热盘读+解码 0.060 ms、首次写入+sync 9.279 ms。小文件首次写入受同步和计时粒度影响；该样本不足以代表大型几何性能或 RSS。 |
 | 2026-10-16 | macOS arm64 Release；`PANTA_BENCH_STL=/Users/yuki/Downloads/Large_Earth_Elemental.stl cargo test --locked --offline -p panta-mesh --release --test mesh_performance supplied_stl_and_sidecar_costs -- --ignored --nocapture` | 真实大模型完整 parse / encode / decode 往返正确；记录空间与 CPU 成本 | 608,218 面，源 30,410,984 B（29.0 MiB），展开 sidecar 估算 43,791,760 B，压缩 sidecar 17,712,259 B（展开数据的 40.45%，源文件的 58.25%）；最新复测解析 p50 3.592 ms、编码 163.888 ms、解码 84.208 ms、热盘读+解码 85.526 ms、首次写入+sync 12.002 ms。该模型显示存储体积下降约 41.8%，但 sidecar 解码慢于本次测得的 STL 解析；不代表工程首次激活、缓存或 RSS。 |
+| 2026-10-17 | macOS arm64 Release，Qt 6.11.2；真实工程夹具含 `cover.STL`、`Large_Earth_Elemental.stl` 和 10k/20k 合成网格；工程基准每次启动独立进程，打开 / 保存 / 缓存各采样 31 次 | 覆盖工程打开 / 保存、首次激活、缓存命中、关闭释放、磁盘字节、进程 CPU 与 RSS；明确不混入 VTK/GPU | 本次复测打开工程（新建 ViewModel + manifest 读取 / 校验，暖 OS 页缓存）p50/p95 0.338/0.515 ms，进程 CPU 0.282/0.424 ms；保存（原子 manifest 写入 + sync，sidecar 不变）5.193/6.583 ms，CPU 0.321/0.399 ms。manifest 4,594 B、Mesh sidecar 17,762,338 B、工程资产总计 17,766,932 B（不含外部 STL、锁文件与 VTK/GPU）。608,218 面大 STL 首次激活到 ready 117.578 ms、进程 CPU 107.359 ms；单独 Rust 微基准解析 p50 3.565 ms、解码 84.873 ms。缓存切换 124 次、0 次 miss，ready p50/p95 0.233/9.897 ms。关闭重载大模型（暖 OS 页缓存）p50/p95 101.132/101.600 ms，CPU p50 95.240 ms。大模型活动 DTO 容量估算 41.76 MiB；全部文档打开时 Mesh 容量估算 43.83 MiB，RSS 从 31.92 MiB 基线上升，进程峰值 RSS 189.03 MiB。关闭四个文档后各 Mesh 弱引用失效、估算 Mesh 容量归零，RSS 仍为 188.73 MiB，说明快照已释放但分配器未即时归还 RSS；该 RSS 不可当作 Mesh 存活量。 |
 | 2026-10-16 | `gh auth status`、`gh issue list --repo Yuki-Nagori/panta --state open`、`gh issue view 47` | 核对任务相关 issue 并按用户要求更新状态 | gh 已认证；issue #47 文档问题已在本分支修正并关闭。#44（task 119 文档同步）与 #36（分层与影响范围测试）仍开放，均不属于本任务，不作状态变更。 |
 | 2026-10-16 | `cargo verify-changed` | Rust、C++、QML 聚合回归和代码质量检查通过 | 通过：workspace Rust 测试、native / QML CTest 77/77、格式和 Cargo lint 9/9 阶段；sidecar 往返、损坏流、目录边界、事务失败及来源文件独立性回归通过。 |
 | 2026-10-16 | `cargo clippy --locked --workspace --all-targets -- -D warnings`; `cargo lint --changed --check`; `cargo format --check`; `git diff HEAD --check` | 代码质量门禁和格式检查通过 | 通过：Clippy、Cargo lint 9/9 阶段、格式与 diff 检查均成功。 |
 | 2026-10-16 | `cargo verify-changed`（检测到公共 Cargo / native 边界变更，自动扩大为完整质量与测试范围） | 完整 Rust、native、QML 测试和适用质量检查通过 | 通过：L2 workspace Rust 包、native / QML CTest 77/77、格式检查及 Cargo lint 9/9 阶段均成功；`git diff --check` 通过。 |
 | 2026-10-16 | 移除旧 schema 迁移后的 `cargo verify-changed` | 确认 schema 版本优先拒绝、当前 schema 校验和各受影响层仍通过 | 通过：选择器因公共 Cargo / native 边界变更扩大为完整范围；Rust workspace 测试、native / QML CTest 77/77、格式、Cargo lint 9/9 阶段全部成功。首轮发现并修复一个 FFI revision 溢出测试仍使用 schema 2 夹具的问题，之后重跑全项通过。 |
+| 2026-10-17 | PR #48 CI（提交 `5c0467e`） | 三平台构建、受影响测试及代码质量检查全部通过后合并 | 通过并已 squash 合并至 `main`：macOS、Linux、Windows 构建与 L1/L2 Rust、native/QML 测试，格式、Clippy、依赖审计、分层、clang-tidy、include-cleaner、cppcheck、qmllint、CMake lint 均通过。 [Actions run 38927686098](https://github.com/Yuki-Nagori/panta/actions/runs/38927686098)。 |
+| 2026-10-17 | 088 合并后整体复审、Release 生命周期基准、`cargo test --locked --workspace`、`cargo lint`、格式及真窗口加载 | 复查编解码、事务、路径安全、schema、异步激活和依赖边界；覆盖完整交付门禁 | 独立只读评审修复 Windows CPU 计时口径与打开工程计时边界后复核；Rust workspace 测试通过，native/QML CTest 77/77、`cargo format --check`、`cargo lint` 9 阶段及 CMake Release 性能目标编译通过；真实 Cocoa / VTK 窗口成功加载 608,218 面 STL。性能测量见上行。 issue #49 同步更新 080 日期与存储边界工作记录。 |
 | 2026-10-16 | 超 2 GiB sidecar 读取边界回归；`cargo test --locked -p panta-mesh -p panta-core --lib` | 不设文件大小硬上限；回归不实际分配超大 payload | 通过：mesh 13/13、core 120/120。core 用大于 2 GiB 的稀疏文件写入有效头部，并在 payload 分配前取消，验证读取路径接受该长度。2 GiB 导入提醒由面数估算，在确认前显示且不阻止继续。 |
 | 2026-10-16 | 088 独立只读终审及修复复核 | 无路径越界、崩溃残留阻塞或来源摘要不一致 | 首轮评审中的路径投影、symlink 边界、孤儿恢复、超大 sidecar 与来源摘要问题已修复并增加回归。压缩实现终审补充截断 Zstandard 流和计数不匹配回归后复核通过。最终评审发现旧 schema 迁移未先验唯一 ID；按维护者决定删除迁移路径，并新增旧 schema 拒绝且原文件不变的回归。后续复审发现版本检查发生在当前 ImportRecord 解析之后；现改为先读版本封套，并以缺少当前必填字段的旧记录验证拒绝结果。删除无生产调用方的 `parse_stl_asset` 包装入口，单位换算测试改走实际导入准备路径。最新独立复审通过，未发现新问题；限制为评审者未重复全量测试，完整验证由主代理完成。2 GiB 提醒阈值、提示时机和翻译正确，超大 sidecar 测试不实际分配 payload。 |
 
@@ -136,4 +139,4 @@ sidecar 与清单是多文件资产事务；先发布资产、后提交索引，
 
 ## 完成摘要
 
-实现及独立架构评审已完成；sidecar v2 保持 f64 三角面值语义并压缩 payload。当前仅支持 schema 4，schema 1–3 在解析当前记录前拒绝且不改写原文件。真实 `cover.STL`、608,218 面的 `Large_Earth_Elemental.stl` 与合成网格基准已记录；工程级首次激活、缓存与 RSS 和更新后的 CI 仍待完成。不保留原始 STL 副本的策略由维护者于 2026-10-16 确认。
+实现及独立架构评审已完成；sidecar v2 保持 f64 三角面值语义并压缩 payload。当前仅支持 schema 4，schema 1–3 在解析当前记录前拒绝且不改写原文件。PR #48 的三平台 CI 已通过并合并，合并后整体复审未发现阻断问题；补充的体网格非法连接解码回归、完整 Cargo / native / QML 门禁和真实 Cocoa / VTK 窗口加载验收均通过。真实 `cover.STL`、608,218 面的 `Large_Earth_Elemental.stl` 与合成网格测量覆盖工程打开 / 保存、首次激活、缓存命中、关闭释放、解析 / 解码延迟、磁盘字节、CPU 时间和 RSS 峰值；限制及边界见性能表。Issue #49 的 080 日期与 sidecar 数据源说明已同步。任务验收完成。

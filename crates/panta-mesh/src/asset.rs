@@ -465,7 +465,8 @@ fn ensure_decompressed_eof<R: Read>(reader: &mut R) -> Result<(), MeshAssetError
 #[cfg(test)]
 mod tests {
     use super::{
-        MeshAsset, MeshAssetError, decode_mesh_asset, encode_mesh_asset, mesh_asset_encoded_len,
+        HEADER_SIZE, MeshAsset, MeshAssetError, decode_mesh_asset, encode_mesh_asset,
+        mesh_asset_encoded_len,
     };
     use crate::{SurfaceMesh, SurfaceTriangle, TetMesh, Tetrahedron};
     use sha2::{Digest, Sha256};
@@ -531,6 +532,17 @@ mod tests {
         });
         let (bytes, _) = encode_mesh_asset(&mesh)?;
         assert_eq!(decode_mesh_asset(&bytes)?, mesh);
+
+        let mut decoder = zstd::stream::read::Decoder::new(&bytes[HEADER_SIZE..])?;
+        let mut raw_payload = Vec::new();
+        decoder.read_to_end(&mut raw_payload)?;
+        // 固定头 32 B + 4 个 24 B 节点后是首个四面体的节点索引。
+        raw_payload[128..132].copy_from_slice(&99_u32.to_le_bytes());
+        let corrupted = sidecar_with_repacked_payload(&bytes, &raw_payload)?;
+        assert_eq!(
+            decode_mesh_asset(&corrupted),
+            Err(MeshAssetError::InvalidMesh)
+        );
         Ok(())
     }
 

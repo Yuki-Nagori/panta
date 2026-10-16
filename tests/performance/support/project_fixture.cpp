@@ -1,6 +1,7 @@
 // 通过正式工程服务生成性能套件专用的 STL 工程；输入和产物只写入调用方的新目录。
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QString>
 #include <QStringList>
 #include <array>
@@ -41,8 +42,9 @@ void write_stl(const QString& path, std::uint32_t triangles) {
 int main(int argc, char* argv[]) try {
     QCoreApplication application(argc, argv);
     const auto arguments = application.arguments();
-    if (arguments.size() != 2) {
-        throw std::invalid_argument("usage: panta_performance_fixture <new-directory>");
+    if (arguments.size() < 2) {
+        throw std::invalid_argument(
+            "usage: panta_performance_fixture <new-directory> [representative.stl ...]");
     }
     const QDir directory(arguments[1]);
     if (directory.exists()) {
@@ -63,11 +65,26 @@ int main(int argc, char* argv[]) try {
             throw std::runtime_error(project.error().toStdString());
         }
     }
+    for (qsizetype index = 2; index < arguments.size(); ++index) {
+        const auto& path = arguments[index];
+        if (!QFileInfo::exists(path) || !QFileInfo(path).isFile()) {
+            throw std::invalid_argument("Representative STL file does not exist: " +
+                                        path.toStdString());
+        }
+        if (!project.importStl(path, QStringLiteral("solid-3d"), QStringLiteral("millimeters"),
+                               false)) {
+            throw std::runtime_error(project.error().toStdString());
+        }
+    }
     if (!project.saveProject()) {
         throw std::runtime_error(project.error().toStdString());
     }
     std::cout << "fixture=" << project.currentPath().toStdString()
-              << " source=synthetic_planar_triangles units=millimeters triangles=10000,20000\n";
+              << " source=synthetic_planar_triangles";
+    for (qsizetype index = 2; index < arguments.size(); ++index) {
+        std::cout << ',' << arguments[index].toStdString();
+    }
+    std::cout << " units=millimeters triangles=10000,20000\n";
     return 0;
 } catch (const std::exception& error) {
     std::cerr << "fixture: " << error.what() << '\n';
