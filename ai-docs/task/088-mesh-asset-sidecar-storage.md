@@ -120,6 +120,7 @@ Mesh sidecar 的确定收益是工程保存独立于外部来源文件，并以�
 | 2026-10-16 | `cargo clippy --locked --workspace --all-targets -- -D warnings`; `cargo lint --changed --check`; `cargo format --check`; `git diff HEAD --check` | 代码质量门禁和格式检查通过 | 通过：Clippy、Cargo lint 9/9 阶段、格式与 diff 检查均成功。 |
 | 2026-10-16 | `cargo verify-changed`（检测到公共 Cargo / native 边界变更，自动扩大为完整质量与测试范围） | 完整 Rust、native、QML 测试和适用质量检查通过 | 通过：L2 workspace Rust 包、native / QML CTest 77/77、格式检查及 Cargo lint 9/9 阶段均成功；`git diff --check` 通过。 |
 | 2026-10-16 | 移除旧 schema 迁移后的 `cargo verify-changed` | 确认 schema 版本优先拒绝、当前 schema 校验和各受影响层仍通过 | 通过：选择器因公共 Cargo / native 边界变更扩大为完整范围；Rust workspace 测试、native / QML CTest 77/77、格式、Cargo lint 9/9 阶段全部成功。首轮发现并修复一个 FFI revision 溢出测试仍使用 schema 2 夹具的问题，之后重跑全项通过。 |
+| 2026-10-17 | PR #48 CI（提交 `5c0467e`） | 三平台构建、受影响测试及代码质量检查全部通过后合并 | 通过并已 squash 合并至 `main`：macOS、Linux、Windows 构建与 L1/L2 Rust、native/QML 测试，格式、Clippy、依赖审计、分层、clang-tidy、include-cleaner、cppcheck、qmllint、CMake lint 均通过。 [Actions run 38927686098](https://github.com/Yuki-Nagori/panta/actions/runs/38927686098)。 |
 | 2026-10-16 | 超 2 GiB sidecar 读取边界回归；`cargo test --locked -p panta-mesh -p panta-core --lib` | 不设文件大小硬上限；回归不实际分配超大 payload | 通过：mesh 13/13、core 120/120。core 用大于 2 GiB 的稀疏文件写入有效头部，并在 payload 分配前取消，验证读取路径接受该长度。2 GiB 导入提醒由面数估算，在确认前显示且不阻止继续。 |
 | 2026-10-16 | 088 独立只读终审及修复复核 | 无路径越界、崩溃残留阻塞或来源摘要不一致 | 首轮评审中的路径投影、symlink 边界、孤儿恢复、超大 sidecar 与来源摘要问题已修复并增加回归。压缩实现终审补充截断 Zstandard 流和计数不匹配回归后复核通过。最终评审发现旧 schema 迁移未先验唯一 ID；按维护者决定删除迁移路径，并新增旧 schema 拒绝且原文件不变的回归。后续复审发现版本检查发生在当前 ImportRecord 解析之后；现改为先读版本封套，并以缺少当前必填字段的旧记录验证拒绝结果。删除无生产调用方的 `parse_stl_asset` 包装入口，单位换算测试改走实际导入准备路径。最新独立复审通过，未发现新问题；限制为评审者未重复全量测试，完整验证由主代理完成。2 GiB 提醒阈值、提示时机和翻译正确，超大 sidecar 测试不实际分配 payload。 |
 
@@ -136,4 +137,4 @@ sidecar 与清单是多文件资产事务；先发布资产、后提交索引，
 
 ## 完成摘要
 
-实现及独立架构评审已完成；sidecar v2 保持 f64 三角面值语义并压缩 payload。当前仅支持 schema 4，schema 1–3 在解析当前记录前拒绝且不改写原文件。真实 `cover.STL`、608,218 面的 `Large_Earth_Elemental.stl` 与合成网格基准已记录；工程级首次激活、缓存与 RSS 和更新后的 CI 仍待完成。不保留原始 STL 副本的策略由维护者于 2026-10-16 确认。
+实现及独立架构评审已完成；sidecar v2 保持 f64 三角面值语义并压缩 payload。当前仅支持 schema 4，schema 1–3 在解析当前记录前拒绝且不改写原文件。PR #48 的三平台 CI 已通过并合并；真实 `cover.STL`、608,218 面的 `Large_Earth_Elemental.stl` 与合成网格基准已记录。工程级首次激活、缓存与 RSS 测量仍待完成，因此任务保持 in-progress。不保留原始 STL 副本的策略由维护者于 2026-10-16 确认。
