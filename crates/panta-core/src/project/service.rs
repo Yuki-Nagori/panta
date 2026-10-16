@@ -3,13 +3,11 @@ use super::model::{MeshAssetRef, next_revision, validate_name};
 use super::storage::write_manifest;
 use super::{
     ActivationAttempt, ActivationResultKind, DocumentDiagnostic, DocumentWorkspace,
-    IMPORT_RECORD_VERSION, ImportRecord, MIN_SUPPORTED_PROJECT_SCHEMA_VERSION, Outcome,
-    PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError, ProjectManifest,
-    ProjectSnapshot, ProjectState, StlImportSession, SurfaceMeshCache, WorkspaceActivationRequest,
-    WorkspaceSnapshot, activation_error_message_key, analysis_sequence, gate_location, material,
-    mesh_assets, preview, process_settings, storage,
+    IMPORT_RECORD_VERSION, ImportRecord, Outcome, PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION,
+    ProjectCommand, ProjectError, ProjectManifest, ProjectSnapshot, ProjectState, StlImportSession,
+    SurfaceMeshCache, WorkspaceActivationRequest, WorkspaceSnapshot, activation_error_message_key,
+    analysis_sequence, gate_location, material, preview, process_settings, storage,
 };
-use panta_import::{default_display_name, parse_stl_asset, read_source};
 use panta_mesh::SurfaceMesh;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -151,16 +149,23 @@ impl ProjectService {
         }
         let bytes = fs::read(path)
             .map_err(|error| ProjectError::Io(format!("{}: {error}", path.display())))?;
-        let mut manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
+        // 先只读取版本号，确保旧 schema 不会因其记录形状与当前模型不同而
+        // 被误报为当前清单损坏。
+        #[derive(serde::Deserialize)]
+        struct SchemaEnvelope {
+            schema: u32,
+        }
+
+        let envelope: SchemaEnvelope = serde_json::from_slice(&bytes).map_err(|error| {
             ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
         })?;
-        if !(MIN_SUPPORTED_PROJECT_SCHEMA_VERSION..=PROJECT_SCHEMA_VERSION)
-            .contains(&manifest.schema)
-        {
-            return Err(ProjectError::UnsupportedSchema(manifest.schema));
+        if envelope.schema != PROJECT_SCHEMA_VERSION {
+            return Err(ProjectError::UnsupportedSchema(envelope.schema));
         }
-        let source_schema = manifest.schema;
-        migrate_import_records(&mut manifest)?;
+        let manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
+            ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
+        })?;
+        validate_schema_four_mesh_assets(&manifest.imports, &manifest.mesh_assets)?;
         validate_name(&manifest.name)?;
         analysis_sequence::validate_sequences(&manifest)?;
         material::validate_materials(&manifest)?;
@@ -171,9 +176,6 @@ impl ProjectService {
             .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
         for asset in manifest.mesh_assets.values() {
             resolve_asset_path(project_root, &asset.relative_path)?;
-        }
-        if source_schema < PROJECT_SCHEMA_VERSION && !manifest.imports.is_empty() {
-            migrate_mesh_sidecars(&mut manifest, path)?;
         }
         self.current = Some(ProjectState {
             path: path.to_path_buf(),
@@ -580,76 +582,42 @@ impl ProjectService {
     }
 }
 
-fn migrate_import_records(manifest: &mut ProjectManifest) -> Result<(), ProjectError> {
-    match manifest.schema {
-        1 if manifest.imports.is_empty() => {}
-        1 => {
+fn validate_schema_four_mesh_assets(
+    imports: &[ImportRecord],
+    mesh_assets: &std::collections::BTreeMap<String, MeshAssetRef>,
+) -> Result<(), ProjectError> {
+    let mut import_ids = std::collections::BTreeSet::new();
+    let mut asset_ids = std::collections::BTreeSet::new();
+    if imports.iter().any(|import| {
+        import.id.is_empty()
+            || import.record_version != IMPORT_RECORD_VERSION
+            || import.display_name.is_empty()
+            || import.mesh_asset_id.is_empty()
+            || !import_ids.insert(import.id.as_str())
+            || !asset_ids.insert(import.mesh_asset_id.as_str())
+            || import
+                .source_digest
+                .as_deref()
+                .is_some_and(|digest| !is_sha256_digest(digest))
+            || !mesh_assets.contains_key(&import.mesh_asset_id)
+    }) {
+        return Err(ProjectError::ManifestInvalid(
+            "schema 4 imports require a mesh asset index entry and display name".to_owned(),
+        ));
+    }
+    for (id, asset) in mesh_assets {
+        if id != &asset.id
+            || asset.revision == 0
+            || asset.format_version != panta_mesh::MESH_ASSET_FORMAT_VERSION
+            || !is_sha256_digest(&asset.digest)
+            || asset.units != "millimeters"
+            || !matches!(asset.kind.as_str(), "surface" | "volume")
+        {
             return Err(ProjectError::ManifestInvalid(
-                "schema 1 cannot contain import records".to_owned(),
+                "schema 4 mesh asset index contains an invalid entry".to_owned(),
             ));
         }
-        2 => {
-            for import in &mut manifest.imports {
-                if import.record_version != 1 {
-                    return Err(ProjectError::ManifestInvalid(format!(
-                        "unsupported import record version {} in schema 2",
-                        import.record_version
-                    )));
-                }
-                // COMPAT(task 063; remove-task 088): map legacy import metadata to the
-                // schema 4 sidecar record contract during the one-time project migration.
-                import.display_name = default_display_name(&import.source_name, &import.format);
-                import.mesh_asset_id = format!("mesh-{}", import.id);
-                import.record_version = IMPORT_RECORD_VERSION;
-            }
-        }
-        3 => {
-            for import in &mut manifest.imports {
-                if import.record_version != 2 || import.display_name.is_empty() {
-                    return Err(ProjectError::ManifestInvalid(
-                        "schema 3 imports require record version 2 and a display name".to_owned(),
-                    ));
-                }
-                import.mesh_asset_id = format!("mesh-{}", import.id);
-                import.record_version = IMPORT_RECORD_VERSION;
-            }
-        }
-        PROJECT_SCHEMA_VERSION => {
-            let mut import_ids = std::collections::BTreeSet::new();
-            let mut asset_ids = std::collections::BTreeSet::new();
-            if manifest.imports.iter().any(|import| {
-                import.record_version != IMPORT_RECORD_VERSION
-                    || import.display_name.is_empty()
-                    || import.mesh_asset_id.is_empty()
-                    || !import_ids.insert(import.id.as_str())
-                    || !asset_ids.insert(import.mesh_asset_id.as_str())
-                    || import
-                        .source_digest
-                        .as_deref()
-                        .is_some_and(|digest| !is_sha256_digest(digest))
-                    || !manifest.mesh_assets.contains_key(&import.mesh_asset_id)
-            }) {
-                return Err(ProjectError::ManifestInvalid(
-                    "schema 4 imports require a mesh asset index entry and display name".to_owned(),
-                ));
-            }
-            for (id, asset) in &manifest.mesh_assets {
-                if id != &asset.id
-                    || asset.revision == 0
-                    || asset.format_version != panta_mesh::MESH_ASSET_FORMAT_VERSION
-                    || !is_sha256_digest(&asset.digest)
-                    || asset.units != "millimeters"
-                    || !matches!(asset.kind.as_str(), "surface" | "volume")
-                {
-                    return Err(ProjectError::ManifestInvalid(
-                        "schema 4 mesh asset index contains an invalid entry".to_owned(),
-                    ));
-                }
-            }
-        }
-        _ => unreachable!("schema version was checked before migration"),
     }
-    manifest.schema = PROJECT_SCHEMA_VERSION;
     Ok(())
 }
 
@@ -657,106 +625,6 @@ fn is_sha256_digest(value: &str) -> bool {
     value
         .strip_prefix("sha256:")
         .is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
-}
-
-/// 一次性迁移 schema 2/3 中工程内 STL 副本。先发布并验证所有 sidecar，再提交新索引；
-/// 任一步失败都会保留旧清单和 STL，使调用方仍可重新打开旧工程。
-fn migrate_mesh_sidecars(
-    manifest: &mut ProjectManifest,
-    project_file: &Path,
-) -> Result<(), ProjectError> {
-    let root = project_file
-        .parent()
-        .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-    let mut published = Vec::new();
-    let mut legacy_assets = Vec::with_capacity(manifest.imports.len());
-    let migration = (|| {
-        let mut candidate = ProjectState {
-            path: project_file.to_path_buf(),
-            name: manifest.name.clone(),
-            revision: next_revision(manifest.revision)?,
-            dirty: false,
-            persisted_revision: Some(manifest.revision),
-            imports: manifest.imports.clone(),
-            mesh_assets: manifest.mesh_assets.clone(),
-            analysis_sequences: manifest.analysis_sequences.clone(),
-            materials: manifest.materials.clone(),
-            fill_settings: manifest.fill_settings.clone(),
-            gate_location_settings: manifest.gate_location_settings.clone(),
-        };
-        let lease = super::repository::WriteLease::acquire(&candidate)?;
-        for (index, import) in manifest.imports.iter_mut().enumerate() {
-            let old_path = resolve_asset_path(root, &import.legacy_asset)?;
-            legacy_assets.push(old_path.clone());
-            let snapshot = read_source(&old_path).map_err(|error| {
-                ProjectError::ImportParseFailed(format!("migrate {}: {error}", old_path.display()))
-            })?;
-            if import
-                .source_digest
-                .as_deref()
-                .is_some_and(|expected| panta_import::source_digest(&snapshot.bytes) != expected)
-            {
-                return Err(ProjectError::ImportSourceChanged(
-                    old_path.display().to_string(),
-                ));
-            }
-            let mesh = parse_stl_asset(&snapshot, &import.units).map_err(|error| {
-                ProjectError::ImportParseFailed(format!("migrate {}: {error}", old_path.display()))
-            })?;
-            let relative = format!("assets/meshes/mesh-{:04}-r1.pmesh", index + 1);
-            let target = resolve_asset_path(root, &relative)?;
-            let (digest, created) = mesh_assets::write_surface_mesh_asset_or_reuse(&target, &mesh)?
-                .ok_or_else(|| {
-                    ProjectError::Io(format!(
-                        "immutable mesh asset already exists with different content: {}",
-                        target.display()
-                    ))
-                })?;
-            if created {
-                published.push(target);
-            }
-            import.mesh_asset_id = format!("mesh-{}", import.id);
-            import.legacy_asset.clear();
-            manifest.mesh_assets.insert(
-                import.mesh_asset_id.clone(),
-                MeshAssetRef {
-                    id: import.mesh_asset_id.clone(),
-                    revision: 1,
-                    format_version: panta_mesh::MESH_ASSET_FORMAT_VERSION,
-                    kind: "surface".to_owned(),
-                    relative_path: relative,
-                    digest,
-                    units: "millimeters".to_owned(),
-                    source_revision: import.source_digest.clone(),
-                },
-            );
-            if import.source_size_bytes == 0 {
-                import.source_size_bytes = u64::try_from(snapshot.bytes.len()).unwrap_or(u64::MAX);
-            }
-        }
-        candidate.imports = manifest.imports.clone();
-        candidate.mesh_assets = manifest.mesh_assets.clone();
-        lease.commit(&mut candidate)?;
-        manifest.revision = candidate.revision;
-        Ok(())
-    })();
-    if let Err(error) = migration {
-        for path in &published {
-            let _ = fs::remove_file(path);
-        }
-        return Err(error);
-    }
-    // 清理是提交后的回收，不得使已成功迁移回报失败。
-    for old_path in legacy_assets {
-        if old_path
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("stl"))
-        {
-            let _ = fs::remove_file(old_path);
-        }
-    }
-    manifest.schema = PROJECT_SCHEMA_VERSION;
-    Ok(())
 }
 
 /// 校验清单内的工程相对资产引用并解析为绝对路径；拒绝绝对路径与

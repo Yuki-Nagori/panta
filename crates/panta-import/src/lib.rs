@@ -43,22 +43,15 @@ pub struct ImportRecord {
     pub record_version: u32,
     pub parser_version: u32,
     pub id: String,
-    #[serde(default)]
     pub display_name: String,
     pub source_name: String,
-    #[serde(default)]
     pub source_path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_digest: Option<String>,
-    #[serde(default)]
     pub source_size_bytes: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_modified_unix_ms: Option<u64>,
-    #[serde(default)]
     pub mesh_asset_id: String,
-    /// 088 一次性 schema 2/3 迁移字段；schema 4 序列化后为空并省略。
-    #[serde(default, rename = "asset", skip_serializing_if = "String::is_empty")]
-    pub legacy_asset: String,
     pub format: String,
     pub mesh_type: String,
     pub units: String,
@@ -300,15 +293,6 @@ fn reserve_source_bytes(
     }
 }
 
-/// 已提交工程资产的解析入口：STL 解析 + 记录单位换算到毫米。
-/// 与 [`read_source_checked`] 组合构成 073 只读激活的加载阶段；
-/// 解析本身不可中断，过期快照由调用方在完成边界释放。
-pub fn parse_stl_asset(snapshot: &SourceSnapshot, units: &str) -> Result<SurfaceMesh, ImportError> {
-    let mut mesh = parse_stl_snapshot(snapshot)?;
-    scale_mesh_mm(&mut mesh, LengthUnit::parse(units)?)?;
-    Ok(mesh)
-}
-
 /// 唯一的 STL 解析入口；几何格式尚无 native backend 时不得走此函数。
 pub fn parse_stl_snapshot(snapshot: &SourceSnapshot) -> Result<SurfaceMesh, ImportError> {
     if snapshot.format != ImportFormat::Stl {
@@ -352,7 +336,6 @@ impl PreparedStl {
             source_size_bytes: u64::try_from(self.bytes.len()).unwrap_or(u64::MAX),
             source_modified_unix_ms: self.modified_unix_ms,
             mesh_asset_id: format!("mesh-import-{import_number}"),
-            legacy_asset: String::new(),
             format: "stl".to_owned(),
             mesh_type: options.mesh_type.to_owned(),
             units: options.units.label().to_owned(),
@@ -706,11 +689,12 @@ mod tests {
         let fixture = Fixture::new()?;
         let source = fixture.root.join("part.stl");
         fs::write(&source, b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n")?;
-        let snapshot = read_source(&source)?;
-        let mesh = parse_stl_asset(&snapshot, "centimeters")?;
+        let centimeters = ImportOptions::new("dual-domain", "centimeters", false)?;
+        let mut mesh = StlImportSession::default().prepare(&source)?;
+        mesh.scale_mesh_mm(centimeters)?;
         assert_eq!(mesh.summary().dimensions, [20.0, 30.0, 0.0]);
         assert!(matches!(
-            parse_stl_asset(&snapshot, "yards"),
+            ImportOptions::new("dual-domain", "yards", false),
             Err(ImportError::UnsupportedUnits(units)) if units == "yards"
         ));
 
@@ -721,9 +705,10 @@ mod tests {
                 f64::MAX / 2.0
             ),
         )?;
-        let scaled_snapshot = read_source(&source)?;
+        let mut scaled_mesh = StlImportSession::default().prepare(&source)?;
+        let inches = ImportOptions::new("dual-domain", "inches", false)?;
         assert!(matches!(
-            parse_stl_asset(&scaled_snapshot, "inches"),
+            scaled_mesh.scale_mesh_mm(inches),
             Err(ImportError::CoordinateOverflow)
         ));
 

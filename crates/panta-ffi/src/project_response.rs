@@ -293,10 +293,33 @@ mod tests {
     fn exhausted_revision_crosses_cxx_as_diagnostic_without_changing_the_project()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = crate::temp_directory::Fixture::new()?;
-        let path = fixture.root.join("Max.panta");
-        let bytes = format!(r#"{{"schema":2,"name":"Max","revision":{}}}"#, u64::MAX);
-        std::fs::write(&path, &bytes)?;
         let mut service = crate::project_service_new();
+        let created = project_service_create_response(
+            &mut service,
+            fixture.root.display().to_string(),
+            "Max".into(),
+        );
+        assert!(created.error.code.is_empty());
+        let path = std::path::PathBuf::from(&created.value.path);
+        let mut manifest = String::from_utf8(std::fs::read(&path)?)?;
+        let revision_key = manifest
+            .find("\"revision\"")
+            .ok_or("revision field missing")?;
+        let value_start = revision_key
+            + manifest[revision_key..]
+                .find(':')
+                .ok_or("revision field has no value")?
+            + 1;
+        let value_start = value_start
+            + manifest[value_start..]
+                .find(|character: char| !character.is_whitespace())
+                .ok_or("revision value missing")?;
+        let value_end = value_start
+            + manifest[value_start..]
+                .find(|character: char| !character.is_ascii_digit())
+                .ok_or("revision value has no terminator")?;
+        manifest.replace_range(value_start..value_end, &u64::MAX.to_string());
+        std::fs::write(&path, &manifest)?;
         let opened = project_service_open_response(&mut service, path.display().to_string());
         assert!(opened.error.code.is_empty());
         let result = project_service_execute_response(
@@ -315,7 +338,7 @@ mod tests {
         assert_eq!(current.value.name, "Max");
         assert_eq!(current.value.revision, u64::MAX);
         assert!(!current.value.dirty);
-        assert_eq!(std::fs::read_to_string(path)?, bytes);
+        assert_eq!(std::fs::read(&path)?, manifest.as_bytes());
         Ok(())
     }
 

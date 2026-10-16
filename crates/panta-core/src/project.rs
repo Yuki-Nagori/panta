@@ -49,7 +49,6 @@ pub use crate::fsm::open_saved_stl::{ActivationAttempt, Outcome, OutcomeKind};
 
 /// 当前范例工程清单的 schema 版本。
 pub const PROJECT_SCHEMA_VERSION: u32 = 4;
-const MIN_SUPPORTED_PROJECT_SCHEMA_VERSION: u32 = 1;
 const PROJECT_FILE_EXTENSION: &str = "panta";
 
 #[cfg(test)]
@@ -204,7 +203,6 @@ mod tests {
             source_size_bytes: 0,
             source_modified_unix_ms: None,
             mesh_asset_id: "mesh-overflow".to_owned(),
-            legacy_asset: String::new(),
             format: "stl".to_owned(),
             mesh_type: "midplane".to_owned(),
             units: "millimeters".to_owned(),
@@ -280,7 +278,6 @@ mod tests {
                 source_size_bytes: 0,
                 source_modified_unix_ms: None,
                 mesh_asset_id: format!("mesh-{id}"),
-                legacy_asset: String::new(),
                 format: "stl".to_owned(),
                 mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
                 units: "millimeters".to_owned(),
@@ -322,7 +319,6 @@ mod tests {
             source_size_bytes: 0,
             source_modified_unix_ms: None,
             mesh_asset_id: "mesh-saved-import".to_owned(),
-            legacy_asset: String::new(),
             format: "stl".to_owned(),
             mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
             units: "millimeters".to_owned(),
@@ -378,7 +374,6 @@ mod tests {
             source_size_bytes: 0,
             source_modified_unix_ms: None,
             mesh_asset_id: "mesh-invalid-saved-import".to_owned(),
-            legacy_asset: String::new(),
             format: "stl".to_owned(),
             mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
             units: "millimeters".to_owned(),

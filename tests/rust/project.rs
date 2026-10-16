@@ -187,6 +187,10 @@ fn opens_invalid_manifests_and_accepts_case_insensitive_extension()
     let fixture = Fixture::new()?;
     let project = fixture.root.join("Demo");
     fs::create_dir_all(&project)?;
+    let mut source_service = ProjectService::new();
+    let source_project = source_service.create(&fixture.root, "Upper")?;
+    let valid_manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&source_project.path)?)?;
 
     let mut service = ProjectService::new();
     assert!(matches!(
@@ -212,17 +216,18 @@ fn opens_invalid_manifests_and_accepts_case_insensitive_extension()
     ));
 
     let invalid_name = project.join("invalid-name.panta");
-    fs::write(
-        &invalid_name,
-        br#"{"schema":1,"name":"bad/name","revision":0}"#,
-    )?;
+    let mut invalid_manifest = valid_manifest.clone();
+    invalid_manifest["name"] = serde_json::json!("bad/name");
+    fs::write(&invalid_name, serde_json::to_vec(&invalid_manifest)?)?;
     assert!(matches!(
         service.open(&invalid_name),
         Err(ProjectError::InvalidName(_))
     ));
 
     let uppercase = project.join("Upper.PANTA");
-    fs::write(&uppercase, br#"{"schema":1,"name":"Upper","revision":2}"#)?;
+    let mut uppercase_manifest = valid_manifest;
+    uppercase_manifest["revision"] = serde_json::json!(2);
+    fs::write(&uppercase, serde_json::to_vec(&uppercase_manifest)?)?;
     let opened = service.open(&uppercase)?;
     assert_eq!(opened.name, "Upper");
     assert_eq!(opened.revision, 2);
@@ -362,92 +367,73 @@ fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn migrates_schema_two_import_names_and_saves_schema_four() -> Result<(), Box<dyn std::error::Error>>
-{
-    let fixture = Fixture::new()?;
-    let source = fixture.root.join("零件.STL");
-    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
-    let mut service = ProjectService::new();
-    service.create(&fixture.root, "Migration")?;
-    service.import_stl(&source, "dual-domain", "millimeters", false)?;
-    let project_path = fixture.root.join("Migration/Migration.panta");
-
-    let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project_path)?)?;
-    manifest["schema"] = serde_json::json!(2);
-    manifest["imports"][0]["record_version"] = serde_json::json!(1);
-    manifest["imports"][0]["asset"] = serde_json::json!("assets/imports/0001-零件.STL");
-    let import = manifest["imports"][0]
-        .as_object_mut()
-        .ok_or("import record was not an object")?;
-    for field in [
-        "display_name",
-        "source_path",
-        "source_digest",
-        "source_size_bytes",
-        "source_modified_unix_ms",
-        "mesh_asset_id",
-    ] {
-        import.remove(field);
-    }
-    manifest
-        .as_object_mut()
-        .ok_or("manifest was not an object")?
-        .remove("mesh_assets");
-    let legacy_asset = fixture.root.join("Migration/assets/imports/0001-零件.STL");
-    fs::create_dir_all(legacy_asset.parent().ok_or("legacy asset parent missing")?)?;
-    fs::copy(&source, &legacy_asset)?;
-    fs::write(&project_path, serde_json::to_vec(&manifest)?)?;
-
-    let mut reopened = ProjectService::new();
-    reopened.open(&project_path)?;
-    assert!(!legacy_asset.exists());
-    let imports = reopened.imports()?;
-    assert_eq!(imports[0].source_name, "零件.STL");
-    assert_eq!(imports[0].display_name, "零件");
-    assert_eq!(imports[0].record_version, IMPORT_RECORD_VERSION);
-    assert_eq!(imports[0].source_digest, None);
-
-    reopened.save()?;
-    let saved: serde_json::Value = serde_json::from_slice(&fs::read(&project_path)?)?;
-    assert_eq!(saved["schema"], PROJECT_SCHEMA_VERSION);
-    assert_eq!(saved["imports"][0]["record_version"], IMPORT_RECORD_VERSION);
-    assert_eq!(saved["imports"][0]["display_name"], "零件");
-
-    let mut final_open = ProjectService::new();
-    final_open.open(&project_path)?;
-    assert_eq!(final_open.imports()?, imports);
-    Ok(())
-}
-
-#[test]
-fn rejects_unsupported_import_record_migrations_without_replacing_current_project()
+fn rejects_legacy_schemas_without_mutating_project_or_assets()
 -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
     let source = fixture.root.join("part.stl");
     fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
     let mut service = ProjectService::new();
-    let created = service.create(&fixture.root, "Migration")?;
+    let project = service.create(&fixture.root, "No migration")?;
+    let record = service.import_stl(&source, "dual-domain", "millimeters", false)?;
+    let asset_path = fixture
+        .root
+        .join("No migration")
+        .join(service.mesh_asset_path_for_import(&record.id)?);
+    let current = service.current()?;
+    let current_manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+
+    for schema in 1..PROJECT_SCHEMA_VERSION {
+        let mut manifest = current_manifest.clone();
+        manifest["schema"] = serde_json::json!(schema);
+        // 旧版记录可能缺少当前 schema 4 的必填字段；版本应先于记录解析被拒绝。
+        manifest["imports"][0]
+            .as_object_mut()
+            .ok_or("import record was not an object")?
+            .remove("mesh_asset_id");
+        fs::write(&project.path, serde_json::to_vec(&manifest)?)?;
+        let unsupported_bytes = fs::read(&project.path)?;
+
+        assert!(matches!(
+            service.open(&project.path),
+            Err(ProjectError::UnsupportedSchema(found)) if found == schema
+        ));
+        assert_eq!(fs::read(&project.path)?, unsupported_bytes);
+        assert!(asset_path.is_file());
+        assert_eq!(service.current()?, current);
+    }
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_current_import_records_without_replacing_current_project()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let source = fixture.root.join("part.stl");
+    fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
+    let mut service = ProjectService::new();
+    let created = service.create(&fixture.root, "Invalid current manifest")?;
     service.import_stl(&source, "solid-3d", "millimeters", false)?;
     let before = service.current()?;
     let original: serde_json::Value = serde_json::from_slice(&fs::read(&created.path)?)?;
 
-    let invalid_manifests = [
-        ("schema 1 with imports", 1, None, false),
-        ("schema 2 with unknown record version", 2, Some(99), false),
-        ("schema 3 without display name", 3, None, true),
-        ("schema 3 with unknown record version", 3, Some(99), false),
-    ];
-    for (description, schema, record_version, remove_display_name) in invalid_manifests {
+    for invalid in ["record_version", "display_name", "duplicate_id"] {
         let mut manifest = original.clone();
-        manifest["schema"] = serde_json::json!(schema);
-        if let Some(version) = record_version {
-            manifest["imports"][0]["record_version"] = serde_json::json!(version);
-        }
-        if remove_display_name {
-            manifest["imports"][0]
-                .as_object_mut()
-                .ok_or("import record was not an object")?
-                .remove("display_name");
+        match invalid {
+            "record_version" => manifest["imports"][0]["record_version"] = serde_json::json!(99),
+            "display_name" => {
+                manifest["imports"][0]
+                    .as_object_mut()
+                    .ok_or("import record was not an object")?
+                    .remove("display_name");
+            }
+            "duplicate_id" => {
+                let import = manifest["imports"][0].clone();
+                manifest["imports"]
+                    .as_array_mut()
+                    .ok_or("imports were not an array")?
+                    .push(import);
+            }
+            _ => unreachable!(),
         }
         fs::write(&created.path, serde_json::to_vec(&manifest)?)?;
 
@@ -456,12 +442,12 @@ fn rejects_unsupported_import_record_migrations_without_replacing_current_projec
                 service.open(&created.path),
                 Err(ProjectError::ManifestInvalid(_))
             ),
-            "{description} unexpectedly opened"
+            "{invalid} unexpectedly opened"
         );
         assert_eq!(
             service.current()?,
             before,
-            "{description} replaced active state"
+            "{invalid} replaced active state"
         );
     }
     Ok(())
