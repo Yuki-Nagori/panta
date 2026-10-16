@@ -2,7 +2,7 @@
 
 - 状态：planned
 - 阶段：CAE 领域模块迁移
-- 依赖：[121 GUI 与 CLI 共享 Rust 命令入口](121-rust-gui-cli-command-layer.md)、[063 STL 导入与工程工作区](063-stl-import-and-mesh-workspace.md)、[067 Rust 统一 STL 解析与 Mesh IR 领域校验](067-rust-mesh-domain-migration.md)、[073 FSM DSL 与导入状态机](073-fsm-dsl-and-import-state-machine.md)、[123 Rust CLI 检查 STL](123-rust-cli-stl-inspection.md)
+- 依赖：[121 GUI 与 CLI 共享 Rust 命令入口](121-rust-gui-cli-command-layer.md)、[063 STL 导入与工程工作区](063-stl-import-and-mesh-workspace.md)、[067 Rust 统一 STL 解析与 Mesh IR 领域校验](067-rust-mesh-domain-migration.md)、[073 FSM DSL 与导入状态机](073-fsm-dsl-and-import-state-machine.md)、[088 Mesh 资产旁置存储与按需加载](088-mesh-asset-sidecar-storage.md)、[123 Rust CLI 检查 STL](123-rust-cli-stl-inspection.md)
 - 优先级：P2
 - 负责人：维护者
 - 创建 / 更新：2026-10-16 / 2026-10-16
@@ -21,6 +21,7 @@
 ## 范围与非目标
 
 - 支持把指定 STL 导入现有工程，参数表达输入文件及必要的导入选项。
+- 将 STL 解析为工程内部的 `SurfaceMesh` 资产并沿用 088 的旁置存储路径；CLI adapter 不另行复制 STL 源文件。Rust 导入事务是否保留来源副本，严格遵循 088 最终确定的策略。
 - 成功时输出新增资产的稳定标识、显示名和来源摘要；重复文件名遵循资产已有的同名与序号规则。
 - 扩展现有 `project inspect` 的工程摘要，使导入后可查看资产 ID、显示名和来源；不另增一个只为返回资产清单的命令。
 - 复用 Rust 导入服务及其事务边界；失败时不留下部分资产或错误修订。
@@ -30,14 +31,14 @@
 
 ## 前置条件与待决策
 
-- 依赖 063、067 的导入与资产规则，以及 073 已定义的提交/取消边界。
+- 依赖 063、067 的导入与资产规则、073 已定义的提交/取消边界，以及 088 确定的 Mesh sidecar 格式和来源留存策略。
 - 实施前确认 CLI 是同步等待导入完成，还是输出可查询的任务 ID；第一版优先复用已存在的同步服务入口，不新增轮询器。
 - 确认工程打开状态是否由命令内部隔离实例维护，以及并发修改时如何检测修订冲突。
 
 ## 验收标准
 
 - [ ] CLI 与 GUI 共用同一 Rust 导入应用入口、选项默认值、验证和提交语义。
-- [ ] 成功导入后 `project inspect` 能读取新资产 ID、显示名和来源；失败不会留下部分写入。
+- [ ] 成功导入后 `project inspect` 能读取新资产 ID、显示名和来源；重新打开工程后可按资产 ID/revision 从 sidecar 加载 Mesh；失败不会留下部分写入。
 - [ ] 同名来源、无效 STL、工程冲突、目标路径错误均有行为测试和可诊断退出结果。
 - [ ] 任务记录适用验证、独立评审及所有配套文档状态。
 
