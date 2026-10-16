@@ -5,7 +5,7 @@
 - 依赖：[008](008-tasks-errors-logging.md)、[034](034-rust-panta-artifact-parser.md)、[035](035-pa-formatter-and-validator.md)、[067](067-rust-mesh-domain-migration.md)、[072](072-flow-state-machine-planning.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-14
+- 创建 / 更新：2026-09-24 / 2026-10-17
 
 ## 目标与背景
 
@@ -73,6 +73,8 @@
 | 2026-10-14 | `cargo test --locked --workspace` | Rust、native、QML 聚合回归通过 | 通过；Rust workspace 测试通过，CTest 75/75，包含 FSM、资产激活、ViewModel、QML 和 FFI 回归。 |
 | 2026-10-14 | `cargo format --check`、`cargo lint` | 格式与静态质量门禁通过 | 通过；Clippy、依赖检查、CMake/QML lint、clang-tidy、include-cleaner、cppcheck 均通过。 |
 | 2026-10-14 | [PR #19 CI](https://github.com/Yuki-Nagori/panta/actions/runs/38491168172) | 新增 Cargo fixture 的三平台构建 / 测试与聚合质量门禁 | 通过；15/15 作业通过，包含 macOS、Linux、Windows 构建及 Rust / native 覆盖率、QML 测试和静态检查。Windows 作业通过；编译日志中的 `lock_crash_state` 未使用警告来自既有 Unix 测试辅助函数，不影响构建，也不属于本任务改动。 |
+| 2026-10-17 | `cargo +nightly-2026-09-15 miri test --locked -p panta-core --test fsm_build` | Miri 验证真实 Cargo fixture 的输入重建与失败路径 | 通过；3 项测试通过，Cargo 子进程 fixture 按设计在 Miri 下跳过。该 fixture 依赖独立 Cargo 进程与宿主文件系统复制 syscall，仍由普通 Cargo 测试覆盖。 |
+| 2026-10-17 | `cargo verify-changed` | 验证受影响 Rust 与 native / QML 范围 | 通过；Rust 受影响包与 CTest 67/67 通过。完整 `cargo ub-check` 在本机 macOS 后续运行时另遇到 `zstd` 外部函数 `ZSTD_createCCtx` 不受 Miri 支持，与本次 Linux CI 的 `fsm_build` syscall 失败无关。 |
 | 2026-10-09 | [CI 37910040544](https://github.com/Yuki-Nagori/panta/actions/runs/37910040544) 及 080 真窗口验收 | 三平台 CI 与异步页签真实视口行为 | 三平台 CI 全部 19 个作业通过；真实窗口切换、关闭、迟到结果与 VTK 资源释放证据见 [080](080-qml-viewport-document-tabs.md#验证计划与结果)。 |
 
 
@@ -96,6 +98,7 @@
 实现与验收完成。DSL 内核、只读激活 FSM、FFI 与 080 联调已实现；本轮补齐真实 Cargo 输入生命周期与必需输入删除的失败验收。现有失败 / 取消 / 过期、状态矩阵、视口生命周期、三平台 CI 和 109 执行容量回归均通过。输出命名冲突检查作为防御路径测试；根据 canonical 名称和 stem 一致规则，不同合法输入之间无法形成同名输出。PR #19 的 Linux、Windows、macOS 构建与完整质量门禁均通过。2026-10-14 同步清理了目标、验证说明和本轮范围中残留的进行中措辞。
 
 - 2026-10-14 独立只读评审：首轮指出直接调用生成器不足以证明 Cargo 重建，且唯一输入删除未覆盖仍有其他 FSM 的情况；已增加使用仓库原版 build.rs 的临时 Cargo 消费者 fixture，补测真实新增 / 修改 / 删除和必需 `include!` 输入删除。复核指出 Windows canonical path 直接替换分隔符会破坏 verbatim 路径，已改用 JSON 字符串编码写入 TOML；复制根 Cargo.lock 作为解析起点，首次离线锁定 fixture 后后续检查传 `--locked`。评审未实际运行 Windows，跨平台结果留给 CI。
+- 2026-10-17：Nightly Miri 在 Linux 上运行真实 Cargo 子进程 fixture 时触发 Miri 不支持的 `copy_file_range` syscall。该用例验收 Cargo 子进程的构建重建行为，不是 Rust 内存安全边界；增加仅对 Miri 生效的 ignore，普通测试仍执行完整夹具。定向 Miri 通过；本机完整 `cargo ub-check` 因另一个 zstd FFI 外部函数限制未能完成。
 
 ## 本轮已完成范围（2026-10-14）
 

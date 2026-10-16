@@ -119,6 +119,10 @@ fn rejects_filename_mismatch_and_output_name_collision() -> Result<(), Box<dyn E
 }
 
 #[test]
+#[cfg_attr(
+    miri,
+    ignore = "executes a Cargo subprocess and uses filesystem syscalls unsupported by Miri"
+)]
 fn cargo_rebuilds_changed_inputs_and_fails_when_required_input_is_deleted()
 -> Result<(), Box<dyn Error>> {
     let root = TestDirectory::new("cargo-rebuild")?;
