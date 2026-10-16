@@ -269,9 +269,8 @@ pub fn read_source_checked(
 
 fn source_name(path: &Path) -> Result<String, ImportError> {
     path.file_name()
-        .and_then(|value| value.to_str())
         .filter(|value| !value.is_empty())
-        .map(str::to_owned)
+        .map(|value| value.to_string_lossy().into_owned())
         .ok_or_else(|| ImportError::UnsupportedFormat(path.display().to_string()))
 }
 
@@ -769,10 +768,8 @@ mod tests {
             let non_utf8 = fixture.root.join(non_utf8_name);
             match fs::write(&non_utf8, payload) {
                 Ok(()) => {
-                    assert!(matches!(
-                        read_source_checked(&non_utf8, || false),
-                        Err(CheckedReadError::Failed(ImportError::UnsupportedFormat(_)))
-                    ));
+                    let source = read_source_checked(&non_utf8, || false)?;
+                    assert_eq!(source.source_name, "part-\u{fffd}.stl");
                     fs::remove_file(non_utf8)?;
                 }
                 // Some filesystems reject non-UTF-8 names before they can be read.
@@ -781,10 +778,7 @@ mod tests {
                         || error.kind() == std::io::ErrorKind::InvalidInput
                         || (cfg!(target_os = "macos") && error.raw_os_error() == Some(92)) =>
                 {
-                    assert!(matches!(
-                        source_name(&non_utf8),
-                        Err(ImportError::UnsupportedFormat(_))
-                    ));
+                    assert_eq!(source_name(&non_utf8)?, "part-\u{fffd}.stl");
                 }
                 Err(error) => return Err(error.into()),
             }

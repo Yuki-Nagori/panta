@@ -137,6 +137,130 @@ fn inspect_accepts_relative_paths_and_prints_the_project_summary()
 }
 
 #[test]
+fn stl_inspect_prints_the_shared_preview_for_a_path_with_spaces_and_unicode()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let source = fixture.root.join("零件 sample.stl");
+    let original = b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 2 0\nendsolid\n";
+    std::fs::write(&source, original)?;
+
+    let output = panta_cli().args(["stl", "inspect"]).arg(&source).output()?;
+
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("STL: 零件 sample.stl"), "{stdout}");
+    assert!(stdout.contains("Triangles: 1"), "{stdout}");
+    assert!(stdout.contains("Dimensions: 1 × 2 × 0"), "{stdout}");
+    assert!(stdout.contains("STL does not encode units"), "{stdout}");
+    assert!(stdout.contains("does not assess mesh quality"), "{stdout}");
+    assert_eq!(std::fs::read(&source)?, original);
+    assert_eq!(std::fs::read_dir(&fixture.root)?.count(), 1);
+    Ok(())
+}
+
+#[test]
+fn stl_inspect_rejects_missing_and_malformed_inputs_with_diagnostics()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let missing = fixture.root.join("missing.stl");
+    let missing_output = panta_cli().args(["stl", "inspect"]).arg(missing).output()?;
+    assert_eq!(missing_output.status.code(), Some(2), "{missing_output:?}");
+    assert!(
+        String::from_utf8_lossy(&missing_output.stderr).contains("project.import_file_missing")
+    );
+    assert!(missing_output.stdout.is_empty());
+
+    let malformed = fixture.root.join("malformed.stl");
+    std::fs::write(&malformed, b"not an STL")?;
+    let malformed_output = panta_cli()
+        .args(["stl", "inspect"])
+        .arg(malformed)
+        .output()?;
+    assert_eq!(
+        malformed_output.status.code(),
+        Some(2),
+        "{malformed_output:?}"
+    );
+    assert!(
+        String::from_utf8_lossy(&malformed_output.stderr).contains("project.import_parse_failed")
+    );
+    assert!(malformed_output.stdout.is_empty());
+
+    let empty = fixture.root.join("empty.stl");
+    std::fs::write(&empty, [])?;
+    let empty_output = panta_cli().args(["stl", "inspect"]).arg(empty).output()?;
+    assert_eq!(empty_output.status.code(), Some(2), "{empty_output:?}");
+    assert!(String::from_utf8_lossy(&empty_output.stderr).contains("project.import_parse_failed"));
+    assert!(empty_output.stdout.is_empty());
+
+    let unsupported = fixture.root.join("model.obj");
+    std::fs::write(&unsupported, b"triangle data")?;
+    let unsupported_output = panta_cli()
+        .args(["stl", "inspect"])
+        .arg(unsupported)
+        .output()?;
+    assert_eq!(
+        unsupported_output.status.code(),
+        Some(2),
+        "{unsupported_output:?}"
+    );
+    assert!(
+        String::from_utf8_lossy(&unsupported_output.stderr).contains("project.import_invalid_file")
+    );
+    assert!(unsupported_output.stdout.is_empty());
+    Ok(())
+}
+
+#[test]
+fn stl_inspect_accepts_a_non_utf8_unix_parent_path() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+
+        let fixture = temp_directory::Fixture::new()?;
+        let parent = fixture
+            .root
+            .join(std::ffi::OsString::from_vec(b"input-\xff".to_vec()));
+        match std::fs::create_dir(&parent) {
+            Ok(()) => {}
+            Err(error)
+                if error.kind() == std::io::ErrorKind::PermissionDenied
+                    || error.kind() == std::io::ErrorKind::InvalidInput
+                    || (cfg!(target_os = "macos") && error.raw_os_error() == Some(92)) =>
+            {
+                eprintln!("skipping non-UTF-8 path fixture: {error}");
+                return Ok(());
+            }
+            Err(error) => return Err(error.into()),
+        }
+        let source = parent.join(std::ffi::OsString::from_vec(b"part-\xff.stl".to_vec()));
+        match std::fs::write(
+            &source,
+            b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+        ) {
+            Ok(()) => {}
+            Err(error)
+                if error.kind() == std::io::ErrorKind::PermissionDenied
+                    || error.kind() == std::io::ErrorKind::InvalidInput
+                    || (cfg!(target_os = "macos") && error.raw_os_error() == Some(92)) =>
+            {
+                eprintln!("skipping non-UTF-8 file-name fixture: {error}");
+                return Ok(());
+            }
+            Err(error) => return Err(error.into()),
+        }
+
+        let output = panta_cli().args(["stl", "inspect"]).arg(&source).output()?;
+
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(stdout.contains("STL: part-\u{fffd}.stl"), "{stdout}");
+        assert!(stdout.contains("Triangles: 1"), "{stdout}");
+    }
+    Ok(())
+}
+
+#[test]
 fn invalid_project_returns_diagnostic_on_stderr_and_exit_code_two()
 -> Result<(), Box<dyn std::error::Error>> {
     let fixture = temp_directory::Fixture::new()?;
