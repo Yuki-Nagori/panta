@@ -67,6 +67,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
+| 2026-10-16 | PR #45 CI 复验（run 38869986612） | macOS、Linux、Windows 构建与测试通过；Windows native/QML CTest 全部通过（75/75），包括 Unicode 路径创建/打开回归；format、clang-tidy、cmake、cppcheck、includes、layering、qmllint 全部通过。Clippy、machete、audit 按选择器跳过。CI 未运行带 GPU 的真实窗口，控制台中文字显示与 Vulkan 日志消失仍需 Windows 实机确认。 |
 | 2026-10-16 | PR #45 Windows CI（run 38868760786） | 构建成功；74/75 CTest 通过。新增 Unicode 工程创建/打开测试也成功打开工程，但路径字符串直接比较因 Windows 分隔符表示差异失败；改为比较 canonical path，待 CI 重跑。 |
 | 2026-10-16 | macOS arm64；修正后执行 `cargo format --changed`、`cargo test-scope all` | 通过；native/QML CTest 77/77，含比较 canonical path 的 `ProjectViewModelTest.CreatesAndOpensProjectThroughUnicodeFilesystemPaths`。Windows 控制台编码与 D3D12 初始化分支仍需 Windows CI/实机确认。 |
 | 2026-10-14 | macOS arm64；`cargo build --locked` | 通过；生成 `target/native/debug/app/panta.app`，bundle 内 executable 为 `panta`。本机构建信息：Apple clang 17、Qt 6.11.2、VTK 9.7.0。 |
