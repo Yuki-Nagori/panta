@@ -649,9 +649,10 @@ mod tests {
         ));
         let mut header = [0_u8; 56];
         header[..8].copy_from_slice(b"PNTMESH\0");
-        header[8..12].copy_from_slice(&1_u32.to_le_bytes());
+        header[8..12].copy_from_slice(&panta_mesh::MESH_ASSET_FORMAT_VERSION.to_le_bytes());
         header[12] = 1;
         header[13] = 1;
+        header[14] = 1; // Zstandard codec.
         header[16..24].copy_from_slice(&(2_u64 * 1024 * 1024 * 1024).to_le_bytes());
         let file = File::create(&path)?;
         use std::io::Write;

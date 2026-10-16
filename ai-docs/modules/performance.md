@@ -29,7 +29,7 @@ PANTA_BENCH_STL=/path/to/model.stl \
   supplied_stl_and_sidecar_costs -- --ignored --nocapture
 ```
 
-该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量，并同时报告进程 RSS 与估算 Mesh 常驻量。Sidecar v1 保留 f64 三角顶点、不压缩，编码 / 解码可能比特定 binary STL 解析更慢、文件也更大；以任务记录中的实测为准，不据其名称推断性能优势。
+该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量，并同时报告进程 RSS 与估算 Mesh 常驻量。Mesh sidecar v2 保留 f64 三角顶点语义并用 Zstandard 压缩 payload；压缩后大小和编解码耗时依赖具体数据。完整工程首次激活、缓存命中和 RSS 仍需使用对应工程级基准，不由微基准推断。
 
 ## 定位与边界
 

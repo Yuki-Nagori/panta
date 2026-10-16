@@ -139,6 +139,8 @@ fn supplied_stl_and_sidecar_costs() -> Result<(), Box<dyn std::error::Error>> {
     };
     let (encoded, _) = encode_mesh_asset(&asset)?;
     assert_eq!(decode_mesh_asset(&encoded)?, asset);
+    let raw_sidecar_estimate = 56 + 8 + mesh.triangles.len() * 72;
+    let compressed_ratio_percent = encoded.len() as f64 / raw_sidecar_estimate as f64 * 100.0;
 
     let nonce = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)?
@@ -181,11 +183,12 @@ fn supplied_stl_and_sidecar_costs() -> Result<(), Box<dyn std::error::Error>> {
         disk_read_decode_samples.push(start.elapsed());
     }
     println!(
-        "file={filename} triangles={} source_bytes={} mesh_payload_estimate_bytes={} sidecar_bytes={} parse_p50_ms={:.3} encode_p50_ms={:.3} decode_p50_ms={:.3} warm_disk_read_decode_p50_ms={:.3} first_write_sync_ms={:.3}",
+        "file={filename} triangles={} source_bytes={} expanded_sidecar_estimate_bytes={} compressed_sidecar_bytes={} compressed_ratio_percent={:.2} parse_p50_ms={:.3} encode_p50_ms={:.3} decode_p50_ms={:.3} warm_disk_read_decode_p50_ms={:.3} first_write_sync_ms={:.3}",
         mesh.triangles.len(),
         bytes.len(),
-        mesh.triangles.capacity() * std::mem::size_of::<[[f64; 3]; 3]>(),
+        raw_sidecar_estimate,
         encoded.len(),
+        compressed_ratio_percent,
         median(parse_samples).as_secs_f64() * 1000.0,
         median(encode_samples).as_secs_f64() * 1000.0,
         median(decode_samples).as_secs_f64() * 1000.0,

@@ -31,7 +31,7 @@
 将导入选项记录在 `.panta` 内是正确的边界，但不应只保存 UI 当前值或原始绝对路径。导入确认后，工程 manifest 应保存可重放的 import record，至少包含：
 
 - 独立的用户可见 `display_name`，与来源文件名、资产 ID 分离；默认由来源文件名去除已识别扩展名得到。名称冲突规则在实现前确认。
-- 来源快照记录导入时所选路径、原文件名、格式、内容摘要（SHA-256）、mtime 和 size；它们仅用于追溯与诊断，不能成为工程重开或加载 Mesh 的依赖，也不代表工程内保留源文件副本。
+- 063 完成时持久化的来源字段为原文件名、格式和内容摘要（SHA-256）；导入时所选路径、mtime 和 size 是 088 新增的诊断快照字段，仅用于追溯，不成为工程重开或加载 Mesh 的依赖，也不代表工程内保留源文件副本。
 - `meshType`：`midplane`、`dual-domain`、`solid-3d`；这是影响后续网格解释的工程数据。
 - `units`：首期支持界面中的明确单位选项，不能把“未指定”静默当成某个单位。
 - `showImportLog`：记录用户对该次导入的日志可见性选择，但它只是展示偏好，不替代导入诊断和结果状态。
@@ -39,13 +39,13 @@
 
 原始 STL 不应被修改；近似尺寸由解析结果计算并在确认窗只读展示。取消或导入失败不能写入工程 manifest、替换当前工程或清空已有视口。确认后的导入记录采用追加 / 版本化语义，避免改写其他已导入资产。当前 schema 与复制行为记录在本任务验收结果中；不保留源副本并改用 Mesh sidecar 的最终存储由 088 负责。
 
-063 实施期间曾将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。当前 schema 4 由 [任务 088](088-mesh-asset-sidecar-storage.md) 管理 `.panta` Mesh 索引及按页签加载，迁移保留 `display_name` 和来源快照并移除工程内 STL 副本。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
+063 实施期间曾将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；当时记录包含 `source_name`、`format`、`source_digest`，不含导入时所选路径、mtime 和 size，也不是解析后的 `SurfaceMesh` sidecar。任务 088 新增后三项诊断快照字段，并管理 schema 4 `.panta` Mesh 索引及按页签加载；迁移保留 `display_name` 命名契约、补齐来源快照并移除工程内 STL 副本。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
 
 ### 资产显示名与来源
 
 来源文件、工程内资产和运行期数据是三个相关但不同的概念。063 最初复制并保存原始 STL，激活时由 `panta-mesh` 解析为内存 `SurfaceMesh`；当前 schema 4 已由 088 改为持久化 Mesh sidecar。历史 STL 副本只有 schema 2/3 迁移时会从工程包读取，成功提交 sidecar 索引后再清理；导入时用户选定的外部 STL 不再复制或作为运行依赖。
 
-导入记录区分用户看到的 `display_name` 与来源快照：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名，格式、路径、SHA-256、mtime 和 size 仅用于来源诊断。当前 `ImportRecord.id` 标识导入记录；Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。088 迁移保留 063 建立的命名契约和来源快照，并将 Mesh 索引从导入记录中拆开。
+导入记录区分用户看到的 `display_name` 与来源快照：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名。063 持久化 `source_name`、`format` 和 `source_digest`；导入时所选路径、mtime 和 size 是 088 为追溯诊断新增的字段，不作为工程运行依赖。当前 `ImportRecord.id` 标识导入记录；Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。088 迁移保留 063 建立的命名契约并补齐来源快照，同时将 Mesh 索引从导入记录中拆开。
 
 显示名允许重复。记录持久化相同的基础 `display_name`，工程树和文档页签按当前导入顺序显示序号以消除歧义；来源名与导入记录 ID 不因显示冲突而改写。
 
@@ -59,7 +59,7 @@
 - 工程工作区左栏有两个独立 Dock：上部工程 / 任务 Dock 内部分为上下两区，顶部工程树展示多个导入 study，中间显示当前 study 的任务；底部保留独立的 Layers Dock、截图中的工具按钮和带 Layers 图标的单一页签，内容先留空，具体图层行为待后续确认。
 - `.panta` 工程打开后可再次导入一个或多个 STL；每个文件作为工程下独立零件加入，不覆盖已有零件，文件选择器允许多选。
 - `.panta` 内的 import record、源资产引用、失败回滚和重新打开恢复；QML 只发语义请求，C++ ViewModel 负责 Qt 适配，Rust 服务负责解析、校验、持久化和导入 DTO。
-- 将显示名与来源快照分开：STL 默认显示名不带 `.stl`，来源名保留原扩展名；路径、格式、SHA-256、mtime 和 size 仅用于追溯诊断，不作为稳定资产身份或 Mesh 加载依赖。
+- 将显示名与来源快照分开：STL 默认显示名不带 `.stl`，来源名保留原扩展名；063 保存来源名、格式和 SHA-256，088 新增所选路径、mtime 和 size。所有来源字段仅用于追溯诊断，不作为稳定资产身份或 Mesh 加载依赖。
 - 新建项目弹窗 HTML 参考，补齐 homepage 之前遗漏的 Create New Project 状态。
 - 独立 HTML 状态参考：`open-project` 中点击 Import 后的导入弹窗，以及导入完成后的 `imported-project` 页面。
 

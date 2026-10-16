@@ -167,7 +167,7 @@ DialogWindow {
             ThemedLabel {
                 Layout.fillWidth: true
                 visible: dialog.largeMeshWarning
-                text: qsTranslate("ImportDialogStatus", "The mesh asset is expected to exceed 2 GiB. Import is allowed, but it may take a long time and require substantial memory and disk space. Make sure your computer and project drive have enough resources before continuing.")
+                text: qsTranslate("ImportDialogStatus", "The expanded mesh data is estimated to exceed 2 GiB. Import is allowed, but it may take a long time and require substantial memory and disk space. Make sure your computer and project drive have enough resources before continuing.")
                 textSize: Theme.fontSmall
                 textColor: Theme.colorError
                 wrapMode: Text.Wrap
