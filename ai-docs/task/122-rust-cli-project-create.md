@@ -1,6 +1,6 @@
 # 122 — Rust CLI 创建工程
 
-- 状态：in-progress
+- 状态：done
 - 阶段：Rust 架构整理
 - 依赖：[121 GUI 与 CLI 共享 Rust 命令入口](121-rust-gui-cli-command-layer.md)、[057 新建项目对话框与工程命令边界](057-new-project-dialog.md)、[107 Rust 工程服务边界](107-rust-service-boundaries-and-revisions.md)
 - 优先级：P1
@@ -42,6 +42,7 @@
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-10-17 | `cargo test-plan`、`cargo verify-changed` | 显示受影响包并运行对应格式、lint 和 L1/L2 测试 | 选择器仅选中 `panta-cli`（L1），无 L2/native 回退；格式与适用 lint 通过。CLI 单元测试 4/4、真实进程测试 7/7，测试选择器回归 23 项通过、3 项忽略。 |
+| 2026-10-17 | PR [#52](https://github.com/Yuki-Nagori/panta/pull/52) CI | Linux、macOS、Windows 构建与 L1/L2 测试，格式、Clippy、machete 和分层检查通过 | CI run [38943061899](https://github.com/Yuki-Nagori/panta/actions/runs/38943061899) 全部必需检查通过；Windows、macOS、Ubuntu 构建与测试成功，格式、Clippy、machete、分层 lint 成功。与改动无关的 CMake、qmllint、native 工具矩阵及 audit 按路径选择器跳过。 |
 
 ## 风险与回退
 
@@ -53,7 +54,8 @@
 - 2026-10-17：依赖任务 057、107、121 均已完成，开始在专用分支实施。
 - 2026-10-17：新增 `project create <父目录> <工程名>`；CLI 将相对父目录解析为绝对路径，再直接调用 `ProjectService::create`。真实进程测试覆盖嵌套父目录创建后 inspect、重复目标、非法名称及文件占用父路径的失败诊断。
 - 2026-10-17：独立 `gpt-6.1-sol` medium 评审后补强平台绝对路径、相对父目录和冲突时清单不变断言；复核通过，无剩余可操作问题。
+- 2026-10-17：PR #52 的 Linux、macOS、Windows CI 与适用质量检查全部通过，验收完成。
 
 ## 完成摘要
 
-CLI 已接入共享 Rust 工程创建服务；`cargo verify-changed`、独立评审和任务文档均完成，等待 PR CI 后完成交付验收。
+CLI 已接入共享 Rust 工程创建服务；受影响范围验证、独立评审和 PR #52 的跨平台 CI 均通过，任务验收完成。
