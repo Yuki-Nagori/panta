@@ -1,6 +1,5 @@
 //! STL 导入的工程事务；读取、预览和解析由 panta-import 负责。
 use super::model::{MeshAssetRef, next_revision};
-use super::repository::WriteLease;
 use super::{ImportRecord, ProjectError, ProjectService, StlImportPreview, mesh_assets};
 use panta_import::{CheckedReadError, StlImportSession};
 use panta_import::{ImportError, ImportOptions};
@@ -314,16 +313,6 @@ impl ProjectService {
         if self.current.is_none() {
             return Err(ProjectError::NoProject);
         }
-        let revision = next_revision(
-            self.current
-                .as_ref()
-                .ok_or(ProjectError::NoProject)?
-                .revision,
-        )?;
-        let mut prepared = self
-            .import_session
-            .prepare(source)
-            .map_err(map_import_error)?;
         let options =
             ImportOptions::new(mesh_type, units, show_import_log).map_err(map_import_error)?;
         let import_number = self
@@ -333,40 +322,31 @@ impl ProjectService {
             .imports
             .len()
             + 1;
-        let mut record = prepared.record(import_number, options);
-        drop(std::mem::take(&mut prepared.bytes));
-        prepared.scale_mesh_mm(options).map_err(map_import_error)?;
-        let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
-        let lease = WriteLease::acquire(state)?;
-        let project_root = state
-            .path
-            .parent()
-            .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-        let (asset_reference, asset_path, created) =
-            write_import_mesh_asset(project_root, &mut record, &prepared.mesh, None)?;
-
-        let previous_revision = state.revision;
-        let previous_dirty = state.dirty;
-        let mesh_asset_id = asset_reference.id.clone();
-        state
-            .mesh_assets
-            .insert(mesh_asset_id.clone(), asset_reference);
-        state.imports.push(record.clone());
-        state.revision = revision;
-        state.dirty = false;
-        if let Err(error) = lease.commit(state) {
-            state.imports.pop();
-            state.mesh_assets.remove(&mesh_asset_id);
-            state.revision = previous_revision;
-            state.dirty = previous_dirty;
-            if created {
-                let _ = fs::remove_file(&asset_path);
-            }
-            return Err(error);
-        }
+        let revision = next_revision(
+            self.current
+                .as_ref()
+                .ok_or(ProjectError::NoProject)?
+                .revision,
+        )?;
+        let mut candidate = self
+            .current
+            .as_ref()
+            .ok_or(ProjectError::NoProject)?
+            .clone();
+        candidate.revision = revision;
+        candidate.dirty = false;
+        let phase = AtomicU8::new(IMPORT_RUNNING);
+        let (candidate, record, mesh) = commit_import(
+            &mut candidate,
+            &mut self.import_session,
+            source,
+            options,
+            import_number,
+            &phase,
+        )?;
+        self.current = Some(candidate);
         self.latest_mesh_id = Some(record.id.clone());
-        self.mesh_cache
-            .insert_active(record.id.clone(), prepared.mesh);
+        self.mesh_cache.insert_active(record.id.clone(), mesh);
         Ok(record)
     }
 

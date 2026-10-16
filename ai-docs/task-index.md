@@ -134,7 +134,7 @@ ai-docs/
 | 121 | [GUI 与 CLI 共享 Rust 命令入口](task/121-rust-gui-cli-command-layer.md) | Rust 架构整理 | 107, 118 | done |
 | 122 | [Rust CLI 创建工程](task/122-rust-cli-project-create.md) | Rust 架构整理 | 057, 107, 121 | done |
 | 123 | [Rust CLI 检查 STL](task/123-rust-cli-stl-inspection.md) | CAE 领域模块迁移 | 063, 067, 121 | done |
-| 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | planned |
+| 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | in-progress |
 
 ## 验证与质量扩展队列
 

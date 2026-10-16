@@ -727,16 +727,25 @@ fn rejects_invalid_stl_import_requests_without_project_changes()
     let fixture = Fixture::new()?;
     let source = fixture.root.join("case.stl");
     fs::write(&source, b"not an stl")?;
+    let valid_source = fixture.root.join("valid.stl");
+    fs::write(
+        &valid_source,
+        b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+    )?;
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let revision = service.current()?.revision;
     assert!(matches!(
-        service.import_stl(&source, "unknown", "millimeters", false),
+        service.import_stl(&source, "dual-domain", "millimeters", false),
         Err(ProjectError::ImportParseFailed(_))
     ));
     assert!(matches!(
-        service.import_stl(&source, "dual-domain", "unknown", false),
-        Err(ProjectError::ImportParseFailed(_))
+        service.import_stl(&valid_source, "unknown", "millimeters", false),
+        Err(ProjectError::ImportUnsupportedMeshType(_))
+    ));
+    assert!(matches!(
+        service.import_stl(&valid_source, "dual-domain", "unknown", false),
+        Err(ProjectError::ImportUnsupportedUnits(_))
     ));
     assert!(matches!(
         service.import_stl(
