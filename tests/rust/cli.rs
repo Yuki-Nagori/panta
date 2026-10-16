@@ -11,6 +11,104 @@ fn panta_cli() -> Command {
 }
 
 #[test]
+fn create_writes_a_project_that_inspect_can_read() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let relative_parent = std::path::Path::new("nested").join("projects");
+    let parent = fixture.root.join(&relative_parent);
+    let created = panta_cli()
+        .current_dir(&fixture.root)
+        .args(["project", "create"])
+        .arg(&relative_parent)
+        .arg("CLI created project")
+        .output()?;
+
+    assert_eq!(created.status.code(), Some(0), "{created:?}");
+    let created_stdout = String::from_utf8(created.stdout)?;
+    assert!(
+        created_stdout.contains("Project: CLI created project"),
+        "{created_stdout}"
+    );
+    assert!(created_stdout.contains("Revision: 0"), "{created_stdout}");
+
+    let project_path = parent
+        .join("CLI created project")
+        .join("CLI created project.panta");
+    assert!(project_path.is_file());
+    let inspected = panta_cli()
+        .current_dir(&fixture.root)
+        .args(["project", "inspect"])
+        .arg(&project_path)
+        .output()?;
+
+    assert_eq!(inspected.status.code(), Some(0), "{inspected:?}");
+    assert!(String::from_utf8(inspected.stdout)?.contains("Project: CLI created project"));
+    Ok(())
+}
+
+#[test]
+fn create_rejects_an_existing_project_without_overwriting_it()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let parent = fixture.root.join("projects");
+    let first = panta_cli()
+        .args(["project", "create"])
+        .arg(&parent)
+        .arg("Existing project")
+        .output()?;
+    assert_eq!(first.status.code(), Some(0), "{first:?}");
+    let manifest = parent
+        .join("Existing project")
+        .join("Existing project.panta");
+    let original_contents = std::fs::read(&manifest)?;
+
+    let conflict = panta_cli()
+        .args(["project", "create"])
+        .arg(&parent)
+        .arg("Existing project")
+        .output()?;
+
+    assert_eq!(conflict.status.code(), Some(2), "{conflict:?}");
+    assert!(String::from_utf8_lossy(&conflict.stderr).contains("project.already_exists"));
+    assert!(conflict.stdout.is_empty());
+    assert_eq!(std::fs::read(manifest)?, original_contents);
+    Ok(())
+}
+
+#[test]
+fn create_rejects_invalid_names_with_a_domain_diagnostic() -> Result<(), Box<dyn std::error::Error>>
+{
+    let fixture = temp_directory::Fixture::new()?;
+    let output = panta_cli()
+        .args(["project", "create"])
+        .arg(&fixture.root)
+        .arg("../escape")
+        .output()?;
+
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("project.invalid_name"));
+    assert!(output.stdout.is_empty());
+    assert!(!fixture.root.join("escape").exists());
+    Ok(())
+}
+
+#[test]
+fn create_reports_an_unusable_parent_directory() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let parent_file = fixture.root.join("not-a-directory");
+    std::fs::write(&parent_file, b"occupied")?;
+    let output = panta_cli()
+        .args(["project", "create"])
+        .arg(&parent_file)
+        .arg("Unwritable project")
+        .output()?;
+
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("project.location_create_failed"));
+    assert!(output.stdout.is_empty());
+    Ok(())
+}
+
+#[test]
 fn inspect_accepts_relative_paths_and_prints_the_project_summary()
 -> Result<(), Box<dyn std::error::Error>> {
     let fixture = temp_directory::Fixture::new()?;
@@ -61,7 +159,7 @@ fn unsupported_arguments_print_usage_and_exit_two() -> Result<(), Box<dyn std::e
     let output = panta_cli().output()?;
 
     assert_eq!(output.status.code(), Some(2), "{output:?}");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("用法：panta-cli project inspect"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("用法：panta-cli project"));
     assert!(output.stdout.is_empty());
     Ok(())
 }

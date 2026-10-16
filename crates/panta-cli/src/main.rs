@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use panta_core::project::{ProjectCommand, ProjectService, ProjectSnapshot};
 
 const EXIT_COMMAND_FAILED: u8 = 2;
+const USAGE: &str = "用法：panta-cli project <inspect <工程文件.panta> | create <父目录> <工程名>>";
 
 #[cfg(test)]
 #[path = "../../../tests/support/rust/temp_directory.rs"]
@@ -27,17 +28,27 @@ fn main() -> ExitCode {
 }
 
 fn run(arguments: &[OsString]) -> Result<ProjectSnapshot, String> {
-    if arguments.len() != 3 || arguments[0] != "project" || arguments[1] != "inspect" {
-        return Err("用法：panta-cli project inspect <工程文件.panta>".to_owned());
-    }
-
     let current_directory =
         std::env::current_dir().map_err(|error| format!("无法读取当前目录：{error}"))?;
-    let path = resolve_project_path(PathBuf::from(&arguments[2]), &current_directory);
     let mut service = ProjectService::new();
-    service
-        .execute(ProjectCommand::Open { path })
-        .map_err(|error| error.to_string())
+    match arguments {
+        [command, operation, path] if command == "project" && operation == "inspect" => {
+            let path = resolve_project_path(PathBuf::from(path), &current_directory);
+            service
+                .execute(ProjectCommand::Open { path })
+                .map_err(|error| error.to_string())
+        }
+        [command, operation, location, name] if command == "project" && operation == "create" => {
+            let location = resolve_project_path(PathBuf::from(location), &current_directory);
+            let name = name
+                .to_str()
+                .ok_or_else(|| "工程名必须是有效 UTF-8".to_owned())?;
+            service
+                .create(&location, name)
+                .map_err(|error| error.to_string())
+        }
+        _ => Err(USAGE.to_owned()),
+    }
 }
 
 fn resolve_project_path(path: PathBuf, current_directory: &Path) -> PathBuf {
@@ -101,5 +112,13 @@ mod tests {
         let current = Path::new("/workspace");
         let path = resolve_project_path(PathBuf::from("projects/demo.panta"), current);
         assert_eq!(path, current.join("projects/demo.panta"));
+    }
+
+    #[test]
+    fn absolute_paths_are_preserved() -> Result<(), Box<dyn std::error::Error>> {
+        let current = std::env::current_dir()?;
+        let path = current.join("data/projects/demo");
+        assert_eq!(resolve_project_path(path.clone(), &current), path);
+        Ok(())
     }
 }
