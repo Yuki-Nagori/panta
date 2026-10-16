@@ -1,6 +1,6 @@
 # 124 — Rust CLI 导入 STL
 
-- 状态：in-progress
+- 状态：done
 - 阶段：CAE 领域模块迁移
 - 依赖：[121 GUI 与 CLI 共享 Rust 命令入口](121-rust-gui-cli-command-layer.md)、[063 STL 导入与工程工作区](063-stl-import-and-mesh-workspace.md)、[067 Rust 统一 STL 解析与 Mesh IR 领域校验](067-rust-mesh-domain-migration.md)、[073 FSM DSL 与导入状态机](073-fsm-dsl-and-import-state-machine.md)、[088 Mesh 资产旁置存储与按需加载](088-mesh-asset-sidecar-storage.md)、[123 Rust CLI 检查 STL](123-rust-cli-stl-inspection.md)
 - 优先级：P2
@@ -53,6 +53,7 @@
 | 2026-10-17 | `cargo test-plan`、`cargo verify-changed`（macOS arm64） | 选择直接影响的 Rust L1、消费者 L2 与相关 CTest；格式、Clippy、Rust/native/QML 测试通过 | 通过。L1：`panta-cli`、`panta-core`；L2：`panta-ffi`、`panta-launcher`；CTest labels：`app`、`bridge`、`ffi`、`i18n`、`mesh`、`qml`、`qt-adapter`；没有触发完整回退。CLI 单元测试 7/7、CLI 进程测试 14/14、core 115/115、ffi 32/32、launcher 4/4、测试选择器 23 项通过（3 项按设计忽略）、`native_and_qml_suite_passes` 3/3，native/QML CTest 67/67。 |
 | 2026-10-17 | CLI 导入行为回归 | 验证显式选项、来源快照、同名来源、失败诊断、无部分提交及删除来源后仍可读取工程 | 通过：`tests/rust/cli.rs` 覆盖成功导入、源文件不被修改、删除来源后 `project inspect` 仍可读、单位/网格类型错误、缺失/损坏/不支持的 STL、无效工程文件及同名资产；core 导入回归覆盖来源删除后重新激活 Mesh、写入冲突与失败回滚。 |
 | 2026-10-17 | 展开 Mesh 大小提醒边界 | 72 字节/三角形的估算跨越 2 GiB 阈值时正确分类，CLI 提醒不阻断提交 | 通过：`panta-cli` 单元测试覆盖阈值两侧；CLI 在同步提交前输出 stderr 提醒，继续调用共用导入事务。 |
+| 2026-10-17 | PR [#54](https://github.com/Yuki-Nagori/panta/pull/54) CI | Windows、macOS、Linux 构建/测试与必需格式和 lint 检查通过 | 全部必需检查通过：三平台构建，格式、Clippy、clang-tidy、CMake、cppcheck、分层、qmllint、includes、machete；`cargo audit` 按 workflow 条件跳过。 |
 
 ## 风险与回退
 
@@ -67,7 +68,8 @@
 - 2026-10-17：将 `panta-cli` 拆分为轻量 `main.rs`、命令分发与输出模块，以及独立的 project/STL 命令适配模块；用分段 `concat!` 定义可读的 usage 文本。同步 `ProjectService::import_stl` 改为调用与 GUI 后台 begin/finish 相同的 `commit_import` 事务实现，避免两套提交、清理及冲突处理逻辑。
 - 2026-10-17：按 L1/L2 影响范围运行 `cargo verify-changed`，所有受影响 Rust、native 与 QML 验证通过。
 - 2026-10-17：`gpt-6.1-sol` medium 独立只读评审完整 11 文件 diff，通过，未发现需要修复的问题。评审追踪了 `prepare_checked`、`WriteLease`、sidecar 写入与激活加载；限制为未现场执行 Windows/Linux 文件锁与替换、实际超 2 GiB 网格导入，后者由边界单测覆盖。
+- 2026-10-17：PR #54 所有必需 CI 检查通过；更新任务与索引为 done。
 
 ## 完成摘要
 
-已实现同步 `stl import`、`project inspect` 资产来源摘要、共享导入事务、失败回滚及来源文件删除后的可用性回归，并同步 README 与命令层架构文档。受影响本地验证与独立只读评审通过；任务保持 in-progress，等待 PR/CI 验收。
+已实现同步 `stl import`、`project inspect` 资产来源摘要、共享导入事务、失败回滚及来源文件删除后的可用性回归，并同步 README 与命令层架构文档。受影响本地验证、独立只读评审与 PR #54 必需 CI 均通过。
