@@ -1,15 +1,13 @@
 //! 工程会话与应用服务编排；格式解析、存储及缓存各有专用模块。
-use super::model::{next_revision, validate_name};
+use super::model::{MeshAssetRef, next_revision, validate_name};
 use super::storage::write_manifest;
 use super::{
     ActivationAttempt, ActivationResultKind, DocumentDiagnostic, DocumentWorkspace,
-    IMPORT_RECORD_VERSION, ImportRecord, MIN_SUPPORTED_PROJECT_SCHEMA_VERSION, Outcome,
-    PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError, ProjectManifest,
-    ProjectSnapshot, ProjectState, StlImportSession, SurfaceMeshCache, WorkspaceActivationRequest,
-    WorkspaceSnapshot, activation_error_message_key, analysis_sequence, gate_location, material,
-    preview, process_settings, storage,
+    IMPORT_RECORD_VERSION, ImportRecord, Outcome, PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION,
+    ProjectCommand, ProjectError, ProjectManifest, ProjectSnapshot, ProjectState, StlImportSession,
+    SurfaceMeshCache, WorkspaceActivationRequest, WorkspaceSnapshot, activation_error_message_key,
+    analysis_sequence, gate_location, material, preview, process_settings, storage,
 };
-use panta_import::default_display_name;
 use panta_mesh::SurfaceMesh;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -110,6 +108,7 @@ impl ProjectService {
             persisted_revision: None,
             dirty: false,
             imports: Vec::new(),
+            mesh_assets: BTreeMap::new(),
             analysis_sequences: BTreeMap::new(),
             materials: BTreeMap::new(),
             fill_settings: BTreeMap::new(),
@@ -133,7 +132,7 @@ impl ProjectService {
 
     /// 打开既有 `.panta` 主文件并读取清单；不改变 cwd，也不接受其他扩展名。
     ///
-    /// 打开只读清单，不解析任何导入资产：已保存 STL 的网格由
+    /// 打开清单但不解析导入资产：已保存 Mesh sidecar 由
     /// [`Self::begin_asset_activation`] 异步按需重建（080 文档页签），
     /// 避免保留同步与异步两条重复加载路径。
     pub fn open(&mut self, path: &Path) -> Result<ProjectSnapshot, ProjectError> {
@@ -150,20 +149,34 @@ impl ProjectService {
         }
         let bytes = fs::read(path)
             .map_err(|error| ProjectError::Io(format!("{}: {error}", path.display())))?;
-        let mut manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
+        // 先只读取版本号，确保旧 schema 不会因其记录形状与当前模型不同而
+        // 被误报为当前清单损坏。
+        #[derive(serde::Deserialize)]
+        struct SchemaEnvelope {
+            schema: u32,
+        }
+
+        let envelope: SchemaEnvelope = serde_json::from_slice(&bytes).map_err(|error| {
             ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
         })?;
-        if !(MIN_SUPPORTED_PROJECT_SCHEMA_VERSION..=PROJECT_SCHEMA_VERSION)
-            .contains(&manifest.schema)
-        {
-            return Err(ProjectError::UnsupportedSchema(manifest.schema));
+        if envelope.schema != PROJECT_SCHEMA_VERSION {
+            return Err(ProjectError::UnsupportedSchema(envelope.schema));
         }
-        migrate_import_records(&mut manifest)?;
+        let manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
+            ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
+        })?;
+        validate_schema_four_mesh_assets(&manifest.imports, &manifest.mesh_assets)?;
         validate_name(&manifest.name)?;
         analysis_sequence::validate_sequences(&manifest)?;
         material::validate_materials(&manifest)?;
         process_settings::validate_settings(&manifest.imports, &manifest.fill_settings)?;
         gate_location::validate_settings(&manifest.imports, &manifest.gate_location_settings)?;
+        let project_root = path
+            .parent()
+            .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
+        for asset in manifest.mesh_assets.values() {
+            resolve_asset_path(project_root, &asset.relative_path)?;
+        }
         self.current = Some(ProjectState {
             path: path.to_path_buf(),
             name: manifest.name,
@@ -171,6 +184,7 @@ impl ProjectService {
             persisted_revision: Some(manifest.revision),
             dirty: false,
             imports: manifest.imports,
+            mesh_assets: manifest.mesh_assets,
             analysis_sequences: manifest.analysis_sequences,
             materials: manifest.materials,
             fill_settings: manifest.fill_settings,
@@ -245,19 +259,59 @@ impl ProjectService {
             .path
             .parent()
             .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-        let asset_path = resolve_asset_path(root, &record.asset)?;
+        let asset_ref = state
+            .mesh_assets
+            .get(&record.mesh_asset_id)
+            .ok_or_else(|| {
+                ProjectError::ManifestInvalid("mesh asset index entry is missing".to_owned())
+            })?;
+        if asset_ref.revision == 0
+            || asset_ref.format_version != panta_mesh::MESH_ASSET_FORMAT_VERSION
+            || asset_ref.kind != "surface"
+            || asset_ref.source_revision != record.source_digest
+        {
+            return Err(ProjectError::ManifestInvalid(
+                "mesh asset index entry is unsupported".to_owned(),
+            ));
+        }
+        let asset_path = resolve_asset_path(root, &asset_ref.relative_path)?;
+        let expected_digest = asset_ref.digest.clone();
         let import_id = record.id.clone();
-        let units = record.units.clone();
         let attempt = self
             .activation
             .begin(
                 &import_id,
-                crate::fsm::open_saved_stl::ActivationRequest { asset_path, units },
+                crate::fsm::open_saved_stl::ActivationRequest {
+                    asset_path,
+                    expected_digest,
+                },
                 Arc::clone(&self.execution.reads),
             )
             .map_err(|detail| ProjectError::CommandInvalid(detail.to_owned()))?;
         self.activation_attempts.insert(import_id, attempt.attempt);
         Ok(attempt)
+    }
+
+    /// 相对路径投影只供 C++ 视图适配层定位已提交 sidecar，不构成资产身份。
+    pub fn mesh_asset_path_for_import(&self, import_id: &str) -> Result<String, ProjectError> {
+        let state = self.current.as_ref().ok_or(ProjectError::NoProject)?;
+        let record = state
+            .imports
+            .iter()
+            .find(|record| record.id == import_id)
+            .ok_or_else(|| ProjectError::ImportRecordMissing(import_id.to_owned()))?;
+        let asset = state
+            .mesh_assets
+            .get(&record.mesh_asset_id)
+            .ok_or_else(|| {
+                ProjectError::ManifestInvalid("mesh asset index entry is missing".to_owned())
+            })?;
+        let root = state
+            .path
+            .parent()
+            .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
+        resolve_asset_path(root, &asset.relative_path)?;
+        Ok(asset.relative_path.clone())
     }
 
     /// 请求取消一次在飞激活；`Cancelled` 终态由 worker 在安全检查点确认。
@@ -528,56 +582,64 @@ impl ProjectService {
     }
 }
 
-fn migrate_import_records(manifest: &mut ProjectManifest) -> Result<(), ProjectError> {
-    match manifest.schema {
-        1 if manifest.imports.is_empty() => {}
-        1 => {
+fn validate_schema_four_mesh_assets(
+    imports: &[ImportRecord],
+    mesh_assets: &std::collections::BTreeMap<String, MeshAssetRef>,
+) -> Result<(), ProjectError> {
+    let mut import_ids = std::collections::BTreeSet::new();
+    let mut asset_ids = std::collections::BTreeSet::new();
+    if imports.iter().any(|import| {
+        import.id.is_empty()
+            || import.record_version != IMPORT_RECORD_VERSION
+            || import.display_name.is_empty()
+            || import.mesh_asset_id.is_empty()
+            || !import_ids.insert(import.id.as_str())
+            || !asset_ids.insert(import.mesh_asset_id.as_str())
+            || import
+                .source_digest
+                .as_deref()
+                .is_some_and(|digest| !is_sha256_digest(digest))
+            || !mesh_assets.contains_key(&import.mesh_asset_id)
+    }) {
+        return Err(ProjectError::ManifestInvalid(
+            "schema 4 imports require a mesh asset index entry and display name".to_owned(),
+        ));
+    }
+    for (id, asset) in mesh_assets {
+        if id != &asset.id
+            || asset.revision == 0
+            || asset.format_version != panta_mesh::MESH_ASSET_FORMAT_VERSION
+            || !is_sha256_digest(&asset.digest)
+            || asset.units != "millimeters"
+            || !matches!(asset.kind.as_str(), "surface" | "volume")
+        {
             return Err(ProjectError::ManifestInvalid(
-                "schema 1 cannot contain import records".to_owned(),
+                "schema 4 mesh asset index contains an invalid entry".to_owned(),
             ));
         }
-        2 => {
-            for import in &mut manifest.imports {
-                if import.record_version != 1 {
-                    return Err(ProjectError::ManifestInvalid(format!(
-                        "unsupported import record version {} in schema 2",
-                        import.record_version
-                    )));
-                }
-                // COMPAT(task 063; remove-task 088): migrate supported schema 2 imports to the
-                // schema 3 display-name contract; remove when 088 replaces the import index.
-                import.display_name = default_display_name(&import.source_name, &import.format);
-                import.record_version = IMPORT_RECORD_VERSION;
-            }
-        }
-        PROJECT_SCHEMA_VERSION => {
-            if manifest.imports.iter().any(|import| {
-                import.record_version != IMPORT_RECORD_VERSION || import.display_name.is_empty()
-            }) {
-                return Err(ProjectError::ManifestInvalid(
-                    "schema 3 imports require record version 2 and a display name".to_owned(),
-                ));
-            }
-        }
-        _ => unreachable!("schema version was checked before migration"),
     }
     Ok(())
 }
 
+fn is_sha256_digest(value: &str) -> bool {
+    value
+        .strip_prefix("sha256:")
+        .is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
 /// 校验清单内的工程相对资产引用并解析为绝对路径；拒绝绝对路径与
 /// `..` 等非普通分量，防止清单注入越出工程包目录。
-fn resolve_asset_path(root: &Path, relative: &str) -> Result<PathBuf, ProjectError> {
-    let relative_path = Path::new(relative);
-    if relative_path.is_absolute()
-        || relative_path
-            .components()
-            .any(|part| !matches!(part, std::path::Component::Normal(_)))
-    {
-        return Err(ProjectError::ManifestInvalid(
-            "invalid import asset path".to_owned(),
-        ));
-    }
-    Ok(root.join(relative_path))
+pub(super) fn resolve_asset_path(root: &Path, relative: &str) -> Result<PathBuf, ProjectError> {
+    let mut paths = crate::path::PathService::new();
+    paths
+        .set_root(crate::path::RootCategory::Project, root)
+        .map_err(|error| ProjectError::ManifestInvalid(error.to_string()))?;
+    paths
+        .resolve_write_target(&crate::path::ResourceRef {
+            category: crate::path::RootCategory::Project,
+            relative: relative.to_owned(),
+        })
+        .map_err(|error| ProjectError::ManifestInvalid(error.to_string()))
 }
 
 impl Drop for ProjectService {

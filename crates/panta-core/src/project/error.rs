@@ -22,7 +22,7 @@ pub enum ProjectError {
     ImportUnsupportedUnits(String),
     ImportParseFailed(String),
     ImportSourceChanged(String),
-    ImportAssetCopyFailed(String),
+    ImportAssetWriteFailed(String),
     ImportRecordMissing(String),
     Io(String),
 }
@@ -49,7 +49,7 @@ impl ProjectError {
             Self::ImportUnsupportedUnits(_) => "project.import_unsupported_units",
             Self::ImportParseFailed(_) => "project.import_parse_failed",
             Self::ImportSourceChanged(_) => "project.import_source_changed",
-            Self::ImportAssetCopyFailed(_) => "project.import_asset_copy_failed",
+            Self::ImportAssetWriteFailed(_) => "project.import_asset_write_failed",
             Self::ImportRecordMissing(_) => "project.import_record_missing",
             Self::Io(_) => "project.io",
         }
@@ -75,7 +75,7 @@ impl ProjectError {
             | Self::ImportUnsupportedMeshType(_)
             | Self::ImportUnsupportedUnits(_)
             | Self::ImportParseFailed(_) => "format",
-            Self::LocationCreateFailed(_) | Self::ImportAssetCopyFailed(_) | Self::Io(_) => "io",
+            Self::LocationCreateFailed(_) | Self::ImportAssetWriteFailed(_) | Self::Io(_) => "io",
         }
     }
 
@@ -97,7 +97,7 @@ impl ProjectError {
             | Self::ImportUnsupportedUnits(name)
             | Self::ImportParseFailed(name)
             | Self::ImportSourceChanged(name)
-            | Self::ImportAssetCopyFailed(name)
+            | Self::ImportAssetWriteFailed(name)
             | Self::ImportRecordMissing(name)
             | Self::Io(name) => name.clone(),
             Self::UnsupportedSchema(schema) => schema.to_string(),

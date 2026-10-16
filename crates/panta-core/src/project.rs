@@ -41,14 +41,14 @@ pub use gate_location::{GateLocationSettings, GateLocatorAlgorithm, NUMBER_OF_GA
 mod material;
 pub use material::{MaterialDefinition, MaterialProperty, default_material};
 mod import;
+mod mesh_assets;
 mod preview;
 mod storage;
 
 pub use crate::fsm::open_saved_stl::{ActivationAttempt, Outcome, OutcomeKind};
 
 /// 当前范例工程清单的 schema 版本。
-pub const PROJECT_SCHEMA_VERSION: u32 = 3;
-const MIN_SUPPORTED_PROJECT_SCHEMA_VERSION: u32 = 1;
+pub const PROJECT_SCHEMA_VERSION: u32 = 4;
 const PROJECT_FILE_EXTENSION: &str = "panta";
 
 #[cfg(test)]
@@ -188,26 +188,41 @@ mod tests {
         let fixture = temp_directory::Fixture::new()?;
         let mut service = ProjectService::new();
         service.create(&fixture.root, "Activation backlog")?;
-        service
+        let state = service
             .current
             .as_mut()
-            .ok_or("created project state missing")?
-            .imports
-            .push(ImportRecord {
-                record_version: 1,
-                parser_version: 1,
-                id: "import-overflow".to_owned(),
-                display_name: "part".to_owned(),
-                source_name: "part.stl".to_owned(),
-                source_digest: None,
-                asset: "assets/part.stl".to_owned(),
-                format: "stl".to_owned(),
-                mesh_type: "midplane".to_owned(),
+            .ok_or("created project state missing")?;
+        state.imports.push(ImportRecord {
+            record_version: super::IMPORT_RECORD_VERSION,
+            parser_version: 1,
+            id: "import-overflow".to_owned(),
+            display_name: "part".to_owned(),
+            source_name: "part.stl".to_owned(),
+            source_path: String::new(),
+            source_digest: None,
+            source_size_bytes: 0,
+            source_modified_unix_ms: None,
+            mesh_asset_id: "mesh-overflow".to_owned(),
+            format: "stl".to_owned(),
+            mesh_type: "midplane".to_owned(),
+            units: "millimeters".to_owned(),
+            show_import_log: false,
+            triangle_count: 1,
+            dimensions: [1.0, 1.0, 0.0],
+        });
+        state.mesh_assets.insert(
+            "mesh-overflow".to_owned(),
+            super::model::MeshAssetRef {
+                id: "mesh-overflow".to_owned(),
+                revision: 1,
+                format_version: panta_mesh::MESH_ASSET_FORMAT_VERSION,
+                kind: "surface".to_owned(),
+                relative_path: "assets/meshes/overflow.pmesh".to_owned(),
+                digest: "sha256:test".to_owned(),
                 units: "millimeters".to_owned(),
-                show_import_log: false,
-                triangle_count: 1,
-                dimensions: [1.0, 1.0, 0.0],
-            });
+                source_revision: None,
+            },
+        );
 
         let coordinator = Arc::new(ActivationCoordinator::default());
         for index in 0..OUTCOME_CAPACITY {
@@ -218,7 +233,7 @@ mod tests {
                         &import_id,
                         ActivationRequest {
                             asset_path: PathBuf::from("unused.stl"),
-                            units: "millimeters".to_owned(),
+                            expected_digest: "sha256:test".to_owned(),
                         },
                         |_, _, _, _| Ok(()),
                     )
@@ -258,8 +273,11 @@ mod tests {
                 id: id.to_owned(),
                 display_name: "model_a".to_owned(),
                 source_name: "model_a.stl".to_owned(),
+                source_path: String::new(),
                 source_digest: None,
-                asset: format!("assets/{id}.stl"),
+                source_size_bytes: 0,
+                source_modified_unix_ms: None,
+                mesh_asset_id: format!("mesh-{id}"),
                 format: "stl".to_owned(),
                 mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
                 units: "millimeters".to_owned(),
@@ -286,26 +304,41 @@ mod tests {
         let fixture = temp_directory::Fixture::new()?;
         let mut service = ProjectService::new();
         service.create(&fixture.root, "Open saved import")?;
-        service
+        let state = service
             .current
             .as_mut()
-            .ok_or("created project state missing")?
-            .imports
-            .push(ImportRecord {
-                record_version: super::IMPORT_RECORD_VERSION,
-                parser_version: super::STL_IMPORT_PARSER_VERSION,
-                id: "saved-import".to_owned(),
-                display_name: "part".to_owned(),
-                source_name: "part.stl".to_owned(),
-                source_digest: None,
-                asset: "assets/missing.stl".to_owned(),
-                format: "stl".to_owned(),
-                mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+            .ok_or("created project state missing")?;
+        state.imports.push(ImportRecord {
+            record_version: super::IMPORT_RECORD_VERSION,
+            parser_version: super::STL_IMPORT_PARSER_VERSION,
+            id: "saved-import".to_owned(),
+            display_name: "part".to_owned(),
+            source_name: "part.stl".to_owned(),
+            source_path: String::new(),
+            source_digest: None,
+            source_size_bytes: 0,
+            source_modified_unix_ms: None,
+            mesh_asset_id: "mesh-saved-import".to_owned(),
+            format: "stl".to_owned(),
+            mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+            units: "millimeters".to_owned(),
+            show_import_log: false,
+            triangle_count: 1,
+            dimensions: [1.0, 1.0, 0.0],
+        });
+        state.mesh_assets.insert(
+            "mesh-saved-import".to_owned(),
+            super::model::MeshAssetRef {
+                id: "mesh-saved-import".to_owned(),
+                revision: 1,
+                format_version: panta_mesh::MESH_ASSET_FORMAT_VERSION,
+                kind: "surface".to_owned(),
+                relative_path: "assets/meshes/missing.pmesh".to_owned(),
+                digest: "sha256:test".to_owned(),
                 units: "millimeters".to_owned(),
-                show_import_log: false,
-                triangle_count: 1,
-                dimensions: [1.0, 1.0, 0.0],
-            });
+                source_revision: None,
+            },
+        );
 
         service.open_import_document("saved-import", "part");
 
@@ -326,26 +359,41 @@ mod tests {
         let fixture = temp_directory::Fixture::new()?;
         let mut service = ProjectService::new();
         service.create(&fixture.root, "Invalid saved asset")?;
-        service
+        let state = service
             .current
             .as_mut()
-            .ok_or("created project state missing")?
-            .imports
-            .push(ImportRecord {
-                record_version: super::IMPORT_RECORD_VERSION,
-                parser_version: super::STL_IMPORT_PARSER_VERSION,
-                id: "invalid-saved-import".to_owned(),
-                display_name: "part".to_owned(),
-                source_name: "part.stl".to_owned(),
-                source_digest: None,
-                asset: "../outside.stl".to_owned(),
-                format: "stl".to_owned(),
-                mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+            .ok_or("created project state missing")?;
+        state.imports.push(ImportRecord {
+            record_version: super::IMPORT_RECORD_VERSION,
+            parser_version: super::STL_IMPORT_PARSER_VERSION,
+            id: "invalid-saved-import".to_owned(),
+            display_name: "part".to_owned(),
+            source_name: "part.stl".to_owned(),
+            source_path: String::new(),
+            source_digest: None,
+            source_size_bytes: 0,
+            source_modified_unix_ms: None,
+            mesh_asset_id: "mesh-invalid-saved-import".to_owned(),
+            format: "stl".to_owned(),
+            mesh_type: super::DEFAULT_MESH_TYPE.to_owned(),
+            units: "millimeters".to_owned(),
+            show_import_log: false,
+            triangle_count: 1,
+            dimensions: [1.0, 1.0, 0.0],
+        });
+        state.mesh_assets.insert(
+            "mesh-invalid-saved-import".to_owned(),
+            super::model::MeshAssetRef {
+                id: "mesh-invalid-saved-import".to_owned(),
+                revision: 1,
+                format_version: panta_mesh::MESH_ASSET_FORMAT_VERSION,
+                kind: "surface".to_owned(),
+                relative_path: "../outside.pmesh".to_owned(),
+                digest: "sha256:test".to_owned(),
                 units: "millimeters".to_owned(),
-                show_import_log: false,
-                triangle_count: 1,
-                dimensions: [1.0, 1.0, 0.0],
-            });
+                source_revision: None,
+            },
+        );
 
         service.open_import_document("invalid-saved-import", "part");
 
@@ -359,7 +407,7 @@ mod tests {
         assert_eq!(document.diagnostic.code, "project.manifest_invalid");
         assert_eq!(
             document.message_key,
-            "The saved STL asset could not be opened."
+            "The saved mesh asset could not be opened."
         );
         Ok(())
     }

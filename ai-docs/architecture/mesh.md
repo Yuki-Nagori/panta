@@ -31,7 +31,7 @@ Rust 拥有资产身份、来源 revision、转换 / 网格任务策略、领域
 
 Netgen API 依据：[v6.2.2604 `nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h)。最终能否对特定输入直接体网格化，仍由未来网格任务的封闭性、方向、容差及失败诊断测试决定。
 
-Mesh IR 的旁置持久化和页签按需读取由 [088](../task/088-mesh-asset-sidecar-storage.md) 规划：`.panta` 保存索引，Mesh payload 使用工程内相对引用，打开项目不把所有网格读入内存。持久文件格式不依赖 VTK / Netgen 对象布局；内容格式版本和来源 revision 不匹配时拒绝作为当前资产使用。
+Mesh IR 的旁置持久化和页签按需读取由 [088](../task/088-mesh-asset-sidecar-storage.md) 实施：schema 4 的 `.panta` 保存 `mesh_assets` 索引，Mesh payload 以工程内相对路径引用，打开工程不把网格读入内存。`panta-mesh` 定义与 VTK / Netgen 无关的 sidecar v2 编解码，显式写入 Mesh 类型、毫米单位、元素数量、f64 坐标 / 连接字段、Zstandard codec 和压缩 payload SHA-256；损坏、未知版本 / codec、摘要错误或越出工程根的引用会失败。SurfaceMesh sidecar 保留当前三角面 IR 的完整 f64 顶点语义；解码流式构造领域 Mesh，不分配完整的未压缩 payload 副本。展开数据约 72 字节 / 面，文件压缩率随输入而变。Mesh 格式版本与索引不一致时拒绝作为当前资产使用。当前开发阶段不读取或迁移旧 schema；新导入不复制来源 STL。
 
 ## 生成流程
 

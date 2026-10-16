@@ -406,20 +406,22 @@ pub fn project_error_message_key(code: &str) -> &'static str {
         }
         "project.import_source_changed" => "The STL file changed after preview. Select it again.",
         "project.import_parse_failed" => "The selected STL file could not be read.",
-        "project.import_asset_copy_failed" => "The STL file could not be copied into the project.",
+        "project.import_asset_write_failed" => {
+            "The mesh asset could not be saved into the project."
+        }
         _ => "The project operation could not be completed.",
     }
 }
 
 pub fn activation_error_message_key(code: &str) -> &'static str {
     match code {
-        "project.asset_missing" => "The saved STL asset is missing from the project package.",
-        "project.asset_unsupported_format" => "The saved STL asset format is not supported.",
-        "project.import_unsupported_units" => "The saved STL asset uses unsupported units.",
+        "project.asset_missing" => "The saved mesh asset is missing from the project package.",
+        "project.asset_unsupported_format" => "The saved mesh asset format is not supported.",
+        "project.import_unsupported_units" => "The saved mesh asset uses unsupported units.",
         "project.asset_read_failed" | "project.asset_parse_failed" => {
-            "The saved STL asset could not be read."
+            "The saved mesh asset could not be read."
         }
-        _ => "The saved STL asset could not be opened.",
+        _ => "The saved mesh asset could not be opened.",
     }
 }
 
@@ -725,8 +727,8 @@ mod tests {
                 "The selected STL file could not be read.",
             ),
             (
-                "project.import_asset_copy_failed",
-                "The STL file could not be copied into the project.",
+                "project.import_asset_write_failed",
+                "The mesh asset could not be saved into the project.",
             ),
             ("unknown", "The project operation could not be completed."),
         ];
@@ -736,37 +738,37 @@ mod tests {
         let activation_cases = [
             (
                 "project.asset_missing",
-                "The saved STL asset is missing from the project package.",
+                "The saved mesh asset is missing from the project package.",
             ),
             (
                 "project.asset_unsupported_format",
-                "The saved STL asset format is not supported.",
+                "The saved mesh asset format is not supported.",
             ),
             (
                 "project.import_unsupported_units",
-                "The saved STL asset uses unsupported units.",
+                "The saved mesh asset uses unsupported units.",
             ),
             (
                 "project.asset_read_failed",
-                "The saved STL asset could not be read.",
+                "The saved mesh asset could not be read.",
             ),
             (
                 "project.asset_parse_failed",
-                "The saved STL asset could not be read.",
+                "The saved mesh asset could not be read.",
             ),
             (
                 "project.asset_source_changed",
-                "The saved STL asset could not be opened.",
+                "The saved mesh asset could not be opened.",
             ),
             (
                 "project.activation_spawn_failed",
-                "The saved STL asset could not be opened.",
+                "The saved mesh asset could not be opened.",
             ),
             (
                 "project.activation_worker_failed",
-                "The saved STL asset could not be opened.",
+                "The saved mesh asset could not be opened.",
             ),
-            ("unknown", "The saved STL asset could not be opened."),
+            ("unknown", "The saved mesh asset could not be opened."),
         ];
         for (code, expected) in activation_cases {
             assert_eq!(activation_error_message_key(code), expected, "{code}");

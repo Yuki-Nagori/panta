@@ -1,4 +1,4 @@
-// 080 的手动真实工程基准；测量工程内 STL 激活/重载、页签快切与快照内存。
+// 080 / 088 的手动真实工程基准；测量 Mesh sidecar 激活/重载、页签快切与快照内存。
 #include "project_view_model.hpp"
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -245,7 +245,7 @@ int main(int argc, char* argv[]) try {
         return fail("reload_iterations must be a positive integer");
     }
 
-    std::cout << "benchmark=project_stl_activation build="
+    std::cout << "benchmark=project_mesh_activation build="
 #if defined(NDEBUG)
               << "Release"
 #else
@@ -267,7 +267,7 @@ int main(int argc, char* argv[]) try {
     const auto ids = view_model.importedPartIds();
     const auto names = view_model.importedPartNames();
     if (ids.isEmpty() || ids.size() != names.size()) {
-        return fail("project has no consistent saved STL records");
+        return fail("project has no consistent saved mesh records");
     }
 
     std::vector<LoadedDocument> loaded;

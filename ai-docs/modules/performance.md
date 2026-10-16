@@ -21,6 +21,16 @@ native 基准采用当前 runner 配置（缺省 Debug），Rust 网格微基准
 
 CPU 套件还运行 `panta-core` 的 `background_execution` example（源码 `tests/performance/cpu/background_execution.rs`）：合成 5 万 / 50 万三角面的 binary STL，分别提交 1 / 4 / 8 / 64 个预检请求，输出输入字节、整批耗时及请求完成延迟 p50 / p95。通过公开工程服务驱动，完成即释放来源快照；固定负载不受 `--samples` 或 `--project` 控制。可单独用 `cargo run --locked --release -p panta-core --example background_execution` 定位；不纳入功能测试或 CI 时间门禁。容量及峰值内存证据见 [109](../task/109-bounded-background-execution.md)。
 
+任务 [088](../task/088-mesh-asset-sidecar-storage.md) 的 Rust microbenchmark 可对比来源 STL 解析、Mesh sidecar 编码 / 解码、热文件缓存读 + 解码、同步写入和文件字节。未设置 `PANTA_BENCH_STL` 时用 100k 合成 binary STL；代表性实物应显式传入文件，并在相同机器 / Release 环境运行：
+
+```sh
+PANTA_BENCH_STL=/path/to/model.stl \
+  cargo test --locked --release -p panta-mesh --test mesh_performance \
+  supplied_stl_and_sidecar_costs -- --ignored --nocapture
+```
+
+该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量，并同时报告进程 RSS 与估算 Mesh 常驻量。Mesh sidecar v2 保留 f64 三角顶点语义并用 Zstandard 压缩 payload；压缩后大小和编解码耗时依赖具体数据。完整工程首次激活、缓存命中和 RSS 仍需使用对应工程级基准，不由微基准推断。
+
 ## 定位与边界
 
 性能阈值不作为 CI 门禁。维护者于 2026-10-13 确认，每日定时 CI 可运行 `cargo performance cpu` 并保留日志 artifact，用于观察趋势；共享 runner 的波动不阻断变更。GPU 基准要求可识别的硬件设备或真实图形会话，仍由开发侧手动运行，直到有稳定的专用 runner。测量优先于修改——没有测量支撑的"优化"不保留；对比必须固定同一机器、同一命令与同一构建配置，波动显著才立项修复。

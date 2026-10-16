@@ -211,10 +211,14 @@ importing:
   src: Importing…
   tr: Importing…
 
+large-mesh-warning:
+  src: The expanded mesh data is estimated to exceed 2 GiB. Import is allowed, but it may take a long time and require substantial memory and disk space. Make sure your computer and project drive have enough resources before continuing.
+  tr: The expanded mesh data is estimated to exceed 2 GiB. Import is allowed, but it may take a long time and require substantial memory and disk space. Make sure your computer and project drive have enough resources before continuing.
+
 [ImportDialogHelp]
 help-text:
-  src: The source file is copied into the project assets so the import can be reopened later.
-  tr: The source file is copied into the project assets so the import can be reopened later.
+  src: A mesh asset is saved into the project. The original STL can be moved or deleted after import.
+  tr: A mesh asset is saved into the project. The original STL can be moved or deleted after import.
 
 [ImportDialogErrors]
 error-file-missing:
@@ -229,9 +233,9 @@ error-parse:
   src: The selected STL file could not be read.
   tr: The selected STL file could not be read.
 
-error-copy:
-  src: The STL file could not be copied into the project.
-  tr: The STL file could not be copied into the project.
+error-write:
+  src: The mesh asset could not be saved into the project.
+  tr: The mesh asset could not be saved into the project.
 
 error-generic:
   src: The import operation could not be completed.
@@ -848,9 +852,9 @@ import-read-failed:
   src: The selected STL file could not be read.
   tr: The selected STL file could not be read.
 
-import-copy-failed:
-  src: The STL file could not be copied into the project.
-  tr: The STL file could not be copied into the project.
+import-asset-write-failed:
+  src: The mesh asset could not be saved into the project.
+  tr: The mesh asset could not be saved into the project.
 
 project-operation-failed:
   src: The project operation could not be completed.
@@ -881,25 +885,25 @@ failed-to-load:
   src: Failed to load
   tr: Failed to load
 
-saved-stl-missing:
-  src: The saved STL asset is missing from the project package.
-  tr: The saved STL asset is missing from the project package.
+saved-mesh-missing:
+  src: The saved mesh asset is missing from the project package.
+  tr: The saved mesh asset is missing from the project package.
 
-saved-stl-unsupported-format:
-  src: The saved STL asset format is not supported.
-  tr: The saved STL asset format is not supported.
+saved-mesh-unsupported-format:
+  src: The saved mesh asset format is not supported.
+  tr: The saved mesh asset format is not supported.
 
-saved-stl-unsupported-units:
-  src: The saved STL asset uses unsupported units.
-  tr: The saved STL asset uses unsupported units.
+saved-mesh-unsupported-units:
+  src: The saved mesh asset uses unsupported units.
+  tr: The saved mesh asset uses unsupported units.
 
-saved-stl-read-failed:
-  src: The saved STL asset could not be read.
-  tr: The saved STL asset could not be read.
+saved-mesh-read-failed:
+  src: The saved mesh asset could not be read.
+  tr: The saved mesh asset could not be read.
 
-saved-stl-open-failed:
-  src: The saved STL asset could not be opened.
-  tr: The saved STL asset could not be opened.
+saved-mesh-open-failed:
+  src: The saved mesh asset could not be opened.
+  tr: The saved mesh asset could not be opened.
 
 [AnalysisSequenceDialog]
 title:

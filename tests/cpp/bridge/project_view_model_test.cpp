@@ -250,15 +250,19 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
     EXPECT_EQ(model.mesh_snapshot(), mesh);
     EXPECT_EQ(model.openDocuments(), documents);
 
-    // 已存在的目标资产使 create_new 确定失败，无需依赖用户权限或时序。
-    const QString collision = QFileInfo(model.currentPath()).absolutePath() +
-                              QStringLiteral("/assets/imports/0002-零件 sample.stl");
-    ASSERT_TRUE(QFile::copy(sourcePath, collision));
+    // 临时把资产目录替换为普通文件，稳定触发 sidecar 目录创建失败。
+    const QString projectRoot = QFileInfo(model.currentPath()).absolutePath();
+    const QString assetsDirectory = projectRoot + QStringLiteral("/assets");
+    const QString parkedAssetsDirectory = projectRoot + QStringLiteral("/assets-parked");
+    ASSERT_TRUE(QDir().rename(assetsDirectory, parkedAssetsDirectory));
+    QFile assetsBlocker(assetsDirectory);
+    ASSERT_TRUE(assetsBlocker.open(QIODevice::WriteOnly));
+    assetsBlocker.write("not a directory");
+    assetsBlocker.close();
     EXPECT_FALSE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                  QStringLiteral("millimeters"), false));
-    EXPECT_EQ(model.errorCode(), QStringLiteral("project.import_asset_copy_failed"));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.import_asset_write_failed"));
     EXPECT_EQ(model.errorCategory(), QStringLiteral("io"));
-    EXPECT_TRUE(model.errorDetail().contains(QStringLiteral("0002-零件 sample.stl")));
     EXPECT_EQ(imported.count(), 0);
     EXPECT_EQ(model.planSettings(), settings);
     EXPECT_EQ(model.mesh_snapshot(), mesh);
@@ -266,6 +270,8 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
     ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
     EXPECT_EQ(manifest.readAll(), before);
     manifest.close();
+    ASSERT_TRUE(QFile::remove(assetsDirectory));
+    ASSERT_TRUE(QDir().rename(parkedAssetsDirectory, assetsDirectory));
 
     ASSERT_TRUE(model.inspectStl(sourcePath));
     EXPECT_TRUE(model.importPreviewPending());
@@ -463,8 +469,9 @@ TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelReq
     ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
     const auto data = manifest.readAll();
     EXPECT_TRUE(data.contains("\"id\": \"import-1\""));
-    EXPECT_TRUE(QFile::exists(QDir(fixture.filePath(QStringLiteral("Demo")))
-                                  .filePath(QStringLiteral("assets/imports/0001-part.stl"))));
+    EXPECT_TRUE(
+        QFile::exists(QDir(fixture.filePath(QStringLiteral("Demo")))
+                          .filePath(QStringLiteral("assets/meshes/mesh-import-1-r1.pmesh"))));
 }
 
 TEST(ProjectViewModelTest, PreviewNotificationsCanReplaceOrCancelTheCompletedRequest) {
@@ -840,7 +847,7 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
     QTRY_COMPARE(reopened.openDocuments()[1].toMap()[QStringLiteral("state")].toString(),
                  QStringLiteral("failed"));
     EXPECT_EQ(reopened.openDocuments()[1].toMap()[QStringLiteral("message")].toString(),
-              QStringLiteral("The saved STL asset is missing from the project package."));
+              QStringLiteral("The saved mesh asset is missing from the project package."));
     const auto diagnostic =
         reopened.openDocuments()[1].toMap().value(QStringLiteral("diagnostic")).toMap();
     EXPECT_EQ(diagnostic.value(QStringLiteral("code")).toString(),

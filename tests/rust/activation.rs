@@ -3,7 +3,6 @@
 //! 真实线程；结果以 `drain_asset_activations` 轮询拉取。
 use panta_core::project::{Outcome, OutcomeKind, ProjectError, ProjectService};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -26,45 +25,43 @@ fn import_sample_stl(
     Ok(record.id)
 }
 
-/// 大体积二进制 STL：让读取/解析窗口远大于测试线程设置取消的延迟，
-/// 使取消、去重与失效用例摆脱调度时序依赖。
-fn overwrite_asset_with_binary_stl(
-    asset: &Path,
+/// 大型有效 sidecar 让校验和解码持续足够久，覆盖激活的取消与失效路径。
+fn overwrite_asset_with_large_mesh(
+    service: &ProjectService,
+    record_id: &str,
     triangles: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut bytes = Vec::new();
-    bytes.extend_from_slice(&[0u8; 80]);
-    bytes.extend_from_slice(&(triangles as u32).to_le_bytes());
-    let mut payload = [0u8; 50];
-    let vertices: [f32; 9] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
-    payload[12..48].copy_from_slice(&bytemuck_vertices(&vertices));
-    for _ in 0..triangles {
-        bytes.extend_from_slice(&payload);
-    }
-    let mut file = fs::File::create(asset)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
-    Ok(())
-}
+    let imports = service.imports()?;
+    let record = imports
+        .iter()
+        .find(|record| record.id == record_id)
+        .ok_or("import record not found")?;
+    let path = asset_path(service, record_id)?;
+    let mesh = panta_mesh::SurfaceMesh {
+        triangles: vec![[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]; triangles],
+    };
+    let (bytes, digest) = panta_mesh::encode_mesh_asset(&panta_mesh::MeshAsset::Surface(mesh))?;
+    fs::write(&path, bytes)?;
 
-fn bytemuck_vertices(vertices: &[f32; 9]) -> [u8; 36] {
-    // f32 与字节互转的标准安全路径；二进制 STL 载荷就是小端 f32 序列。
-    let mut bytes = [0u8; 36];
-    for (index, value) in vertices.iter().enumerate() {
-        bytes[index * 4..(index + 1) * 4].copy_from_slice(&value.to_le_bytes());
-    }
-    bytes
+    let project_path = &service.current()?.path;
+    let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(project_path)?)?;
+    let asset = manifest["mesh_assets"]
+        .get_mut(&record.mesh_asset_id)
+        .ok_or("mesh asset index entry missing")?;
+    asset["digest"] = serde_json::Value::String(digest);
+    let persisted_record = manifest["imports"]
+        .as_array_mut()
+        .and_then(|imports| imports.iter_mut().find(|value| value["id"] == record_id))
+        .ok_or("persisted import record missing")?;
+    persisted_record["triangle_count"] = serde_json::Value::from(triangles as u64);
+    fs::write(project_path, serde_json::to_vec_pretty(&manifest)?)?;
+    Ok(())
 }
 
 fn asset_path(
     service: &ProjectService,
     record_id: &str,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let record = service
-        .imports()?
-        .into_iter()
-        .find(|record| record.id == record_id)
-        .ok_or("import record not found")?;
     let root = service
         .current()?
         .path
@@ -72,7 +69,7 @@ fn asset_path(
         .ok_or("no project dir")?
         .to_path_buf();
     // 清单内相对路径使用 '/'；Path::join 在各平台均接受该分隔符。
-    Ok(root.join(&record.asset))
+    Ok(root.join(service.mesh_asset_path_for_import(record_id)?))
 }
 
 fn wait_for_outcome(
@@ -153,7 +150,7 @@ fn corrupt_asset_fails_with_stable_code() -> Result<(), Box<dyn std::error::Erro
     reopened.begin_asset_activation(&record_id)?;
     let outcome = wait_for_outcome(&mut reopened, Duration::from_secs(10))?;
     assert_eq!(outcome.kind, OutcomeKind::Failed);
-    assert_eq!(outcome.code, "project.asset_parse_failed");
+    assert_eq!(outcome.code, "project.asset_unsupported_format");
     Ok(())
 }
 
@@ -179,7 +176,7 @@ fn cancel_request_terminates_as_cancelled() -> Result<(), Box<dyn std::error::Er
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
-    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, IN_FLIGHT_TRIANGLES)?;
+    overwrite_asset_with_large_mesh(&service, &record_id, IN_FLIGHT_TRIANGLES)?;
 
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
@@ -201,7 +198,7 @@ fn project_switch_invalidates_in_flight_results() -> Result<(), Box<dyn std::err
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
-    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, IN_FLIGHT_TRIANGLES)?;
+    overwrite_asset_with_large_mesh(&service, &record_id, IN_FLIGHT_TRIANGLES)?;
 
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
@@ -223,7 +220,7 @@ fn duplicate_begin_reuses_in_flight_attempt() -> Result<(), Box<dyn std::error::
     let mut service = ProjectService::new();
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
-    overwrite_asset_with_binary_stl(&asset_path(&service, &record_id)?, IN_FLIGHT_TRIANGLES)?;
+    overwrite_asset_with_large_mesh(&service, &record_id, IN_FLIGHT_TRIANGLES)?;
 
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
@@ -250,20 +247,23 @@ fn manifest_asset_traversal_is_rejected_at_activation_admission()
     service.create(&fixture.root, "Demo")?;
     let record_id = import_sample_stl(&mut service, &fixture.root)?;
     service.save()?;
+    let record = service
+        .imports()?
+        .into_iter()
+        .find(|record| record.id == record_id)
+        .ok_or("import record not found")?;
     let manifest_path = fixture.root.join("Demo/Demo.panta");
     drop(service);
 
-    // 改写清单内的资产相对路径为越界 / 绝对引用：打开仍成功（只读清单），
-    // 但激活提交边界必须拒绝，杜绝清单注入越出工程包目录。
-    for evil in ["../../evil.stl", "/absolutely/external.stl"] {
-        let manifest = format!(
-            "{{\"schema\":2,\"name\":\"Demo\",\"revision\":1,\"imports\":[{{\"record_version\":1,\"parser_version\":2,\"id\":\"{record_id}\",\"source_name\":\"evil.stl\",\"asset\":\"{evil}\",\"format\":\"stl\",\"mesh_type\":\"solid-3d\",\"units\":\"millimeters\",\"show_import_log\":false,\"triangle_count\":1,\"dimensions\":[1.0,1.0,0.0]}}]}}"
-        );
-        fs::write(&manifest_path, &manifest)?;
+    // schema 4 的 mesh index 路径必须保持在工程包内。
+    for evil in ["../../evil.pmesh", "/absolutely/external.pmesh"] {
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&manifest_path)?)?;
+        manifest["mesh_assets"][&record.mesh_asset_id]["relative_path"] =
+            serde_json::Value::String(evil.to_owned());
+        fs::write(&manifest_path, serde_json::to_vec(&manifest)?)?;
         let mut reopened = ProjectService::new();
-        reopened.open(&manifest_path)?;
         assert!(matches!(
-            reopened.begin_asset_activation(&record_id),
+            reopened.open(&manifest_path),
             Err(ProjectError::ManifestInvalid(_))
         ));
     }

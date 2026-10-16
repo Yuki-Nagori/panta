@@ -29,6 +29,7 @@ pub(super) struct ProjectState {
     // 最近成功读取 / 提交的磁盘修订，与尚未保存的内存 revision 分开。
     pub(super) persisted_revision: Option<u64>,
     pub(super) imports: Vec<ImportRecord>,
+    pub(super) mesh_assets: BTreeMap<String, MeshAssetRef>,
     pub(super) analysis_sequences: BTreeMap<String, String>,
     pub(super) materials: BTreeMap<String, String>,
     pub(super) fill_settings: BTreeMap<String, FillSettings>,
@@ -42,6 +43,8 @@ pub(super) struct ProjectManifest {
     pub(super) revision: u64,
     #[serde(default)]
     pub(super) imports: Vec<ImportRecord>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(super) mesh_assets: BTreeMap<String, MeshAssetRef>,
     // 稀疏覆盖表；未设置的方案采用领域默认 Fill。
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(super) analysis_sequences: BTreeMap<String, String>,
@@ -52,6 +55,20 @@ pub(super) struct ProjectManifest {
     pub(super) fill_settings: BTreeMap<String, FillSettings>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(super) gate_location_settings: BTreeMap<String, GateLocationSettings>,
+}
+
+/// `.panta` 中独立的权威 Mesh 索引项；来源文件元数据仍留在 ImportRecord。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct MeshAssetRef {
+    pub(super) id: String,
+    pub(super) revision: u64,
+    pub(super) format_version: u32,
+    pub(super) kind: String,
+    pub(super) relative_path: String,
+    pub(super) digest: String,
+    pub(super) units: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) source_revision: Option<String>,
 }
 
 pub(super) fn validate_name(name: &str) -> Result<(), ProjectError> {

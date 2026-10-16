@@ -35,7 +35,7 @@ impl Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
-pub const IMPORT_RECORD_VERSION: u32 = 2;
+pub const IMPORT_RECORD_VERSION: u32 = 4;
 pub const STL_IMPORT_PARSER_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,12 +43,15 @@ pub struct ImportRecord {
     pub record_version: u32,
     pub parser_version: u32,
     pub id: String,
-    #[serde(default)]
     pub display_name: String,
     pub source_name: String,
+    pub source_path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_digest: Option<String>,
-    pub asset: String,
+    pub source_size_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_modified_unix_ms: Option<u64>,
+    pub mesh_asset_id: String,
     pub format: String,
     pub mesh_type: String,
     pub units: String,
@@ -157,6 +160,12 @@ pub struct SourceSnapshot {
     pub source_name: String,
     pub format: ImportFormat,
     pub bytes: Vec<u8>,
+    pub modified_unix_ms: Option<u64>,
+}
+
+/// 为导入来源计算稳定的 SHA-256 快照标识。
+pub fn source_digest(bytes: &[u8]) -> String {
+    format!("sha256:{:x}", Sha256::digest(bytes))
 }
 
 pub fn detect_format(path: &Path) -> Result<ImportFormat, ImportError> {
@@ -219,10 +228,16 @@ pub fn read_source_checked(
         Ok(file) => file,
         Err(error) => return Err(read_error(path, error)),
     };
-    let expected = match file.metadata() {
-        Ok(metadata) => metadata.len(),
+    let metadata = match file.metadata() {
+        Ok(metadata) => metadata,
         Err(error) => return Err(read_error(path, error)),
     };
+    let expected = metadata.len();
+    let modified_unix_ms = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok());
     let mut bytes = Vec::new();
     reserve_source_bytes(
         path,
@@ -248,6 +263,7 @@ pub fn read_source_checked(
         source_name,
         format,
         bytes,
+        modified_unix_ms,
     })
 }
 
@@ -277,15 +293,6 @@ fn reserve_source_bytes(
     }
 }
 
-/// 已提交工程资产的解析入口：STL 解析 + 记录单位换算到毫米。
-/// 与 [`read_source_checked`] 组合构成 073 只读激活的加载阶段；
-/// 解析本身不可中断，过期快照由调用方在完成边界释放。
-pub fn parse_stl_asset(snapshot: &SourceSnapshot, units: &str) -> Result<SurfaceMesh, ImportError> {
-    let mut mesh = parse_stl_snapshot(snapshot)?;
-    scale_mesh_mm(&mut mesh, LengthUnit::parse(units)?)?;
-    Ok(mesh)
-}
-
 /// 唯一的 STL 解析入口；几何格式尚无 native backend 时不得走此函数。
 pub fn parse_stl_snapshot(snapshot: &SourceSnapshot) -> Result<SurfaceMesh, ImportError> {
     if snapshot.format != ImportFormat::Stl {
@@ -308,13 +315,10 @@ pub struct PreparedStl {
     pub source_name: String,
     pub bytes: Vec<u8>,
     pub mesh: SurfaceMesh,
+    pub modified_unix_ms: Option<u64>,
 }
 
 impl PreparedStl {
-    pub fn asset_name(&self, import_number: usize) -> String {
-        format!("{import_number:04}-{}", self.source_name)
-    }
-
     pub fn scale_mesh_mm(&mut self, options: ImportOptions) -> Result<(), ImportError> {
         scale_mesh_mm(&mut self.mesh, options.units)
     }
@@ -327,8 +331,11 @@ impl PreparedStl {
             id: format!("import-{import_number}"),
             display_name: default_display_name(&self.source_name, "stl"),
             source_name: self.source_name.clone(),
-            source_digest: Some(format!("sha256:{:x}", Sha256::digest(&self.bytes))),
-            asset: format!("assets/imports/{}", self.asset_name(import_number)),
+            source_path: self.path.to_string_lossy().into_owned(),
+            source_digest: Some(source_digest(&self.bytes)),
+            source_size_bytes: u64::try_from(self.bytes.len()).unwrap_or(u64::MAX),
+            source_modified_unix_ms: self.modified_unix_ms,
+            mesh_asset_id: format!("mesh-import-{import_number}"),
             format: "stl".to_owned(),
             mesh_type: options.mesh_type.to_owned(),
             units: options.units.label().to_owned(),
@@ -382,6 +389,7 @@ impl StlImportSession {
             source_name: input.source_name,
             bytes: input.bytes,
             mesh,
+            modified_unix_ms: input.modified_unix_ms,
         });
         Ok(StlImportPreview {
             source_name,
@@ -422,7 +430,8 @@ impl StlImportSession {
             if is_cancelled() {
                 return Err(CheckedReadError::Cancelled(path.display().to_string()));
             }
-            if let Some(confirmed) = self.preview.take() {
+            if let Some(mut confirmed) = self.preview.take() {
+                confirmed.modified_unix_ms = input.modified_unix_ms;
                 return Ok(confirmed);
             }
         }
@@ -435,6 +444,7 @@ impl StlImportSession {
             source_name: input.source_name,
             bytes: input.bytes,
             mesh,
+            modified_unix_ms: input.modified_unix_ms,
         })
     }
 }
@@ -573,7 +583,6 @@ mod tests {
         assert_eq!(preview.dimensions, [1.0, 2.0, 0.0]);
 
         let prepared = session.prepare(&source)?;
-        assert_eq!(prepared.asset_name(7), "0007-part.stl");
         assert_eq!(prepared.summary().dimensions, preview.dimensions);
         let record = prepared.record(7, centimeters);
         assert_eq!(record.record_version, IMPORT_RECORD_VERSION);
@@ -584,7 +593,9 @@ mod tests {
             record.source_digest,
             Some(format!("sha256:{:x}", Sha256::digest(fs::read(&source)?)))
         );
-        assert_eq!(record.asset, "assets/imports/0007-part.stl");
+        assert_eq!(record.mesh_asset_id, "mesh-import-7");
+        assert_eq!(record.source_path, source.to_string_lossy());
+        assert_eq!(record.source_size_bytes, fs::metadata(&source)?.len());
         assert_eq!(record.mesh_type, "dual-domain");
         assert_eq!(record.units, "centimeters");
         assert!(record.show_import_log);
@@ -637,6 +648,7 @@ mod tests {
             source_name: "part.step".to_owned(),
             format: ImportFormat::Step,
             bytes: original.to_vec(),
+            modified_unix_ms: None,
         };
         assert!(matches!(
             parse_stl_snapshot(&non_stl),
@@ -677,11 +689,12 @@ mod tests {
         let fixture = Fixture::new()?;
         let source = fixture.root.join("part.stl");
         fs::write(&source, b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 3 0\n")?;
-        let snapshot = read_source(&source)?;
-        let mesh = parse_stl_asset(&snapshot, "centimeters")?;
+        let centimeters = ImportOptions::new("dual-domain", "centimeters", false)?;
+        let mut mesh = StlImportSession::default().prepare(&source)?;
+        mesh.scale_mesh_mm(centimeters)?;
         assert_eq!(mesh.summary().dimensions, [20.0, 30.0, 0.0]);
         assert!(matches!(
-            parse_stl_asset(&snapshot, "yards"),
+            ImportOptions::new("dual-domain", "yards", false),
             Err(ImportError::UnsupportedUnits(units)) if units == "yards"
         ));
 
@@ -692,9 +705,10 @@ mod tests {
                 f64::MAX / 2.0
             ),
         )?;
-        let scaled_snapshot = read_source(&source)?;
+        let mut scaled_mesh = StlImportSession::default().prepare(&source)?;
+        let inches = ImportOptions::new("dual-domain", "inches", false)?;
         assert!(matches!(
-            parse_stl_asset(&scaled_snapshot, "inches"),
+            scaled_mesh.scale_mesh_mm(inches),
             Err(ImportError::CoordinateOverflow)
         ));
 

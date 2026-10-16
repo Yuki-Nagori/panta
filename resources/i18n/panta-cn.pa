@@ -211,10 +211,14 @@ importing:
   src: Importing…
   tr: 正在导入…
 
+large-mesh-warning:
+  src: The expanded mesh data is estimated to exceed 2 GiB. Import is allowed, but it may take a long time and require substantial memory and disk space. Make sure your computer and project drive have enough resources before continuing.
+  tr: 预计解压后的网格数据会超过 2 GiB。仍可继续导入，但可能耗时较长并占用大量内存和磁盘空间；继续前请确认计算机和工程所在磁盘有足够资源。
+
 [ImportDialogHelp]
 help-text:
-  src: The source file is copied into the project assets so the import can be reopened later.
-  tr: 源文件会复制到工程资产目录，以便稍后重新打开导入记录。
+  src: A mesh asset is saved into the project. The original STL can be moved or deleted after import.
+  tr: 导入后会将网格资产保存到工程中。原始 STL 文件之后可以移动或删除。
 
 [ImportDialogErrors]
 error-file-missing:
@@ -229,9 +233,9 @@ error-parse:
   src: The selected STL file could not be read.
   tr: 无法读取所选 STL 文件。
 
-error-copy:
-  src: The STL file could not be copied into the project.
-  tr: 无法将 STL 文件复制到工程中。
+error-write:
+  src: The mesh asset could not be saved into the project.
+  tr: 无法将网格资产保存到工程中。
 
 error-generic:
   src: The import operation could not be completed.
@@ -848,9 +852,9 @@ import-read-failed:
   src: The selected STL file could not be read.
   tr: 无法读取所选 STL 文件。
 
-import-copy-failed:
-  src: The STL file could not be copied into the project.
-  tr: 无法将 STL 文件复制到工程中。
+import-asset-write-failed:
+  src: The mesh asset could not be saved into the project.
+  tr: 无法将网格资产保存到工程中。
 
 project-operation-failed:
   src: The project operation could not be completed.
@@ -881,25 +885,25 @@ failed-to-load:
   src: Failed to load
   tr: 加载失败
 
-saved-stl-missing:
-  src: The saved STL asset is missing from the project package.
-  tr: 工程包中缺少已保存的 STL 资产。
+saved-mesh-missing:
+  src: The saved mesh asset is missing from the project package.
+  tr: 工程包中缺少已保存的网格资产。
 
-saved-stl-unsupported-format:
-  src: The saved STL asset format is not supported.
-  tr: 不支持已保存 STL 资产的格式。
+saved-mesh-unsupported-format:
+  src: The saved mesh asset format is not supported.
+  tr: 不支持已保存网格资产的格式。
 
-saved-stl-unsupported-units:
-  src: The saved STL asset uses unsupported units.
-  tr: 已保存 STL 资产使用了不支持的单位。
+saved-mesh-unsupported-units:
+  src: The saved mesh asset uses unsupported units.
+  tr: 已保存网格资产使用了不支持的单位。
 
-saved-stl-read-failed:
-  src: The saved STL asset could not be read.
-  tr: 无法读取已保存的 STL 资产。
+saved-mesh-read-failed:
+  src: The saved mesh asset could not be read.
+  tr: 无法读取已保存的网格资产。
 
-saved-stl-open-failed:
-  src: The saved STL asset could not be opened.
-  tr: 无法打开已保存的 STL 资产。
+saved-mesh-open-failed:
+  src: The saved mesh asset could not be opened.
+  tr: 无法打开已保存的网格资产。
 
 [AnalysisSequenceDialog]
 title:

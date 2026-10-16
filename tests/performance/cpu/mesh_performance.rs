@@ -1,9 +1,12 @@
 //! 固定输入的 CPU 微基准；手动用 `cargo test -p panta-mesh --release --test mesh_performance -- --ignored --nocapture` 运行。
 use panta_mesh::{
-    SurfaceMesh, SurfaceTriangle, TetMesh, Tetrahedron, parse_stl, validate_tet_mesh,
+    MeshAsset, SurfaceMesh, SurfaceTriangle, TetMesh, Tetrahedron, decode_mesh_asset,
+    encode_mesh_asset, parse_stl, validate_tet_mesh,
 };
 use std::hint::black_box;
+use std::io::Write;
 use std::path::Path;
+use std::time::SystemTime;
 use std::time::{Duration, Instant};
 
 const TRIANGLE_COUNT: usize = 100_000;
@@ -14,9 +17,14 @@ fn binary_fixture() -> Vec<u8> {
     bytes[80..84].copy_from_slice(&(TRIANGLE_COUNT as u32).to_le_bytes());
     for triangle in 0..TRIANGLE_COUNT {
         let base = 84 + triangle * 50 + 12;
-        for (corner, point) in [[0.0_f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-            .into_iter()
-            .enumerate()
+        let offset = triangle as f32 * 2.0;
+        for (corner, point) in [
+            [offset, 0.0, 0.0],
+            [offset + 1.0, 0.0, 0.0],
+            [offset, 1.0, 0.0],
+        ]
+        .into_iter()
+        .enumerate()
         {
             for (axis, value) in point.into_iter().enumerate() {
                 let offset = base + corner * 12 + axis * 4;
@@ -107,6 +115,96 @@ fn supplied_stl_parse_and_snapshot_copy_cost() -> Result<(), Box<dyn std::error:
         median(copy_samples).as_secs_f64() * 1000.0
     );
     Ok(())
+}
+
+#[test]
+#[ignore = "manual sidecar benchmark; run in release mode"]
+fn supplied_stl_and_sidecar_costs() -> Result<(), Box<dyn std::error::Error>> {
+    let (filename, bytes) = match std::env::var_os("PANTA_BENCH_STL") {
+        Some(path) => {
+            let bytes = std::fs::read(&path)?;
+            let filename = Path::new(&path)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("stl")
+                .to_owned();
+            (filename, bytes)
+        }
+        None => ("synthetic-100k.stl".to_owned(), binary_fixture()),
+    };
+    let asset = MeshAsset::Surface(parse_stl(&bytes)?);
+    let mesh = match &asset {
+        MeshAsset::Surface(mesh) => mesh,
+        MeshAsset::Volume(_) => return Err("expected a surface mesh".into()),
+    };
+    let (encoded, _) = encode_mesh_asset(&asset)?;
+    assert_eq!(decode_mesh_asset(&encoded)?, asset);
+    let raw_sidecar_estimate = 56 + 8 + mesh.triangles.len() * 72;
+    let compressed_ratio_percent = encoded.len() as f64 / raw_sidecar_estimate as f64 * 100.0;
+
+    let nonce = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)?
+        .as_nanos();
+    let sidecar_path = std::env::temp_dir().join(format!(
+        "panta-sidecar-benchmark-{}-{nonce}.pmesh",
+        std::process::id()
+    ));
+    let cleanup = TemporaryFile(sidecar_path.clone());
+    let write_start = Instant::now();
+    {
+        let mut file = std::fs::File::create(&sidecar_path)?;
+        file.write_all(&encoded)?;
+        file.sync_all()?;
+    }
+    let write_once = write_start.elapsed();
+
+    let mut parse_samples = Vec::with_capacity(SAMPLES);
+    let mut encode_samples = Vec::with_capacity(SAMPLES);
+    let mut decode_samples = Vec::with_capacity(SAMPLES);
+    let mut disk_read_decode_samples = Vec::with_capacity(SAMPLES);
+    for _ in 0..SAMPLES {
+        let start = Instant::now();
+        black_box(parse_stl(black_box(&bytes))?);
+        parse_samples.push(start.elapsed());
+
+        let start = Instant::now();
+        let (candidate, _) = encode_mesh_asset(black_box(&asset))?;
+        encode_samples.push(start.elapsed());
+        assert_eq!(candidate.len(), encoded.len());
+        black_box(candidate);
+
+        let start = Instant::now();
+        black_box(decode_mesh_asset(black_box(&encoded))?);
+        decode_samples.push(start.elapsed());
+
+        let start = Instant::now();
+        let sidecar = std::fs::read(&sidecar_path)?;
+        black_box(decode_mesh_asset(black_box(&sidecar))?);
+        disk_read_decode_samples.push(start.elapsed());
+    }
+    println!(
+        "file={filename} triangles={} source_bytes={} expanded_sidecar_estimate_bytes={} compressed_sidecar_bytes={} compressed_ratio_percent={:.2} parse_p50_ms={:.3} encode_p50_ms={:.3} decode_p50_ms={:.3} warm_disk_read_decode_p50_ms={:.3} first_write_sync_ms={:.3}",
+        mesh.triangles.len(),
+        bytes.len(),
+        raw_sidecar_estimate,
+        encoded.len(),
+        compressed_ratio_percent,
+        median(parse_samples).as_secs_f64() * 1000.0,
+        median(encode_samples).as_secs_f64() * 1000.0,
+        median(decode_samples).as_secs_f64() * 1000.0,
+        median(disk_read_decode_samples).as_secs_f64() * 1000.0,
+        write_once.as_secs_f64() * 1000.0,
+    );
+    drop(cleanup);
+    Ok(())
+}
+
+struct TemporaryFile(std::path::PathBuf);
+
+impl Drop for TemporaryFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
 }
 
 #[test]

@@ -5,13 +5,13 @@
 - 依赖：[057](057-new-project-dialog.md)、[060](060-qml-project-workspace-reference.md)、[062](062-ribbon-tab-components.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-22 / 2026-10-13
+- 创建 / 更新：2026-09-22 / 2026-10-16
 
 ## 目标与背景
 
 将 Home 工具栏的 Import 从视觉入口推进为第一条真实导入流程：选择一个或多个 `.stl` 文件，随后显示网格类型、单位、导入日志和近似尺寸确认窗口；确认后将导入资产、来源信息及影响几何解释的选项纳入当前 `.panta` 工程，并在工程树中展示多个独立零件。左侧工程工作区上下分区：上方展示工程与导入文件，下方展示当前选择零件的任务和属性；右侧视口显示所选 STL，后续再扩展其他格式。
 
-2026-10-16 的存储决策由后续任务 088 收敛：工程内保存解析后的 `SurfaceMesh` sidecar，不保留原始 STL 副本；来源快照保留导入时所选路径、文件名、格式、SHA-256、mtime 和 size，仅用于追溯与诊断。下文提到的 `assets/imports/` 是 063 当前已实现的过渡存储行为，最终迁移由 088 负责。
+2026-10-16，任务 088 将本任务原有的工程内 STL 副本存储改为 `SurfaceMesh` sidecar。当前 schema 4 不保留原始 STL 副本；来源快照保留导入时所选路径、文件名、格式、SHA-256、mtime 和 size，仅用于追溯与诊断。下方 `assets/imports/` 与 schema 2/3 的说明是 063 当时的历史行为；088 已决定当前开发阶段不支持或迁移旧 schema。
 
 本任务先完成可验收的 HTML 状态参考和持久化边界设计，再分阶段实现 QML、C++ ViewModel、Rust 导入服务与视口数据流。HTML 参考覆盖新建项目弹窗。首期 STL 运行时闭环、结构化导入 / 工程诊断、后台导入事务、`display_name` 重名策略、四档缩放行为验证与 Metal 硬件离屏性能基准均已完成；实际网格生成不在本任务范围。
 
@@ -31,7 +31,7 @@
 将导入选项记录在 `.panta` 内是正确的边界，但不应只保存 UI 当前值或原始绝对路径。导入确认后，工程 manifest 应保存可重放的 import record，至少包含：
 
 - 独立的用户可见 `display_name`，与来源文件名、资产 ID 分离；默认由来源文件名去除已识别扩展名得到。名称冲突规则在实现前确认。
-- 来源快照记录导入时所选路径、原文件名、格式、内容摘要（SHA-256）、mtime 和 size；它们仅用于追溯与诊断，不能成为工程重开或加载 Mesh 的依赖，也不代表工程内保留源文件副本。
+- 063 完成时持久化的来源字段为原文件名、格式和内容摘要（SHA-256）；导入时所选路径、mtime 和 size 是 088 新增的诊断快照字段，仅用于追溯，不成为工程重开或加载 Mesh 的依赖，也不代表工程内保留源文件副本。
 - `meshType`：`midplane`、`dual-domain`、`solid-3d`；这是影响后续网格解释的工程数据。
 - `units`：首期支持界面中的明确单位选项，不能把“未指定”静默当成某个单位。
 - `showImportLog`：记录用户对该次导入的日志可见性选择，但它只是展示偏好，不替代导入诊断和结果状态。
@@ -39,13 +39,13 @@
 
 原始 STL 不应被修改；近似尺寸由解析结果计算并在确认窗只读展示。取消或导入失败不能写入工程 manifest、替换当前工程或清空已有视口。确认后的导入记录采用追加 / 版本化语义，避免改写其他已导入资产。当前 schema 与复制行为记录在本任务验收结果中；不保留源副本并改用 Mesh sidecar 的最终存储由 088 负责。
 
-当前实现将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。063 负责为 import record 明确并持久化 `display_name` 与来源信息的分离；后续 `.panta` 元数据 + Mesh 索引、按页签加载规范 Mesh 的设计由 [任务 088](088-mesh-asset-sidecar-storage.md) 跟踪，并从 import record 迁移显示名和来源快照。按 2026-10-16 决策，088 实施后不再保留 `assets/imports/` 中的 STL 副本。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
+063 实施期间曾将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；当时记录包含 `source_name`、`format`、`source_digest`，不含导入时所选路径、mtime 和 size，也不是解析后的 `SurfaceMesh` sidecar。任务 088 新增后三项诊断快照字段，并管理 schema 4 `.panta` Mesh 索引及按页签加载；保留 `display_name` 命名契约、补齐来源快照并移除工程内 STL 副本。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
 
 ### 资产显示名与来源
 
-来源文件、工程内资产和运行期数据是三个相关但不同的概念。当前实现复制并保存原始 STL；打开时由 `panta-mesh` 解析为内存中的 `SurfaceMesh`，尚未持久化为 Mesh sidecar。088 将用 Mesh sidecar 替换该过渡行为，并按最新决策移除工程内 STL 副本。Sidecar 实施前不能把当前 STL 源副本描述成已经转换后的工程 Mesh 文件。
+来源文件、工程内资产和运行期数据是三个相关但不同的概念。063 最初复制并保存原始 STL，激活时由 `panta-mesh` 解析为内存 `SurfaceMesh`；当前 schema 4 由 088 改为持久化 Mesh sidecar。导入时用户选定的外部 STL 不再复制或作为运行依赖；旧 schema 2/3 文件不迁移。
 
-导入记录应区分用户看到的 `display_name` 与来源快照：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名，格式、路径、SHA-256、mtime 和 size 是来源诊断信息，不是资产身份或重开工程的依赖。当前实现另有工程内源副本引用；088 迁移到 Mesh sidecar 索引时删除该引用。当前 import record 的 ID 标识导入记录；Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。063 在 import record 中持久化该显示名；088 迁移时保留此命名契约和来源快照。
+导入记录区分用户看到的 `display_name` 与来源快照：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名。063 持久化 `source_name`、`format` 和 `source_digest`；导入时所选路径、mtime 和 size 是 088 为追溯诊断新增的字段，不作为工程运行依赖。当前 `ImportRecord.id` 标识导入记录；Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。088 保留 063 建立的命名契约并补齐来源快照，同时将 Mesh 索引从导入记录中拆开。
 
 显示名允许重复。记录持久化相同的基础 `display_name`，工程树和文档页签按当前导入顺序显示序号以消除歧义；来源名与导入记录 ID 不因显示冲突而改写。
 
@@ -59,7 +59,7 @@
 - 工程工作区左栏有两个独立 Dock：上部工程 / 任务 Dock 内部分为上下两区，顶部工程树展示多个导入 study，中间显示当前 study 的任务；底部保留独立的 Layers Dock、截图中的工具按钮和带 Layers 图标的单一页签，内容先留空，具体图层行为待后续确认。
 - `.panta` 工程打开后可再次导入一个或多个 STL；每个文件作为工程下独立零件加入，不覆盖已有零件，文件选择器允许多选。
 - `.panta` 内的 import record、源资产引用、失败回滚和重新打开恢复；QML 只发语义请求，C++ ViewModel 负责 Qt 适配，Rust 服务负责解析、校验、持久化和导入 DTO。
-- 将显示名与来源快照分开：STL 默认显示名不带 `.stl`，来源名保留原扩展名；路径、格式、SHA-256、mtime 和 size 仅用于追溯诊断，不作为稳定资产身份或 Mesh 加载依赖。
+- 将显示名与来源快照分开：STL 默认显示名不带 `.stl`，来源名保留原扩展名；063 保存来源名、格式和 SHA-256，088 新增所选路径、mtime 和 size。所有来源字段仅用于追溯诊断，不作为稳定资产身份或 Mesh 加载依赖。
 - 新建项目弹窗 HTML 参考，补齐 homepage 之前遗漏的 Create New Project 状态。
 - 独立 HTML 状态参考：`open-project` 中点击 Import 后的导入弹窗，以及导入完成后的 `imported-project` 页面。
 
@@ -86,13 +86,13 @@
 - 保留现有同步领域入口仅供无 GUI 测试 / 调用方使用时，需由本轮验证确认是否仍有实际消费者；不保留没有消费者的重复路径。
 - 当时的异步写入批次不包含 `display_name` 重名策略和四档缩放验证；后续批次已补齐这两项。实际网格生成仍不属于本任务范围。
 
-### 本轮范围（2026-10-13，显示名）
+### 本轮范围（2026-10-13，显示名；历史记录）
 
 - 在 ImportRecord 持久化 `display_name`，STL 默认使用移除 `.stl` 扩展名后的文件名主体；`source_name` 仍保留原始名称。当前只接受 STL，格式识别依据由 Rust 导入领域层负责。
-- 新导入记录保存源字节快照的 SHA-256（`sha256:<lowercase hex>`）；旧 schema 2 记录迁移时摘要保留缺失，打开清单不额外读取 STL 资产。
+- 新导入记录保存源字节快照的 SHA-256（`sha256:<lowercase hex>`）；当时的 schema 2 迁移记录允许摘要缺失。088 后当前只接受 schema 4。
 - 工程树与文档页签显示 `display_name`；重复名称保留相同基础名，并按完整导入记录顺序加序号。页签序号不依赖打开 / 激活顺序，关闭其他同名页签后仍保持稳定，不写回领域名。Layers Dock 当前没有资产行。
-- 通过 schema / import record 版本化迁移现有 schema 2 记录：从 `source_name` 派生显示名，保存时写入新版本。schema 1 无导入记录的打开行为保持不变；未知版本仍明确拒绝。
-- 增加文件名大小写、Unicode、缺失扩展名 / 非预期扩展名、重复名称、逆序打开 / 关闭后页签序号稳定性、schema 1/2/3 无效导入版本拒绝且不替换当前工程，以及旧 schema 迁移回归；不涉及 Mesh sidecar（088）或四档缩放性能基准。
+- 当时通过 schema / import record 版本化迁移现有 schema 2 记录：从 `source_name` 派生显示名，保存时写入新版本。088 移除这些迁移逻辑，当前只接受 schema 4。
+- 增加文件名大小写、Unicode、缺失扩展名 / 非预期扩展名、重复名称、逆序打开 / 关闭后页签序号稳定性，以及当时的 schema 迁移回归；088 将旧 schema 行为改为明确拒绝且不修改工程文件。
 
 ## 验收标准
 
@@ -108,9 +108,9 @@
 - [x] STL 预检 / 写入导入迁为 Rust 后台任务，定义取消与提交截止点；GUI 线程不执行文件读取和格式解析。
 - [x] QML / C++ / Rust 分层、静态检查、native 测试、四档缩放行为与 Metal 硬件离屏性能基准、真实窗口及视口生命周期验证通过。
 
-## 清理与兼容例外
+## 清理与兼容例外（历史记录）
 
-- `COMPAT(task 063; remove-task 088)`: 读取当前受支持的 schema 2 工程时，将旧 ImportRecord 的 `display_name` 从 `source_name` 派生并迁移到当前 schema 3；schema 1 继续按无 imports 打开。迁移发生在 Rust 工程读取边界，保存只写 schema 3 / ImportRecord v2；未知版本明确拒绝。该读取路径用于保留用户已有工程，088 切换到 Mesh 资产索引时复核并清除过期 schema 支持；验证覆盖 schema 1、2、3 的打开及保存往返。
+063 曾支持 schema 2 到 schema 3 的一次性 ImportRecord 迁移，并以 `COMPAT(task 063; remove-task 088)` 标记。按维护者在 task 088 中的决定，该兼容代码和迁移测试已移除；当前 schema 1–3 均拒绝，文件保持不变。
 
 ## 验证计划与结果
 
@@ -146,7 +146,7 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 ### 显示名批次（2026-10-13）
 
-将导入记录显示名从来源文件名拆分并持久化为 schema 3 / ImportRecord v2；导入时记录源字节 SHA-256，旧 schema 2 迁移时摘要缺省。工程树和文档页签显示去除 `.stl` 后的名称；同名页签序号按完整导入顺序投影，逆序打开或关闭其他同名页签不会改变序号。迁移拒绝未知 ImportRecord 版本及不符合 schema 约束的记录，并确保失败不替换当前工程。
+本轮当时将导入记录显示名从来源文件名拆分并持久化为 schema 3 / ImportRecord v2；导入时记录源字节 SHA-256，旧 schema 2 迁移时摘要缺省。工程树和文档页签显示去除 `.stl` 后的名称；同名页签序号按完整导入顺序投影，逆序打开或关闭其他同名页签不会改变序号。迁移拒绝未知 ImportRecord 版本及不符合 schema 约束的记录，并确保失败不替换当前工程。088 后当前项目只接受 schema 4，历史 schema 迁移不再保留。
 
 - `cargo test --locked --workspace`：通过 Rust 工作区测试、qmllint 与 75/75 个 native / QML CTest；新增覆盖逆序打开及关闭后同名页签序号稳定、schema 1 非空 imports 和 schema 2/3 不支持记录的拒绝及当前工程状态保留。
 - `cargo build --locked`、`cargo format --check`、`cargo lint --check`：通过。lint 覆盖 Clippy、依赖检查、CMake、qmllint、clang-tidy、include-cleaner 与 cppcheck。
@@ -171,7 +171,7 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 ## 风险与工作记录
 
-- 2026-10-13：按维护者确认，重复导入保留相同 `display_name`，工程树与文档页签按导入顺序加序号；`source_name` 与 ID 不改写。当前导入仍复制 STL 并在激活时解析为内存 `SurfaceMesh`；Mesh sidecar 属于 088。OCCT 几何修复与 Netgen 网格优化边界同步澄清，具体几何修复流程不纳入 063。
+- 2026-10-13：按维护者确认，重复导入保留相同 `display_name`，工程树与文档页签按导入顺序加序号；`source_name` 与 ID 不改写。063 当时将 STL 副本存入工程并在激活时解析为内存 `SurfaceMesh`；该存储由 088 的 sidecar 实现取代。OCCT 几何修复与 Netgen 网格优化边界同步澄清，具体几何修复流程不纳入 063。
 - 2026-10-13：显示名实现评审发现页签序号受打开顺序影响；改为依据完整导入记录顺序计算，并补充关闭后稳定、逆序打开以及旧 schema 无效记录拒绝回归。macOS `cargo test --locked --workspace`、`cargo build --locked`、`cargo format --check`、`cargo lint --check` 全部通过；75/75 个 native / QML CTest 通过。复审无新增 findings；未运行 sanitizer、跨平台 CI、真实窗口或四档缩放基准。
 - 2026-10-13：显示名提交 `a2d7716` 后，四档缩放在 Qt 6.11.2 / macOS 26.3.1 下分别运行 `panta_qml_shell_module_test`，1、1.25、1.5、2 倍均 15/15 通过。四档 Metal 硬件离屏性能基准以 500k 三角形 STL 各测 31 次并正常结束，实测数据及计时边界见上方；可见 Cocoa 窗口重启因当前会话无可用屏幕未能复测，既有真实窗口证据见结构化诊断批次。无头 Shell 结果不描述为 GPU 通过。
 - 2026-10-13：063 收尾的独立 `gpt-6.1-sol` medium review 核实四档指标边界、确认 Cocoa 恢复证据引用正确，并要求补机器 / GPU 与预热边界；已登记 Apple M4、单次初始激活 / 渲染和 31 次测量样本。没有剩余 actionable findings。
@@ -201,7 +201,7 @@ Rust 后台预检、Qt 非阻塞轮询与弹窗取消已实现；确认导入的
 
 ## 完成摘要
 
-已完成任务登记、`.panta` 持久化边界说明、HTML 状态参考，以及 STL 预检 / 确认导入 / 资产复制 / 重开恢复 / 任务树 / VTK 视口链路。结构化错误迁移、失败回归、异步预检与确认写入、`display_name` 持久化与重名展示、Cargo 聚合 / 质量检查、四档 Qt 缩放行为、四档 Metal 硬件离屏性能基准和既有 macOS 可见窗口验收均已完成。保存资产的异步激活由 073/080 实现；实际 Create Mesh 不属于本任务。任务验收完成。
+已完成任务登记、`.panta` 持久化边界说明、HTML 状态参考，以及 STL 预检 / 确认导入 / 当时的工程内资产保存 / 重开恢复 / 任务树 / VTK 视口链路。结构化错误迁移、失败回归、异步预检与确认写入、`display_name` 持久化与重名展示、Cargo 聚合 / 质量检查、四档 Qt 缩放行为、四档 Metal 硬件离屏性能基准和既有 macOS 可见窗口验收均已完成。088 后资产保存改为 Mesh sidecar，并不迁移旧 schema。保存资产的异步激活由 073/080 实现；实际 Create Mesh 不属于本任务。任务验收完成。
 
 ## 契约更新（080，2026-09-26）
 
