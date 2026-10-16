@@ -287,3 +287,226 @@ fn unsupported_arguments_print_usage_and_exit_two() -> Result<(), Box<dyn std::e
     assert!(output.stdout.is_empty());
     Ok(())
 }
+
+#[test]
+fn stl_import_persists_asset_metadata_and_inspect_works_after_source_removal()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let mut creator = ProjectService::new();
+    let project = creator.create(&fixture.root, "CLI import project")?;
+    let source = fixture.root.join("inputs").join("cover sample.stl");
+    std::fs::create_dir_all(source.parent().ok_or("STL has no parent directory")?)?;
+    let original = b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 2 0\nendsolid\n";
+    std::fs::write(&source, original)?;
+
+    let imported = panta_cli()
+        .args(["stl", "import"])
+        .arg(&project.path)
+        .arg(&source)
+        .args(["--mesh-type", "midplane", "--units", "centimeters"])
+        .output()?;
+
+    assert_eq!(imported.status.code(), Some(0), "{imported:?}");
+    let stdout = String::from_utf8(imported.stdout)?;
+    assert!(stdout.contains("Imported: cover sample"), "{stdout}");
+    assert!(stdout.contains("Import ID: import-1"), "{stdout}");
+    assert!(stdout.contains("Mesh asset ID: mesh-import-1"), "{stdout}");
+    assert!(stdout.contains("cover sample.stl"), "{stdout}");
+    assert_eq!(std::fs::read(&source)?, original);
+
+    let mut reopened = ProjectService::new();
+    reopened.execute(panta_core::project::ProjectCommand::Open {
+        path: project.path.clone(),
+    })?;
+    let records = reopened.imports()?;
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].display_name, "cover sample");
+    assert_eq!(records[0].mesh_type, "midplane");
+    assert_eq!(records[0].units, "centimeters");
+    assert_eq!(records[0].source_size_bytes, original.len() as u64);
+    let mesh_path = reopened.mesh_asset_path_for_import(&records[0].id)?;
+    assert!(
+        project
+            .path
+            .parent()
+            .ok_or("project has no parent")?
+            .join(mesh_path)
+            .is_file()
+    );
+
+    std::fs::remove_file(&source)?;
+    let inspected = panta_cli()
+        .args(["project", "inspect"])
+        .arg(&project.path)
+        .output()?;
+    assert_eq!(inspected.status.code(), Some(0), "{inspected:?}");
+    let inspect_stdout = String::from_utf8(inspected.stdout)?;
+    assert!(
+        inspect_stdout.contains("Imported assets: 1"),
+        "{inspect_stdout}"
+    );
+    assert!(
+        inspect_stdout.contains("Import ID: import-1"),
+        "{inspect_stdout}"
+    );
+    assert!(
+        inspect_stdout.contains("Mesh asset ID: mesh-import-1"),
+        "{inspect_stdout}"
+    );
+    assert!(
+        inspect_stdout.contains("Source: cover sample.stl"),
+        "{inspect_stdout}"
+    );
+    assert!(
+        !inspect_stdout.contains(&source.display().to_string()),
+        "{inspect_stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn stl_import_rejects_invalid_options_without_changing_the_project()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let mut creator = ProjectService::new();
+    let project = creator.create(&fixture.root, "CLI invalid import")?;
+    let source = fixture.root.join("part.stl");
+    std::fs::write(
+        &source,
+        b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+    )?;
+
+    let unsupported_type = panta_cli()
+        .args(["stl", "import"])
+        .arg(&project.path)
+        .arg(&source)
+        .args(["--mesh-type", "unknown"])
+        .output()?;
+    assert_eq!(
+        unsupported_type.status.code(),
+        Some(2),
+        "{unsupported_type:?}"
+    );
+    assert!(
+        String::from_utf8_lossy(&unsupported_type.stderr)
+            .contains("project.import_unsupported_mesh_type")
+    );
+    assert!(unsupported_type.stdout.is_empty());
+
+    let unsupported_units = panta_cli()
+        .args(["stl", "import"])
+        .arg(&project.path)
+        .arg(&source)
+        .args(["--units", "meters"])
+        .output()?;
+    assert_eq!(
+        unsupported_units.status.code(),
+        Some(2),
+        "{unsupported_units:?}"
+    );
+    assert!(
+        String::from_utf8_lossy(&unsupported_units.stderr)
+            .contains("project.import_unsupported_units")
+    );
+    assert!(unsupported_units.stdout.is_empty());
+
+    let mut reopened = ProjectService::new();
+    let snapshot =
+        reopened.execute(panta_core::project::ProjectCommand::Open { path: project.path })?;
+    assert_eq!(snapshot.revision, 0);
+    assert!(reopened.imports()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn stl_import_rejects_invalid_sources_and_projects_without_partial_assets()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let mut creator = ProjectService::new();
+    let project = creator.create(&fixture.root, "CLI failed imports")?;
+    let missing = fixture.root.join("missing.stl");
+    let malformed = fixture.root.join("malformed.stl");
+    let unsupported = fixture.root.join("model.obj");
+    let invalid_project = fixture.root.join("invalid.panta");
+    std::fs::write(&malformed, b"not an STL")?;
+    std::fs::write(&unsupported, b"triangle data")?;
+    std::fs::write(&invalid_project, b"not a Panta project")?;
+    let valid_source = fixture.root.join("valid.stl");
+    std::fs::write(
+        &valid_source,
+        b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+    )?;
+
+    for (source, expected_code) in [
+        (&missing, "project.import_file_missing"),
+        (&malformed, "project.import_parse_failed"),
+        (&unsupported, "project.import_invalid_file"),
+    ] {
+        let output = panta_cli()
+            .args(["stl", "import"])
+            .arg(&project.path)
+            .arg(source)
+            .output()?;
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains(expected_code));
+        assert!(output.stdout.is_empty());
+    }
+
+    let invalid_destination = panta_cli()
+        .args(["stl", "import"])
+        .arg(&invalid_project)
+        .arg(&valid_source)
+        .output()?;
+    assert_eq!(
+        invalid_destination.status.code(),
+        Some(2),
+        "{invalid_destination:?}"
+    );
+    assert!(
+        String::from_utf8_lossy(&invalid_destination.stderr).contains("project.manifest_invalid")
+    );
+    assert!(invalid_destination.stdout.is_empty());
+
+    let mut reopened = ProjectService::new();
+    let snapshot =
+        reopened.execute(panta_core::project::ProjectCommand::Open { path: project.path })?;
+    assert_eq!(snapshot.revision, 0);
+    assert!(reopened.imports()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn stl_import_allows_duplicate_display_names_and_assigns_distinct_ids()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = temp_directory::Fixture::new()?;
+    let mut creator = ProjectService::new();
+    let project = creator.create(&fixture.root, "CLI duplicate names")?;
+    let left = fixture.root.join("left").join("model.stl");
+    let right = fixture.root.join("right").join("model.stl");
+    for source in [&left, &right] {
+        std::fs::create_dir_all(source.parent().ok_or("STL has no parent directory")?)?;
+        std::fs::write(
+            source,
+            b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+        )?;
+    }
+
+    for source in [&left, &right] {
+        let output = panta_cli()
+            .args(["stl", "import"])
+            .arg(&project.path)
+            .arg(source)
+            .output()?;
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+    }
+
+    let mut reopened = ProjectService::new();
+    reopened.execute(panta_core::project::ProjectCommand::Open { path: project.path })?;
+    let records = reopened.imports()?;
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].display_name, "model");
+    assert_eq!(records[1].display_name, "model");
+    assert_ne!(records[0].id, records[1].id);
+    assert_ne!(records[0].mesh_asset_id, records[1].mesh_asset_id);
+    Ok(())
+}
