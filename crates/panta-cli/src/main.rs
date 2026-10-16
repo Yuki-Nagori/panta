@@ -2,10 +2,15 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use panta_core::project::{ProjectCommand, ProjectService, ProjectSnapshot};
+use panta_core::project::{ProjectCommand, ProjectService, ProjectSnapshot, StlImportPreview};
 
 const EXIT_COMMAND_FAILED: u8 = 2;
-const USAGE: &str = "用法：panta-cli project <inspect <工程文件.panta> | create <父目录> <工程名>>";
+const USAGE: &str = "用法：panta-cli project inspect <工程文件.panta> | project create <父目录> <工程名> | stl inspect <文件.stl>";
+
+enum CommandOutput {
+    Project(ProjectSnapshot),
+    StlInspection(StlImportPreview),
+}
 
 #[cfg(test)]
 #[path = "../../../tests/support/rust/temp_directory.rs"]
@@ -14,10 +19,22 @@ mod temp_directory;
 fn main() -> ExitCode {
     let arguments: Vec<OsString> = std::env::args_os().skip(1).collect();
     match run(&arguments) {
-        Ok(project) => {
+        Ok(CommandOutput::Project(project)) => {
             println!("Project: {}", project.name);
             println!("Path: {}", project.path.display());
             println!("Revision: {}", project.revision);
+            ExitCode::SUCCESS
+        }
+        Ok(CommandOutput::StlInspection(preview)) => {
+            println!("STL: {}", preview.source_name);
+            println!("Triangles: {}", preview.triangle_count);
+            println!(
+                "Dimensions: {} × {} × {}",
+                preview.dimensions[0], preview.dimensions[1], preview.dimensions[2]
+            );
+            println!(
+                "Note: STL does not encode units; dimensions use source coordinates. Parsing does not assess mesh quality."
+            );
             ExitCode::SUCCESS
         }
         Err(message) => {
@@ -27,7 +44,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(arguments: &[OsString]) -> Result<ProjectSnapshot, String> {
+fn run(arguments: &[OsString]) -> Result<CommandOutput, String> {
     let current_directory =
         std::env::current_dir().map_err(|error| format!("无法读取当前目录：{error}"))?;
     let mut service = ProjectService::new();
@@ -36,6 +53,7 @@ fn run(arguments: &[OsString]) -> Result<ProjectSnapshot, String> {
             let path = resolve_project_path(PathBuf::from(path), &current_directory);
             service
                 .execute(ProjectCommand::Open { path })
+                .map(CommandOutput::Project)
                 .map_err(|error| error.to_string())
         }
         [command, operation, location, name] if command == "project" && operation == "create" => {
@@ -45,6 +63,14 @@ fn run(arguments: &[OsString]) -> Result<ProjectSnapshot, String> {
                 .ok_or_else(|| "工程名必须是有效 UTF-8".to_owned())?;
             service
                 .create(&location, name)
+                .map(CommandOutput::Project)
+                .map_err(|error| error.to_string())
+        }
+        [command, operation, path] if command == "stl" && operation == "inspect" => {
+            let path = resolve_project_path(PathBuf::from(path), &current_directory);
+            service
+                .inspect_stl(&path)
+                .map(CommandOutput::StlInspection)
                 .map_err(|error| error.to_string())
         }
         _ => Err(USAGE.to_owned()),
@@ -60,6 +86,7 @@ fn resolve_project_path(path: PathBuf, current_directory: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use super::CommandOutput;
     use super::resolve_project_path;
     use super::run;
     use super::temp_directory;
@@ -78,7 +105,9 @@ mod tests {
             created.path.as_os_str().to_owned(),
         ];
 
-        let inspected = run(&arguments)?;
+        let CommandOutput::Project(inspected) = run(&arguments)? else {
+            return Err("project inspect returned an unexpected output".into());
+        };
 
         assert_eq!(inspected.path, created.path);
         assert_eq!(inspected.name, "CLI inspection");
@@ -119,6 +148,30 @@ mod tests {
         let current = std::env::current_dir()?;
         let path = current.join("data/projects/demo");
         assert_eq!(resolve_project_path(path.clone(), &current), path);
+        Ok(())
+    }
+
+    #[test]
+    fn stl_inspection_returns_the_shared_preview() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("part.stl");
+        std::fs::write(
+            &source,
+            b"solid part\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 2 0\nendsolid\n",
+        )?;
+        let arguments = [
+            OsString::from("stl"),
+            OsString::from("inspect"),
+            source.into_os_string(),
+        ];
+
+        let CommandOutput::StlInspection(preview) = run(&arguments)? else {
+            return Err("stl inspect returned an unexpected output".into());
+        };
+
+        assert_eq!(preview.source_name, "part.stl");
+        assert_eq!(preview.triangle_count, 1);
+        assert_eq!(preview.dimensions, [1.0, 2.0, 0.0]);
         Ok(())
     }
 }
