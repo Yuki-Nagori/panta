@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-Rust 应用服务位于 `panta-core`，例如 `ProjectService` 编排工程状态和网格激活。GUI 通过 `panta-ffi`/CXX 将请求转到 Rust，再由 C++ ViewModel 提供 Qt 属性、信号及异步调度。
+Rust 应用服务位于 `panta-core`，例如 `ProjectService` 编排工程状态和网格激活。GUI 通过 `panta-ffi`/CXX 将请求转到 Rust，再由 C++ ViewModel 提供 Qt 属性、信号及异步调度。工程打开由 Qt 无关的 `ProjectCommand::Open` 表达，GUI FFI 与 CLI 都经 `ProjectService::execute` 调用同一校验和读取路径。
 
-`panta-dslc` 是 `.pa` parser/formatter 的命令行工具，但它不是桌面应用的通用 CLI；`panta-launcher` 负责启动 native app 与打包，也不是应用命令入口。当前没有正式的 `panta-cli`，也没有已完成的 GUI/CLI 共用领域命令。构建脚本与 CLI 共用 `panta-dsl-core` 函数不满足此边界验收。
+`panta-dslc` 是 `.pa` parser/formatter 的命令行工具；`panta-launcher` 负责启动 native app 与打包。新增的 `panta-cli project inspect <path>` 是窄应用 CLI，用于读取并输出工程摘要，不负责启动 GUI。它和 GUI 的打开工程操作共用 `ProjectCommand::Open`。构建脚本与 CLI 共用 `panta-dsl-core` 函数不等同于应用命令复用。
 
 ## 目标职责
 
@@ -20,8 +20,10 @@ CLI 参数 → Rust CLI adapter ─────┘
 - Rust 应用入口负责业务校验与编排，调用既有领域服务。领域不依赖 UI、命令行、Qt 或 CXX。
 - FFI 只转换 DTO、错误与句柄并转发；Bridge/ViewModel 只做 Qt 生命周期、属性/信号和线程适配。
 - CLI 解析参数、调用同一 Rust 入口并呈现结果；不得另行复制业务校验和流程。
-- 不预先搭建命令总线、插件系统或空的 CLI crate。先以一个可从当前 GUI 与最小 CLI 实际触发的操作验证边界，再根据真实消费者决定接口归属。
+- 不预先搭建命令总线或插件系统。优先让应用命令表达用户意图，由真实消费者决定后续接口扩展。
 
-## 后续实施
+## 命令选择
 
-任务 121 需先盘点 `ProjectService` 等现有操作，选择最窄且具有用户价值的共享命令；为 Rust 命令行为和 GUI/CLI 调用路径增加测试。未实施部分仍是设计目标，不代表当前已有 `panta-cli`。
+首个共享命令是打开工程：GUI 用它加载活动工程状态；CLI 用隔离的 `ProjectService` 实例检查 `.panta` 文件并显示名称、路径和修订号。打开命令会复用文件存在性、扩展名、清单解析和 schema 校验，不复制业务规则。CLI 只解析参数并格式化结果；参数/格式错误返回非零退出码，领域错误保留稳定的 `ProjectError` code 供诊断。
+
+开发时可运行 `cargo run -p panta-cli -- project inspect <工程文件.panta>`。新增跨 GUI/CLI 的用户操作时，先定义 Qt 无关输入/输出和错误，再由 FFI 与 CLI 各自做薄适配。

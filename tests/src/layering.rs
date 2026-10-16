@@ -34,6 +34,7 @@ const ALLOWED_RUST_EDGES: &[(&str, &[&str])] = &[
         "panta-launcher",
         &["panta-ffi", "panta-build", "panta-dsl-core"],
     ),
+    ("panta-cli", &["panta-core"]),
     ("panta-tests", &["panta-build"]),
 ];
 

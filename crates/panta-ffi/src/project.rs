@@ -30,7 +30,9 @@ pub(super) fn project_service_open(
 ) -> Result<bridge::ProjectSnapshot, panta_core::project::ProjectError> {
     service
         .service
-        .open(std::path::Path::new(&path))
+        .execute(panta_core::project::ProjectCommand::Open {
+            path: std::path::PathBuf::from(path),
+        })
         .map(project_snapshot)
 }
 

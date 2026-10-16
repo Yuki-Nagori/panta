@@ -277,6 +277,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "panta-cli"
+version = "0.1.0"
+dependencies = [
+ "panta-core",
+]
+
+[[package]]
 name = "panta-core"
 version = "0.1.0"
 dependencies = [
