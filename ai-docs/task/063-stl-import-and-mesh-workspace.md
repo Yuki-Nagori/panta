@@ -11,7 +11,7 @@
 
 将 Home 工具栏的 Import 从视觉入口推进为第一条真实导入流程：选择一个或多个 `.stl` 文件，随后显示网格类型、单位、导入日志和近似尺寸确认窗口；确认后将导入资产、来源信息及影响几何解释的选项纳入当前 `.panta` 工程，并在工程树中展示多个独立零件。左侧工程工作区上下分区：上方展示工程与导入文件，下方展示当前选择零件的任务和属性；右侧视口显示所选 STL，后续再扩展其他格式。
 
-2026-10-16 的存储决策由后续任务 088 收敛：工程内保存解析后的 `SurfaceMesh` sidecar，不保留原始 STL 副本；来源快照保留导入时所选路径、文件名、格式、SHA-256、mtime 和 size，仅用于追溯与诊断。下文提到的 `assets/imports/` 是 063 当前已实现的过渡存储行为，最终迁移由 088 负责。
+2026-10-16，任务 088 将本任务原有的工程内 STL 副本存储迁移为 `SurfaceMesh` sidecar。当前 schema 4 不保留原始 STL 副本；来源快照保留导入时所选路径、文件名、格式、SHA-256、mtime 和 size，仅用于追溯与诊断。下方 `assets/imports/` 与 schema 2/3 的说明记录 063 实施时的历史行为及兼容迁移输入，不代表当前新导入行为。
 
 本任务先完成可验收的 HTML 状态参考和持久化边界设计，再分阶段实现 QML、C++ ViewModel、Rust 导入服务与视口数据流。HTML 参考覆盖新建项目弹窗。首期 STL 运行时闭环、结构化导入 / 工程诊断、后台导入事务、`display_name` 重名策略、四档缩放行为验证与 Metal 硬件离屏性能基准均已完成；实际网格生成不在本任务范围。
 
@@ -39,13 +39,13 @@
 
 原始 STL 不应被修改；近似尺寸由解析结果计算并在确认窗只读展示。取消或导入失败不能写入工程 manifest、替换当前工程或清空已有视口。确认后的导入记录采用追加 / 版本化语义，避免改写其他已导入资产。当前 schema 与复制行为记录在本任务验收结果中；不保留源副本并改用 Mesh sidecar 的最终存储由 088 负责。
 
-当前实现将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。063 负责为 import record 明确并持久化 `display_name` 与来源信息的分离；后续 `.panta` 元数据 + Mesh 索引、按页签加载规范 Mesh 的设计由 [任务 088](088-mesh-asset-sidecar-storage.md) 跟踪，并从 import record 迁移显示名和来源快照。按 2026-10-16 决策，088 实施后不再保留 `assets/imports/` 中的 STL 副本。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
+063 实施期间曾将原始 STL 复制到 `assets/imports/`，manifest 保存 import record；这不是解析后的 `SurfaceMesh` sidecar。当前 schema 4 由 [任务 088](088-mesh-asset-sidecar-storage.md) 管理 `.panta` Mesh 索引及按页签加载，迁移保留 `display_name` 和来源快照并移除工程内 STL 副本。063 不实现 Mesh sidecar，也不把 VTK 快照持久化。
 
 ### 资产显示名与来源
 
-来源文件、工程内资产和运行期数据是三个相关但不同的概念。当前实现复制并保存原始 STL；打开时由 `panta-mesh` 解析为内存中的 `SurfaceMesh`，尚未持久化为 Mesh sidecar。088 将用 Mesh sidecar 替换该过渡行为，并按最新决策移除工程内 STL 副本。Sidecar 实施前不能把当前 STL 源副本描述成已经转换后的工程 Mesh 文件。
+来源文件、工程内资产和运行期数据是三个相关但不同的概念。063 最初复制并保存原始 STL，激活时由 `panta-mesh` 解析为内存 `SurfaceMesh`；当前 schema 4 已由 088 改为持久化 Mesh sidecar。历史 STL 副本只有 schema 2/3 迁移时会从工程包读取，成功提交 sidecar 索引后再清理；导入时用户选定的外部 STL 不再复制或作为运行依赖。
 
-导入记录应区分用户看到的 `display_name` 与来源快照：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名，格式、路径、SHA-256、mtime 和 size 是来源诊断信息，不是资产身份或重开工程的依赖。当前实现另有工程内源副本引用；088 迁移到 Mesh sidecar 索引时删除该引用。当前 import record 的 ID 标识导入记录；Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。063 在 import record 中持久化该显示名；088 迁移时保留此命名契约和来源快照。
+导入记录区分用户看到的 `display_name` 与来源快照：STL 的默认显示名取文件名主体（例如 `model_a.stl` 显示为 `model_a`）；`source_name` 保留原始文件名及扩展名，格式、路径、SHA-256、mtime 和 size 仅用于来源诊断。当前 `ImportRecord.id` 标识导入记录；Mesh sidecar 的 `asset_id` / `revision` 标识 Mesh 资产。显示名和源文件名都不是身份键。088 迁移保留 063 建立的命名契约和来源快照，并将 Mesh 索引从导入记录中拆开。
 
 显示名允许重复。记录持久化相同的基础 `display_name`，工程树和文档页签按当前导入顺序显示序号以消除歧义；来源名与导入记录 ID 不因显示冲突而改写。
 

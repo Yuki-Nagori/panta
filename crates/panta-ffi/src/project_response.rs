@@ -528,8 +528,8 @@ mod tests {
                 context,
             ),
             (
-                ProjectError::ImportAssetCopyFailed(context.into()),
-                "project.import_asset_copy_failed",
+                ProjectError::ImportAssetWriteFailed(context.into()),
+                "project.import_asset_write_failed",
                 "io",
                 context,
             ),

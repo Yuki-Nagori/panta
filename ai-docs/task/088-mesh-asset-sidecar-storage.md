@@ -1,6 +1,6 @@
 # 088 — Mesh 资产旁置存储与按需加载
 
-- 状态：planned
+- 状态：in-progress
 - 阶段：CAE 领域模块迁移
 - 依赖：[063](063-stl-import-and-mesh-workspace.md)、[067](067-rust-mesh-domain-migration.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[080](080-qml-viewport-document-tabs.md)
 - 优先级：P1
@@ -11,11 +11,11 @@
 
 将 `.panta` 保持为小型工程元数据和资产索引；Surface / Volume Mesh 使用工程目录内可独立校验、带版本与修订身份的旁置资产文件。打开工程只读取清单与索引；首次打开某个文档页签时，Rust `panta-mesh` 按资产 ID 和 revision 加载权威 Mesh，缓存拥有内存的快照并批量交给 C++ 显示适配层。关闭页签释放该文档的运行期快照。
 
-当前 `.panta` 保存 STL import record 与相对路径，原始 STL 暂时复制到 `assets/imports/`；073 激活未打开记录时读取该 STL 并解析为 `SurfaceMesh`，080 再把快照交给 VTK。按维护者 2026-10-16 的决策，088 的目标是将导入后的 `SurfaceMesh` sidecar 作为工程内唯一权威资产，**不保留原始 STL 副本**。工程保留来源快照元数据：导入时选中的原始路径、文件名、格式、SHA-256、mtime 和 size；这些字段仅用于追溯与诊断，不作为工程重开、Mesh 加载或重新导入的依赖。来源文件不存在或路径失效时也不得阻断工程使用。此任务将替换当前复制 STL 再解析的临时存储路径，同时支持只加载用户实际打开的资产。
+当前实现把导入后的 `SurfaceMesh` sidecar 作为工程内唯一权威资产，不保留原始 STL 副本。工程保留导入时选中的原始路径、文件名、格式、SHA-256、mtime 和 size 作为追溯诊断快照；来源文件不存在或路径失效不影响重开工程或加载 Mesh。打开页签只按工程内资产 ID/revision 加载 sidecar。旧 schema 2/3 迁移仅读取原来保存在工程包内的 STL 副本，提交新清单后才清理旧副本，不读取已失效的外部来源路径。
 
 当前 Rust `SurfaceMesh` 每个面存三个 `[f64; 3]` 顶点，内存 payload 约 72 字节 / 面；binary STL 约 50 字节 / 面。若保留两份，工程磁盘占用会增加；不能默认 sidecar 会压缩文件或节省内存。格式评估应比较紧凑坐标、索引 / 连接关系与压缩方案，同时保持单位、硬边语义和精度可验证。
 
-Mesh sidecar 的主要收益是避免原始格式解析及其临时分配。它仍需读取 Mesh 数据、创建本次运行期快照、转换成 VTK 数据并上传图形资源；不承诺消除显示内存或 GPU 驻留。080 已通过跳过 STL 三角面上重复的 VTK 法线过滤器降低渲染切换高水位，不能把两种优化混为一项。
+Mesh sidecar 的确定收益是工程保存独立于外部来源文件，并以工程内版本化 Mesh IR 作为唯一权威数据。它可能避免来源格式解析，但 sidecar 仍需读取、校验和构造运行期快照；对 binary STL，尚不能预设该路径更快。它不消除转换 VTK 数据或上传图形资源的成本，也不承诺降低显示内存 / GPU 驻留。性能基准应分开比较 STL 解析、sidecar 编解码、工程激活、缓存命中与 VTK；080 已通过跳过 STL 三角面上重复的 VTK 法线过滤器降低渲染切换高水位，不能把两种优化混为一项。
 
 ## 必读
 
@@ -51,6 +51,25 @@ Mesh sidecar 的主要收益是避免原始格式解析及其临时分配。它�
 - 明确文件格式版本、内容摘要算法、相对路径规则、写入持久性与损坏诊断；若格式或写入事务无法保证失败后保留上一份有效索引，暂不提交 schema 变更。
 - 明确 sidecar 发布顺序：写入临时文件、校验并发布不可变资产，再提交引用它的新清单；崩溃留下未引用文件不得影响已提交工程。垃圾回收不删除当前或仍被任务引用的 revision。
 
+## 本轮实施边界
+
+- 将当前 schema 3 的 STL 导入记录迁移到 schema 4 Mesh asset 索引；schema 1（无导入）、schema 2 与 schema 3 仍按既有契约读取。
+- 旧工程迁移在打开时读取其工程内 `assets/imports/` STL，并以同一 Rust parser 生成 sidecar。迁移候选全部写入并验证成功后才替换清单；失败时保留旧清单与所有 STL 文件，打开操作不得替换当前会话。
+- 新导入从 `PreparedStl` 已解析并换算为毫米的 Mesh 生成 sidecar，不将来源 STL 复制到工程。来源绝对路径仅是可失效的诊断快照。
+- sidecar 使用固定小端字段、显式格式版本、Mesh 类型、单位、元素数量及 SHA-256；解码先验证头、长度与摘要，再进行领域校验。未知版本和损坏数据明确失败，不尝试 STL fallback。
+- 清单索引字段独立于来源信息：稳定 asset ID、revision、工程相对 sidecar 路径、payload 摘要和格式版本。当前导入记录继续通过稳定 ID 向 UI 展示。
+- 迁移成功后，旧 STL 视为未引用文件；本轮仅在清单提交成功后清理迁移来源副本。清理失败不得使已提交迁移回报失败，遗留文件可被后续显式清理；不得删除用户选定的工程外源文件。
+
+## 当前实现
+
+- `panta-mesh` 定义 sidecar v1 的 Surface / Tet Mesh 编解码，使用显式小端字段、f64 坐标、毫米单位、元素计数与 payload SHA-256；格式与 VTK、OCCT、Netgen 对象布局无关。
+- `panta-import` 只负责 STL 来源快照及领域导入记录；`panta-core` 生成工程资产索引、管理写租约、发布 sidecar、迁移旧工程并按需激活。`panta-ffi` 只投影工程相对 Mesh 路径，不重做解析或路径拼接策略。
+- 新导入对预览时冻结的内容做确认复核，复用已解析网格换算毫米后写 sidecar；源字节在提取追溯元数据后释放，不复制到工程。
+- 同步和异步导入都在工程写租约内发布 sidecar，再提交 schema 4；重复的同内容孤儿文件可安全复用，不同内容的崩溃残留使用有界恢复 ID，提交失败只清理本次新建的文件。
+- schema 2/3 的内部 STL 迁移先校验可用的来源 SHA-256，再在同一个工程写租约下逐项生成候选 sidecar；所有候选成功后提交 schema 4，失败时移除本轮新文件并保留旧 manifest 与源副本。成功提交后清理旧工程副本。
+- 工程资产路径沿用 `PathService` 的相对片段和符号链接包含检查；导入投影使用真实工程根目录。sidecar 激活先检查固定头与长度，再分块读取、核对摘要与 Mesh 有效性；文件格式不设 2 GiB 上限。预计 sidecar 超过 2 GiB 时，确认导入前提醒用户耗时、内存和磁盘空间风险，但允许继续。
+- 当前 Surface sidecar 每三角面保存 72 字节的 f64 顶点数据，未压缩；binary STL 约 50 字节 / 面。文件体积不会因格式转换而减少，实际收益应从避免 STL 解析和工程中保留第二份源副本衡量。
+
 ## 实施步骤
 
 1. 核对当前 ProjectManifest、ImportRecord、SurfaceMesh / TetMesh 与异步激活所有权；补测 STL 解析、Mesh 解码、磁盘读写和批量 CXX 快照成本。
@@ -73,25 +92,32 @@ Mesh sidecar 的主要收益是避免原始格式解析及其临时分配。它�
 
 ## 验收标准
 
-- [ ] `.panta` 只含工程元数据和 Mesh asset 索引；有效 Mesh payload 存在工程内相对路径指向的旁置文件。
-- [ ] 打开工程仅读取清单 / 索引；未打开页签的 Mesh payload 不进入进程内存。
-- [ ] 按稳定 asset ID 与 revision 加载一个 Mesh，CXX 批量快照正确；已缓存页签激活不重读、不重复解析。
-- [ ] STL 预览、导入提交与 Mesh sidecar 使用同一内容快照；源文件变化检测不会让清单记录与 Mesh payload 指向不同输入。
-- [ ] 导入不在工程中留下原始 STL 文件；保留所选路径、来源名、格式、SHA-256、mtime 和 size 后，删除或移动输入 STL 不影响工程重开与 sidecar Mesh 加载，失效路径也不产生阻断错误。
-- [ ] 关闭页签释放其独占快照；关闭工程及 revision 失效后旧数据和迟到任务不能覆盖新资产。
-- [ ] Sidecar 保存和清单提交失败时，上一份有效工程保持可打开；孤立新文件不会被当作已提交资产。
-- [ ] 缺失、损坏、摘要不符、格式不支持和来源 revision 失配均返回稳定结构化错误，保留原始资产与工程可恢复性。
-- [ ] Surface / Volume Mesh 持久化往返后领域值、单位、连接关系、分组和 revision 一致，校验结果可复现。
+- [x] `.panta` 只含工程元数据和 Mesh asset 索引；有效 Mesh payload 存在工程内相对路径指向的旁置文件。
+- [x] 打开工程仅读取清单 / 索引；未打开页签的 Mesh payload 不进入进程内存。
+- [x] 按稳定 asset ID 与 revision 加载一个 Mesh，CXX 批量快照正确；已缓存页签激活不重读、不重复解析。
+- [x] STL 预览、导入提交与 Mesh sidecar 使用同一内容快照；源文件变化检测不会让清单记录与 Mesh payload 指向不同输入。
+- [x] 导入不在工程中留下原始 STL 文件；保留所选路径、来源名、格式、SHA-256、mtime 和 size 后，删除或移动输入 STL 不影响工程重开与 sidecar Mesh 加载，失效路径也不产生阻断错误。
+- [x] 关闭页签释放其独占快照；关闭工程及 revision 失效后旧数据和迟到任务不能覆盖新资产。
+- [x] Sidecar 保存和清单提交失败时，上一份有效工程保持可打开；孤立新文件不会被当作已提交资产，后续导入可复用同内容 sidecar 或选择恢复 ID。
+- [x] 缺失、损坏、摘要不符、格式不支持和来源 revision 失配均返回稳定结构化错误；schema 3 迁移校验已有来源摘要。
+- [x] Surface / Volume Mesh 持久化往返后领域值、单位、连接关系、分组和 revision 一致，校验结果可复现。
+- [x] Sidecar 头部先于 payload 校验，声明长度与文件长度一致；单文件不设 2 GiB 上限。预计 sidecar 超过 2 GiB 时，确认导入前显示耗时、内存和磁盘空间非阻断提醒。
 - [ ] 代表性测量覆盖保存、打开工程、首次激活、缓存命中及关闭释放；给出解析 / 解码时延、磁盘字节、CPU/RSS峰值与测量边界。
 - [ ] Cargo 构建、workspace 测试、格式、lint、CMake/native 测试和适用的真窗口加载验收通过；所有 task 与架构说明一致。
 
 ## 验证计划与结果
 
-尚未开始；依赖任务完成后按仓库聚合入口和性能场景验证。CPU / 磁盘性能基准不作为普通 CI 时间门禁。
+实施已覆盖功能和架构验收。剩余真实代表性 STL 的性能测量，以及 GitHub issue 清单核对（`gh issue list` 当前无法连接 `api.github.com`）；合成数据不作为真实工程性能结论。CPU / 磁盘性能基准不作为普通 CI 时间门禁。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-29 | 架构评审：080 高水位测量、063 manifest / STL 资产、067 Mesh IR 与现有分层文档 | 区分解析成本、运行期 Mesh / VTK / GPU 成本；登记独立实施边界 | 已核对：080 的 608,218 面真实模型经 31 轮 VTK 切换峰值 RSS 已由约 1.65 GiB 降到 0.46–0.47 GiB；sidecar 可免重复 STL 解析，但仍需加载 Mesh 和创建 VTK / GPU 数据。本任务只规划 Mesh 旁置存储及按需加载。 |
+| 2026-10-16 | `cargo test -p panta-mesh --lib --offline`; `cargo test -p panta-import --lib --offline`; `cargo test -p panta-core --lib --offline`; `cargo test -p panta-ffi --lib --offline --no-run` | codec、来源快照、迁移、事务与 FFI 投影回归 | 通过：panta-mesh 13/13、panta-import 7/7、panta-core 120/120；FFI 测试目标编译成功。 |
+| 2026-10-16 | macOS 26.3.1 arm64, Release；`cargo test -p panta-mesh --release --test mesh_performance supplied_stl_and_sidecar_costs --offline -- --ignored --nocapture` | 量化 STL 解析、sidecar 编解码、热读解码、首次同步写入和字节数，不设阈值 | 100k 合成 binary STL：源 5,000,084 B，f64 Mesh 估算 7,200,000 B，sidecar 7,200,064 B；解析 p50 0.581 ms、编码 12.817 ms、解码 12.844 ms、热盘读+解码 13.187 ms、首次写入+sync 11.391 ms。该场景 sidecar 大于源 STL 且解析更快；结果仅说明该合成输入，真实工程首次激活 / cache 命中 / RSS 需用独立 C++ 工程基准和代表性用户工程复测。 |
+| 2026-10-16 | `cargo test --locked --workspace` | Rust、C++、QML 聚合回归完整通过 | 通过：workspace Rust 测试通过，native / QML 聚合 CTest 77/77；涵盖孤儿 sidecar 恢复、symlink 越界拒绝和 schema 3 来源摘要不符回归。终审修复 `.STL` 大写扩展名迁移后的旧副本清理，并通过 `cargo test -p panta-core --test project migrates_schema_two_import_names_and_saves_schema_four` 复验。 |
+| 2026-10-16 | `cargo clippy --locked --workspace --all-targets -- -D warnings`; `cargo lint --changed --check`; `cargo format --check`; `git diff HEAD --check` | 代码质量门禁和格式检查通过 | 通过：Clippy、Cargo lint 9/9 阶段、格式与 diff 检查均成功。 |
+| 2026-10-16 | 超 2 GiB sidecar 读取边界回归；`cargo test --locked -p panta-mesh -p panta-core --lib` | 不设文件大小硬上限；回归不实际分配超大 payload | 通过：mesh 13/13、core 120/120。core 用大于 2 GiB 的稀疏文件写入有效头部，并在 payload 分配前取消，验证读取路径接受该长度。2 GiB 导入提醒由面数估算，在确认前显示且不阻止继续。 |
+| 2026-10-16 | 088 独立只读终审及修复复核 | 无路径越界、崩溃残留阻塞或来源摘要不一致 | 首轮评审提出 Windows 工程根投影、mesh 目录符号链接、迁移孤儿、超大 sidecar、普通导入孤儿与 schema 3 来源摘要等问题；已修复并增加回归。终审发现并修复 `.STL` 后缀旧副本清理遗漏，复核确认修复正确；同时确认 2 GiB 提醒阈值、提示时机和翻译正确，读取层超大文件测试避免实际分配 payload。GitHub issue #47 已通过本分支文档澄清来源字段归属；待 PR 合并后关闭。 |
 
 ## 风险与回退
 
@@ -105,4 +131,4 @@ sidecar 与清单是多文件资产事务；先发布资产、后提交索引，
 
 ## 完成摘要
 
-未实施。等待 063、067、073、080 的相关契约收敛后，确定持久格式、事务语义和测量门槛；不保留原始 STL 副本的策略已由维护者确定。
+实现及独立架构评审已完成。sidecar v1 固定为精确的 f64 三角面值格式；其文件体积高于 binary STL，不能作为压缩或节省空间优化。真实代表性 STL 的工程性能数据仍未取得；合成基准不替代该证据。GitHub API 当前不可达，待 issue 列表可读后核对并关闭本分支已修复的问题。不保留原始 STL 副本的策略由维护者于 2026-10-16 确认。

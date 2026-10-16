@@ -80,7 +80,7 @@ pub(super) fn project_service_import_stl(
             &units,
             show_import_log,
         )
-        .map(project_import)
+        .and_then(|import| project_import(&service.service, import))
 }
 
 pub(super) fn project_service_begin_stl_import(
@@ -105,7 +105,11 @@ pub(super) fn project_service_finish_stl_import(
     service
         .service
         .finish_stl_import(request)
-        .map(|record| record.map(project_import))
+        .and_then(|record| {
+            record
+                .map(|record| project_import(&service.service, record))
+                .transpose()
+        })
 }
 
 pub(super) fn project_service_cancel_stl_import(
@@ -118,10 +122,12 @@ pub(super) fn project_service_cancel_stl_import(
 pub(super) fn project_service_imports(
     service: &ProjectService,
 ) -> Result<Vec<bridge::ProjectImport>, panta_core::project::ProjectError> {
-    service
-        .service
-        .imports()
-        .map(|imports| imports.into_iter().map(project_import).collect())
+    service.service.imports().and_then(|imports| {
+        imports
+            .into_iter()
+            .map(|import| project_import(&service.service, import))
+            .collect()
+    })
 }
 
 pub(super) fn project_service_workspace_snapshot(
@@ -662,14 +668,18 @@ fn project_snapshot(snapshot: panta_core::project::ProjectSnapshot) -> bridge::P
     }
 }
 
-fn project_import(import: panta_core::project::ImportRecord) -> bridge::ProjectImport {
-    bridge::ProjectImport {
+fn project_import(
+    service: &panta_core::project::ProjectService,
+    import: panta_core::project::ImportRecord,
+) -> Result<bridge::ProjectImport, panta_core::project::ProjectError> {
+    let mesh_asset_path = service.mesh_asset_path_for_import(&import.id)?;
+    Ok(bridge::ProjectImport {
         record_version: import.record_version,
         parser_version: import.parser_version,
         id: import.id,
         display_name: import.display_name,
         source_name: import.source_name,
-        asset: import.asset,
+        mesh_asset_path,
         format: import.format,
         mesh_type: import.mesh_type,
         units: import.units,
@@ -678,7 +688,7 @@ fn project_import(import: panta_core::project::ImportRecord) -> bridge::ProjectI
         size_x: import.dimensions[0],
         size_y: import.dimensions[1],
         size_z: import.dimensions[2],
-    }
+    })
 }
 
 pub(super) fn stl_import_preview(
@@ -1309,7 +1319,10 @@ endsolid
         )?;
         assert_eq!(imported.id, "import-1");
         assert_eq!(imported.source_name, "part.stl");
-        assert_eq!(imported.asset, "assets/imports/0001-part.stl");
+        assert_eq!(
+            imported.mesh_asset_path,
+            "assets/meshes/mesh-import-1-r1.pmesh"
+        );
         assert_eq!(imported.mesh_type, "solid-3d");
         assert_eq!(imported.units, "centimeters");
         assert!(imported.show_import_log);

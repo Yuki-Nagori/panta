@@ -89,6 +89,7 @@ impl WriteLease {
             name: state.name.clone(),
             revision: state.revision,
             imports: state.imports.clone(),
+            mesh_assets: state.mesh_assets.clone(),
             analysis_sequences: state.analysis_sequences.clone(),
             materials: state.materials.clone(),
             fill_settings: state.fill_settings.clone(),

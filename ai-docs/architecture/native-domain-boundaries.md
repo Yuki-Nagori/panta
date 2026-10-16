@@ -2,7 +2,7 @@
 
 [架构总览](README.md) · [分层规则](../standards/layering.md) · [任务 066](../task/066-native-domain-boundaries.md)
 
-更新日期：2026-09-30。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，其余领域模块按实际功能建立。
+更新日期：2026-10-16。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，Mesh sidecar 持久化与按需激活由 [088](../task/088-mesh-asset-sidecar-storage.md) 实施，其余领域模块按实际功能建立。
 
 ## 分层与调用
 
@@ -102,7 +102,7 @@ Rust 工作区由 `panta-import` 承担统一的**导入服务契约**，不要�
 | B. 修复为几何 | 决定是否启动转换任务、领域操作选项和来源 revision；校验并提交新 `GeometryAsset` | C++ adapter 将领域选项映射到 OCCT 参数，重建 faceted B-rep、执行范围明确的 B-rep 修复并返回诊断 | 新几何 ID / revision 与来源 Mesh revision 关联；原 Mesh 保留 |
 | C. 生成体网格 | 选择 `SurfaceMesh` revision、领域网格参数和任务语义；`panta-mesh` 校验 `TetMesh` 并提交 | C++ adapter 调用 Netgen 的 STL 几何入口与适用的表面 / 体网格优化步骤，转换输出 DTO，不持有 Rust 领域规则 | 新 Volume Mesh ID / revision 与来源 Mesh 和参数关联 |
 
-读取 / 解析、OCCT 修复和 Netgen 网格生成都是不可预测耗时操作，应在 Rust 后台任务中编排并支持取消 / 过期结果拒绝。固定 SDK Netgen 6.2.2604 的 [`nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h) 暴露 STL 几何、表面网格和体网格入口；其具体优化步骤与输入要求由对应 adapter / 网格任务验证，不据此推断 Netgen 执行 B-rep 修复。Rust 保存领域操作选项和提交策略，C++ adapter 负责映射到底层库参数并执行调用。CXX 只声明快照 / DTO 与受控适配调用，不存领域策略。Mesh sidecar 和 `.panta` 索引规划见 [088](../task/088-mesh-asset-sidecar-storage.md)；OCCT B-rep 持久化不在该任务中。
+读取 / 解析、OCCT 修复和 Netgen 网格生成都是不可预测耗时操作，应在 Rust 后台任务中编排并支持取消 / 过期结果拒绝。固定 SDK Netgen 6.2.2604 的 [`nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h) 暴露 STL 几何、表面网格和体网格入口；其具体优化步骤与输入要求由对应 adapter / 网格任务验证，不据此推断 Netgen 执行 B-rep 修复。Rust 保存领域操作选项和提交策略，C++ adapter 负责映射到底层库参数并执行调用。CXX 只声明快照 / DTO 与受控适配调用，不存领域策略。Mesh sidecar 和 `.panta` 索引见 [088](../task/088-mesh-asset-sidecar-storage.md)；该格式仅持久化 Surface / Volume Mesh IR，不持久化 OCCT B-rep。
 
 格式分发以显式声明或扩展名为入口，再由实际解析器验证内容；扩展名本身不保证格式有效。各格式返回结构化错误，公共流程只决定是否提交，不吞掉 OCCT / STL 的专门诊断。新的导入格式在有端到端使用者时才加入路由、bridge 和测试；若新增本构、网格生成或格式修复算法，仍调用相应重库或另立明确的轻量功能任务。
 

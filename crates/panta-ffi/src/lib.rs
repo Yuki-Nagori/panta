@@ -169,7 +169,7 @@ pub mod bridge {
         pub id: String,
         pub display_name: String,
         pub source_name: String,
-        pub asset: String,
+        pub mesh_asset_path: String,
         pub format: String,
         pub mesh_type: String,
         pub units: String,

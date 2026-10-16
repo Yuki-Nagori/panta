@@ -36,17 +36,17 @@ Rust 负责工程、工作区、命令、任务、作业、序列化、撤销/�
 
 ## 存储契约
 
-完整工程容器和二进制资产格式仍未定。任务 057 的最小契约使用 `Documents/panta/<name>/<name>.panta` 目录包；任务 063 当前主文件 schema 为 `3`，在名称和修订号之外保存可重放的 STL `imports` 记录，记录固定导入记录版本与 STL 解析器版本，原始 STL 复制到 `assets/imports/`。ImportRecord 持久化与来源名分离的 `display_name`，新记录保存源字节快照的 SHA-256；旧 schema 2 记录从 `source_name` 派生显示名，缺失摘要保持为空，不在打开清单时读取全部来源资产。schema 1 按缺省空 imports 读取，成功保存时写当前 schema。保存先在工程目录内写独立临时文件再替换主文件。该实现是当前边界，不代表完整工程格式，也不等于持久化了解析后的 Mesh IR。
+完整工程容器尚未定型。任务 057 的最小契约使用 `Documents/panta/<name>/<name>.panta` 目录包；当前 schema 4 将工程元数据、ImportRecord v4 和 `mesh_assets` 索引写入 `.panta`，Mesh payload 独立保存于 `assets/meshes/`。导入记录保存来源路径、名称、格式、源字节 SHA-256、mtime 与 size 作为诊断快照，不保留原始 STL 副本，也不在重开工程或加载 Mesh 时访问来源路径。schema 1/2/3 通过 Rust 迁移入口读取；schema 2/3 的工程内 STL 副本先转换为 sidecar，候选资产与新清单提交成功后才清理旧副本。schema 1 仅允许空 imports。保存和迁移均通过工程写入租约及同目录临时文件替换主清单。该实现仍是最小工程契约，不代表完整工程格式。
 
 [108](../task/108-project-write-coordination.md) 将工程写入集中到 Rust repository 租约：使用 fs4 同步文件锁协调同一工程的跨实例 / 跨进程写入；争用立即返回 `project.command_invalid`（`project write pending`）。锁文件 `<name>.panta.lock` 保持稳定，不在释放租约时删除。租约销毁时先显式 unlock 再关闭句柄，避免 fork / dup 的共享描述符延长锁存活；解锁失败记录诊断，不改变已提交结果。内存状态分别记录当前 revision 与已保存 revision；租约取得和清单替换前复核磁盘已保存修订，过期服务返回 `project changed on disk` 并保留其候选及旧磁盘内容。该锁为协作式，不拦截绕过租约的外部写入。
 
-临时清单位于 `<name>.panta.write/`，按进程 ID / 序号使用 `create_new` 独立创建，碰撞有限重试；失败清理只针对当前租约拥有的临时文件。写入与 `sync_all` 成功后 rename 为提交点，其后更新内存已保存修订；解锁收尾及诊断不改变提交结果。STL 资产复制、清单提交与失败回滚共享同一租约。稳定锁文件及空 staging 目录保留在工程目录，不写入清单或作为资产展示；本实现保证文件内容同步，不承诺所有平台断电后的目录项持久性。
+临时清单位于 `<name>.panta.write/`，按进程 ID / 序号使用 `create_new` 独立创建，碰撞有限重试；失败清理只针对当前租约拥有的临时文件。写入与 `sync_all` 成功后 rename 为提交点，其后更新内存已保存修订；解锁收尾及诊断不改变提交结果。Mesh sidecar 发布、清单提交与失败回滚共享同一租约。稳定锁文件及空 staging 目录保留在工程目录，不写入清单或作为资产展示；本实现保证文件内容同步，不承诺所有平台断电后的目录项持久性。
 
 [092](../task/092-plan-analysis-sequence-and-mesh-settings.md) 在当前清单中增加按导入记录 ID 索引的 `analysis_sequences` 稀疏覆盖表；缺省表示 Fill，非默认选择由 Rust 校验并事务保存。读取时拒绝未知序列或没有对应导入记录的覆盖项。`imports[].mesh_type` 保留 STL 导入时选择的类型，供 Tasks 展示；它不代表已经生成对应分析网格。当前暂以导入记录关联方案设置，后续独立 Study 模型应保持领域 ID 和修订边界。
 
-目标存储将 `.panta` 保持为元数据和资产索引，规范 `SurfaceMesh` / 体 Mesh payload 旁置于同一可移交工程目录。索引按稳定 asset ID 和 revision 指向带格式版本、单位、来源 revision、内容摘要及相对路径的资产文件；用户可见 `display_name` 是资产元数据，与 asset ID、来源文件名和格式分开。打开工程只读索引，视口页签打开时由 Rust `panta-mesh` 按需读取并验证单个 Mesh。运行期缓存保存拥有内存的领域快照，C++ 通过批量 CXX DTO 创建 VTK 数据；VTK mapper、filter、actor 和 GPU 资源不写入工程。当前实现仍将原始 STL 复制到 `assets/imports/`，再在激活时解析成内存 `SurfaceMesh`，尚无持久 Mesh sidecar。维护者已决定目标存储不保留原始 STL 副本：成功导入后由 Mesh sidecar 独立支撑工程重开；索引仅保存所选原始路径、文件名、格式、SHA-256、mtime 和 size 用于来源追溯，来源路径不得作为加载依赖。当前 `SurfaceMesh` 的三角面 payload 约 72 字节 / 面，binary STL 约 50 字节 / 面；目标不保留两份数据，侧重避免双权威及重复数据。实现跟踪于 [088](../task/088-mesh-asset-sidecar-storage.md)，sidecar 格式与事务细节仍待该任务实施验证。
+`.panta` 保存元数据和资产索引，规范 `SurfaceMesh` / 体 Mesh payload 旁置于同一可移交工程目录。索引按稳定 asset ID 和 revision 指向带格式版本、单位、来源 revision、内容摘要及相对路径的资产文件；用户可见 `display_name` 与 asset ID、来源文件名和格式分开。打开工程读取索引但不读取 Mesh payload；页签激活时 Rust `panta-core` 协调、`panta-mesh` 解码并验证单个 Mesh，运行期缓存持有领域快照，C++ 通过批量 CXX DTO 创建 VTK 数据。VTK mapper、filter、actor 和 GPU 资源不写入工程。新导入只保存 Mesh sidecar 与来源诊断快照，来源文件之后可被删除或移动。当前 sidecar v1 使用显式小端字段、毫米单位、元素数量与 SHA-256；SurfaceMesh 保留三角面顶点的 f64 精度，不压缩，约 72 字节 / 面，因而大于约 50 字节 / 面的 binary STL，但工程内不再同时保留两份数据。schema 2/3 迁移读取工程内旧 STL 副本，不依赖可能已失效的外部来源路径。实现与验证细节见 [088](../task/088-mesh-asset-sidecar-storage.md)。
 
-资产文件使用不可变 revision 名称。保存时先写临时 sidecar、校验并发布文件，再原子提交引用它的新 `.panta`；崩溃产生的未引用文件不影响上个有效索引，后续清理也必须检查运行中任务和资产引用。相对路径使整个工程目录可移动。单文件原子替换不代表多文件事务；资产发布顺序、摘要校验和失败恢复须由实际实现测试。
+资产文件使用不可变 revision 名称。新导入和 schema 2/3 迁移均在写入租约内先创建临时 sidecar、同步并发布文件，再原子提交引用它的新 `.panta`；提交失败会清理本次候选文件并保留旧清单。旧 STL 副本仅在迁移清单提交后回收，回收失败不反向报告提交失败。未引用 sidecar 不会被当作已提交资产。相对路径与符号链接包含性校验使整个工程包可移动且拒绝越出工程根的引用。单文件原子替换不代表多文件断电事务；目录项断电持久性仍不承诺。
 
 需要明确嵌入资产与外部引用策略。便携工程应包含必要资产或可解析的相对引用；只保存开发机绝对路径不能作为默认可移交方案。读取时对缺失资产、未知 schema 版本、损坏数据及单位不一致提供明确诊断。
 

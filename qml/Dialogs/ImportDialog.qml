@@ -20,6 +20,8 @@ DialogWindow {
 
     readonly property var meshTypes: projectModel.meshTypes
     readonly property var unitValues: ["millimeters", "centimeters", "inches"]
+    // A surface sidecar uses 72 bytes per triangle plus a 64-byte header.
+    readonly property bool largeMeshWarning: projectModel.importPreviewReady && projectModel.importPreviewTriangleCount * 72 + 64 > 2147483648
 
     onVisibleChanged: {
         if (!visible) {
@@ -65,8 +67,8 @@ DialogWindow {
             return qsTranslate("ImportDialogErrors", "Choose an STL file to import.");
         if (projectModel.errorCode === "project.import_parse_failed")
             return qsTranslate("ImportDialogErrors", "The selected STL file could not be read.");
-        if (projectModel.errorCode === "project.import_asset_copy_failed")
-            return qsTranslate("ImportDialogErrors", "The STL file could not be copied into the project.");
+        if (projectModel.errorCode === "project.import_asset_write_failed")
+            return qsTranslate("ImportDialogErrors", "The mesh asset could not be saved into the project.");
         return qsTranslate("ImportDialogErrors", "The import operation could not be completed.");
     }
 
@@ -162,6 +164,15 @@ DialogWindow {
                 }
             }
 
+            ThemedLabel {
+                Layout.fillWidth: true
+                visible: dialog.largeMeshWarning
+                text: qsTranslate("ImportDialogStatus", "The mesh asset is expected to exceed 2 GiB. Import is allowed, but it may take a long time and require substantial memory and disk space. Make sure your computer and project drive have enough resources before continuing.")
+                textSize: Theme.fontSmall
+                textColor: Theme.colorError
+                wrapMode: Text.Wrap
+            }
+
             ThemedCheckBox {
                 id: showImportLogCheckBox
 
@@ -174,7 +185,7 @@ DialogWindow {
                 id: helpText
                 Layout.fillWidth: true
                 visible: false
-                text: qsTranslate("ImportDialogHelp", "The source file is copied into the project assets so the import can be reopened later.")
+                text: qsTranslate("ImportDialogHelp", "A mesh asset is saved into the project. The original STL can be moved or deleted after import.")
                 textSize: Theme.fontSmall
                 textColor: Theme.colorTextMuted
                 wrapMode: Text.Wrap

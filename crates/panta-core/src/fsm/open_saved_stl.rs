@@ -6,13 +6,15 @@
 //! FFI。加载不修改工程 revision / dirty，也不写存储。
 
 use std::collections::{HashMap, VecDeque};
+use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, PoisonError};
 
-use panta_import::{CheckedReadError, ImportError, parse_stl_asset, read_source_checked};
-use panta_mesh::SurfaceMesh;
+use panta_import::ImportError;
+use panta_mesh::{MeshAsset, SurfaceMesh, decode_mesh_asset_with_digest, mesh_asset_encoded_len};
 
 use super::generated as fsm;
 
@@ -28,7 +30,7 @@ pub struct ActivationAttempt {
 /// 一次激活请求的工作数据；提交后归 worker 线程所有。
 pub(crate) struct ActivationRequest {
     pub asset_path: PathBuf,
-    pub units: String,
+    pub expected_digest: String,
 }
 
 /// 每个进程内 attempt 至多发布一次的终态结果；`Expired` 无网格负载。
@@ -423,7 +425,7 @@ fn outcome_for(entry: &AttemptEntry, state: fsm::State, attempt: u64, event: Eve
     outcome
 }
 
-/// worker 入口：分块读取（可取消）→ 解析（不可中断，完成边界校验代次）。
+/// worker 入口：分块读取（可取消）→ 校验 / 解码（完成边界检查会话代次）。
 /// GUI 线程永不 join 本线程；终止只经由状态图终态发布结果。
 fn run_attempt(
     coordinator: Arc<ActivationCoordinator>,
@@ -436,13 +438,13 @@ fn run_attempt(
         coordinator.complete(attempt, Event::CancelAcknowledged);
         return;
     }
-    let snapshot = match read_source_checked(&request.asset_path, cancelled) {
-        Ok(snapshot) => snapshot,
-        Err(CheckedReadError::Cancelled(_)) => {
+    let bytes = match read_mesh_bytes(&request.asset_path, cancelled) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => {
             coordinator.complete(attempt, Event::CancelAcknowledged);
             return;
         }
-        Err(CheckedReadError::Failed(error)) => {
+        Err(error) => {
             let (code, category, detail) = activation_failure(&error);
             coordinator.complete(
                 attempt,
@@ -460,20 +462,113 @@ fn run_attempt(
         coordinator.complete(attempt, Event::CancelAcknowledged);
         return;
     }
-    match parse_stl_asset(&snapshot, &request.units) {
-        Ok(mesh) => coordinator.complete(attempt, Event::ParseSucceeded { mesh }),
-        Err(error) => {
-            let (code, category, detail) = activation_failure(&error);
+    match decode_mesh_asset_with_digest(&bytes) {
+        Ok((MeshAsset::Surface(mesh), digest)) if digest == request.expected_digest => {
+            if cancelled() {
+                coordinator.complete(attempt, Event::CancelAcknowledged);
+            } else {
+                coordinator.complete(attempt, Event::ParseSucceeded { mesh });
+            }
+        }
+        Ok((MeshAsset::Surface(_), _)) => {
             coordinator.complete(
                 attempt,
                 Event::Fail {
-                    code,
-                    category,
-                    detail,
+                    code: "project.asset_parse_failed",
+                    category: "format",
+                    detail: request.asset_path.display().to_string(),
                 },
             );
         }
+        Ok((MeshAsset::Volume(_), _)) => {
+            coordinator.complete(
+                attempt,
+                Event::Fail {
+                    code: "project.asset_unsupported_format",
+                    category: "format",
+                    detail: request.asset_path.display().to_string(),
+                },
+            );
+        }
+        Err(error) => coordinator.complete(
+            attempt,
+            Event::Fail {
+                code: "project.asset_parse_failed",
+                category: "format",
+                detail: error.to_string(),
+            },
+        ),
     }
+}
+
+/// 先验证头部与声明长度，再分块读取并响应关闭 / 取消；格式不设单文件大小上限。
+fn read_mesh_bytes(
+    path: &std::path::Path,
+    cancelled: impl Fn() -> bool,
+) -> Result<Option<Vec<u8>>, ImportError> {
+    let mut file = File::open(path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            ImportError::Missing(path.display().to_string())
+        } else {
+            ImportError::Read(format!("{}: {error}", path.display()))
+        }
+    })?;
+    let file_len = file
+        .metadata()
+        .map_err(|error| ImportError::Read(format!("{}: {error}", path.display())))?
+        .len();
+    let mut header = [0_u8; 56];
+    file.read_exact(&mut header)
+        .map_err(|error| ImportError::UnsupportedFormat(format!("{}: {error}", path.display())))?;
+    let expected = mesh_asset_encoded_len(&header)
+        .map_err(|error| ImportError::UnsupportedFormat(format!("{}: {error}", path.display())))?;
+    let expected_u64 = u64::try_from(expected)
+        .map_err(|_| ImportError::UnsupportedFormat(path.display().to_string()))?;
+    if expected_u64 != file_len {
+        return Err(ImportError::UnsupportedFormat(format!(
+            "{}: sidecar length does not match its header",
+            path.display()
+        )));
+    }
+    if cancelled() {
+        return Ok(None);
+    }
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(expected).map_err(|error| {
+        ImportError::Read(format!("{}: allocation failed: {error}", path.display()))
+    })?;
+    bytes.extend_from_slice(&header);
+    let mut remaining = expected - header.len();
+    let mut chunk = [0_u8; 256 * 1024];
+    while remaining > 0 {
+        if cancelled() {
+            return Ok(None);
+        }
+        let capacity = remaining.min(chunk.len());
+        let read = file
+            .read(&mut chunk[..capacity])
+            .map_err(|error| ImportError::Read(format!("{}: {error}", path.display())))?;
+        if read == 0 {
+            return Err(ImportError::Read(format!(
+                "{}: sidecar ended before its declared size",
+                path.display()
+            )));
+        }
+        bytes.extend_from_slice(&chunk[..read]);
+        remaining -= read;
+    }
+    let mut trailing = [0_u8; 1];
+    if file
+        .read(&mut trailing)
+        .map_err(|error| ImportError::Read(format!("{}: {error}", path.display())))?
+        != 0
+    {
+        return Err(ImportError::Read(format!(
+            "{}: sidecar grew while being read",
+            path.display()
+        )));
+    }
+    Ok(Some(bytes))
 }
 
 /// 共享读取通道限制并发；准入失败仍走已有 spawn-failed 状态边。
@@ -539,6 +634,36 @@ mod tests {
         _: ActivationRequest,
         _: Arc<AtomicBool>,
     ) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    #[test]
+    fn sidecar_header_above_two_gib_is_accepted_by_format_policy()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let path = std::env::temp_dir().join(format!(
+            "panta-large-mesh-{}-{}.pmesh",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_nanos()
+        ));
+        let mut header = [0_u8; 56];
+        header[..8].copy_from_slice(b"PNTMESH\0");
+        header[8..12].copy_from_slice(&1_u32.to_le_bytes());
+        header[12] = 1;
+        header[13] = 1;
+        header[16..24].copy_from_slice(&(2_u64 * 1024 * 1024 * 1024).to_le_bytes());
+        let file = File::create(&path)?;
+        use std::io::Write;
+        (&file).write_all(&header)?;
+        file.set_len(2_u64 * 1024 * 1024 * 1024 + header.len() as u64)?;
+        drop(file);
+
+        // Cancellation after header validation proves the read path accepts the size
+        // without allocating or touching the sparse payload.
+        let result = read_mesh_bytes(&path, || true);
+        std::fs::remove_file(&path)?;
+        assert!(matches!(result, Ok(None)));
         Ok(())
     }
 
@@ -751,7 +876,7 @@ mod tests {
                 "import-1",
                 ActivationRequest {
                     asset_path: PathBuf::from("unused.stl"),
-                    units: "millimeters".to_owned(),
+                    expected_digest: "sha256:test".to_owned(),
                 },
                 accept_activation_request,
             )
@@ -868,7 +993,7 @@ mod tests {
         let coordinator = Arc::new(ActivationCoordinator::default());
         let request = || ActivationRequest {
             asset_path: PathBuf::from("unused.stl"),
-            units: "millimeters".to_owned(),
+            expected_digest: "sha256:test".to_owned(),
         };
         let first = coordinator
             .begin_with("import-1", request(), accept_activation_request)
@@ -893,7 +1018,7 @@ mod tests {
                 "import-1",
                 ActivationRequest {
                     asset_path: PathBuf::from("unused.stl"),
-                    units: "millimeters".to_owned(),
+                    expected_digest: "sha256:test".to_owned(),
                 },
                 |_coordinator, _attempt, _request, _cancel| {
                     Err(std::io::Error::other("thread pool exhausted"))
@@ -949,7 +1074,7 @@ mod tests {
         let coordinator = Arc::new(ActivationCoordinator::default());
         let request = || ActivationRequest {
             asset_path: PathBuf::from("unused.stl"),
-            units: "millimeters".into(),
+            expected_digest: "sha256:test".into(),
         };
         for id in 0..OUTCOME_CAPACITY {
             let attempt = coordinator
@@ -995,7 +1120,7 @@ mod tests {
                 "queued",
                 ActivationRequest {
                     asset_path: PathBuf::from("unused.stl"),
-                    units: "millimeters".into(),
+                    expected_digest: "sha256:test".into(),
                 },
                 move |_, _, _, token| {
                     *saved

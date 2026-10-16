@@ -857,7 +857,7 @@ void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& 
     if (imports.size() > 0) {
         const auto& imported = imports[imports.size() - 1];
         nextPartName = QString::fromUtf8(imported.display_name);
-        nextAssetPath = projectDirectory.filePath(QString::fromUtf8(imported.asset));
+        nextAssetPath = projectDirectory.filePath(QString::fromUtf8(imported.mesh_asset_path));
         nextMeshType = QString::fromUtf8(imported.mesh_type);
         nextUnits = QString::fromUtf8(imported.units);
         nextTriangleCount = imported.triangle_count;

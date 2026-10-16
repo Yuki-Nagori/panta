@@ -10,6 +10,9 @@ publish = false
 [lints]
 workspace = true
 
+[dependencies]
+sha2.workspace = true
+
 [[test]]
 name = "mesh_performance"
 path = "../../tests/performance/cpu/mesh_performance.rs"

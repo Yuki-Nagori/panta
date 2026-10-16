@@ -1,10 +1,9 @@
 //! STL 导入的工程事务；读取、预览和解析由 panta-import 负责。
-use super::model::next_revision;
+use super::model::{MeshAssetRef, next_revision};
 use super::repository::WriteLease;
-use super::{ImportRecord, ProjectError, ProjectService, StlImportPreview};
-use panta_import::{CheckedReadError, PreparedStl, StlImportSession};
+use super::{ImportRecord, ProjectError, ProjectService, StlImportPreview, mesh_assets};
+use panta_import::{CheckedReadError, StlImportSession};
 use panta_import::{ImportError, ImportOptions};
-use std::io::Write;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -44,7 +43,7 @@ impl Drop for PendingImport {
 }
 
 impl ProjectService {
-    /// 启动确认导入事务。源复核、资产复制和清单提交都由 Rust 写入 worker 执行。
+    /// 启动确认导入事务。源复核、Mesh sidecar 写入和清单提交都由 Rust 写入 worker 执行。
     /// 成功提交只有在 `finish_stl_import` 消费结果后才发布到内存模型。
     pub fn begin_stl_import(
         &mut self,
@@ -200,20 +199,25 @@ fn commit_import(
             CheckedReadError::Cancelled(_) => import_cancelled(),
         })?;
     ensure_import_running(phase)?;
-    let record = prepared.record(import_number, options);
+    let mut record = prepared.record(import_number, options);
+    drop(std::mem::take(&mut prepared.bytes));
     prepared.scale_mesh_mm(options).map_err(map_import_error)?;
-    candidate.imports.push(record.clone());
     let lease = super::repository::WriteLease::acquire(candidate)?;
     let project_root = candidate
         .path
         .parent()
         .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-    let asset_dir = project_root.join("assets").join("imports");
-    fs::create_dir_all(&asset_dir).map_err(|error| {
-        ProjectError::ImportAssetCopyFailed(format!("{}: {error}", asset_dir.display()))
-    })?;
-    let asset_path = asset_dir.join(prepared.asset_name(import_number));
-    let mut asset = write_import_asset(&prepared, &asset_path, phase)?;
+    let (asset_reference, asset_path, created) =
+        write_import_mesh_asset(project_root, &mut record, &prepared.mesh, Some(phase))?;
+    candidate
+        .mesh_assets
+        .insert(asset_reference.id.clone(), asset_reference);
+    candidate.imports.push(record.clone());
+    let mut asset = ImportAsset {
+        path: asset_path,
+        created,
+        committed: false,
+    };
     let commit_result = lease.commit_with_before_replace(candidate, || {
         phase
             .compare_exchange(
@@ -233,48 +237,50 @@ fn commit_import(
 
 struct ImportAsset {
     path: std::path::PathBuf,
+    created: bool,
     committed: bool,
 }
 
 impl Drop for ImportAsset {
     fn drop(&mut self) {
-        if !self.committed {
+        if self.created && !self.committed {
             let _ = fs::remove_file(&self.path);
         }
     }
 }
 
-fn write_import_asset(
-    prepared: &PreparedStl,
-    asset_path: &Path,
-    phase: &AtomicU8,
-) -> Result<ImportAsset, ProjectError> {
-    let mut asset = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(asset_path)
-        .map_err(|error| {
-            ProjectError::ImportAssetCopyFailed(format!("{}: {error}", asset_path.display()))
-        })?;
-    let cleanup = ImportAsset {
-        path: asset_path.to_path_buf(),
-        committed: false,
-    };
-    let result = (|| {
-        for chunk in prepared.bytes.chunks(256 * 1024) {
+fn write_import_mesh_asset(
+    project_root: &Path,
+    record: &mut ImportRecord,
+    mesh: &panta_mesh::SurfaceMesh,
+    phase: Option<&AtomicU8>,
+) -> Result<(MeshAssetRef, std::path::PathBuf, bool), ProjectError> {
+    let base_id = record.mesh_asset_id.clone();
+    for attempt in 0..32 {
+        if let Some(phase) = phase {
             ensure_import_running(phase)?;
-            asset.write_all(chunk).map_err(|error| {
-                ProjectError::ImportAssetCopyFailed(format!("{}: {error}", asset_path.display()))
-            })?;
         }
-        ensure_import_running(phase)?;
-        asset.sync_all().map_err(|error| {
-            ProjectError::ImportAssetCopyFailed(format!("{}: {error}", asset_path.display()))
-        })
-    })();
-    drop(asset);
-    result?;
-    Ok(cleanup)
+        let asset_id = if attempt == 0 {
+            base_id.clone()
+        } else {
+            format!("{base_id}-recovery-{attempt}")
+        };
+        record.mesh_asset_id = asset_id;
+        let mut asset_reference = new_surface_asset_ref(record, "millimeters");
+        let asset_path =
+            super::service::resolve_asset_path(project_root, &asset_reference.relative_path)
+                .map_err(|error| ProjectError::ImportAssetWriteFailed(error.to_string()))?;
+        let write_result = mesh_assets::write_surface_mesh_asset_or_reuse(&asset_path, mesh)
+            .map_err(|error| ProjectError::ImportAssetWriteFailed(error.to_string()))?;
+        if let Some((digest, created)) = write_result {
+            asset_reference.digest = digest;
+            return Ok((asset_reference, asset_path, created));
+        }
+    }
+    record.mesh_asset_id = base_id;
+    Err(ProjectError::ImportAssetWriteFailed(
+        "mesh asset recovery path limit reached".to_owned(),
+    ))
 }
 
 fn ensure_import_running(phase: &AtomicU8) -> Result<(), ProjectError> {
@@ -290,7 +296,7 @@ fn import_cancelled() -> ProjectError {
 }
 
 impl ProjectService {
-    /// 校验、复制并持久化当前工程包中的一次 STL 导入。
+    /// 校验来源快照并将 Mesh sidecar 与导入记录提交到当前工程。
     /// 返回成功前先写入清单，重新打开工程时无需依赖后续显式保存即可恢复。
     pub fn import_stl(
         &mut self,
@@ -327,7 +333,8 @@ impl ProjectService {
             .imports
             .len()
             + 1;
-        let record = prepared.record(import_number, options);
+        let mut record = prepared.record(import_number, options);
+        drop(std::mem::take(&mut prepared.bytes));
         prepared.scale_mesh_mm(options).map_err(map_import_error)?;
         let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
         let lease = WriteLease::acquire(state)?;
@@ -335,41 +342,26 @@ impl ProjectService {
             .path
             .parent()
             .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-        let asset_dir = project_root.join("assets").join("imports");
-        fs::create_dir_all(&asset_dir).map_err(|error| {
-            ProjectError::ImportAssetCopyFailed(format!("{}: {error}", asset_dir.display()))
-        })?;
-        let asset_name = prepared.asset_name(import_number);
-        let asset_path = asset_dir.join(&asset_name);
-        let mut asset = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&asset_path)
-            .map_err(|error| {
-                ProjectError::ImportAssetCopyFailed(format!("{}: {error}", asset_path.display()))
-            })?;
-        let written = asset
-            .write_all(&prepared.bytes)
-            .and_then(|()| asset.sync_all());
-        drop(asset);
-        if let Err(error) = written {
-            let _ = fs::remove_file(&asset_path);
-            return Err(ProjectError::ImportAssetCopyFailed(format!(
-                "{}: {error}",
-                asset_path.display()
-            )));
-        }
+        let (asset_reference, asset_path, created) =
+            write_import_mesh_asset(project_root, &mut record, &prepared.mesh, None)?;
 
         let previous_revision = state.revision;
         let previous_dirty = state.dirty;
+        let mesh_asset_id = asset_reference.id.clone();
+        state
+            .mesh_assets
+            .insert(mesh_asset_id.clone(), asset_reference);
         state.imports.push(record.clone());
         state.revision = revision;
         state.dirty = false;
         if let Err(error) = lease.commit(state) {
             state.imports.pop();
+            state.mesh_assets.remove(&mesh_asset_id);
             state.revision = previous_revision;
             state.dirty = previous_dirty;
-            let _ = fs::remove_file(&asset_path);
+            if created {
+                let _ = fs::remove_file(&asset_path);
+            }
             return Err(error);
         }
         self.latest_mesh_id = Some(record.id.clone());
@@ -384,6 +376,19 @@ impl ProjectService {
         self.import_session
             .preview(source)
             .map_err(map_import_error)
+    }
+}
+
+fn new_surface_asset_ref(record: &ImportRecord, units: &str) -> MeshAssetRef {
+    MeshAssetRef {
+        id: record.mesh_asset_id.clone(),
+        revision: 1,
+        format_version: panta_mesh::MESH_ASSET_FORMAT_VERSION,
+        kind: "surface".to_owned(),
+        relative_path: format!("assets/meshes/{}-r1.pmesh", record.mesh_asset_id),
+        digest: String::new(),
+        units: units.to_owned(),
+        source_revision: record.source_digest.clone(),
     }
 }
 
@@ -408,8 +413,8 @@ mod tests {
         IMPORT_CANCELLED, IMPORT_COMMITTING, IMPORT_RUNNING, PendingImport, map_import_error,
     };
     use crate::execution::Executor;
-    use crate::project::ProjectService;
     use crate::project::temp_directory;
+    use crate::project::{ProjectError, ProjectService};
     use panta_import::ImportError;
     use panta_mesh::StlError;
     use std::fs;
@@ -555,12 +560,442 @@ mod tests {
         assert_eq!(service.current()?.revision, 1);
         assert_eq!(service.imports()?, vec![record.clone()]);
         assert!(service.current_mesh().is_some());
-        assert!(fixture.root.join("Async").join(&record.asset).is_file());
+        let asset_path = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| asset.relative_path.clone())
+            .ok_or("mesh asset index entry missing")?;
+        assert!(fixture.root.join("Async").join(asset_path).is_file());
+        assert!(!fixture.root.join("Async/assets/imports").exists());
 
         let mut reopened = ProjectService::new();
         reopened.open(&project.path)?;
         assert_eq!(reopened.imports()?, vec![record]);
         executor.close_and_wait();
+        Ok(())
+    }
+
+    #[test]
+    fn imported_mesh_does_not_depend_on_source_file_after_commit()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("external-part.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Portable mesh")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let sidecar_path = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| asset.relative_path.clone())
+            .ok_or("mesh asset index entry missing")?;
+        let sidecar = fixture.root.join("Portable mesh").join(sidecar_path);
+        assert!(sidecar.is_file());
+        assert!(!fixture.root.join("Portable mesh/assets/imports").exists());
+
+        fs::remove_file(&source)?;
+        let mut reopened = ProjectService::new();
+        reopened.open(&project.path)?;
+        let attempt = reopened.begin_asset_activation(&record.id)?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            let outcomes = reopened.drain_asset_activations();
+            if let Some(outcome) = outcomes.into_iter().next() {
+                assert_eq!(outcome.attempt, attempt.attempt);
+                assert_eq!(
+                    outcome.kind,
+                    crate::fsm::open_saved_stl::OutcomeKind::Succeeded
+                );
+                assert_eq!(
+                    outcome
+                        .mesh
+                        .ok_or("activated sidecar has no mesh")?
+                        .triangles
+                        .len(),
+                    1
+                );
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "sidecar activation timed out"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn corrupt_mesh_sidecar_fails_activation_without_publishing_a_mesh()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("part.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Corrupt sidecar")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let asset_path = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| {
+                fixture
+                    .root
+                    .join("Corrupt sidecar")
+                    .join(&asset.relative_path)
+            })
+            .ok_or("mesh asset index entry missing")?;
+        drop(service);
+
+        let mut bytes = fs::read(&asset_path)?;
+        *bytes.last_mut().ok_or("mesh sidecar is empty")? ^= 1;
+        fs::write(&asset_path, bytes)?;
+
+        let mut reopened = ProjectService::new();
+        reopened.open(&project.path)?;
+        let attempt = reopened.begin_asset_activation(&record.id)?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            let outcomes = reopened.drain_asset_activations();
+            if let Some(outcome) = outcomes.into_iter().next() {
+                assert_eq!(outcome.attempt, attempt.attempt);
+                assert_eq!(
+                    outcome.kind,
+                    crate::fsm::open_saved_stl::OutcomeKind::Failed
+                );
+                assert_eq!(outcome.code, "project.asset_parse_failed");
+                assert!(outcome.mesh.is_none());
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "corrupt sidecar activation timed out"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn schema_three_projects_migrate_sidecars_before_removing_copied_stl()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("source.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Legacy")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let project_root = fixture.root.join("Legacy");
+        let legacy_asset = project_root.join("assets/imports/0001-source.stl");
+        fs::create_dir_all(legacy_asset.parent().ok_or("legacy asset parent missing")?)?;
+        fs::copy(&source, &legacy_asset)?;
+        let original_sidecar = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| project_root.join(&asset.relative_path))
+            .ok_or("mesh asset index entry missing")?;
+        fs::remove_file(original_sidecar)?;
+
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        manifest["schema"] = serde_json::json!(3);
+        let import = manifest["imports"][0]
+            .as_object_mut()
+            .ok_or("legacy import is not an object")?;
+        import.insert("record_version".into(), serde_json::json!(2));
+        import.insert(
+            "asset".into(),
+            serde_json::json!("assets/imports/0001-source.stl"),
+        );
+        for key in [
+            "source_path",
+            "source_size_bytes",
+            "source_modified_unix_ms",
+            "mesh_asset_id",
+        ] {
+            import.remove(key);
+        }
+        manifest
+            .as_object_mut()
+            .ok_or("manifest is not an object")?
+            .remove("mesh_assets");
+        fs::write(&project.path, serde_json::to_vec_pretty(&manifest)?)?;
+        drop(service);
+
+        let mut reopened = ProjectService::new();
+        reopened.open(&project.path)?;
+        let migrated = reopened
+            .imports()?
+            .into_iter()
+            .next()
+            .ok_or("migrated record missing")?;
+        let migrated_asset = reopened
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&migrated.mesh_asset_id))
+            .ok_or("migrated mesh asset index missing")?;
+        assert_eq!(
+            migrated_asset.relative_path,
+            "assets/meshes/mesh-0001-r1.pmesh"
+        );
+        assert!(project_root.join(&migrated_asset.relative_path).is_file());
+        assert!(!legacy_asset.exists());
+        let persisted: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        assert_eq!(persisted["schema"], 4);
+        assert_eq!(
+            persisted["mesh_assets"][&migrated.mesh_asset_id]["format_version"],
+            panta_mesh::MESH_ASSET_FORMAT_VERSION
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn schema_three_migration_failure_preserves_manifest_and_copied_stl()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("source.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Legacy failure")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let project_root = fixture.root.join("Legacy failure");
+        let original_sidecar = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| project_root.join(&asset.relative_path))
+            .ok_or("mesh asset index entry missing")?;
+        fs::remove_file(original_sidecar)?;
+        let legacy_asset = project_root.join("assets/imports/0001-source.stl");
+        fs::create_dir_all(legacy_asset.parent().ok_or("legacy asset parent missing")?)?;
+        fs::write(&legacy_asset, b"not an STL")?;
+
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        manifest["schema"] = serde_json::json!(3);
+        let import = manifest["imports"][0]
+            .as_object_mut()
+            .ok_or("legacy import is not an object")?;
+        import.insert("record_version".into(), serde_json::json!(2));
+        import.insert(
+            "asset".into(),
+            serde_json::json!("assets/imports/0001-source.stl"),
+        );
+        for key in [
+            "source_path",
+            "source_size_bytes",
+            "source_modified_unix_ms",
+            "mesh_asset_id",
+        ] {
+            import.remove(key);
+        }
+        manifest
+            .as_object_mut()
+            .ok_or("manifest is not an object")?
+            .remove("mesh_assets");
+        fs::write(&project.path, serde_json::to_vec_pretty(&manifest)?)?;
+        drop(service);
+        let original_manifest = fs::read(&project.path)?;
+
+        let mut reopened = ProjectService::new();
+        assert!(reopened.open(&project.path).is_err());
+        assert_eq!(fs::read(&project.path)?, original_manifest);
+        assert!(legacy_asset.is_file());
+        assert!(
+            !project_root
+                .join("assets/meshes/mesh-0001-r1.pmesh")
+                .exists()
+        );
+        assert!(reopened.current().is_err());
+        assert_eq!(record.id, "import-1");
+        Ok(())
+    }
+
+    #[test]
+    fn schema_three_migration_rejects_a_changed_source_snapshot()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("source.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Changed migration source")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let project_root = fixture.root.join("Changed migration source");
+        let legacy_asset = project_root.join("assets/imports/0001-source.stl");
+        fs::create_dir_all(legacy_asset.parent().ok_or("legacy asset parent missing")?)?;
+        fs::copy(&source, &legacy_asset)?;
+        let current_sidecar = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| project_root.join(&asset.relative_path))
+            .ok_or("mesh asset index entry missing")?;
+        fs::remove_file(current_sidecar)?;
+
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        manifest["schema"] = serde_json::json!(3);
+        let import = manifest["imports"][0]
+            .as_object_mut()
+            .ok_or("legacy import is not an object")?;
+        import.insert("record_version".into(), serde_json::json!(2));
+        import.insert(
+            "asset".into(),
+            serde_json::json!("assets/imports/0001-source.stl"),
+        );
+        import.remove("mesh_asset_id");
+        manifest
+            .as_object_mut()
+            .ok_or("manifest is not an object")?
+            .remove("mesh_assets");
+        fs::write(&project.path, serde_json::to_vec_pretty(&manifest)?)?;
+        fs::write(&legacy_asset, b"vertex 0 0 0\nvertex 2 0 0\nvertex 0 1 0\n")?;
+        let original_manifest = fs::read(&project.path)?;
+        drop(service);
+
+        let mut reopened = ProjectService::new();
+        assert!(matches!(
+            reopened.open(&project.path),
+            Err(ProjectError::ImportSourceChanged(_))
+        ));
+        assert_eq!(fs::read(&project.path)?, original_manifest);
+        assert!(legacy_asset.is_file());
+        assert!(reopened.current().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn schema_two_projects_migrate_to_current_mesh_sidecars()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("source.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Schema two")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let project_root = fixture.root.join("Schema two");
+        let legacy_asset = project_root.join("assets/imports/0001-source.stl");
+        fs::create_dir_all(legacy_asset.parent().ok_or("legacy asset parent missing")?)?;
+        fs::copy(&source, &legacy_asset)?;
+        let original_sidecar = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| project_root.join(&asset.relative_path))
+            .ok_or("mesh asset index entry missing")?;
+        fs::remove_file(original_sidecar)?;
+
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        manifest["schema"] = serde_json::json!(2);
+        let import = manifest["imports"][0]
+            .as_object_mut()
+            .ok_or("legacy import is not an object")?;
+        import.insert("record_version".into(), serde_json::json!(1));
+        import.insert(
+            "asset".into(),
+            serde_json::json!("assets/imports/0001-source.stl"),
+        );
+        for key in [
+            "display_name",
+            "source_path",
+            "source_digest",
+            "source_size_bytes",
+            "source_modified_unix_ms",
+            "mesh_asset_id",
+        ] {
+            import.remove(key);
+        }
+        manifest
+            .as_object_mut()
+            .ok_or("manifest is not an object")?
+            .remove("mesh_assets");
+        fs::write(&project.path, serde_json::to_vec_pretty(&manifest)?)?;
+        drop(service);
+
+        let mut reopened = ProjectService::new();
+        reopened.open(&project.path)?;
+        let migrated = reopened
+            .imports()?
+            .into_iter()
+            .next()
+            .ok_or("migrated record missing")?;
+        assert_eq!(migrated.display_name, "source");
+        assert!(migrated.source_digest.is_none());
+        assert_eq!(migrated.mesh_asset_id, "mesh-import-1");
+        let persisted: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        assert_eq!(persisted["schema"], 4);
+        assert!(
+            project_root
+                .join("assets/meshes/mesh-0001-r1.pmesh")
+                .is_file()
+        );
+        assert!(!legacy_asset.exists());
+        Ok(())
+    }
+
+    #[test]
+    fn schema_three_migration_reuses_an_orphaned_sidecar_after_interrupted_commit()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let source = fixture.root.join("source.stl");
+        write_triangle(&source)?;
+        let mut service = ProjectService::new();
+        let project = service.create(&fixture.root, "Migration retry")?;
+        let record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
+        let project_root = fixture.root.join("Migration retry");
+        let current_sidecar = service
+            .current
+            .as_ref()
+            .and_then(|state| state.mesh_assets.get(&record.mesh_asset_id))
+            .map(|asset| project_root.join(&asset.relative_path))
+            .ok_or("mesh asset index entry missing")?;
+        fs::remove_file(current_sidecar)?;
+
+        let legacy_asset = project_root.join("assets/imports/0001-source.stl");
+        fs::create_dir_all(legacy_asset.parent().ok_or("legacy asset parent missing")?)?;
+        fs::copy(&source, &legacy_asset)?;
+        let orphaned = project_root.join("assets/meshes/mesh-0001-r1.pmesh");
+        fs::create_dir_all(orphaned.parent().ok_or("mesh asset parent missing")?)?;
+        let mesh = panta_mesh::parse_stl(&fs::read(&source)?)?;
+        let (orphan_bytes, _) =
+            panta_mesh::encode_mesh_asset(&panta_mesh::MeshAsset::Surface(mesh))?;
+        fs::write(&orphaned, orphan_bytes)?;
+
+        let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        manifest["schema"] = serde_json::json!(3);
+        let import = manifest["imports"][0]
+            .as_object_mut()
+            .ok_or("legacy import is not an object")?;
+        import.insert("record_version".into(), serde_json::json!(2));
+        import.insert(
+            "asset".into(),
+            serde_json::json!("assets/imports/0001-source.stl"),
+        );
+        for key in [
+            "source_path",
+            "source_size_bytes",
+            "source_modified_unix_ms",
+            "mesh_asset_id",
+        ] {
+            import.remove(key);
+        }
+        manifest
+            .as_object_mut()
+            .ok_or("manifest is not an object")?
+            .remove("mesh_assets");
+        fs::write(&project.path, serde_json::to_vec_pretty(&manifest)?)?;
+        drop(service);
+
+        let mut reopened = ProjectService::new();
+        reopened.open(&project.path)?;
+        assert!(orphaned.is_file());
+        assert!(!legacy_asset.exists());
+        let persisted: serde_json::Value = serde_json::from_slice(&fs::read(&project.path)?)?;
+        assert_eq!(persisted["schema"], 4);
+        assert_eq!(
+            persisted["mesh_assets"]["mesh-import-1"]["relative_path"],
+            "assets/meshes/mesh-0001-r1.pmesh"
+        );
         Ok(())
     }
 
@@ -589,6 +1024,12 @@ mod tests {
             !fixture
                 .root
                 .join("Cancel/assets/imports/0001-part.stl")
+                .exists()
+        );
+        assert!(
+            !fixture
+                .root
+                .join("Cancel/assets/meshes/import-1-r1.pmesh")
                 .exists()
         );
         assert!(service.imports()?.is_empty());

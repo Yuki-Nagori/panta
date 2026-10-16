@@ -11,6 +11,8 @@
 
 在首个真实多阶段异步视口资源激活流程中引入编译期 `.pa` FSM 元数据与手写 Rust 状态机。首个消费者为任务 [080](080-qml-viewport-document-tabs.md)：用户首次打开已保存在 `.panta` 内的 STL 时，Rust 按稳定 ImportRecord ID 读取并解析该资产，再将拥有明确所有权的网格快照交给视口层。加载不改写工程或提交记录；FSM 负责加载阶段、取消、工程代次校验与迟到结果丢弃。登记时 `ProjectService` 只在内存持有最新导入网格，`kind: fsm`、代码生成和真实异步业务尚未实现。此后 DSL、只读激活及 080 联调均已落地，验收结果见完成摘要。
 
+存储来源已由后续任务 [088](088-mesh-asset-sidecar-storage.md) 从工程内 STL 副本迁移为 schema 4 Mesh sidecar。073 的稳定导入 ID、只读激活、取消及过期结果契约保持不变；当前激活读取并验证 Mesh sidecar，不读取来源 STL。
+
 ## 必读
 
 - [FSM 设计](../modules/fsm.md)、[DSL 工具链](../modules/dsl-engine-and-toolchain.md)、[PA 规范](../standards/pa.md)

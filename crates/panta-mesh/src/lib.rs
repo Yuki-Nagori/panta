@@ -6,6 +6,13 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 
+mod asset;
+pub use asset::{
+    MESH_ASSET_FORMAT_VERSION, MeshAsset, MeshAssetError, MeshAssetRef, decode_mesh_asset,
+    decode_mesh_asset_with_digest, encode_mesh_asset, encode_mesh_asset_ref,
+    mesh_asset_encoded_len,
+};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SurfaceMesh {
     pub triangles: Vec<[[f64; 3]; 3]>,
