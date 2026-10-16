@@ -66,6 +66,12 @@ constexpr double kModelCameraFitMargin = 1.25;
 // Welcome 字标独立留出更大适配边距；导入模型继续使用标准视口边距。
 constexpr double kWelcomeCameraFitMargin = 2.25;
 constexpr std::uint64_t kAdapterProbeTimeoutNs = 2'000'000'000ULL;
+// Windows 桌面视口固定使用 D3D12，避免 Dawn 探测未选用的 Vulkan backend。
+#if defined(Q_OS_WIN)
+constexpr wgpu::BackendType kDefaultAdapterProbeBackend = wgpu::BackendType::D3D12;
+#else
+constexpr wgpu::BackendType kDefaultAdapterProbeBackend = wgpu::BackendType::Undefined;
+#endif
 
 // VTK 9.7.0 的 vtkWebGPUConfiguration::Initialize 在 RequestAdapter 失败后
 // 仍对空 adapter 调用 PopulateRequiredLimits，Dawn 会空指针崩溃。预检使用
@@ -356,7 +362,7 @@ void VtkViewport::ensure_render_window() {
 
     // 失败时不能调用 render window Initialize：锁定的 VTK 会在空 adapter 上崩溃。
     const wgpu::BackendType probe_backend =
-        impl_->fail_webgpu_device ? wgpu::BackendType::OpenGL : wgpu::BackendType::Undefined;
+        impl_->fail_webgpu_device ? wgpu::BackendType::OpenGL : kDefaultAdapterProbeBackend;
     if (!dawn_adapter_available(probe_backend)) {
         warn_once("VtkViewport: VTK WebGPU device 初始化失败");
         destroy_render_window();
@@ -376,6 +382,13 @@ void VtkViewport::ensure_render_window() {
     impl_->applied_mesh = impl_->pending.mesh;
     impl_->renderer->AddActor(impl_->primitive_actor);
     impl_->render_window->AddRenderer(impl_->renderer);
+
+#if defined(Q_OS_WIN)
+    // 让预检与 VTK 实际初始化使用同一 backend；只约束预检仍会让 VTK 再次探测 Vulkan。
+    auto configuration = vtkSmartPointer<vtkWebGPUConfiguration>::New();
+    configuration->SetBackend(vtkWebGPUConfiguration::BackendType::D3D12);
+    impl_->render_window->SetWGPUConfiguration(configuration);
+#endif
 
 #if defined(Q_OS_MACOS)
     impl_->interactor = vtkSmartPointer<vtkCocoaRenderWindowInteractor>::New();

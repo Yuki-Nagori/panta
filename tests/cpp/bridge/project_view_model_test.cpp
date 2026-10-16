@@ -71,6 +71,29 @@ TEST(ProjectViewModelTest, CreatesOpensRenamesAndSavesThroughRustService) {
     EXPECT_FALSE(reopened.dirty());
 }
 
+TEST(ProjectViewModelTest, CreatesAndOpensProjectThroughUnicodeFilesystemPaths) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    const QString location = QDir(fixture.path()).filePath(QStringLiteral("项目资料"));
+    ProjectViewModel created;
+    ASSERT_TRUE(created.createProject(QStringLiteral("工程-测试"), location))
+        << created.errorCode().toStdString() << ": " << created.errorDetail().toStdString();
+
+    const QString projectPath = created.currentPath();
+    ASSERT_TRUE(QFile::exists(projectPath));
+    EXPECT_EQ(QDir::fromNativeSeparators(projectPath),
+              QDir::fromNativeSeparators(
+                  QDir(location).filePath(QStringLiteral("工程-测试/工程-测试.panta"))));
+
+    ProjectViewModel reopened;
+    const QUrl projectUrl = QUrl::fromLocalFile(projectPath);
+    ASSERT_TRUE(reopened.openProjectUrl(projectUrl))
+        << reopened.errorCode().toStdString() << ": " << reopened.errorDetail().toStdString();
+    EXPECT_EQ(reopened.currentName(), QStringLiteral("工程-测试"));
+    EXPECT_EQ(reopened.currentPath(), projectPath);
+}
+
 TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
