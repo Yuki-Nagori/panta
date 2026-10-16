@@ -25,7 +25,7 @@
 #include <system_error>
 #include <vector>
 
-#if !defined(Q_OS_WIN)
+#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
 #include <sys/resource.h>
 #endif
 
