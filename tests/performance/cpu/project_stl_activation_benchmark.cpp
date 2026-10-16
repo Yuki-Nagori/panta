@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <ctime>
 #include <exception>
 #include <filesystem>
 #include <iomanip>
@@ -23,9 +24,10 @@
 #include <ratio>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
+#if defined(Q_OS_MACOS)
 #include <sys/resource.h>
 #endif
 
@@ -54,15 +56,25 @@ struct MemorySample {
     std::optional<std::uint64_t> peak_bytes;
 };
 
-struct SampleView {
-    const std::vector<double>& wall_ms;
-    const std::vector<double>& cpu_ms;
+struct TimedSample {
+    double wall_ms = 0.0;
+    std::optional<double> process_cpu_ms;
+};
+
+struct MeasurementStart {
+    Clock::time_point wall;
+    std::optional<double> process_cpu_ms;
 };
 
 struct LoadedDocument {
     QString id;
     QString name;
     std::uint64_t mesh_payload_estimate_bytes = 0;
+};
+
+struct MeshCacheStats {
+    std::size_t resident_documents = 0;
+    std::uint64_t estimated_resident_mesh_bytes = 0;
 };
 
 std::optional<std::uint64_t> resident_bytes() {
@@ -143,17 +155,23 @@ MemorySample sample_memory() { return {resident_bytes(), peak_rss_bytes()}; }
 
 double mib(std::uint64_t bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); }
 
-double process_cpu_ms() {
-#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
+std::optional<double> process_cpu_ms() {
+#if defined(Q_OS_MACOS)
     struct rusage usage{};
     if (getrusage(RUSAGE_SELF, &usage) != 0) {
-        return -1.0;
+        return std::nullopt;
     }
     const auto to_microseconds = [](const auto& value) {
         return static_cast<std::int64_t>(value.tv_sec) * 1'000'000 + value.tv_usec;
     };
     return static_cast<double>(to_microseconds(usage.ru_utime) + to_microseconds(usage.ru_stime)) /
            1000.0;
+#elif defined(Q_OS_LINUX)
+    const std::clock_t ticks = std::clock();
+    if (ticks == static_cast<std::clock_t>(-1)) {
+        return std::nullopt;
+    }
+    return static_cast<double>(ticks) * 1000.0 / CLOCKS_PER_SEC;
 #elif defined(Q_OS_WIN)
     FILETIME creation_time{};
     FILETIME exit_time{};
@@ -161,7 +179,7 @@ double process_cpu_ms() {
     FILETIME user_time{};
     if (!GetProcessTimes(GetCurrentProcess(), &creation_time, &exit_time, &kernel_time,
                          &user_time)) {
-        return -1.0;
+        return std::nullopt;
     }
     ULARGE_INTEGER kernel_ticks{};
     ULARGE_INTEGER user_ticks{};
@@ -171,8 +189,23 @@ double process_cpu_ms() {
     user_ticks.HighPart = user_time.dwHighDateTime;
     return static_cast<double>(kernel_ticks.QuadPart + user_ticks.QuadPart) / 10'000.0;
 #else
-    return -1.0;
+    return std::nullopt;
 #endif
+}
+
+MeasurementStart start_measurement() {
+    const auto cpu = process_cpu_ms();
+    return {Clock::now(), cpu};
+}
+
+TimedSample finish_measurement(const MeasurementStart& start,
+                               Clock::time_point wall_end = Clock::now()) {
+    const auto cpu_end = process_cpu_ms();
+    std::optional<double> cpu_elapsed;
+    if (start.process_cpu_ms && cpu_end) {
+        cpu_elapsed = *cpu_end - *start.process_cpu_ms;
+    }
+    return {std::chrono::duration<double, std::milli>(wall_end - start.wall).count(), cpu_elapsed};
 }
 
 std::uint64_t file_bytes(const std::filesystem::path& path) {
@@ -245,32 +278,49 @@ void print_memory(const char* phase, const MemorySample& sample,
               << mib(estimated_resident_mesh_bytes) << '\n';
 }
 
-double percentile_ms(std::vector<double> samples, double percentile) {
+std::pair<double, double> percentiles_ms(std::vector<double> samples) {
     if (samples.empty()) {
-        return 0.0;
+        return {0.0, 0.0};
     }
     std::sort(samples.begin(), samples.end());
-    const auto rank =
-        static_cast<std::size_t>(std::ceil(percentile * static_cast<double>(samples.size())));
-    const auto index = std::clamp<std::size_t>(rank, 1, samples.size()) - 1;
-    return samples[index];
+    const auto at_percentile = [&samples](double percentile) {
+        const auto rank =
+            static_cast<std::size_t>(std::ceil(percentile * static_cast<double>(samples.size())));
+        const auto index = std::clamp<std::size_t>(rank, 1, samples.size()) - 1;
+        return samples[index];
+    };
+    return {at_percentile(0.50), at_percentile(0.95)};
 }
 
-void print_samples(const char* phase, SampleView samples, const char* scope) {
-    std::cout << phase << " samples=" << samples.wall_ms.size() << " wall_p50_ms=" << std::fixed
-              << std::setprecision(3) << percentile_ms(samples.wall_ms, 0.50)
-              << " wall_p95_ms=" << percentile_ms(samples.wall_ms, 0.95) << " process_cpu_p50_ms=";
-    if (!samples.cpu_ms.empty() && samples.cpu_ms.front() >= 0.0) {
-        std::cout << percentile_ms(samples.cpu_ms, 0.50);
+void print_optional_ms(const std::optional<double>& value) {
+    if (value) {
+        std::cout << std::fixed << std::setprecision(3) << *value;
     } else {
         std::cout << "unavailable";
     }
+}
+
+void print_samples(const std::string& phase, const std::vector<TimedSample>& samples,
+                   const char* scope) {
+    std::vector<double> wall_ms;
+    std::vector<double> cpu_ms;
+    wall_ms.reserve(samples.size());
+    cpu_ms.reserve(samples.size());
+    for (const auto& sample : samples) {
+        wall_ms.push_back(sample.wall_ms);
+        if (sample.process_cpu_ms) {
+            cpu_ms.push_back(*sample.process_cpu_ms);
+        }
+    }
+    const bool has_cpu_samples = !cpu_ms.empty();
+    const auto [wall_p50, wall_p95] = percentiles_ms(std::move(wall_ms));
+    const auto [cpu_p50, cpu_p95] = percentiles_ms(std::move(cpu_ms));
+    std::cout << phase << " samples=" << samples.size() << " wall_p50_ms=" << std::fixed
+              << std::setprecision(3) << wall_p50 << " wall_p95_ms=" << wall_p95
+              << " process_cpu_p50_ms=";
+    print_optional_ms(has_cpu_samples ? std::optional<double>(cpu_p50) : std::nullopt);
     std::cout << " process_cpu_p95_ms=";
-    if (!samples.cpu_ms.empty() && samples.cpu_ms.front() >= 0.0) {
-        std::cout << percentile_ms(samples.cpu_ms, 0.95);
-    } else {
-        std::cout << "unavailable";
-    }
+    print_optional_ms(has_cpu_samples ? std::optional<double>(cpu_p95) : std::nullopt);
     std::cout << " scope=" << scope << '\n';
 }
 
@@ -318,23 +368,16 @@ bool wait_for_activation(ProjectViewModel& view_model, Predicate&& ready, int ti
 }
 
 // 用每个资产先前跨 FFI 得到的显示 DTO 容量估算 Rust Mesh payload；DTO 本身不按页签保留。
-std::uint64_t resident_mesh_payload_estimate(const ProjectViewModel& view_model,
-                                             const std::vector<LoadedDocument>& documents) {
-    std::uint64_t bytes = 0;
+MeshCacheStats mesh_cache_stats(const ProjectViewModel& view_model,
+                                const std::vector<LoadedDocument>& documents) {
+    MeshCacheStats stats;
     for (const auto& document : documents) {
         if (document_state(view_model, document.id) == QStringLiteral("ready")) {
-            bytes += document.mesh_payload_estimate_bytes;
+            ++stats.resident_documents;
+            stats.estimated_resident_mesh_bytes += document.mesh_payload_estimate_bytes;
         }
     }
-    return bytes;
-}
-
-std::size_t cached_document_count(const ProjectViewModel& view_model,
-                                  const std::vector<LoadedDocument>& documents) {
-    return static_cast<std::size_t>(std::count_if(
-        documents.cbegin(), documents.cend(), [&view_model](const LoadedDocument& document) {
-            return document_state(view_model, document.id) == QStringLiteral("ready");
-        }));
+    return stats;
 }
 
 int fail(const std::string& message) {
@@ -368,27 +411,20 @@ int main(int argc, char* argv[]) try {
               << " reload_iterations=" << reload_iterations
               << " mesh_cache_policy=ProjectService_default"
               << " memory_scope=ProjectViewModel+Rust_activation excludes=VTK_GPU"
-              << " cpu_clock=process_user_plus_kernel_time\n";
+              << " cpu_clock=platform_process_cpu_time\n";
 
     const std::filesystem::path manifest_path(arguments[1].toStdU16String());
-    std::vector<double> project_open_wall_samples;
-    std::vector<double> project_open_cpu_samples;
-    project_open_wall_samples.reserve(static_cast<std::size_t>(reload_iterations));
-    project_open_cpu_samples.reserve(static_cast<std::size_t>(reload_iterations));
+    std::vector<TimedSample> project_open_samples;
+    project_open_samples.reserve(static_cast<std::size_t>(reload_iterations));
     for (int sample = 0; sample < reload_iterations; ++sample) {
-        const double cpu_start_ms = process_cpu_ms();
-        const auto wall_start = Clock::now();
+        const auto start = start_measurement();
         ProjectViewModel probe;
         if (!probe.openProject(arguments[1])) {
             return fail("openProject failed: " + probe.error().toStdString());
         }
-        project_open_wall_samples.push_back(
-            std::chrono::duration<double, std::milli>(Clock::now() - wall_start).count());
-        const double cpu_end_ms = process_cpu_ms();
-        project_open_cpu_samples.push_back(
-            cpu_start_ms < 0.0 || cpu_end_ms < 0.0 ? -1.0 : cpu_end_ms - cpu_start_ms);
+        project_open_samples.push_back(finish_measurement(start));
     }
-    print_samples("project_open", {project_open_wall_samples, project_open_cpu_samples},
+    print_samples("project_open", project_open_samples,
                   "new_ProjectViewModel+manifest_read_validate;warm_os_page_cache");
 
     auto view_model = std::make_unique<ProjectViewModel>();
@@ -400,24 +436,16 @@ int main(int argc, char* argv[]) try {
     }
     print_project_storage(manifest_path);
 
-    std::vector<double> save_wall_samples;
-    std::vector<double> save_cpu_samples;
-    save_wall_samples.reserve(static_cast<std::size_t>(reload_iterations));
-    save_cpu_samples.reserve(static_cast<std::size_t>(reload_iterations));
+    std::vector<TimedSample> save_samples;
+    save_samples.reserve(static_cast<std::size_t>(reload_iterations));
     for (int sample = 0; sample < reload_iterations; ++sample) {
-        const double cpu_start_ms = process_cpu_ms();
-        const auto wall_start = Clock::now();
+        const auto start = start_measurement();
         if (!vm.saveProject()) {
             return fail("saveProject failed: " + vm.error().toStdString());
         }
-        save_wall_samples.push_back(
-            std::chrono::duration<double, std::milli>(Clock::now() - wall_start).count());
-        const double cpu_end_ms = process_cpu_ms();
-        save_cpu_samples.push_back(
-            cpu_start_ms < 0.0 || cpu_end_ms < 0.0 ? -1.0 : cpu_end_ms - cpu_start_ms);
+        save_samples.push_back(finish_measurement(start));
     }
-    print_samples("project_save", {save_wall_samples, save_cpu_samples},
-                  "atomic_manifest_write+sync;sidecars_unchanged");
+    print_samples("project_save", save_samples, "atomic_manifest_write+sync;sidecars_unchanged");
 
     const auto ids = vm.importedPartIds();
     const auto names = vm.importedPartNames();
@@ -429,16 +457,13 @@ int main(int argc, char* argv[]) try {
     loaded.reserve(static_cast<std::size_t>(ids.size()));
     for (qsizetype index = 0; index < ids.size(); ++index) {
         const QString& id = ids[index];
-        const double cpu_start_ms = process_cpu_ms();
-        const auto start = Clock::now();
+        const auto start = start_measurement();
         vm.openImportRecord(id);
         const auto ready = [&vm, &id]() { return document_ready(vm, id); };
         if (!wait_for_activation(vm, ready, 60000)) {
             return fail("activation timed out or failed for " + names[index].toStdString());
         }
-        const double elapsed_ms =
-            std::chrono::duration<double, std::milli>(Clock::now() - start).count();
-        const double cpu_end_ms = process_cpu_ms();
+        const auto sample = finish_measurement(start);
         const auto snapshot = vm.mesh_snapshot();
         if (!snapshot || snapshot->vertices.empty()) {
             return fail("activation returned an empty mesh for " + names[index].toStdString());
@@ -451,40 +476,35 @@ int main(int argc, char* argv[]) try {
                   << " triangles=" << snapshot->vertices.size() / 3
                   << " active_dto_capacity_mib=" << std::fixed << std::setprecision(2)
                   << mib(mesh_payload_estimate_bytes) << " elapsed_ms=" << std::setprecision(3)
-                  << elapsed_ms << " process_cpu_ms=";
-        if (cpu_start_ms < 0.0 || cpu_end_ms < 0.0) {
-            std::cout << "unavailable";
-        } else {
-            std::cout << cpu_end_ms - cpu_start_ms;
-        }
+                  << sample.wall_ms << " process_cpu_ms=";
+        print_optional_ms(sample.process_cpu_ms);
         std::cout << '\n';
+        const auto stats = mesh_cache_stats(vm, loaded);
         print_memory(("cache_after_activation_" + std::to_string(index + 1)).c_str(),
-                     sample_memory(), resident_mesh_payload_estimate(vm, loaded));
+                     sample_memory(), stats.estimated_resident_mesh_bytes);
     }
 
     const auto all_loaded_memory = sample_memory();
-    const auto resident_mesh_bytes = resident_mesh_payload_estimate(vm, loaded);
-    std::cout << "mesh_cache_state resident_documents=" << cached_document_count(vm, loaded)
-              << " unloaded_documents=" << loaded.size() - cached_document_count(vm, loaded)
+    const auto cache_stats = mesh_cache_stats(vm, loaded);
+    std::cout << "mesh_cache_state resident_documents=" << cache_stats.resident_documents
+              << " unloaded_documents=" << loaded.size() - cache_stats.resident_documents
               << " estimated_resident_mesh_payload_mib=" << std::fixed << std::setprecision(2)
-              << mib(resident_mesh_bytes) << '\n';
-    print_memory("mesh_cache_after_opening_all_tabs", all_loaded_memory, resident_mesh_bytes);
+              << mib(cache_stats.estimated_resident_mesh_bytes) << '\n';
+    print_memory("mesh_cache_after_opening_all_tabs", all_loaded_memory,
+                 cache_stats.estimated_resident_mesh_bytes);
 
     if (loaded.size() > 1) {
         constexpr int kSwitchCycles = 31;
         std::vector<double> selection_call_samples_ms;
-        std::vector<double> selection_ready_samples_ms;
-        std::vector<double> selection_cpu_samples_ms;
+        std::vector<TimedSample> selection_ready_samples;
         const auto expected_samples = static_cast<std::size_t>(kSwitchCycles) * loaded.size();
         selection_call_samples_ms.reserve(expected_samples);
-        selection_ready_samples_ms.reserve(expected_samples);
-        selection_cpu_samples_ms.reserve(expected_samples);
+        selection_ready_samples.reserve(expected_samples);
         std::size_t cache_misses = 0;
         for (int cycle = 0; cycle < kSwitchCycles; ++cycle) {
             for (const auto& document : loaded) {
                 cache_misses += document_state(vm, document.id) == QStringLiteral("unloaded");
-                const double cpu_start_ms = process_cpu_ms();
-                const auto start = Clock::now();
+                const auto start = start_measurement();
                 vm.activateDocument(document.id);
                 const auto selection_returned = Clock::now();
                 const auto ready = [&vm, &document] { return document_ready(vm, document.id); };
@@ -494,31 +514,41 @@ int main(int argc, char* argv[]) try {
                 }
                 const auto completed = Clock::now();
                 selection_call_samples_ms.push_back(
-                    std::chrono::duration<double, std::milli>(selection_returned - start).count());
-                selection_ready_samples_ms.push_back(
-                    std::chrono::duration<double, std::milli>(completed - start).count());
-                const double cpu_end_ms = process_cpu_ms();
-                selection_cpu_samples_ms.push_back(
-                    cpu_start_ms < 0.0 || cpu_end_ms < 0.0 ? -1.0 : cpu_end_ms - cpu_start_ms);
+                    std::chrono::duration<double, std::milli>(selection_returned - start.wall)
+                        .count());
+                selection_ready_samples.push_back(finish_measurement(start, completed));
             }
         }
+        const auto [call_p50, call_p95] = percentiles_ms(selection_call_samples_ms);
+        std::vector<double> ready_ms;
+        std::vector<double> cpu_ms;
+        ready_ms.reserve(selection_ready_samples.size());
+        cpu_ms.reserve(selection_ready_samples.size());
+        for (const auto& sample : selection_ready_samples) {
+            ready_ms.push_back(sample.wall_ms);
+            if (sample.process_cpu_ms) {
+                cpu_ms.push_back(*sample.process_cpu_ms);
+            }
+        }
+        const bool has_cpu_samples = !cpu_ms.empty();
+        const auto [ready_p50, ready_p95] = percentiles_ms(std::move(ready_ms));
+        const auto [cpu_p50, cpu_p95] = percentiles_ms(std::move(cpu_ms));
         std::cout << "document_selection samples=" << selection_call_samples_ms.size()
                   << " cache_misses=" << cache_misses << " call_p50_ms=" << std::fixed
-                  << std::setprecision(3) << percentile_ms(selection_call_samples_ms, 0.50)
-                  << " call_p95_ms=" << percentile_ms(selection_call_samples_ms, 0.95)
-                  << " ready_p50_ms=" << percentile_ms(selection_ready_samples_ms, 0.50)
-                  << " ready_p95_ms=" << percentile_ms(selection_ready_samples_ms, 0.95)
-                  << " process_cpu_p50_ms=" << percentile_ms(selection_cpu_samples_ms, 0.50)
-                  << " scope=ViewModel_selection_call_and_selection_to_ready\n";
+                  << std::setprecision(3) << call_p50 << " call_p95_ms=" << call_p95
+                  << " ready_p50_ms=" << ready_p50 << " ready_p95_ms=" << ready_p95
+                  << " process_cpu_p50_ms=";
+        print_optional_ms(has_cpu_samples ? std::optional<double>(cpu_p50) : std::nullopt);
+        std::cout << " process_cpu_p95_ms=";
+        print_optional_ms(has_cpu_samples ? std::optional<double>(cpu_p95) : std::nullopt);
+        std::cout << " scope=ViewModel_selection_call_and_selection_to_ready\n";
     } else {
         std::cout << "cache_hit=unavailable reason=project_has_fewer_than_two_documents\n";
     }
 
     for (const auto& document : loaded) {
-        std::vector<double> reload_samples_ms;
-        std::vector<double> reload_cpu_samples_ms;
-        reload_samples_ms.reserve(static_cast<std::size_t>(reload_iterations));
-        reload_cpu_samples_ms.reserve(static_cast<std::size_t>(reload_iterations));
+        std::vector<TimedSample> reload_samples;
+        reload_samples.reserve(static_cast<std::size_t>(reload_iterations));
         for (int iteration = 0; iteration < reload_iterations; ++iteration) {
             vm.activateDocument(document.id);
             const auto ready = [&vm, &document]() { return document_ready(vm, document.id); };
@@ -539,41 +569,30 @@ int main(int argc, char* argv[]) try {
                 return fail("closed document retained its mesh snapshot");
             }
 
-            const auto start = Clock::now();
-            const double cpu_start_ms = process_cpu_ms();
+            const auto start = start_measurement();
             vm.openImportRecord(document.id);
             if (!wait_for_activation(vm, ready, 60000)) {
                 return fail("reload timed out or failed for " + document.name.toStdString());
             }
-            reload_samples_ms.push_back(
-                std::chrono::duration<double, std::milli>(Clock::now() - start).count());
-            const double cpu_end_ms = process_cpu_ms();
-            reload_cpu_samples_ms.push_back(
-                cpu_start_ms < 0.0 || cpu_end_ms < 0.0 ? -1.0 : cpu_end_ms - cpu_start_ms);
+            reload_samples.push_back(finish_measurement(start));
             const int completed = iteration + 1;
             if (completed == 1 || completed == 10 || completed == 50 ||
                 completed == reload_iterations) {
                 const std::string phase = "reload_" + document.id.toStdString() + "_iteration_" +
                                           std::to_string(completed);
                 print_memory(phase.c_str(), sample_memory(),
-                             resident_mesh_payload_estimate(vm, loaded));
+                             mesh_cache_stats(vm, loaded).estimated_resident_mesh_bytes);
             }
         }
-        std::cout << "file_reload file=" << document.name.toStdString()
-                  << " samples=" << reload_samples_ms.size() << " p50_ms=" << std::fixed
-                  << std::setprecision(3) << percentile_ms(reload_samples_ms, 0.50)
-                  << " p95_ms=" << percentile_ms(reload_samples_ms, 0.95)
-                  << " process_cpu_p50_ms=" << percentile_ms(reload_cpu_samples_ms, 0.50)
-                  << " cache=warm_os_page_cache\n";
+        print_samples("file_reload file=" + document.name.toStdString(), reload_samples,
+                      "cache=warm_os_page_cache");
     }
 
     const auto before_close_memory = sample_memory();
     print_memory("after_reloads_all_open", before_close_memory,
-                 resident_mesh_payload_estimate(vm, loaded));
-    std::vector<double> close_wall_samples_ms;
-    std::vector<double> close_cpu_samples_ms;
-    close_wall_samples_ms.reserve(loaded.size());
-    close_cpu_samples_ms.reserve(loaded.size());
+                 mesh_cache_stats(vm, loaded).estimated_resident_mesh_bytes);
+    std::vector<TimedSample> close_samples;
+    close_samples.reserve(loaded.size());
     for (const auto& document : loaded) {
         vm.activateDocument(document.id);
         const auto ready = [&vm, &document]() { return document_ready(vm, document.id); };
@@ -588,20 +607,14 @@ int main(int argc, char* argv[]) try {
             }
             prior_snapshot = snapshot;
         }
-        const double cpu_start_ms = process_cpu_ms();
-        const auto start = Clock::now();
+        const auto start = start_measurement();
         vm.closeDocument(document.id);
-        close_wall_samples_ms.push_back(
-            std::chrono::duration<double, std::milli>(Clock::now() - start).count());
-        const double cpu_end_ms = process_cpu_ms();
-        close_cpu_samples_ms.push_back(
-            cpu_start_ms < 0.0 || cpu_end_ms < 0.0 ? -1.0 : cpu_end_ms - cpu_start_ms);
+        close_samples.push_back(finish_measurement(start));
         if (!prior_snapshot.expired()) {
             return fail("closed document retained its mesh snapshot");
         }
     }
-    print_samples("close_documents", {close_wall_samples_ms, close_cpu_samples_ms},
-                  "ViewModel_closeDocument_and_snapshot_release");
+    print_samples("close_documents", close_samples, "ViewModel_closeDocument_and_snapshot_release");
     vm.closeDocument(QStringLiteral("welcome"));
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     print_memory("all_documents_closed", sample_memory(), 0);

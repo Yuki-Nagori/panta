@@ -38,7 +38,7 @@ PANTA_BENCH_STL=/path/to/model.stl \
   supplied_stl_and_sidecar_costs -- --ignored --nocapture
 ```
 
-该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量。工程级结果包括 manifest 打开 / 原子保存耗时、manifest 与 sidecar 字节、首次激活与关闭重载耗时、缓存切换、各阶段进程 CPU 时间、进程 RSS / 高水位，以及 Mesh DTO 常驻容量估算。进程 CPU 时间累计用户态与内核态时间（macOS/Linux 使用 `getrusage`，Windows 使用 `GetProcessTimes`）。打开计时覆盖新建 `ProjectViewModel`、读取并校验 manifest，不加载 sidecar；激活到 ready 覆盖 Rust sidecar 读盘、摘要校验、解压 / 解码、领域校验及 FFI 快照投影，不包含 VTK、GPU 上传或真实窗口呈现。RSS 是进程级采样；关闭后 Mesh 快照弱引用必须失效，RSS 不保证立即下降，因为分配器可能保留已释放内存。所有磁盘读取均使用暖 OS 页缓存，除非另有标记。Mesh sidecar v2 保留 f64 三角顶点语义并用 Zstandard 压缩 payload；压缩后大小和编解码耗时依赖具体数据。
+该微基准不测完整工程首次激活或缓存命中；这些项目由 `panta_bridge_project_stl_activation_cpu_benchmark <project.panta> [reload_iterations]` 测量。工程级结果包括 manifest 打开 / 原子保存耗时、manifest 与 sidecar 字节、首次激活与关闭重载耗时、缓存切换、各阶段进程 CPU 时间、进程 RSS / 高水位，以及 Mesh DTO 常驻容量估算。进程 CPU 时间由平台进程 CPU 时钟测量（macOS 使用 `getrusage`，Linux 使用 `std::clock`，Windows 使用 `GetProcessTimes`）。打开计时覆盖新建 `ProjectViewModel`、读取并校验 manifest，不加载 sidecar；激活到 ready 覆盖 Rust sidecar 读盘、摘要校验、解压 / 解码、领域校验及 FFI 快照投影，不包含 VTK、GPU 上传或真实窗口呈现。RSS 是进程级采样；关闭后 Mesh 快照弱引用必须失效，RSS 不保证立即下降，因为分配器可能保留已释放内存。所有磁盘读取均使用暖 OS 页缓存，除非另有标记。Mesh sidecar v2 保留 f64 三角顶点语义并用 Zstandard 压缩 payload；压缩后大小和编解码耗时依赖具体数据。
 
 ## 定位与边界
 
