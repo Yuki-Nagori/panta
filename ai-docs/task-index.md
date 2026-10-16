@@ -131,7 +131,10 @@ ai-docs/
 | 118 | [实际依赖图与应用命令层设计](task/118-layering-lint-and-command-boundaries.md) | Rust 架构整理 | 106, 111 | done |
 | 119 | [Rust 与 CMake 分层依赖 lint](task/119-rust-cmake-layering-lint.md) | Rust 架构整理 | 118 | done |
 | 120 | [PR 按影响范围选择测试](task/120-pr-affected-test-selection.md) | 验证基础 | 100, 118 | done |
-| 121 | [GUI 与 CLI 共享 Rust 命令入口](task/121-rust-gui-cli-command-layer.md) | Rust 架构整理 | 107, 118 | planned |
+| 121 | [GUI 与 CLI 共享 Rust 命令入口](task/121-rust-gui-cli-command-layer.md) | Rust 架构整理 | 107, 118 | done |
+| 122 | [Rust CLI 创建工程](task/122-rust-cli-project-create.md) | Rust 架构整理 | 057, 107, 121 | planned |
+| 123 | [Rust CLI 检查 STL](task/123-rust-cli-stl-inspection.md) | CAE 领域模块迁移 | 063, 067, 121 | planned |
+| 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | planned |
 
 ## 验证与质量扩展队列
 

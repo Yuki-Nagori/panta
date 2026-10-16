@@ -194,12 +194,13 @@ impl ProjectService {
         self.snapshot()
     }
 
-    /// 执行一个有校验的模型命令，并标记工程 dirty。
+    /// 执行工程命令；打开命令复用工程读取流程，模型修改命令更新内存修订。
     pub fn execute(&mut self, command: ProjectCommand) -> Result<ProjectSnapshot, ProjectError> {
-        self.ensure_project_writable()?;
-        let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
         match command {
+            ProjectCommand::Open { path } => self.open(&path),
             ProjectCommand::Rename { name } => {
+                self.ensure_project_writable()?;
+                let state = self.current.as_mut().ok_or(ProjectError::NoProject)?;
                 validate_name(&name)?;
                 if name == state.name {
                     return Err(ProjectError::CommandInvalid("name is unchanged".to_owned()));
@@ -208,9 +209,9 @@ impl ProjectService {
                 state.name = name;
                 state.revision = revision;
                 state.dirty = true;
+                self.snapshot()
             }
         }
-        self.snapshot()
     }
 
     pub fn current(&self) -> Result<ProjectSnapshot, ProjectError> {

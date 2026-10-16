@@ -58,7 +58,10 @@ mod temp_directory;
 #[cfg(test)]
 mod tests {
     use super::model::validate_name;
-    use super::{DocumentState, ProjectError, ProjectService, SurfaceMeshCache, temp_directory};
+    use super::{
+        DocumentState, ProjectCommand, ProjectError, ProjectService, SurfaceMeshCache,
+        temp_directory,
+    };
     use crate::fsm::open_saved_stl::{ActivationCoordinator, ActivationRequest, OUTCOME_CAPACITY};
     use panta_import::ImportRecord;
     use panta_mesh::SurfaceMesh;
@@ -98,6 +101,22 @@ mod tests {
         );
         cache.deactivate();
         assert!(cache.resident_ids().is_empty());
+    }
+
+    #[test]
+    fn open_command_uses_the_project_service_open_flow() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let mut creator = ProjectService::new();
+        let created = creator.create(&fixture.root, "Opened by command")?;
+        let mut service = ProjectService::new();
+
+        let opened = service.execute(ProjectCommand::Open {
+            path: created.path.clone(),
+        })?;
+
+        assert_eq!(opened, created);
+        assert_eq!(service.current()?, opened);
+        Ok(())
     }
 
     #[test]

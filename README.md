@@ -35,6 +35,7 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 | `cargo build --locked` | 构建默认成员 `panta-launcher` 及其依赖，并生成桌面程序 `panta`（Windows 为 `panta.exe`）。 |
 | `cargo build --locked --workspace` | 构建 workspace 全部成员。 |
 | `cargo run --locked` | 启动桌面窗口并转发程序参数与退出码。 |
+| `cargo run --locked -p panta-cli -- project inspect <工程文件.panta>` | 读取工程清单并输出名称、路径和修订号；与 GUI 共用 Rust 打开工程命令。 |
 | `cargo panta-package` | 生成当前 profile 的可搬迁安装目录，默认位于 `target/package/<profile>`。 |
 | `cargo panta-package /path/to/output` | 将安装目录写到指定路径。macOS 输出 `panta.app`，Windows/Linux 输出 `bin/panta[.exe]`。 |
 | `cargo test --locked --workspace` | 运行 Rust、native、QML 聚合测试。 |

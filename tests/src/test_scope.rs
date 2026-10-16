@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::error::Error;
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 
@@ -619,19 +619,18 @@ fn dependency_closure(
 }
 
 fn package_for_path(path: &str, packages: &Packages, root: &Path) -> Option<String> {
-    let resolved = root.join(path);
+    let resolved = normalize_path(&root.join(path));
     packages
         .iter()
         .filter_map(|(name, package)| {
-            let package_root = package.manifest.parent()?;
-            let manifest_match = resolved == package.manifest || resolved.starts_with(package_root);
+            let manifest = normalize_path(&package.manifest);
+            let package_root = normalize_path(package.manifest.parent()?);
+            let manifest_match = resolved == manifest || resolved.starts_with(&package_root);
             let target_depth = package
                 .targets
                 .iter()
-                .filter(|source| {
-                    resolved == **source || resolved.starts_with(source.parent().unwrap_or(source))
-                })
-                .map(|source| source.parent().unwrap_or(source).components().count())
+                .filter(|source| resolved == normalize_path(source))
+                .map(|source| normalize_path(source).components().count())
                 .max()
                 .unwrap_or(0);
             let root_depth = if manifest_match {
@@ -644,6 +643,22 @@ fn package_for_path(path: &str, packages: &Packages, root: &Path) -> Option<Stri
         })
         .max_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)))
         .map(|(_, name)| name)
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() && !path.is_absolute() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            component => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
 }
 
 fn is_document_path(path: &str) -> bool {
@@ -789,6 +804,26 @@ mod tests {
         assert!(!plan.packages_l2.is_empty());
         assert!(plan.native_labels.contains("ffi"));
         assert!(!plan.full);
+        Ok(())
+    }
+
+    #[test]
+    fn cli_changes_select_the_cli_package_and_core_changes_select_cli_consumer()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        let cli = make_plan(&["crates/panta-cli/src/main.rs".into()], &root)?;
+        assert!(cli.packages_l1.contains("panta-cli"));
+        assert!(cli.packages_l2.is_empty());
+        assert!(!cli.native);
+
+        let cli_test = make_plan(&["tests/rust/cli.rs".into()], &root)?;
+        assert!(cli_test.packages_l1.contains("panta-cli"), "{cli_test:?}");
+        assert!(cli_test.packages_l2.is_empty());
+
+        let core = make_plan(&["crates/panta-core/src/project/service.rs".into()], &root)?;
+        assert!(core.packages_l1.contains("panta-core"));
+        assert!(core.packages_l2.contains("panta-cli"));
+        assert!(!core.full);
         Ok(())
     }
 

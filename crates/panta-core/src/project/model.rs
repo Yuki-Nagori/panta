@@ -1,12 +1,13 @@
-//! 工程命令、状态与清单数据；不启动后台任务或写入文件。
+//! 工程应用命令、状态与清单数据；不依赖 Qt、CXX 或命令行解析。
 use super::{FillSettings, GateLocationSettings, ImportRecord, ProjectError};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-/// 可被工程模型接受的命令；扩展命令时必须增加对应验证和持久化测试。
+/// 可被工程服务接受的命令；扩展命令时必须增加对应行为与持久化测试。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectCommand {
+    Open { path: PathBuf },
     Rename { name: String },
 }
 

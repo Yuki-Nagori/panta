@@ -28,7 +28,7 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 | Rust L2：领域适配与工具入口 | `panta-import`、`panta-dslc` | `panta-import → panta-mesh`；`panta-dslc → panta-dsl-core` | 导入格式适配与 DSL 命令行工具；`panta-dslc` 是独立工具入口，不因此成为应用组合根 |
 | Rust L3：应用 / 工程服务 | `panta-core` | `panta-core → panta-import, panta-mesh, panta-dsl-core` | 编排工程状态、资产和领域服务 |
 | Rust L4：语言边界 | `panta-ffi` | `panta-ffi → panta-core, panta-mesh, panta-foundation, panta-build` | DTO、错误、句柄转换与服务转发，不承载领域算法 |
-| Rust L5：桌面启动组合根 | `panta-launcher` | `panta-launcher → panta-ffi, panta-build, panta-dsl-core` | 组装并启动 native app |
+| Rust L5：应用消费者与桌面启动组合根 | `panta-cli`、`panta-launcher` | `panta-cli → panta-core`；`panta-launcher → panta-ffi, panta-build, panta-dsl-core` | CLI 适配应用命令；launcher 组装并启动 native app |
 | 测试工具（生产层外） | `panta-tests`、`tests/` | `panta-tests → panta-build`；测试可依赖被测 crate | 只作为验证消费者，不得被生产 crate 依赖 |
 
 ### Native 层级
@@ -46,7 +46,7 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 
 ### 应用命令层
 
-命令 / 查询的输入、领域校验、编排、结果与稳定错误由 Qt 无关的 Rust 应用服务提供。GUI 通过 `panta-ffi`/Bridge 适配 Qt 值和展示；CLI 将参数适配为同一命令，不复制业务规则。当前 `panta-core::ProjectService` 已是 Rust 服务入口，`panta-dslc` 是 DSL 工具 CLI；仓库尚无面向应用领域的通用 `panta-cli`，不能把 build script 或两个调用方共用一个解析函数误记为共享命令。首个具体共享操作和 CLI 接入由任务 121 根据现有服务确定。
+命令 / 查询的输入、领域校验、编排、结果与稳定错误由 Qt 无关的 Rust 应用服务提供。GUI 通过 `panta-ffi`/Bridge 适配 Qt 值和展示；CLI 将参数适配为同一命令，不复制业务规则。`panta-core::ProjectService` 提供服务入口；`panta-cli project inspect <path>` 与 GUI 打开工程共用 `ProjectCommand::Open`。`panta-dslc` 仍是独立 DSL 工具 CLI；构建脚本与 CLI 共用一个解析函数不等同于应用命令复用。详见[应用命令层](../architecture/command-layer.md)及任务 121。
 
 ## 领域、适配与桥接
 
