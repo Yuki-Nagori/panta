@@ -1,11 +1,11 @@
 # 013 — 桌面安装布局与部署冒烟
 
-- 状态：in-progress
+- 状态：deferred
 - 阶段：交付基础
 - 依赖：[011](011-test-quality-entrypoints.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-19
+- 创建 / 更新：2026-09-16 / 2026-10-17
 
 ## 目标与背景
 
@@ -97,6 +97,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 ## 决策与工作记录
 
 - 2026-09-16：仅完成任务编排，未实施。
+- 2026-10-17：维护者决定暂缓剩余部署验收；状态改为 `deferred`。恢复时继续处理 Linux 实机安装验收、Windows 启动诊断与 D3D12 实机确认，以及桌面 app 接入 OCCT/Netgen 后的动态依赖验收。
 - 2026-10-14：开始实施前盘点确认：当前 app install 规则只安装 `panta-native`；基础库及 CMake export 单独安装。Windows 的 `windeployqt` 和 SDK DLL 复制仅挂在 app 的 `POST_BUILD`，用于 `target/native/<profile>/app` 裸启，不构成安装部署。任务继续覆盖安装树独立启动、Qt/QML 与运行库定位、许可清单及平台证据；先按 macOS arm64 主平台实现并验收，其他平台只有实际完成同等验证后才记录支持。VTK 窗口的 macOS 限制按 007 的实测现状记录，不以构建成功代替窗口验收。
 - 2026-10-14：所有平台的应用 executable 统一命名为 `panta`（Windows 为 `panta.exe`）；macOS bundle 为 `panta.app`。新增 `Panta.App` 入口包装 Shell 页，Qt 部署脚本据此扫描传递的 QML imports。CMake 安装阶段部署 Qt/QML、应用链接闭包内的 native 动态库，并随包保存 SDK 许可/provenance 与 Qt SPDX/CycloneDX SBOM。launcher 按平台定位 executable。独立安装位置、清洁环境启动和真实窗口验收通过；166 个 app/打包动态库的 Mach-O 依赖/RPATH 检查没有发现开发机绝对路径。统一命名变更后的重建与安装验证待复验。
 - 2026-10-14：独立评审确认 Windows Dawn 通过 `LoadLibrary` 动态加载 `d3dcompiler_47.dll`，CMake 依赖扫描无法发现；新增 Windows install 规则，从 `%WINDIR%/System32` 将 DLL 放到安装 `bin`。同时将 Qt SBOM 安装移出 Bridge 条件，确保 `--no-default-features` 的 Qt Shell 变体也有清单。Qt 部署脚本延后到 native 运行库复制之后，让 macdeployqt 能修正完整 app 链接闭包的 `@rpath`。以上 Windows 行为未在本机实测，等待 Windows CI/实机验收。
@@ -128,4 +129,4 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 
 ## 完成摘要
 
-部分完成：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收；Windows 11 x64 的单机包启动和本次 manifest 修复后的 package 产物均已通过用户验收，三平台 package CI 通过。OCCT/Netgen 尚无桌面 app consumer，Linux 尚未实机验收；任务保持 in-progress。
+部分完成并暂缓：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收；Windows 11 x64 的单机包启动和 manifest 修复后的 package 产物已通过用户验收，package CI 通过。OCCT/Netgen 尚无桌面 app consumer，Linux 尚未实机验收；维护者于 2026-10-17 决定暂不推进，恢复时从未完成的验收项继续。
