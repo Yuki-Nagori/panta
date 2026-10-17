@@ -85,7 +85,6 @@ ai-docs/
 | 027 | [开发模式 QML 重载与状态恢复](task/027-qml-state-reload.md) | 应用平台扩展 | 007, 024, 026 | planned |
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | done |
 | 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
-| 048 | [设置服务与 Qt 持久化适配](task/048-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
 | 050 | [QML 页面设计 HTML 先行复刻](task/050-qml-html-page-replica.md) | 应用平台扩展 | 028, 029 | done |
 | 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | deferred |
 | 052 | [QML 图标规范与首页布局优化](task/052-qml-icon-and-layout-polish.md) | 应用平台扩展 | 029, 050 | done |
@@ -110,7 +109,7 @@ ai-docs/
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | deferred |
 | 085 | [Qt reduced-motion 原生属性迁移](task/085-qt-reduced-motion-preference-migration.md) | 应用平台扩展 | 080, 086, 002 | planned |
 | 086 | [Qt 平台服务适配层](task/086-qt-platform-adapter.md) | 应用平台扩展 | 002, 005, 023, 034 | done |
-| 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 048, 086 | planned |
+| 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 086, 115, 125 | planned |
 | 088 | [Mesh 资产旁置存储与按需加载](task/088-mesh-asset-sidecar-storage.md) | CAE 领域模块迁移 | 063, 067, 073, 080 | done |
 | 090 | [Mesh Tool QML 界面](task/090-mesh-tool-qml-ui.md) | 应用平台扩展 | 050, 068, 081 | done |
 | 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | done |
@@ -125,7 +124,7 @@ ai-docs/
 | 100 | [tests 整体整理与性能入口统一](task/100-tests-consolidation.md) | 验证基础 | 048, 099 | done |
 | 113 | [Tools 工具栏内容](task/113-tools-ribbon.md) | 应用平台扩展 | 050, 062, 096 | done |
 | 114 | [View 工具栏内容](task/114-view-ribbon.md) | 应用平台扩展 | 060, 062, 064, 080 | done |
-| 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 048 | planned |
+| 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 125 | planned |
 | 116 | [Rust 工艺参数约束统一暴露](task/116-rust-process-parameter-constraints.md) | 应用平台扩展 | 094, 095, 099 | done |
 | 117 | [Rust 工程文档工作区状态](task/117-rust-project-document-workspace.md) | Rust 架构整理 | 067, 080, 107 | done |
 | 118 | [实际依赖图与应用命令层设计](task/118-layering-lint-and-command-boundaries.md) | Rust 架构整理 | 106, 111 | done |
@@ -135,6 +134,7 @@ ai-docs/
 | 122 | [Rust CLI 创建工程](task/122-rust-cli-project-create.md) | Rust 架构整理 | 057, 107, 121 | done |
 | 123 | [Rust CLI 检查 STL](task/123-rust-cli-stl-inspection.md) | CAE 领域模块迁移 | 063, 067, 121 | done |
 | 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | done |
+| 125 | [设置服务与 Qt 持久化适配](task/125-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
 
 ## 验证与质量扩展队列
 

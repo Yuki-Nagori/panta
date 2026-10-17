@@ -11,6 +11,7 @@
 | 方向 | 设计说明 | 实施任务 |
 |---|---|---|
 | 原子组件、统一尺寸与主题切换 | [组件库与主题 DSL](qml-components-and-theme.md) | [029](../task/029-qml-component-library.md)、[030](../task/030-theme-dsl.md) |
+| 用户设置、平台菜单入口与语言设置 | [国际化](internationalization.md)、[应用与存储架构](../architecture/application-and-storage.md) | [115](../task/115-platform-application-menu-and-settings-entry.md)、[125](../task/125-settings-service-and-qt-adapter.md)、[087](../task/087-language-settings-ui.md) |
 | 英文源文案、语言字典与切换 | [国际化](internationalization.md) | [022](../task/022-ui-internationalization.md) |
 | 跨平台路径、逻辑资源地址与运行上下文 | [路径与运行时](paths-and-runtime.md) | [023](../task/023-cross-platform-paths.md)、[024](../task/024-runtime-context.md) |
 | 变量声明、表达式与快照 | [变量 DSL](variable-dsl.md) | [025](../task/025-variable-dsl.md) |
