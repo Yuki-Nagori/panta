@@ -507,6 +507,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "commits a compressed mesh sidecar through zstd native FFI"
+    )]
     fn async_import_publishes_only_after_atomic_manifest_commit()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
@@ -557,6 +561,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "commits a compressed mesh sidecar through zstd native FFI"
+    )]
     fn imported_mesh_does_not_depend_on_source_file_after_commit()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
@@ -608,6 +616,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "commits a compressed mesh sidecar through zstd native FFI"
+    )]
     fn corrupt_mesh_sidecar_fails_activation_without_publishing_a_mesh()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
@@ -720,6 +732,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "commits a compressed mesh sidecar through zstd native FFI"
+    )]
     fn rejected_import_admission_restores_preview_for_retry()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
