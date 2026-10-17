@@ -1,7 +1,9 @@
-/// 翻译目录安装失败时，已安装的 Qt translator 必须继续生效。
+/// 翻译目录缺项或加载失败时，已安装的 Qt translator 必须继续生效。
 #include <QCoreApplication>
+#include <QFile>
 #include <QObject>
 #include <QString>
+#include <QTemporaryDir>
 #include <QtCore/qtmetamacros.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
@@ -23,8 +25,21 @@ void TranslationCatalogTest::failedReplacementPreservesInstalledCatalog() {
     QVERIFY(catalog.install(QStringLiteral(":/i18n/panta_zh_CN.qm"), &error));
     QVERIFY(error.isEmpty());
     QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
+    QCOMPARE(QCoreApplication::translate("App", "Uncatalogued source"),
+             QStringLiteral("Uncatalogued source"));
 
     QVERIFY(!catalog.install(QStringLiteral(":/i18n/missing.qm"), &error));
+    QCOMPARE(error, QStringLiteral("i18n.catalog_load_failed"));
+    QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
+
+    QTemporaryDir temporaryDirectory;
+    QVERIFY(temporaryDirectory.isValid());
+    QFile damagedCatalog(temporaryDirectory.filePath(QStringLiteral("damaged.qm")));
+    QVERIFY(damagedCatalog.open(QIODevice::WriteOnly));
+    QCOMPARE(damagedCatalog.write("not a Qt translation catalog"),
+             qint64(sizeof("not a Qt translation catalog") - 1));
+    damagedCatalog.close();
+    QVERIFY(!catalog.install(damagedCatalog.fileName(), &error));
     QCOMPARE(error, QStringLiteral("i18n.catalog_load_failed"));
     QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
 

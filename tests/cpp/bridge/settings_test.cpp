@@ -1,9 +1,13 @@
 /// 验证 Settings 跨 Rust locale、Qt translator 与 QML 翻译绑定的行为。
+#include "project_view_model.hpp"
 #include "settings.hpp"
+#include "shell_view_model.hpp"
 #include <QCoreApplication>
+#include <QDir>
 #include <QJSEngine>
 #include <QObject>
 #include <QQmlComponent>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QSignalSpy>
 #include <QString>
@@ -29,6 +33,25 @@ class SettingsTest final : public QObject {
         QQmlEngine engine;
         auto* settings = engine.singletonInstance<Settings*>(settingsTypeId);
         QVERIFY(settings != nullptr);
+
+        panta::bridge::ProjectViewModel projectModel;
+        panta::bridge::ShellViewModel shellModel;
+        shellModel.tick();
+        engine.rootContext()->setContextProperty("projectModel", &projectModel);
+        engine.rootContext()->setContextProperty("shellModel", &shellModel);
+        QQmlComponent errorComponent(&engine);
+        errorComponent.setData("import QtQml\nimport Panta.Test 1.0\nQtObject {"
+                               " property string errorText: projectModel.error;"
+                               " property Connections languageConnection: Connections {"
+                               " target: Settings; function onLanguageChanged() {"
+                               " projectModel.retranslateError();"
+                               " shellModel.retranslateCaption() } } }",
+                               QUrl());
+        std::unique_ptr<QObject> errorObject(errorComponent.create());
+        QVERIFY2(errorObject != nullptr, qPrintable(errorComponent.errorString()));
+        QVERIFY(!projectModel.createProject(QStringLiteral("../invalid"), QDir::tempPath()));
+        QCOMPARE(errorObject->property("errorText").toString(),
+                 QStringLiteral("Enter a valid project name."));
 
         QQmlComponent textComponent(&engine);
         textComponent.setData(
@@ -60,6 +83,9 @@ class SettingsTest final : public QObject {
         QVERIFY(settings->languageError().isEmpty());
         QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("就绪"));
+        QCOMPARE(errorObject->property("errorText").toString(),
+                 QStringLiteral("请输入有效的工程名称。"));
+        QCOMPARE(shellModel.caption(), QStringLiteral("修订 1"));
 
         QVERIFY(!settings->setLanguage(QStringLiteral("zh_CN")));
         QCOMPARE(settings->language(), QStringLiteral("zh-CN"));
@@ -77,6 +103,9 @@ class SettingsTest final : public QObject {
         QCOMPARE(changed.count(), 2);
         QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("Ready"));
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("Ready"));
+        QCOMPARE(errorObject->property("errorText").toString(),
+                 QStringLiteral("Enter a valid project name."));
+        QCOMPARE(shellModel.caption(), QStringLiteral("Revision 1"));
     }
 };
 

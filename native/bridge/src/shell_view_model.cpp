@@ -1,5 +1,6 @@
 #include "shell_view_model.hpp"
 
+#include <QCoreApplication>
 #include <QObject>
 #include <QString>
 #include <QtCore/qtmetamacros.h>
@@ -11,6 +12,7 @@ ShellViewModel::ShellViewModel(QObject* parent) : QObject(parent) {}
 auto ShellViewModel::caption() const -> const QString& { return m_caption; }
 
 void ShellViewModel::setCaption(const QString& value) {
+    m_captionUsesRevision = false;
     if (m_caption == value) {
         // 值未变化不重复通知（qt.md）；QML 重复绑定同一值时不得抖动。
         return;
@@ -33,8 +35,22 @@ void ShellViewModel::setError(const QString& message) {
 
 void ShellViewModel::tick() {
     ++m_count;
-    setCaption(QStringLiteral("修订 %1").arg(m_count));
+    m_captionUsesRevision = true;
+    retranslateCaption();
     emit countChanged();
+}
+
+void ShellViewModel::retranslateCaption() {
+    if (!m_captionUsesRevision) {
+        return;
+    }
+    const QString caption =
+        QCoreApplication::translate("ShellViewModel", "Revision %1").arg(m_count);
+    if (m_caption == caption) {
+        return;
+    }
+    m_caption = caption;
+    emit captionChanged();
 }
 
 } // namespace panta::bridge

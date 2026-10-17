@@ -53,6 +53,9 @@ endif()
 # Qt 预编译产物供给（任务 005）：缓存于构建树，首次 configure 需联网。
 # QT_STAGING 暴露路径供 find_package 和诊断使用。
 include(cmake/qt-provision.cmake)
+# 同一平台构建的 Qt host tools 与目标库使用同一份锁定 SDK，避免 CMake
+# 从系统前缀找到其他 Qt 版本的 qmlcachegen、moc 等工具。
+set(QT_HOST_PATH "${QT_STAGING}")
 set(_panta_qt_components
     Core
     Gui

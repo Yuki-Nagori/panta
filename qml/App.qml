@@ -65,6 +65,14 @@ ApplicationWindow {
         }
     }
 
+    Connections {
+        target: Settings
+        function onLanguageChanged() {
+            projectModel.retranslateError();
+            viewModel.retranslateCaption();
+        }
+    }
+
     NewProjectDialog {
         id: newProjectDialog
         ownerWindow: shellWindow

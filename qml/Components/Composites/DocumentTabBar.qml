@@ -58,17 +58,21 @@ Item {
     function slot_of(id) {
         return order.indexOf(id);
     }
+    function document_title(document) {
+        return document.kind === "welcome" ? qsTranslate("ProjectViewModel", "Welcome") : document.title ?? "";
+    }
     function display_title(document) {
+        const title = document_title(document);
         if (document.kind !== "import" || (document.displayCount ?? 1) < 2) {
-            return document.title ?? "";
+            return title;
         }
-        return `${document.displayOrdinal} · ${document.title}`;
+        return `${document.displayOrdinal} · ${title}`;
     }
     function accessible_title(document) {
         if (document.kind !== "import" || (document.displayCount ?? 1) < 2) {
-            return document.title ?? "";
+            return document_title(document);
         }
-        return qsTr("%1, import %2").arg(document.title).arg(document.displayOrdinal);
+        return qsTr("%1, import %2").arg(document_title(document)).arg(document.displayOrdinal);
     }
     function accessible_description(document) {
         if (document.state === "loading") {

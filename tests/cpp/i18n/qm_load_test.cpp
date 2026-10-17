@@ -30,6 +30,9 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QCOMPARE(translator.translate("UiCommonNavigation", "Home"), QStringLiteral("主页"));
     QCOMPARE(translator.translate("ProjectTaskItem", "Project '%1'").arg(QStringLiteral("01")),
              QStringLiteral("工程“01”"));
+    QCOMPARE(
+        translator.translate("ProjectTaskItem", "Project '%1'").arg(QStringLiteral("mold-a 2027")),
+        QStringLiteral("工程“mold-a 2027”"));
     QCOMPARE(translator.translate("UiCommonModeling", "Mesh"), QStringLiteral("网格"));
     QCOMPARE(translator.translate("NewProjectDialog", "Create New Project"),
              QStringLiteral("新建工程"));
@@ -55,6 +58,12 @@ void QmLoadTest::zhCnDictionaryTranslates() {
     QCOMPARE(translator.translate("DocumentTabBar", "%1, import %2")
                  .arg(QStringLiteral("模型"), QStringLiteral("2")),
              QStringLiteral("模型（第 2 个导入）"));
+    QCOMPARE(translator.translate("DocumentTabBar", "%1, import %2")
+                 .arg(QStringLiteral("part-a.stl"), QStringLiteral("3")),
+             QStringLiteral("part-a.stl（第 3 个导入）"));
+    QCOMPARE(translator.translate("FillSettings", "%1 steps · %2 s")
+                 .arg(QStringLiteral("2"), QStringLiteral("4.5")),
+             QStringLiteral("2 个步骤 · 4.5 秒"));
     QCOMPARE(translator.translate("DocumentTabBar", "Loading"), QStringLiteral("正在加载"));
     QCOMPARE(translator.translate("DocumentTabBar", "Failed to load"), QStringLiteral("加载失败"));
     QCOMPARE(translator.translate("DocumentTabBar",
@@ -62,6 +71,10 @@ void QmLoadTest::zhCnDictionaryTranslates() {
              QStringLiteral("工程包中缺少已保存的网格资产。"));
     QCOMPARE(translator.translate("ProjectViewModel", "Enter a valid project name."),
              QStringLiteral("请输入有效的工程名称。"));
+    QCOMPARE(translator.translate("ViewRibbonAccessibility", "Model Display"),
+             QStringLiteral("模型显示"));
+    QCOMPARE(translator.translate("ShellViewModel", "Revision %1").arg(3),
+             QStringLiteral("修订 3"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {
@@ -84,6 +97,15 @@ void QmLoadTest::enBaselineDictionaryLoads() {
     QCOMPARE(translator.translate("DocumentTabBar", "Close %1"), QStringLiteral("Close %1"));
     QCOMPARE(translator.translate("DocumentTabBar", "%1, import %2"),
              QStringLiteral("%1, import %2"));
+    QCOMPARE(
+        translator.translate("ProjectTaskItem", "Project '%1'").arg(QStringLiteral("mold-a 2027")),
+        QStringLiteral("Project 'mold-a 2027'"));
+    QCOMPARE(translator.translate("DocumentTabBar", "%1, import %2")
+                 .arg(QStringLiteral("part-a.stl"), QStringLiteral("3")),
+             QStringLiteral("part-a.stl, import 3"));
+    QCOMPARE(translator.translate("FillSettings", "%1 steps · %2 s")
+                 .arg(QStringLiteral("2"), QStringLiteral("4.5")),
+             QStringLiteral("2 steps · 4.5 s"));
     QCOMPARE(translator.translate("DocumentTabBar", "Loading"), QStringLiteral("Loading"));
     QCOMPARE(translator.translate("DocumentTabBar", "Failed to load"),
              QStringLiteral("Failed to load"));
@@ -92,6 +114,9 @@ void QmLoadTest::enBaselineDictionaryLoads() {
              QStringLiteral("The saved mesh asset is missing from the project package."));
     QCOMPARE(translator.translate("ProjectViewModel", "Enter a valid project name."),
              QStringLiteral("Enter a valid project name."));
+    QCOMPARE(translator.translate("ViewRibbonAccessibility", "Model Display"),
+             QStringLiteral("Model Display"));
+    QCOMPARE(translator.translate("ShellViewModel", "Revision %1"), QStringLiteral("Revision %1"));
 }
 
 QTEST_GUILESS_MAIN(QmLoadTest)
