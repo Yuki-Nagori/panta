@@ -125,6 +125,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
     /// 清除当前错误，供对话框每次打开时重置显示状态。
     Q_INVOKABLE void clearError();
+    /// 语言目录切换后重算缓存的工程错误文案并通知 QML。
+    Q_INVOKABLE void retranslateError();
 
     /// 打开已有工程并读取 Rust 清单。
     Q_INVOKABLE bool openProject(const QString& path);

@@ -5,6 +5,7 @@
 #include "project_view_model.hpp"
 #endif
 #include <QColor>
+#include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -28,6 +29,7 @@
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
+#include <QTranslator>
 #include <QUrl>
 #include <QVariantMap>
 #include <QVector>
@@ -122,6 +124,18 @@ QVariantMap output_run(const QString& context, const QString& id, const QString&
                                   {QStringLiteral("text"), text}}}},
         {QStringLiteral("resultGroups"), QVariantList{}}};
 }
+
+class WelcomeTranslator final : public QTranslator {
+  public:
+    QString translate(const char* context, const char* source_text, const char*,
+                      int) const override {
+        if (QString::fromUtf8(context) == QStringLiteral("ProjectViewModel") &&
+            QString::fromUtf8(source_text) == QStringLiteral("Welcome")) {
+            return QStringLiteral("欢迎");
+        }
+        return {};
+    }
+};
 
 } // namespace
 
@@ -1489,6 +1503,63 @@ class ThemeComponentTest final : public QObject {
         bar->setProperty("order",
                          QStringList{QStringLiteral("import-1"), QStringLiteral("welcome")});
         QCOMPARE(welcomeTab->x(), 134.0);
+    }
+
+    void welcome_document_tab_retranslates_visible_and_accessible_titles() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent component(
+            &engine, QUrl(QStringLiteral(
+                         "qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+
+        const QVariantList documents{
+            QVariantMap{{QStringLiteral("id"), QStringLiteral("welcome")},
+                        {QStringLiteral("kind"), QStringLiteral("welcome")},
+                        {QStringLiteral("state"), QStringLiteral("ready")},
+                        {QStringLiteral("title"), QStringLiteral("Welcome")},
+                        {QStringLiteral("message"), QString{}}}};
+        auto* bar = qobject_cast<QQuickItem*>(component.createWithInitialProperties(
+            QVariantMap{{QStringLiteral("documents"), documents},
+                        {QStringLiteral("activeDocumentId"), QStringLiteral("welcome")}}));
+        QVERIFY(bar != nullptr);
+        bar->setParent(&owner);
+        bar->setWidth(240);
+        bar->setHeight(39);
+
+        QQuickWindow window;
+        window.resize(240, 39);
+        bar->setParentItem(window.contentItem());
+        window.show();
+        QVERIFY2(QTest::qWaitForWindowExposed(&window), "window was not exposed");
+
+        auto* tab = visual_item(bar, QStringLiteral("documentTab-welcome"));
+        QVERIFY(tab != nullptr);
+        auto* title = visual_item(tab, QStringLiteral("documentTabTitle"));
+        auto* close = visual_item(tab, QStringLiteral("documentTabClose"));
+        QVERIFY(title != nullptr);
+        QVERIFY(close != nullptr);
+        auto* tab_accessible = QAccessible::queryAccessibleInterface(tab);
+        auto* close_accessible = QAccessible::queryAccessibleInterface(close);
+        QVERIFY(tab_accessible != nullptr);
+        QVERIFY(close_accessible != nullptr);
+        QCOMPARE(title->property("text").toString(), QStringLiteral("Welcome"));
+        QCOMPARE(tab_accessible->text(QAccessible::Name), QStringLiteral("Welcome"));
+        QCOMPARE(close_accessible->text(QAccessible::Name), QStringLiteral("Close Welcome"));
+
+        WelcomeTranslator translator;
+        QVERIFY(QCoreApplication::installTranslator(&translator));
+        engine.retranslate();
+        QTRY_COMPARE(title->property("text").toString(), QStringLiteral("欢迎"));
+        QTRY_COMPARE(tab_accessible->text(QAccessible::Name), QStringLiteral("欢迎"));
+        QTRY_COMPARE(close_accessible->text(QAccessible::Name), QStringLiteral("Close 欢迎"));
+
+        QVERIFY(QCoreApplication::removeTranslator(&translator));
+        engine.retranslate();
+        QTRY_COMPARE(title->property("text").toString(), QStringLiteral("Welcome"));
+        QTRY_COMPARE(tab_accessible->text(QAccessible::Name), QStringLiteral("Welcome"));
+        QTRY_COMPARE(close_accessible->text(QAccessible::Name), QStringLiteral("Close Welcome"));
     }
 
     void duplicate_document_tabs_are_visibly_and_accessibly_distinguished() {

@@ -63,7 +63,7 @@ Row {
                         lineHeight: Theme.ribbonTextLineHeight
                     }
                 }
-                Accessible.name: qsTranslate("ViewRibbon", "Model Display")
+                Accessible.name: qsTranslate("ViewRibbonAccessibility", "Model Display")
                 Accessible.role: Accessible.RadioButton
                 Accessible.checked: true
                 Accessible.description: qsTranslate("ViewRibbon", "Current display mode")

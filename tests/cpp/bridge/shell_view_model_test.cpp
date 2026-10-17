@@ -22,7 +22,7 @@ TEST(ShellViewModel, TickAdvancesCountAndUpdatesCaption) {
     viewModel.tick();
 
     EXPECT_EQ(viewModel.count(), kInitialCount + 1);
-    EXPECT_EQ(viewModel.caption().toStdString(), "修订 1");
+    EXPECT_EQ(viewModel.caption().toStdString(), "Revision 1");
     EXPECT_EQ(countSpy.count(), 1);
     EXPECT_EQ(captionSpy.count(), 1);
 }

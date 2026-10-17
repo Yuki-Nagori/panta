@@ -34,6 +34,8 @@ class ShellViewModel : public QObject {
 
     /// 命令：推进修订计数并同步刷新说明文字。
     Q_INVOKABLE void tick();
+    /// 语言切换时刷新由 tick() 生成的本地化说明文字。
+    Q_INVOKABLE void retranslateCaption();
 
   signals:
     void captionChanged();
@@ -42,6 +44,7 @@ class ShellViewModel : public QObject {
 
   private:
     QString m_caption;
+    bool m_captionUsesRevision = false;
     int m_count = 0;
     QString m_error;
 };

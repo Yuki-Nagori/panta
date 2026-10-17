@@ -47,6 +47,12 @@ QVariantMap numeric_constraint_map(const panta::ffi::NumericConstraint& constrai
             {QStringLiteral("unit"), QString::fromUtf8(constraint.unit)}};
 }
 
+QString translated_project_error(const QString& code) {
+    const QString message_key =
+        QString::fromUtf8(panta::ffi::project_error_message_key(code.toStdString()));
+    return QCoreApplication::translate("ProjectViewModel", message_key.toUtf8().constData());
+}
+
 QVariantMap draft_validation_map(const panta::ffi::ProcessDraftValidation& result) {
     QStringList errors;
     errors.reserve(static_cast<qsizetype>(result.errors.size()));
@@ -588,6 +594,18 @@ void ProjectViewModel::clearError() {
     emit errorChanged();
 }
 
+void ProjectViewModel::retranslateError() {
+    if (m_errorCode.isEmpty()) {
+        return;
+    }
+    const QString message = translated_project_error(m_errorCode);
+    if (m_error == message) {
+        return;
+    }
+    m_error = message;
+    emit errorChanged();
+}
+
 bool ProjectViewModel::openProject(const QString& path) {
     clearError();
     std::string boundaryPath;
@@ -808,10 +826,7 @@ bool ProjectViewModel::applySnapshot(const panta::ffi::ProjectSnapshotResult& re
 }
 
 bool ProjectViewModel::fail(const QString& code, const QString& category, const QString& detail) {
-    const QString messageKey =
-        QString::fromUtf8(panta::ffi::project_error_message_key(code.toStdString()));
-    const QString message =
-        QCoreApplication::translate("ProjectViewModel", messageKey.toUtf8().constData());
+    const QString message = translated_project_error(code);
     if (m_errorCode != code || m_error != message || m_errorCategory != category ||
         m_errorDetail != detail) {
         m_errorCode = code;

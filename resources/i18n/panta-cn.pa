@@ -660,6 +660,11 @@ label:
   src: Community
   tr: 社区
 
+[ShellViewModel]
+revision:
+  src: Revision %1
+  tr: 修订 %1
+
 [TaskPanelTitle]
 label:
   src: Tasks
@@ -1738,3 +1743,8 @@ entry-44:
 entry-45:
   src: Delete View
   tr: 删除视图
+
+[ViewRibbonAccessibility]
+model-display:
+  src: Model Display
+  tr: 模型显示

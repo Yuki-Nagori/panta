@@ -77,7 +77,7 @@ ai-docs/
 
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
-| 022 | [UI 英文源文案与语言字典](task/022-ui-internationalization.md) | 应用平台扩展 | 005, 034, 086 | planned |
+| 022 | [UI 英文源文案与语言字典](task/022-ui-internationalization.md) | 应用平台扩展 | 005, 034, 086 | done |
 | 023 | [跨平台路径与资源引用服务](task/023-cross-platform-paths.md) | 应用平台扩展 | 005, 006 | done |
 | 024 | [工程运行时上下文与变量快照](task/024-runtime-context.md) | 应用平台扩展 | 008, 023 | planned |
 | 025 | [变量 DSL 解析、求值与存储](task/025-variable-dsl.md) | 应用平台扩展 | 024, 034 | planned |
@@ -87,7 +87,7 @@ ai-docs/
 | 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
 | 048 | [设置服务与 Qt 持久化适配](task/048-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
 | 050 | [QML 页面设计 HTML 先行复刻](task/050-qml-html-page-replica.md) | 应用平台扩展 | 028, 029 | done |
-| 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | in-progress |
+| 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | deferred |
 | 052 | [QML 图标规范与首页布局优化](task/052-qml-icon-and-layout-polish.md) | 应用平台扩展 | 029, 050 | done |
 | 053 | [默认视口立体 panta 字样](task/053-default-panta-wordmark.md) | 应用平台扩展 | 007, 081 | done |
 | 054 | [顶部折叠图标与搜索框引导](task/054-titlebar-search-details.md) | 应用平台扩展 | 052 | done |
