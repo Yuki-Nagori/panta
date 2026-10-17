@@ -1,6 +1,6 @@
 # 022 — UI 英文源文案与语言字典
 
-- 状态：in-progress
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[005](005-qt-qml-shell.md)、[034](034-rust-panta-artifact-parser.md)、[086](086-qt-platform-adapter.md)
 - 优先级：P1
@@ -51,7 +51,7 @@
 - [x] 缺项回退英文；损坏字典保留上一语言且不提交 locale。设置偏好写入和重启恢复由 048/087 验收。
 - [x] 现存产品文案无缺项，参数占位正确，项目名、文件名、序号和数值作为数据参数保留。当前 UI 没有复数文案；DSL 复数表单与 TS 生成由 034 的测试覆盖。
 - [x] 干净构建含翻译资源，任意 cwd 启动可读字典；构建工具版本与三平台供给可追溯。
-- [ ] 三平台 CI 对锁定 Qt host tools 的构建与适用测试通过。
+- [x] 三平台 CI 对锁定 Qt host tools 的构建与适用测试通过。
 - [x] 真实窗口英文默认主页面与新建工程弹窗文案可读；设置界面的语言切换验收由 087 承接。
 - [x] 代码、测试、配置和文档一致，删除废弃实现；记录真实验证并同步索引。
 
@@ -68,6 +68,7 @@
 | 2026-10-17 | 全新 Cargo/native 构建树与任意 cwd 翻译资源验收 | 首次隔离构建发现 CMake 从 Homebrew 选取 Qt 6.12 `qmlcachegen`，与锁定的 Qt 6.11.2 头文件不匹配；在 `native/CMakeLists.txt` 将 `QT_HOST_PATH` 固定到托管 staging 后，全新 `CARGO_TARGET_DIR` 的 `cargo build --locked` 成功，生成的 `Qt6QmlTools_DIR` 与 qmlcachegen 均来自 staging。lrelease 为英文、中文各生成 407 条；干净树 `I18n.CompiledQmLoads` 1/1 通过；从 `/tmp` 启动干净构建的 offscreen 应用到达事件循环。三平台 Qt 版本与固定资产见 005/034；本机实际构建平台为 macOS arm64。 |
 | 2026-10-17 | CMake host-tools 修复后的变更范围门禁 `cargo verify-changed` | 选择器因公共 CMake 构建边界将范围升级为全量；格式、9 阶段 lint、全部 Rust package 测试及 native/QML CTest 77/77 通过。 |
 | 2026-10-17 | 独立 final review 后修复 Welcome 页签重译 | `DocumentTabBar` 按 welcome 文档类型动态翻译显示名和无障碍名称；新增同一 QML 引擎切换中英文时验证页签标题与关闭按钮名称的回归测试。VTK 欢迎画面的 `Welcome!` 根据用户决策保留英文。 |
+| 2026-10-17 | PR #57 三平台 CI 验收 | 所有 CI 检查通过，包括 macOS / Ubuntu / Windows 构建、Rust 格式与 lint、CMake / C++ / QML lint、依赖审计；run [39021842925](https://github.com/Yuki-Nagori/panta/actions/runs/39021842925)。PR 保持打开，尚未合并。 |
 
 ## 风险与回退
 
@@ -83,4 +84,4 @@
 
 ## 完成摘要
 
-进行中。`.pa` 到 QM 的构建链和 Rust/Qt 运行时切换已由 034/086 接入；本任务负责完成现有展示文案覆盖、缺项/失败回退、占位参数检查及默认窗口文案验收，当前仅待三平台 CI。
+已完成。现有 QML/C++ 展示文案、缺项与失败回退、占位参数、运行时重译及默认窗口文案均完成验收；锁定 Qt host tools 的 macOS、Ubuntu、Windows CI 全部通过。设置界面端到端语言切换与偏好持久化仍由 087/048 承接。
