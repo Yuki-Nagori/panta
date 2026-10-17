@@ -8,7 +8,7 @@
 
 Rust 负责工程、工作区、命令、任务、作业、序列化、撤销/重做模型及求解器客户端。插件体系是长期方向，V1 不要求先实现插件加载平台。C++ 负责 Qt 桥接以及几何、网格和渲染的 native 实现。
 
-用户设置另见[048 设置服务与 Qt 持久化适配](../task/048-settings-service-and-qt-adapter.md)：Rust 负责设置 schema、默认值、范围和业务校验，C++ 负责 `QSettings` 的平台存取适配。`QSettings` 不进入 `panta-core`，QML 也不直接访问它；主题定义仍由 `.pa` resource 提供，设置只保存主题 ID、窗口状态等偏好。
+用户设置另见[125 设置服务与 Qt 持久化适配](../task/125-settings-service-and-qt-adapter.md)：Rust 负责设置 schema、默认值、范围和业务校验，C++ 负责 `QSettings` 的平台存取适配。`QSettings` 不进入 `panta-core`，QML 也不直接访问它；主题定义仍由 `.pa` resource 提供，设置只保存主题 ID、窗口状态等偏好。跨平台菜单入口由[115](../task/115-platform-application-menu-and-settings-entry.md)提供，具体设置页由各消费任务实现。
 
 应用服务将用户命令转换为跨模块操作；Rust 与 C++ 之间优先传递明确所有权的 DTO、句柄和结果。任务 057 已用 [CXX](../standards/cxx.md) 落地最小 `ProjectService`：创建、打开、保存和重命名命令通过 `ProjectSnapshot` 传递，错误使用稳定 `project.*` 代码。字符串编码、缓冲区归属、释放接口、线程约束和错误映射必须明确，异常与 panic 不得未经处理跨越 FFI 边界；大工程操作仍需异步化。
 

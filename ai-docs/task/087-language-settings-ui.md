@@ -2,14 +2,14 @@
 
 - 状态：planned
 - 阶段：应用平台扩展
-- 依赖：[022](022-ui-internationalization.md)、[029](029-qml-component-library.md)、[048](048-settings-service-and-qt-adapter.md)、[086](086-qt-platform-adapter.md)
+- 依赖：[022](022-ui-internationalization.md)、[029](029-qml-component-library.md)、[086](086-qt-platform-adapter.md)、[115](115-platform-application-menu-and-settings-entry.md)、[125](125-settings-service-and-qt-adapter.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-29 / 2026-09-29
+- 创建 / 更新：2026-09-29 / 2026-10-17
 
 ## 目标与背景
 
-在应用设置界面提供语言选择。语言目录、切换命令和当前 locale 由 Rust/`Settings` 后端提供；QML 只展示支持项并发出用户意图，不自行访问 QSettings、解析 `.pa` 或加载 QM。切换与翻译刷新机制由 086 接通，用户偏好持久化由 048 提供。
+在应用设置界面提供语言选择。用户从跨平台 Settings 入口进入设置区域；入口和共享路由由 115 提供，语言设置页面由本任务实现。语言目录、切换命令和当前 locale 由 Rust/`Settings` 后端提供；QML 只展示支持项并发出用户意图，不自行访问 QSettings、解析 `.pa` 或加载 QM。切换与翻译刷新机制由 086 接通，用户偏好持久化由 125 提供。
 
 ## 必读
 
@@ -27,8 +27,9 @@
 ## 前置条件与待决策
 
 - 022 的语言目录与 QM 构建验收完成。
-- 048 提供 Rust 设置 schema、CXX DTO 和 Qt QSettings adapter；偏好写入只在 translator 加载成功后提交。
+- 125 提供 Rust 设置 schema、CXX DTO 和 Qt QSettings adapter；偏好写入只在 translator 加载成功后提交。
 - 086 提供 QML `Settings` 类型、supported/current locale 和运行时切换 API。
+- 115 提供 Windows/Linux 的 P 菜单与 macOS 系统菜单栏 Settings 入口，以及共享设置页面路由；本任务将语言选择内容接入该路由。
 - 029 提供的表单/选择器组件可满足布局与键盘操作；否则记录最小必要组件扩展。
 
 ## 实施步骤
@@ -40,7 +41,7 @@
 
 ## 预计改动
 
-预计涉及 `qml/` 设置页面与公共组件、`native/bridge/` settings view model，以及 Rust 设置服务/CXX DTO；路径以 048 的实际接口为准。
+预计涉及 `qml/` 语言设置页面与公共组件、`native/bridge/` settings view model，以及 Rust 设置服务/CXX DTO；路径以 125 和 115 的实际接口为准。
 
 ## 清理与兼容例外
 
@@ -72,4 +73,4 @@
 
 ## 完成摘要
 
-未完成。语言后端 086 已完成；设置界面与持久化仍等待 022、029、048 的对应能力和验收。
+未完成。语言后端 086 与字典/运行时任务 022 已完成；设置界面与持久化仍等待 115 的菜单路由、125 的设置服务及 029 的组件能力。

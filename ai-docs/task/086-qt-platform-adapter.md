@@ -5,7 +5,7 @@
 - 依赖：[002](002-dependency-baseline.md)、[005](005-qt-qml-shell.md)、[023](023-cross-platform-paths.md)、[034](034-rust-panta-artifact-parser.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-29 / 2026-09-29
+- 创建 / 更新：2026-09-29 / 2026-10-17
 
 ## 目标与背景
 
@@ -34,10 +34,10 @@
 - 创建 `native/qt-adapter` 独立 CMake target；不依赖 Bridge、Rust FFI、VTK 或 QML 业务层。其翻译服务只依赖 Qt Core，不承担 locale 选择策略。
 - 将 reduced-motion 平台查询与运行期变化监听从 Bridge 移入 adapter，保持 Bridge/QML 侧统一的只读属性。
 - 将标准目录查找集中到 adapter，并迁移 PathHost 与 ProjectViewModel 的 `QStandardPaths` 直接调用。
-- 增加 Qt 翻译器运行时服务；在 Bridge 的 `Settings` 暴露当前 locale、Rust 提供的支持 locale 和切换命令，并在 QM 安装成功后触发 `QQmlEngine::retranslate()`。产品设置界面和偏好持久化另由 [087](087-language-settings-ui.md) 与 [048](048-settings-service-and-qt-adapter.md) 承接。
+- 增加 Qt 翻译器运行时服务；在 Bridge 的 `Settings` 暴露当前 locale、Rust 提供的支持 locale 和切换命令，并在 QM 安装成功后触发 `QQmlEngine::retranslate()`。产品设置界面和偏好持久化另由 [087](087-language-settings-ui.md) 与 [125](125-settings-service-and-qt-adapter.md) 承接；设置页通过 [115](115-platform-application-menu-and-settings-entry.md) 的跨平台入口访问。
 - 审计结果和分层边界写入规范；适配层仅添加真实调用方所需接口，不为将来预建空服务。
 
-不包含：VTK 原生 surface 重构、QSettings 持久化设置服务（由 048 规划）、工程路径业务规则或 080 的动画行为验收。根窗口的 reduced-motion 属性绑定作为 adapter 的实际消费端一并接入。
+不包含：VTK 原生 surface 重构、QSettings 持久化设置服务（由 125 规划）、工程路径业务规则或 080 的动画行为验收。根窗口的 reduced-motion 属性绑定作为 adapter 的实际消费端一并接入。
 
 ## 前置条件与待决策
 
@@ -102,9 +102,9 @@
 
 - 2026-09-29：任务开始实施。系统 reduced-motion 的操作系统查询和通知从 Bridge 移到 `native/qt-adapter`；Bridge 保留 QML 属性代理。PathHost 根类别映射和工程服务调用不变，标准目录实际查询由 adapter 统一提供。
 - 2026-09-29：完成 Qt/API 盘点：QStandardPaths 使用迁入本层；`vtk_native_surface.*` 因直接创建/同步 VTK hardware window 与 Wayland 子 surface 而留在 Visualization；QQuickImageProvider、QUrl 类型转换、ViewModel 信号/模型和 QML 控件保留原层。
-- 2026-09-29：用户要求先接翻译后端并将 QML 类型命名为 `Settings`。locale 策略与状态归 Rust core，CXX 只传 locale DTO/字符串；Qt adapter 只管理 QTranslator。设置界面登记为独立 task 087，持久化依赖 048。
+- 2026-09-29：用户要求先接翻译后端并将 QML 类型命名为 `Settings`。locale 策略与状态归 Rust core，CXX 只传 locale DTO/字符串；Qt adapter 只管理 QTranslator。设置界面登记为独立 task 087，持久化依赖 125；设置入口后续由 115 提供。
 - 2026-09-29：按用户建议将 Bridge 类型及源文件统一命名为 `Settings` / `settings.*`，删除 `SystemPreferences` 命名，不加兼容别名。
-- 2026-09-29：复查 adapter 依赖方向与 QML API：Rust 只持有 locale ID/规则/当前选择；Qt adapter 只拥有 `QTranslator`；Bridge `Settings` 负责 resource 命名、失败保留、状态提交及 `QQmlEngine::retranslate()`。当前 locale 不持久化，设置 UI 与 QSettings 恢复留给 087/048。
+- 2026-09-29：复查 adapter 依赖方向与 QML API：Rust 只持有 locale ID/规则/当前选择；Qt adapter 只拥有 `QTranslator`；Bridge `Settings` 负责 resource 命名、失败保留、状态提交及 `QQmlEngine::retranslate()`。当前 locale 不持久化，设置 UI 与 QSettings 恢复留给 087/125；设置 UI 通过 115 提供的菜单入口访问。
 - 2026-09-29：`cargo format` 与 macOS arm64 `cargo build --locked` 通过；完成源层级审计与旧命名清理。平台 API 的 Windows/Linux 分支本次未本机编译，运行期语言切换未执行真窗口验证。
 - 2026-09-29：按维护者要求复审暂存区，补 Rust locale 状态、Qt 翻译器失败保留及 QML 实际重翻译的行为测试；使用短暂禁用关键逻辑的消融运行确认测试能识别回归，之后恢复实现并运行 Cargo 聚合入口。
 - 2026-09-29：评审发现 Qt translator 是应用级状态，而多个 QML `Settings` 实例会各自持有不同 locale；将 QML 类型注册为单例，根窗口直接绑定其属性。当前应用使用一个 QML 引擎。
@@ -115,4 +115,4 @@
 
 ## 完成摘要
 
-已新增独立 `panta::qt_adapter` 并迁移 reduced-motion、标准目录查询和 QTranslator 生命周期；Rust `LanguageService` 拥有 locale 目录/状态，Bridge `Settings` 作为 QML 单例暴露语言后端和系统偏好。macOS arm64 的 Cargo build/test/format/lint 通过，CTest 66/66，三次消融按预期失败后恢复并复测；Linux/Windows 平台构建、include-cleaner 与 QML sanitizer 分类经修复后由维护者确认 CI 通过。设置 UI 与语言持久化分别由 087/048 跟进。
+已新增独立 `panta::qt_adapter` 并迁移 reduced-motion、标准目录查询和 QTranslator 生命周期；Rust `LanguageService` 拥有 locale 目录/状态，Bridge `Settings` 作为 QML 单例暴露语言后端和系统偏好。macOS arm64 的 Cargo build/test/format/lint 通过，CTest 66/66，三次消融按预期失败后恢复并复测；Linux/Windows 平台构建、include-cleaner 与 QML sanitizer 分类经修复后由维护者确认 CI 通过。设置 UI 与语言持久化分别由 087/125 跟进，设置页面入口由 115 提供。
