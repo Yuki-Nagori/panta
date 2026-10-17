@@ -5,7 +5,7 @@
 - 依赖：[011](011-test-quality-entrypoints.md)、[018](018-cross-platform-ci.md)、[019](019-gtest-native-testing.md)
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-16 / 2026-10-13
+- 创建 / 更新：2026-09-16 / 2026-10-17
 
 ## 目标
 
@@ -41,11 +41,13 @@
 - 尚待完成：测试命名与行为断言整理、属性测试、nightly mutation 报告，以及 C++ / QML 覆盖统计口径评估。Rust 函数 / 行 85% 全局门槛已配置；本 task 整体保持 deferred，不代表其余规划已完成。
 - 实施时逐项审计稳定可达的生产行为，只为有清晰契约的缺口补测试或小幅重构；若缺口只来自重复实例、不可稳定观察的崩溃路径或手动性能基准，记录证据并保留待办，不为覆盖率数字改变生产行为。
 - CI 调度优化（2026-10-13 起）：PR 保留受影响范围测试、三平台构建检查和相关 lint。2026-10-16 起 PR 与 main push 都按 L1/L2 影响范围测试；完整 workspace 测试、Rust/native coverage 与全量 lint 移到每日 workflow，覆盖率报告上传 artifact；Miri、三平台 sanitizer 与 CPU 性能采样也由每日 workflow 执行。GPU 基准仍需可识别硬件/图形会话，暂不放入通用 runner。nightly 失败用于维护诊断，不替代 PR 必需检查。
+- Miri 范围（2026-10-17）：运行 `panta-core` 库测试、独立 `fsm_build` 集成测试，以及 `panta-dsl-core`、`panta-foundation`；`project` / `activation` 集成测试中的纯 Rust 用例按名称单独纳入。会调用 zstd 原生 FFI 的用例仍由普通 Cargo 测试覆盖，不纳入 Miri；工程元数据、STL 预检、导入前失败和异步预检路径继续在 Miri 下检查。构建夹具中的 Cargo 子进程用例也仅在 Miri 下忽略。
 
 ## 验证与证据
 
 | 日期 / 证据 | 结果 |
 |---|---|
+| 2026-10-17：Nightly Miri 范围修正，[run 38960351402](https://github.com/Yuki-Nagori/panta/actions/runs/38960351402) | Miri 原本完整运行 `panta-core` 测试，在 `async_import_publishes_only_after_atomic_manifest_commit` 中进入 `zstd-safe` 的 `ZSTD_createCCtx`，该外部函数不受 Miri 支持。保留 `panta-core --lib`、单独的 `fsm_build`、`panta-dsl-core` 与 `panta-foundation`，并按测试名加入不访问 Mesh sidecar 的 `project` / `activation` 集成用例；调用 zstd 的四个 core 单元测试与构建夹具中的 Cargo 子进程用例仍仅在 Miri 下忽略。白名单中的 15 项直接 Miri 命令本机通过。`cargo ub-check` 本机未能启动，因为 rustup 无法在沙箱外创建工具链临时文件；需由 CI 验证聚合入口。 |
 | 2026-10-13：GitHub Issue #11 规划更新 | [Issue #11](https://github.com/Yuki-Nagori/panta/issues/11) 的建议已并入本 task：Rust 全局函数 / 行 85%、取消 100% 与逐文件目标、行为测试清理、属性测试及 nightly mutation 报告。本次仅更新规划；状态保持 `deferred`。 |
 | 2026-10-16：Rust 覆盖率门槛调整 | 按维护者要求将阻断门槛从函数 89% / 行 92% 改为各 85%；`032` 整体仍为 `deferred`，其余跨语言质量门禁未因此完成。 |
 | 2026-10-13：CI 动态检查定时化 | `actionlint .github/workflows/ci.yml .github/workflows/nightly.yml` 与 `git diff --check` 通过。Miri、sanitizer 和 CPU 性能采样已拆到每日 workflow；实际 workflow/artifact 结果待 CI 验收，不把静态检查记为运行通过。 |
