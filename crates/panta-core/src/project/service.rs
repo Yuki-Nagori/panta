@@ -226,6 +226,62 @@ impl ProjectService {
         context.commit_task_variables(scope, values).cloned()
     }
 
+    /// 解析变量 DSL、校验逻辑资源引用并按捕获修订原子提交快照。
+    pub fn commit_variable_document(
+        &mut self,
+        scope: &crate::runtime::RuntimeTaskScope,
+        source: &str,
+    ) -> Result<crate::runtime::VariableSnapshot, VariableDocumentError> {
+        let evaluated = panta_dsl_core::evaluate_variables(source)
+            .map_err(VariableDocumentError::Diagnostics)?;
+        let mut values = BTreeMap::new();
+        for (name, value) in evaluated.iter() {
+            let value = match value {
+                panta_dsl_core::EvaluatedValue::Bool(value) => {
+                    crate::runtime::RuntimeValue::Boolean(*value)
+                }
+                panta_dsl_core::EvaluatedValue::Int(value) => {
+                    crate::runtime::RuntimeValue::Integer(*value)
+                }
+                panta_dsl_core::EvaluatedValue::Real(value) => {
+                    crate::runtime::RuntimeValue::Real(*value)
+                }
+                panta_dsl_core::EvaluatedValue::String(value) => {
+                    crate::runtime::RuntimeValue::String(value.clone())
+                }
+                panta_dsl_core::EvaluatedValue::Resource(reference) => {
+                    let resource = crate::path::ResourceRef::parse(reference).map_err(|error| {
+                        VariableDocumentError::InvalidResource {
+                            name: name.to_owned(),
+                            reference: reference.to_owned(),
+                            source_range: evaluated.source_range(name).unwrap_or_default(),
+                            error,
+                        }
+                    })?;
+                    scope
+                        .validate_reference(&resource)
+                        .map_err(|error| match error {
+                            crate::runtime::RuntimeResourceError::Path(error) => {
+                                VariableDocumentError::InvalidResource {
+                                    name: name.to_owned(),
+                                    reference: reference.to_owned(),
+                                    source_range: evaluated.source_range(name).unwrap_or_default(),
+                                    error,
+                                }
+                            }
+                            _ => VariableDocumentError::Commit(
+                                crate::runtime::RuntimeCommitError::StaleContext,
+                            ),
+                        })?;
+                    crate::runtime::RuntimeValue::Resource(resource)
+                }
+            };
+            values.insert(name.to_owned(), value);
+        }
+        self.commit_runtime_variables(scope, values)
+            .map_err(VariableDocumentError::Commit)
+    }
+
     fn replace_runtime_context(&mut self, context: Option<crate::runtime::RuntimeContext>) {
         if let Some(previous) = &mut self.runtime_context {
             previous.close();
@@ -615,6 +671,39 @@ impl ProjectService {
             .ok_or(ProjectError::NoProject)
     }
 }
+
+/// 变量文档解析、资源引用转换或运行时提交失败。
+#[derive(Debug)]
+pub enum VariableDocumentError {
+    Diagnostics(panta_dsl_core::Diagnostics),
+    InvalidResource {
+        name: String,
+        reference: String,
+        source_range: std::ops::Range<usize>,
+        error: crate::path::PathError,
+    },
+    Commit(crate::runtime::RuntimeCommitError),
+}
+
+impl std::fmt::Display for VariableDocumentError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Diagnostics(error) => write!(formatter, "{error}"),
+            Self::InvalidResource {
+                name,
+                reference,
+                error,
+                ..
+            } => write!(
+                formatter,
+                "invalid resource for variable '{name}' ({reference}): {error}"
+            ),
+            Self::Commit(error) => write!(formatter, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for VariableDocumentError {}
 
 fn validate_schema_four_mesh_assets(
     imports: &[ImportRecord],

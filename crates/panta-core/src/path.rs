@@ -309,6 +309,15 @@ impl PathService {
         Ok(path)
     }
 
+    /// 校验逻辑引用结构和根授权，不检查目标是否存在。
+    pub fn validate_reference(&self, reference: &ResourceRef) -> Result<(), PathError> {
+        validate_relative(&reference.relative)?;
+        if reference.category != RootCategory::Qrc {
+            self.native_root(reference.category)?;
+        }
+        Ok(())
+    }
+
     /// 读解析：目标必须存在；目标与根都规范化（解析符号链接/junction）
     /// 后必须保持包含关系，否则视为文件系统级越界。
     pub fn resolve_existing(&self, reference: &ResourceRef) -> Result<PathBuf, PathError> {

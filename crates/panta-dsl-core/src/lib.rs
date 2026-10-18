@@ -3,6 +3,7 @@
 mod artifact;
 mod ast;
 mod diagnostic;
+mod evaluation;
 mod format;
 mod parser;
 mod syntax;
@@ -19,6 +20,7 @@ pub use ast::{
     Document, Kind, Message, SourceKind, Status, Translation, ValueType, Variable, source_prefix,
 };
 pub use diagnostic::{Diagnostic, Diagnostics};
+pub use evaluation::{EvaluatedValue, EvaluatedVariables, evaluate_variables};
 pub use format::{format_document, format_source};
 pub use parser::parse;
 // Pest 派生的 Rule 原已公开，移动 grammar 时保留其根路径。
