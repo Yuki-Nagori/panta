@@ -42,6 +42,141 @@ pub(super) fn project_service_save(
     service.service.save().map(project_snapshot)
 }
 
+pub(super) fn project_service_load_variable_document(
+    service: &mut ProjectService,
+    expected_generation: u64,
+    expected_revision: u64,
+) -> bridge::VariableDocumentResult {
+    variable_document_result(
+        service
+            .service
+            .load_variable_document(expected_generation, expected_revision),
+        service.service.variable_document_generation(),
+    )
+}
+
+pub(super) fn project_service_save_variable_document(
+    service: &mut ProjectService,
+    expected_generation: u64,
+    expected_revision: u64,
+    source: String,
+) -> bridge::VariableDocumentResult {
+    variable_document_result(
+        service
+            .service
+            .save_variable_document(expected_generation, expected_revision, &source),
+        service.service.variable_document_generation(),
+    )
+}
+
+pub(super) fn project_service_variable_document_generation(service: &ProjectService) -> u64 {
+    service.service.variable_document_generation()
+}
+
+fn variable_document_result(
+    result: Result<
+        (String, panta_core::runtime::VariableSnapshot),
+        panta_core::project::VariableDocumentError,
+    >,
+    generation: u64,
+) -> bridge::VariableDocumentResult {
+    match result {
+        Ok((source, snapshot)) => bridge::VariableDocumentResult {
+            source,
+            generation,
+            revision: snapshot.revision(),
+            values: snapshot
+                .iter()
+                .map(|(name, value)| {
+                    use panta_core::runtime::RuntimeValue;
+                    let (value_type, value) = match value {
+                        RuntimeValue::Boolean(value) => ("bool", value.to_string()),
+                        RuntimeValue::Integer(value) => ("int", value.to_string()),
+                        RuntimeValue::Real(value) => ("real", value.to_string()),
+                        RuntimeValue::String(value) => ("string", value.clone()),
+                        RuntimeValue::Resource(value) => ("resource", value.to_logical()),
+                    };
+                    bridge::VariableValue {
+                        name: name.to_owned(),
+                        value_type: value_type.to_owned(),
+                        value,
+                    }
+                })
+                .collect(),
+            ..bridge::VariableDocumentResult::default()
+        },
+        Err(error) => {
+            let mut response = bridge::VariableDocumentResult {
+                generation,
+                ..bridge::VariableDocumentResult::default()
+            };
+            match error {
+                panta_core::project::VariableDocumentError::Diagnostics(diagnostics) => {
+                    response.diagnostics = diagnostics
+                        .diagnostics
+                        .into_iter()
+                        .map(|diagnostic| bridge::VariableDiagnostic {
+                            code: diagnostic.code,
+                            message: diagnostic.message,
+                            start_offset: diagnostic.start_offset as u64,
+                            end_offset: diagnostic.end_offset as u64,
+                            line: diagnostic.line as u64,
+                            column: diagnostic.column as u64,
+                        })
+                        .collect();
+                }
+                panta_core::project::VariableDocumentError::SourceTooLarge { size, limit } => {
+                    response.error = panta_core::project::ProjectError::CommandInvalid(format!(
+                        "normalized source is {size} bytes; limit is {limit}"
+                    ))
+                    .into();
+                    response.error.code = "variables.source_too_large".to_owned();
+                    response.error.category = "validation".to_owned();
+                }
+                panta_core::project::VariableDocumentError::InvalidResource {
+                    name,
+                    reference,
+                    source_range,
+                    line,
+                    column,
+                    error,
+                } => {
+                    response.diagnostics.push(bridge::VariableDiagnostic {
+                        code: "variables.invalid_resource".to_owned(),
+                        message: format!("{name}: {reference}: {error}"),
+                        start_offset: source_range.start as u64,
+                        end_offset: source_range.end as u64,
+                        line: line as u64,
+                        column: column as u64,
+                    });
+                }
+                panta_core::project::VariableDocumentError::Commit(error) => {
+                    let code = match error {
+                        panta_core::runtime::RuntimeCommitError::NoContext => {
+                            "variables.no_context"
+                        }
+                        panta_core::runtime::RuntimeCommitError::StaleRevision { .. } => {
+                            "variables.stale_revision"
+                        }
+                        panta_core::runtime::RuntimeCommitError::StaleContext => {
+                            "variables.stale_generation"
+                        }
+                        _ => "variables.commit_failed",
+                    };
+                    response.error =
+                        panta_core::project::ProjectError::CommandInvalid(error.to_string()).into();
+                    response.error.code = code.to_owned();
+                    response.error.category = "state".to_owned();
+                }
+                panta_core::project::VariableDocumentError::Project(error) => {
+                    response.error = error.into();
+                }
+            }
+            response
+        }
+    }
+}
+
 pub(super) fn project_service_execute(
     service: &mut ProjectService,
     command: bridge::ProjectCommand,

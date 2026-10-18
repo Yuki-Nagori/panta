@@ -95,6 +95,96 @@ TEST(ProjectViewModelTest, CreatesAndOpensProjectThroughUnicodeFilesystemPaths) 
               QFileInfo(projectPath).canonicalFilePath());
 }
 
+TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpdates) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("Variables"), fixture.path()));
+    const QString source = QStringLiteral(
+        "version: 1\nkind: variables\n\nvalues:\n  count: int = 12\n  doubled: int = count * 2\n");
+    ASSERT_TRUE(model.saveVariableDocument(source, model.variableGeneration(), 0))
+        << model.errorCode().toStdString() << ": " << model.errorDetail().toStdString();
+    EXPECT_EQ(model.variableRevision(), 1U);
+    EXPECT_EQ(model.variableSource(), source);
+    ASSERT_EQ(model.variableValues().size(), 2);
+    const auto doubled = model.variableValues().at(1).toMap();
+    EXPECT_EQ(doubled.value(QStringLiteral("name")).toString(), QStringLiteral("doubled"));
+    EXPECT_EQ(doubled.value(QStringLiteral("type")).toString(), QStringLiteral("int"));
+    EXPECT_EQ(doubled.value(QStringLiteral("value")).toString(), QStringLiteral("24"));
+
+    QFile variableFile(QDir(QFileInfo(model.currentPath()).absolutePath())
+                           .filePath(QStringLiteral("variables.pa")));
+    ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
+    const QByteArray previousFile = variableFile.readAll();
+    variableFile.close();
+
+    const QString staleSource =
+        QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 99\n");
+    EXPECT_FALSE(model.saveVariableDocument(staleSource, model.variableGeneration(), 0));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("variables.stale_revision"));
+    EXPECT_EQ(model.variableRevision(), 1U);
+    EXPECT_EQ(model.variableValues().at(0).toMap().value(QStringLiteral("value")).toString(),
+              QStringLiteral("12"));
+    ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
+    EXPECT_EQ(variableFile.readAll(), previousFile);
+    variableFile.close();
+
+    const QString invalidSource =
+        QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = unknown-name\n");
+    EXPECT_FALSE(model.saveVariableDocument(invalidSource, model.variableGeneration(), 1));
+    ASSERT_EQ(model.variableDiagnostics().size(), 1);
+    const auto diagnostic = model.variableDiagnostics().constFirst().toMap();
+    EXPECT_EQ(diagnostic.value(QStringLiteral("code")).toString(),
+              QStringLiteral("variables.unknown_reference"));
+    EXPECT_EQ(diagnostic.value(QStringLiteral("line")).toULongLong(), 5U);
+    EXPECT_EQ(model.variableRevision(), 1U);
+    EXPECT_EQ(model.variableValues().at(0).toMap().value(QStringLiteral("value")).toString(),
+              QStringLiteral("12"));
+
+    const QString invalidResource = QStringLiteral(
+        "version: 1\nkind: variables\n\nvalues:\n  mesh: resource = project:/../outside.stl\n");
+    EXPECT_FALSE(model.saveVariableDocument(invalidResource, model.variableGeneration(), 1));
+    ASSERT_EQ(model.variableDiagnostics().size(), 1);
+    const auto resourceDiagnostic = model.variableDiagnostics().constFirst().toMap();
+    EXPECT_EQ(resourceDiagnostic.value(QStringLiteral("code")).toString(),
+              QStringLiteral("variables.invalid_resource"));
+    EXPECT_EQ(resourceDiagnostic.value(QStringLiteral("line")).toULongLong(), 5U);
+    EXPECT_EQ(model.variableRevision(), 1U);
+    ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
+    EXPECT_EQ(variableFile.readAll(), previousFile);
+    variableFile.close();
+
+    ProjectViewModel reopened;
+    ASSERT_TRUE(reopened.openProject(model.currentPath()));
+    ASSERT_TRUE(reopened.loadVariableDocument(reopened.variableGeneration(), 0))
+        << reopened.errorCode().toStdString() << ": " << reopened.errorDetail().toStdString();
+    EXPECT_EQ(reopened.variableRevision(), 1U);
+    EXPECT_EQ(reopened.variableValues().size(), 2);
+    EXPECT_EQ(reopened.variableSource(), source);
+}
+
+TEST(ProjectViewModelTest, OldVariableRequestCannotWriteIntoAnotherProject) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    const auto oldGeneration = model.variableGeneration();
+    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    EXPECT_NE(model.variableGeneration(), oldGeneration);
+
+    const QString source =
+        QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
+    EXPECT_FALSE(model.saveVariableDocument(source, oldGeneration, 0));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("variables.stale_generation"));
+    EXPECT_EQ(model.variableRevision(), 0U);
+    EXPECT_TRUE(model.variableValues().isEmpty());
+    EXPECT_FALSE(QFileInfo(QDir(QFileInfo(model.currentPath()).absolutePath())
+                               .filePath(QStringLiteral("variables.pa")))
+                     .exists());
+}
+
 TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());

@@ -62,6 +62,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QVariantList openDocuments READ openDocuments NOTIFY documentsChanged)
     Q_PROPERTY(QString activeDocumentId READ activeDocumentId NOTIFY activeDocumentChanged)
     Q_PROPERTY(QString activeDocumentTitle READ activeDocumentTitle NOTIFY activeDocumentChanged)
+    Q_PROPERTY(QString variableSource READ variableSource NOTIFY variableDocumentChanged)
+    Q_PROPERTY(QVariantList variableValues READ variableValues NOTIFY variableDocumentChanged)
+    Q_PROPERTY(
+        QVariantList variableDiagnostics READ variableDiagnostics NOTIFY variableDocumentChanged)
+    Q_PROPERTY(quint64 variableGeneration READ variableGeneration NOTIFY variableDocumentChanged)
+    Q_PROPERTY(quint64 variableRevision READ variableRevision NOTIFY variableDocumentChanged)
 
   public:
     explicit ProjectViewModel(QObject* parent = nullptr);
@@ -114,6 +120,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] QVariantList openDocuments() const; // Rust 工作区快照的 Qt 投影。
     [[nodiscard]] QString activeDocumentId() const;
     [[nodiscard]] QString activeDocumentTitle() const;
+    [[nodiscard]] const QString& variableSource() const;
+    [[nodiscard]] QVariantList variableValues() const;
+    [[nodiscard]] QVariantList variableDiagnostics() const;
+    [[nodiscard]] quint64 variableGeneration() const;
+    [[nodiscard]] quint64 variableRevision() const;
     [[nodiscard]] bool placeholder_visible() const override;
 
     /// 通过 Rust 工程服务创建目录和初始清单；工程资产由后续命令负责。
@@ -139,6 +150,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
     /// 保存当前 Rust 工程模型；无当前工程时返回可恢复错误。
     Q_INVOKABLE bool saveProject();
+
+    /// 从工程固定的 variables.pa 加载并提交已校验快照；预期修订过期时拒绝覆盖。
+    Q_INVOKABLE bool loadVariableDocument(quint64 expectedGeneration, quint64 expectedRevision);
+    /// 保存并规范化变量源码；诊断失败时保留当前值与旧文件。
+    Q_INVOKABLE bool saveVariableDocument(const QString& source, quint64 expectedGeneration,
+                                          quint64 expectedRevision);
 
     /// 示例模型命令：修改显示名称并将工程标记为 dirty。
     Q_INVOKABLE bool renameProject(const QString& name);
@@ -207,6 +224,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void projectCreated(const QString& path);
     void projectOpened(const QString& path);
     void projectSaved(const QString& path);
+    void variableDocumentChanged();
     void importsChanged();
     void planSettingsChanged();
     void materialConfirmationPendingChanged();
@@ -230,6 +248,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
               const QString& detail = {});
     bool applySnapshot(const panta::ffi::ProjectSnapshotResult& result);
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
+    bool applyVariableDocument(const panta::ffi::VariableDocumentResult& result);
+    void resetVariableDocument();
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     bool publish_import(const panta::ffi::ProjectImport& imported);
@@ -264,6 +284,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     QString m_errorDetail;
     QString m_currentPath;
     QString m_currentName;
+    QString m_variableSource;
+    QVariantList m_variableValues;
+    QVariantList m_variableDiagnostics;
+    quint64 m_variableGeneration = 0;
+    quint64 m_variableRevision = 0;
     QString m_lastCreatedPath;
     bool m_dirty = false;
     QStringList m_importedPartNames;

@@ -9,6 +9,7 @@ mod mesh_cache;
 mod model;
 mod repository;
 mod service;
+mod variable_document;
 mod workspace;
 pub use error::ProjectError;
 use mesh_cache::SurfaceMeshCache;
