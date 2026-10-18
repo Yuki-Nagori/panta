@@ -42,7 +42,7 @@ PANTA_BENCH_STL=/path/to/model.stl \
 
 ## 定位与边界
 
-性能阈值不作为 CI 门禁。维护者于 2026-10-13 确认，每日定时 CI 可运行 `cargo performance cpu` 并保留日志 artifact，用于观察趋势；共享 runner 的波动不阻断变更。GPU 基准要求可识别的硬件设备或真实图形会话，仍由开发侧手动运行，直到有稳定的专用 runner。测量优先于修改——没有测量支撑的"优化"不保留；对比必须固定同一机器、同一命令与同一构建配置，波动显著才立项修复。
+性能阈值不作为 CI 门禁。每日定时 CI 运行 `cargo performance cpu`，并用 `cargo hyperfine` 对比 Debug/Release 的 dslc CLI；日志和 hyperfine JSON 上传为 artifact，用于观察趋势。共享 runner 的波动不阻断变更。GPU 基准要求可识别的硬件设备或真实图形会话，仍由开发侧手动运行，直到有稳定的专用 runner。测量优先于修改——没有测量支撑的"优化"不保留；对比必须固定同一机器、同一命令与同一构建配置，波动显著才立项修复。
 
 ## 工具矩阵
 

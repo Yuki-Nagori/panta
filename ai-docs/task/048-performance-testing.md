@@ -59,6 +59,7 @@
 | 2026-10-18 | macOS 26.3.1 arm64；`cargo verify-changed` | 变更含 workspace manifest/lockfile，选择器按规则执行完整质量和测试范围；Rust Clippy、依赖审计、CMake 格式与分层、native build、qmllint、clang-tidy、include-cleaner、Cppcheck 均通过；Rust workspace 测试通过；native/QML CTest 77/77 通过。 |
 | 2026-10-18 | GitHub Actions push CI 前后对照 | 调整前 run [38321157525](https://github.com/Yuki-Nagori/panta/actions/runs/38321157525) 含 Miri 与三平台 sanitizer jobs，关键路径从首个 job `23:15:22Z` 到最后完成 `23:24:46Z`，约 9 分 24 秒；调整后首个 push run [38407816374](https://github.com/Yuki-Nagori/panta/actions/runs/38407816374) 不再运行这些 jobs，首末 job `13:47:14Z`–`13:54:57Z`，约 7 分 43 秒，缩短约 1 分 41 秒（18%）。两次运行提交内容与共享 runner 状态不同，该数据只说明实际 job 范围和关键路径变化，不作为严格性能基准。Miri / sanitizer 已转到 nightly；nightly run [39063928969](https://github.com/Yuki-Nagori/panta/actions/runs/39063928969) 成功，CPU 性能 job 约 2 分 51 秒并上传日志 artifact。 |
 | 2026-10-18 | macOS arm64；`cargo test --locked -p panta-tests --bin panta-tests`、`cargo fmt --all --check`、`git diff --check` | runner 单测 24 项通过、3 项按设计忽略；Criterion 路径选择器回归确认两个 bench 精确映射到 `panta-dsl-core` / `panta-core`，未知 Rust 性能源仍保守回退。格式与 diff 检查通过。`gpt-6.1-sol` medium 独立只读 final review 未发现剩余问题；Linux/Windows hyperfine 实机及 Linux profiling 未验证。 |
+| 2026-10-18 | macOS arm64；`actionlint .github/workflows/nightly.yml`、nightly Hyperfine 命令 smoke | workflow 静态检查通过；本机 Debug/Release `dslc` 构建成功，`cargo hyperfine --runs 3 --warmup 1 --export-json ...` 成功并生成非空 JSON。独立 final review 通过；nightly 使用 30 runs / 5 warmups，尚待 PR CI 和首次 Linux nightly 运行验证。 |
 | 2026-10-18 | macOS 26.3.1 arm64；`cargo performance cpu --samples 31` | 辅助代码行为测试 3/3 与 Qt benchmark-support 行为测试 7/7 通过；QML CPU benchmark 7/7、VTK 导航 CPU benchmark 3/3 通过；工程 STL 打开、激活、缓存切换、重载、关闭测量完成。链接时出现已有 Rust 静态对象目标版本 26.2 高于 native deployment 13.0 的警告，基准正常执行。 |
 | 2026-10-17 | GitHub Actions nightly `CPU performance sample (ubuntu)`；`cargo performance cpu --samples 31`；run [39063928969](https://github.com/Yuki-Nagori/panta/actions/runs/39063928969) | Job 成功，上传 `cpu-performance-39063928969-1` artifact。日志确认辅助代码测试 3/3、Mesh/IR 测量测试 4/4、QML CPU benchmark 7/7、VTK navigation CPU benchmark 3/3 通过；含 50k / 500k 三角面后台预检负载、sidecar 压缩/解码、QML 构造与图标加载、VTK 导航消融，以及 31 轮工程打开/激活/缓存切换/关闭测量。该 run 首次确认定时 CPU 性能 job 与日志 artifact 均实际工作；共享 Ubuntu runner 数字作为趋势记录，不设阈值。 |
 | 2026-10-13 | `actionlint .github/workflows/ci.yml .github/workflows/nightly.yml`、`git diff --check` | 配置静态检查通过。PR/push workflow 移除 Miri 与 sanitizer；每日 workflow 安排 Miri、三平台 sanitizer 和 Ubuntu CPU 性能套件，并上传带提交与 runner 信息的日志。当时实际定时运行与 artifact 尚未验证，后由 2026-10-17 nightly 记录补齐。 |
@@ -90,6 +91,8 @@
 - 2026-10-18：新增 Criterion 0.8.2 开发依赖与 DSL / 工程页签状态微基准；本机两套基准均成功构建和运行。命令级对比按实际存在的 dslc Debug/Release profile 定义，不为 CLI 虚构编译开关。火焰图、QML Profiler、Massif 的工具命令、前置条件和结果边界回填至性能模块文档。
 - 2026-10-18：最终 review 修正 Criterion 基准估计值口径、Linux flamegraph 链接器参数传递，并为新增 Rust bench 路径补充分层选择器映射与回归测试；独立评审确认无剩余问题。
 - 2026-10-18：通过 `gh` 核实 CI 拆分前后运行。Push 关键路径由约 9:24 降至 7:43；Miri / sanitizer 在 nightly 成功运行，CPU 性能 job 已产出 artifact。由于运行提交与共享 runner 条件不同，记录为行为范围和时长参考，不作为受控性能结论。
+- 2026-10-18：维护者确认将 hyperfine CLI 对比加入 nightly CPU 性能 artifact，不设性能阈值。workflow 现在构建 `dslc` Debug/Release，记录 30 轮、5 次预热的输出与 JSON；本机 actionlint 和短跑 smoke 通过，等待 PR CI。
+- 2026-10-18：独立 final review 复核 nightly workflow 更新，通过；确认管道失败会传播、JSON 与日志一并上传，未把性能阈值引入 PR 检查。Ubuntu 实际执行仍待 PR 合并后的 nightly。
 
 ## 完成摘要
 
