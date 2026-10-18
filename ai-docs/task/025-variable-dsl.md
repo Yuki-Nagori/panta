@@ -67,6 +67,7 @@
 |---|---|---|
 | 2026-10-18 | `cargo test --locked -p panta-dsl-core`、`cargo test --locked -p panta-core` | 通过；覆盖值类型、算术、前向引用、环/类型/范围错误、上限、资源根检查及快照原子提交 |
 | 2026-10-18 | `cargo verify-changed` | 六个受影响 Rust package 测试、81 项 native/QML CTest、变更范围格式/lint、完整 native clang-tidy 与依赖分层检查均通过 |
+| 2026-10-18 | [PR #66 GitHub Actions](https://github.com/Yuki-Nagori/panta/actions/runs/39129599109) | Ubuntu、macOS、Windows 构建及全部格式、lint、依赖审计检查通过 |
 | 2026-10-18 | `cargo fmt --all --check`、`git diff --check` | 通过 |
 | 2026-10-18 | `cargo test --locked -p panta-dsl-core evaluation::tests::rejects_excessive_operators_before_building_a_deep_tree` | 通过；确认 128 运算符边界含一元及二元运算符 |
 | 2026-10-18 | `cargo verify-changed` 内受影响 Rust package 测试 | 通过；新增规范化输出超限拒绝与旧工程 generation 请求拒绝回归 |
