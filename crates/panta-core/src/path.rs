@@ -261,7 +261,7 @@ fn validate_relative(relative: &str) -> Result<Vec<String>, PathError> {
 
 /// 根类别到本机根目录的解析服务。根由宿主显式注入且必须绝对；未注入的
 /// 类别解析即失败，不回退 cwd 或任何隐式位置。
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct PathService {
     roots: BTreeMap<RootCategory, PathBuf>,
 }

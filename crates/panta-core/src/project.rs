@@ -53,7 +53,7 @@ const PROJECT_FILE_EXTENSION: &str = "panta";
 
 #[cfg(test)]
 #[path = "../../../tests/support/rust/temp_directory.rs"]
-mod temp_directory;
+pub(crate) mod temp_directory;
 
 #[cfg(test)]
 mod tests {
@@ -116,6 +116,67 @@ mod tests {
 
         assert_eq!(opened, created);
         assert_eq!(service.current()?, opened);
+        Ok(())
+    }
+
+    #[test]
+    fn replacing_project_cancels_old_runtime_scope() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::runtime::{RuntimeCommitError, RuntimeValue};
+        use std::collections::BTreeMap;
+
+        let fixture = temp_directory::Fixture::new()?;
+        let mut service = ProjectService::new();
+        service.create(&fixture.root, "First")?;
+        let first_context = service.runtime_context().ok_or("runtime context missing")?;
+        let first_generation = first_context.generation();
+        let first_scope = first_context.capture_task_scope();
+
+        service.create(&fixture.root, "Second")?;
+
+        assert!(first_scope.is_cancelled());
+        assert!(
+            !service
+                .runtime_context()
+                .ok_or("replacement runtime context missing")?
+                .accepts(&first_scope)
+        );
+        assert!(
+            service
+                .runtime_context()
+                .ok_or("replacement runtime context missing")?
+                .generation()
+                > first_generation
+        );
+        assert_eq!(
+            service.commit_runtime_variables(
+                &first_scope,
+                BTreeMap::from([("stale".to_owned(), RuntimeValue::Integer(1))]),
+            ),
+            Err(RuntimeCommitError::StaleContext)
+        );
+        assert!(
+            service
+                .runtime_context()
+                .ok_or("replacement runtime context missing")?
+                .variables()
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dropping_project_service_cancels_runtime_scopes() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = temp_directory::Fixture::new()?;
+        let scope = {
+            let mut service = ProjectService::new();
+            service.create(&fixture.root, "Closing")?;
+            service
+                .runtime_context()
+                .ok_or("runtime context missing")?
+                .capture_task_scope()
+        };
+
+        assert!(scope.is_cancelled());
         Ok(())
     }
 
