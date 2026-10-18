@@ -241,6 +241,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "解析 1 MiB 边界输入会让解释执行过久；普通测试仍覆盖该上限"
+    )]
     fn normalized_source_over_limit_is_rejected_before_creating_file()
     -> Result<(), Box<dyn std::error::Error>> {
         use crate::project::{ProjectService, VariableDocumentError};
