@@ -38,6 +38,7 @@ panta-import = { path = "crates/panta-import", version = "0.1.0" }
 serde_json = "1.0"
 cxx = "1.0.202"
 cxx-build = "1.0.202"
+criterion = "0.8.2"
 panta-core = { path = "crates/panta-core", version = "0.1.0" }
 panta-dsl-core = { path = "crates/panta-dsl-core", version = "0.1.0" }
 panta-ffi = { path = "crates/panta-ffi", version = "0.1.0" }

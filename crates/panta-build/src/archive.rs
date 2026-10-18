@@ -75,7 +75,7 @@ pub(super) fn extract(
     let mut command = match tool {
         // CMake 压缩包由平台自带 tar 解开（macOS/Windows 为 bsdtar，可直接
         // 读 zip；Linux 为 GNU tar，自动识别 gzip）。
-        Tool::Cmake | Tool::Llvm | Tool::Uv => {
+        Tool::Cmake | Tool::Llvm | Tool::Uv | Tool::Hyperfine => {
             let mut command = Command::new("tar");
             command.arg("-xf").arg(archive).arg("-C").arg(destination);
             command

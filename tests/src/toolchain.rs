@@ -7,6 +7,23 @@ use std::process::Command;
 
 use crate::paths::{native_build_dir, target_root};
 
+pub(super) fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
+    match arguments.split_first() {
+        Some((command, args)) if command == "hyperfine" => run_hyperfine(args),
+        Some((command, _)) => Err(format!("未知 toolchain 命令：{command}").into()),
+        None => verify_toolchain(),
+    }
+}
+
+fn run_hyperfine(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let binary = panta_build::resolve_hyperfine(target_root())?;
+    let status = Command::new(&binary).args(arguments).status()?;
+    if !status.success() {
+        return Err(format!("hyperfine 退出失败：{status}").into());
+    }
+    Ok(())
+}
+
 pub(super) fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     let target_root = target_root();
     let native_dir = native_build_dir();

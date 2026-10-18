@@ -20,6 +20,7 @@ impl Tool {
                 candidate.is_file().then_some(candidate)
             }
             Tool::Uv => find_binary(root, "uv"),
+            Tool::Hyperfine => find_binary(root, "hyperfine"),
             Tool::Cmake => find_cmake_binary(root, &exe, 0),
             Tool::Llvm => {
                 let compiler = if cfg!(windows) { "clang-cl" } else { "clang++" };

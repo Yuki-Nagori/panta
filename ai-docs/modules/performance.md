@@ -48,16 +48,84 @@ PANTA_BENCH_STL=/path/to/model.stl \
 
 | 层 | 工具 | 用途 | 适用场景 |
 |---|---|---|---|
-| Rust | Criterion.rs | 函数级微基准，统计分析 + 报告，可检测性能回归 | 量化核心逻辑（`.pa` 解析、任务状态机）的长期变化 |
+| Rust | Criterion.rs | 函数级微基准，统计分析 + HTML 报告，可对比命名基线 | 量化核心逻辑（`.pa` 解析/格式化、工程页签状态转换）的变化 |
 | Rust | cargo-flamegraph（底层 perf） | CPU 火焰图，展示调用栈耗时分布 | 定位 CPU 瓶颈的首选入口 |
 | Rust/CLI | hyperfine | 命令级基准与统计对比 | 对比 dslc 启动/执行时间、编译选项或参数差异 |
 | QML | QML Profiler（Qt Creator） | 渲染、JS 执行、信号与内存分配时间线 | 界面卡顿的第一诊断工具 |
 | C++ | perf + 火焰图 | C++ 热点采样 | 编译保留 `-g` 调试符号，`perf record -g` 后 `perf report` 或转火焰图 |
 | C++ | Valgrind Massif | 堆内存峰值与分配位置 | 深度排查内存增长；10–20x 运行开销，仅开发阶段按需 |
 
-## 命令与流程（任务 048 落地后回填）
+## Rust 微基准与命令对比
 
-各工具的可复现命令、基线数字与结果解读在实施任务 048 各步骤完成时回填到本节；登记口径：命令、机器环境、构建配置（Debug/Release）、数字与日期。命令尚未落地前不在此占位假命令。
+Criterion 基准源码放在 `tests/performance/cpu/`，通过各领域 crate 的 `[[bench]]` 注册，不进入运行时依赖或常规测试。构建后在 `target/criterion/` 生成统计结果和 HTML 报告；命名基线只保存在本地 target 目录，不提交机器相关数据。基准只包含库调用，不含 CLI 启动、文件读取或 GPU 工作。
+
+```sh
+CRITERION_HOME="$PWD/target/criterion" cargo bench --locked -p panta-dsl-core --bench dsl_core_criterion \
+  -- --save-baseline <machine-and-date>
+CRITERION_HOME="$PWD/target/criterion" cargo bench --locked -p panta-core --bench core_workspace_criterion \
+  -- --save-baseline <machine-and-date>
+# 同一机器、相同工具链和构建参数下重新运行后，与已有基线对照：
+CRITERION_HOME="$PWD/target/criterion" cargo bench --locked -p panta-dsl-core --bench dsl_core_criterion \
+  -- --baseline <machine-and-date>
+```
+
+DSL 套件测量解析 fixture、从源码解析并格式化、以及对已解析 AST 格式化；core 套件测量新建页签、请求激活未加载页签、以及单工程页签快照。Core 基准用 `iter_batched_ref` 在计时区间外创建工作区，避免夹具构造和析构时间混入被测操作。基线只适合同一机器和同一工具链比较，不把单次本机结果解释为跨机器门槛。
+
+2026-10-18 本机 Criterion 基线：macOS 26.3.1 arm64、rustc/cargo 1.98.1、`bench` profile。以下为 Criterion `slope` 点估计及 95% CI：DSL fixture 解析 17.674 µs（17.351–18.172 µs）、源码 parse+format 19.513 µs（19.308–19.767 µs）、已解析文档格式化 1.894 µs（1.890–1.899 µs）；工程页签新建 57.154 ns（56.244–58.210 ns）、未加载页签激活请求 31.659 ns（29.213–33.780 ns）、单页签快照 196.732 ns（194.887–199.628 ns）。少数样本存在高位异常；本结果仅用于同机后续对比，不设性能门槛。`CRITERION_HOME` 显式固定到 workspace `target/criterion`，避免 Cargo workspace 中报告落入 crate 子目录。完整统计与图表可由上方命令重建。
+
+命令级对比使用 `cargo hyperfine`，首次调用会从固定的官方平台资产安装 hyperfine 2.0.0 并验证 SHA256，文件缓存位于 `target/panta-tools/hyperfine/`。先编译两个 profile，避免把编译耗时混入执行耗时；无预热 run 只是首次进程启动样本，不代表清空磁盘缓存。工作区不存在可切换的 dslc 编译开关，因此 Debug/Release 是本项目实际可比较的构建配置：
+
+```sh
+cargo build --locked -p panta-dslc
+cargo build --locked --release -p panta-dslc
+cargo hyperfine --runs 15 --warmup 0 \
+  'target/debug/panta-dslc check tests/fixtures/dsl/artifacts.pa' \
+  'target/release/panta-dslc check tests/fixtures/dsl/artifacts.pa'
+cargo hyperfine --runs 30 --warmup 5 \
+  'target/debug/panta-dslc check tests/fixtures/dsl/artifacts.pa' \
+  'target/release/panta-dslc check tests/fixtures/dsl/artifacts.pa'
+```
+
+短 CLI 测量受进程启动和操作系统调度影响；分别记录 warmup 次数、profile、机器和 hyperfine 输出，不以这些数据取代 Criterion 库级基准。
+
+## CPU 与内存剖析
+
+Linux 使用带调试符号的 bench profile，通过 Criterion 持续采样 Rust 热路径；`--bench` 使 Criterion 以 benchmark 模式运行，`--profile-time` 控制采样时间。Rust 1.90+ 使用 lld 或 mold 链接时，把 `--no-rosegment` 作为链接器参数传入（若环境已有 `RUSTFLAGS`，请将此参数追加到现有值）：
+
+```sh
+CARGO_PROFILE_BENCH_DEBUG=true \
+RUSTFLAGS='-C link-arg=-Wl,--no-rosegment' \
+  cargo flamegraph \
+  -p panta-dsl-core --bench dsl_core_criterion \
+  -- --bench --profile-time 20
+perf record -g --call-graph dwarf -o target/performance/native.data -- \
+  target/native/debug/performance/panta_viewport_navigation_cpu_benchmark
+perf report --input target/performance/native.data
+```
+
+macOS 使用 Instruments 的 Time Profiler 对同一 Release/Debug 场景取样；Windows 使用 Visual Studio CPU Usage 或 Windows Performance Recorder。平台采样器的调用栈和计时口径不同，不与 Linux 的绝对耗时比较。
+
+QML Profiler 需要带 QML debugging infrastructure 的构建，且调试端口只在本机受信任环境开放。通过 Qt Creator 的 Analyze → QML Profiler 启动应用，重现一个固定交互（如打开指定页签或弹窗），停止采样后保存 `.qzt` trace；也可用 `qmlprofiler` 启动并捕获：
+
+```sh
+mkdir -p target/performance
+qmlprofiler --output target/performance/panta.qzt \
+  target/native/debug/app/panta \
+  -qmljsdebugger=port:3768,services:CanvasFrameRate,EngineControl,DebugMessages
+```
+
+QML trace 应记录触发操作、样本时间窗与启用的服务；调试通道本身会增加少量开销，结果用于定位绑定、JS、组件创建和场景图事件，不与未启用调试的帧耗时直接对比。详见 [Qt QML profiling](https://doc.qt.io/qt-6/qtquick-profiling.html)。
+
+Linux 堆分析使用 Valgrind Massif；在图形桌面会话中启动 Debug 应用、重现目标工程操作后退出，再读取快照。Massif 会显著放慢运行，10–20 倍属于诊断工具开销，不是应用实际性能：
+
+```sh
+valgrind --tool=massif --time-unit=ms \
+  --massif-out-file=target/performance/massif.out.%p \
+  target/native/debug/app/panta
+ms_print target/performance/massif.out.<pid>
+```
+
+Massif 观察进程堆分配峰值，不等于 RSS；需要评估常驻集时结合 task 088/109 的 RSS 与 Mesh 容量报告。macOS 使用 Instruments Allocations / VM Tracker；Windows 使用 Windows Performance Recorder 的 Heap/Memory 分析。
 
 ## 当前 QML / 原生视口诊断
 

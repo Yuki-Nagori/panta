@@ -1,6 +1,6 @@
 # 依赖获取与主平台环境
 
-查阅 / 决策日期：2026-09-16。状态：主平台与固定清单已由任务 002 记录，同日按维护者要求升级至各上游最新稳定版并核对依赖间版本关系；CI 三平台矩阵由任务 018 建立。Cargo→CMake 调度已由任务 004 接通；工具二进制供给拆分为任务 020。Qt 已验证采用预编译包，VTK/OCCT/Netgen 的应用接入必须优先消费预编译 SDK，统一供给任务见 [031](../task/031-prebuilt-native-dependencies.md)。版本与兼容性结论的维护规则见 [技术基线](baseline.md)，本文只负责可复核的获取、重建、升级与回退步骤。
+查阅 / 决策日期：2026-10-18。状态：主平台与固定清单已由任务 002 记录，同日按维护者要求升级至各上游最新稳定版并核对依赖间版本关系；CI 三平台矩阵由任务 018 建立。Cargo→CMake 调度已由任务 004 接通；工具二进制供给拆分为任务 020。Qt 已验证采用预编译包，VTK/OCCT/Netgen 的应用接入必须优先消费预编译 SDK，统一供给任务见 [031](../task/031-prebuilt-native-dependencies.md)。版本与兼容性结论的维护规则见 [技术基线](baseline.md)，本文只负责可复核的获取、重建、升级与回退步骤。
 
 ## 托管原则（2026-09-16 决策）
 
@@ -80,7 +80,7 @@
 
 ## 质量工具供给（042/043）
 
-`panta-build` 是 launcher、FFI 与根质量 runner 共享的支持 crate。LLVM/CMake/Ninja/uv 固定资产集中登记在 `src/assets.rs`，由 `src/install.rs` 按版本和 SHA256 隔离并加锁安装；根公开 API 保持。Cargo 扩展按固定版本安装到 `target/panta-tools/<tool>/<version>`。uv 0.12.18 和 CPython 3.14.7 在仓库内托管；cmakelang 0.6.13、Cppcheck wheel 1.5.1（Cppcheck 2.17.1）由 `uv.lock` 锁定，禁止源码安装回退。Python 工具/解释器许可证沿各分发包保留；Cppcheck 为 GPL-3.0 工具，仅开发/CI 使用，不链接进应用。详细边界与入口见 [质量工具链](../modules/quality-tooling.md)。
+`panta-build` 是 launcher、FFI 与根质量 runner 共享的支持 crate。LLVM/CMake/Ninja/uv/hyperfine 固定资产集中登记在 `src/assets.rs`，由 `src/install.rs` 按版本和 SHA256 隔离并加锁安装；根公开 API 保持。Cargo 扩展按版本和摘要安装到 `target/panta-tools/<tool>/<version>-<sha256>`。uv 0.12.18 和 CPython 3.14.7 在仓库内托管；[hyperfine v2.0.0](https://github.com/sharkdp/hyperfine/releases/tag/v2.0.0) 由 `cargo hyperfine` 按需安装，使用上游 macOS arm64、Linux x86_64、Windows x86_64 归档，SHA256 分别为 `590b839cfea386b384ce0b42d16daf2910277cf30950656194bb3a5f20dea81e`、`ae2beda2ac99c098427e4f755244552daf20e514422889cca6d44421e2d93c87`、`3dec51acee1060908e67948838d6bc0a7aacde0774acebfa4afb220dcf0bc078`。cmakelang 0.6.13、Cppcheck wheel 1.5.1（Cppcheck 2.17.1）由 `uv.lock` 锁定，禁止源码安装回退。Python 工具/解释器许可证沿各分发包保留；Cppcheck 为 GPL-3.0 工具，仅开发/CI 使用，不链接进应用。详细边界与入口见 [质量工具链](../modules/quality-tooling.md)。
 
 CI 缓存只保存 Cargo registry/git 和 `target/panta-tools`、`target/panta-deps` 这类可验证的依赖资产；`target/native` 与 Cargo 编译产物每次在当前 checkout 重新生成，避免旧 compile database、CMakeCache 或增量对象从 restore key 泄漏。缓存键包含平台、架构、LLVM 版本、Cargo/Python/原生供给清单；回退命中只能复用目录内带版本和摘要校验的资产。Windows 的 LLVM 官方安装包及其已校验安装目录因此会随 `target/panta-tools` 缓存复用。
 

@@ -14,5 +14,13 @@ quick-xml.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "dsl_core_criterion"
+path = "../../tests/performance/cpu/dsl_core_criterion.rs"
+harness = false
+
 [lints]
 workspace = true

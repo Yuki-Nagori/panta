@@ -35,7 +35,7 @@
 | uv / CPython | 0.12.18 / 3.14.7 | `assets.rs` 登记 uv 的官方资产 / SHA256，`python.rs` 配置解释器与环境 | 禁止选用系统 Python；解释器、venv、缓存均在 target |
 | cmake-format / cmake-lint | cmakelang 0.6.13 | `cargo format` / `cargo lint cmake` | `uv run --locked --managed-python --no-build`，仅消费锁定 wheels |
 
-LLVM、CMake、Ninja、uv 按版本与摘要隔离到 `target/panta-tools/<tool>/<version-sha256>/`；安装持有 OS 文件锁，下载到临时文件并校验，解包成功后才发布目录。进程中断释放锁，下次持锁重试清理未发布目录；旧版本不受失败升级影响。Cargo 扩展按版本隔离并沿用同一发布机制。Qt 供给也串行化，防止 build/format 同时解包。升级同步供给清单、CMake 版本检查、CI 缓存、文档与验收。
+LLVM、CMake、Ninja、uv、hyperfine 按版本与摘要隔离到 `target/panta-tools/<tool>/<version-sha256>/`；安装持有 OS 文件锁，下载到临时文件并校验，解包成功后才发布目录。进程中断释放锁，下次持锁重试清理未发布目录；旧版本不受失败升级影响。Cargo 扩展按版本隔离并沿用同一发布机制；hyperfine 只由 `cargo hyperfine` 显式触发下载，不加入常规构建和质量检查。Qt 供给也串行化，防止 build/format 同时解包。升级同步供给清单、CMake 版本检查、CI 缓存、文档与验收。
 
 Cppcheck wheel 来自 [cppcheck-wheel](https://github.com/msclock/cppcheck-wheel)，不是 LLVM 发行包；锁定包和平台 wheel 摘要，不使用 apt/Homebrew/PATH。其 `unusedFunction` 用于补足跨文件未使用函数分析，Qt 元对象和 Rust 调用的边界须有明确规则，不能将静态分析等同于检出所有死代码。include-cleaner 按[上游限制](https://clang.llvm.org/extra/clang-tidy/checks/misc/include-cleaner.html)诊断主文件，头文件仍需被真实翻译单元包含。独立 IWYU、Cppclean 和无 Node 需求的 knip 不纳入工具链。
 
