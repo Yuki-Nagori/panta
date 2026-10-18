@@ -1198,6 +1198,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "依赖深度与求值预算压力样本的解释执行成本过高；普通测试仍验证预算边界"
+    )]
     fn rejects_dependency_depth_and_operation_budget_overruns() {
         let mut dependencies = String::new();
         for index in 0..=MAX_DEPENDENCY_DEPTH {
