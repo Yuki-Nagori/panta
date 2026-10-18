@@ -68,7 +68,7 @@
 | 2026-10-17 | 全新 Cargo/native 构建树与任意 cwd 翻译资源验收 | 首次隔离构建发现 CMake 从 Homebrew 选取 Qt 6.12 `qmlcachegen`，与锁定的 Qt 6.11.2 头文件不匹配；在 `native/CMakeLists.txt` 将 `QT_HOST_PATH` 固定到托管 staging 后，全新 `CARGO_TARGET_DIR` 的 `cargo build --locked` 成功，生成的 `Qt6QmlTools_DIR` 与 qmlcachegen 均来自 staging。lrelease 为英文、中文各生成 407 条；干净树 `I18n.CompiledQmLoads` 1/1 通过；从 `/tmp` 启动干净构建的 offscreen 应用到达事件循环。三平台 Qt 版本与固定资产见 005/034；本机实际构建平台为 macOS arm64。 |
 | 2026-10-17 | CMake host-tools 修复后的变更范围门禁 `cargo verify-changed` | 选择器因公共 CMake 构建边界将范围升级为全量；格式、9 阶段 lint、全部 Rust package 测试及 native/QML CTest 77/77 通过。 |
 | 2026-10-17 | 独立 final review 后修复 Welcome 页签重译 | `DocumentTabBar` 按 welcome 文档类型动态翻译显示名和无障碍名称；新增同一 QML 引擎切换中英文时验证页签标题与关闭按钮名称的回归测试。VTK 欢迎画面的 `Welcome!` 根据用户决策保留英文。 |
-| 2026-10-17 | PR #57 三平台 CI 验收 | 所有 CI 检查通过，包括 macOS / Ubuntu / Windows 构建、Rust 格式与 lint、CMake / C++ / QML lint、依赖审计；run [39021842925](https://github.com/Yuki-Nagori/panta/actions/runs/39021842925)。PR 保持打开，尚未合并。 |
+| 2026-10-17 | PR #57 三平台 CI 验收并合并 | 所有 CI 检查通过，包括 macOS / Ubuntu / Windows 构建、Rust 格式与 lint、CMake / C++ / QML lint、依赖审计；run [39021842925](https://github.com/Yuki-Nagori/panta/actions/runs/39021842925)。PR 已合并至 `main`，合并提交为 `c94ed1e`。 |
 
 ## 风险与回退
 

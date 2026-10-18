@@ -1,4 +1,4 @@
-# 国际化与语言字典（规划）
+# 国际化与语言字典
 
 [模块导航](README.md) · [实施任务 022](../task/022-ui-internationalization.md)
 
@@ -18,7 +18,7 @@ QML/C++ 使用 context + ID 或 source 查找；`.pa` 保存条目 ID、English 
 
 ## 构建与边界
 
-规划在 `resources/i18n/panta-en.pa`、`resources/i18n/panta-cn.pa` 等文件中按语言保存字典。Rust 编译器使用 034 的共享 parser 校验并聚合 context/ID 后，在构建树写出对应临时 `panta_en.ts`、`panta_zh_CN.ts`，调用锁定的 Qt Linguist 预编译 `lrelease` 生成 QM，再嵌入只读资源；临时 TS 和 QM 不作为源码提交。构建入口由 CMake 管理，Cargo 继续负责统一调度；QtTools 缺失时按预编译依赖规范补供给，不源码构建 Qt。`.pa` 中可用 `cn` 作为 `zh-CN` 的简写。
+`resources/i18n/panta-en.pa`、`resources/i18n/panta-cn.pa` 按语言保存字典。Rust 编译器使用 034 的共享 parser 校验并聚合 context/ID 后，在构建树写出对应临时 `panta_en.ts`、`panta_zh_CN.ts`，调用锁定的 Qt Linguist 预编译 `lrelease` 生成 QM，再嵌入只读资源；临时 TS 和 QM 不作为源码提交。构建入口由 CMake 管理，Cargo 继续负责统一调度；QtTools 缺失时按预编译依赖规范补供给，不源码构建 Qt。`.pa` 中可用 `cn` 作为 `zh-CN` 的简写。
 
 ## `.pa` 字典语法约定
 

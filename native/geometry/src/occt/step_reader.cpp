@@ -1,6 +1,7 @@
 /// STEPControl 基础路径的 OCCT 适配器（任务 009）。本目录是仓库中唯一
 /// 允许包含 OCCT 头的位置；装配/名称/颜色等 XDE 附属元数据不保留，取舍
 /// 见公共头与任务记录。坐标在 OCCT 模型空间内一律毫米。
+#include "shape_repository_internal.hpp"
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
 #include <IFSelect_ReturnStatus.hxx>
@@ -10,23 +11,73 @@
 #include <TCollection_AsciiString.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
-#include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS_Shape.hxx>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <mutex>
 #include <panta/geometry/step_import.hpp>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace panta::geometry {
 namespace {
 
-/// Interface_Static 与 translator 参数是进程级状态（standards/occt.md）：
-/// 在并发隔离逐版本验证之前保守串行，全部导入共用一把进程级锁。
-std::mutex& occt_import_mutex() {
+/// OCCT translator 参数是进程级状态（standards/occt.md），仓库中的 shape
+/// 同样只能在这把锁内访问；导入、查询、网格借用和释放统一串行。
+std::mutex& occt_repository_mutex() {
     static std::mutex mutex;
     return mutex;
+}
+
+struct ShapeEntry {
+    TopoDS_Shape shape;
+    detail::ShapeFaceMap faces;
+    StepImportSummary summary;
+    ShapeRevision revision = 1;
+};
+
+std::unordered_map<ShapeId, ShapeEntry>& shape_repository() {
+    static std::unordered_map<ShapeId, ShapeEntry> entries;
+    return entries;
+}
+
+ShapeId& next_shape_id() {
+    static ShapeId id = 1;
+    return id;
+}
+
+ShapeRef store_shape(const TopoDS_Shape& shape, const detail::ShapeFaceMap& faces,
+                     const StepImportSummary& summary) {
+    ShapeId& next_id = next_shape_id();
+    if (next_id == 0)
+        return {};
+
+    ShapeEntry entry;
+    entry.shape = shape;
+    entry.faces = faces;
+    entry.summary = summary;
+    const ShapeRef ref{next_id, entry.revision};
+    shape_repository().emplace(next_id, std::move(entry));
+    ++next_id;
+    return ref;
+}
+
+const ShapeEntry* find_shape(ShapeRef shape, ShapeRepositoryStatus& status) {
+    const auto found = shape_repository().find(shape.id);
+    if (found == shape_repository().end()) {
+        status = ShapeRepositoryStatus::kNotFound;
+        return {};
+    }
+    if (found->second.revision != shape.revision) {
+        status = ShapeRepositoryStatus::kRevisionMismatch;
+        return {};
+    }
+    status = ShapeRepositoryStatus::kNone;
+    return &found->second;
 }
 
 /// 各长度单位到毫米的换算系数；kUnknown 记 0 表示无法给出换算元数据
@@ -96,21 +147,20 @@ LengthUnit source_length_unit(const NCollection_Sequence<TCollection_AsciiString
 }
 
 /// 汇总去重拓扑计数与毫米包围盒；shape 为空时仅记录 has_geometry=false。
-void fill_geometry_summary(const TopoDS_Shape& shape, StepImportSummary& summary) {
+void fill_geometry_summary(const TopoDS_Shape& shape, StepImportSummary& summary,
+                           detail::ShapeFaceMap& faces) {
     if (shape.IsNull())
         return;
     summary.has_geometry = true;
 
-    TopTools_IndexedMapOfShape solids;
-    TopTools_IndexedMapOfShape faces;
-    TopTools_IndexedMapOfShape edges;
+    detail::ShapeFaceMap solids;
+    detail::ShapeFaceMap edges;
     TopExp::MapShapes(shape, TopAbs_SOLID, solids);
     TopExp::MapShapes(shape, TopAbs_FACE, faces);
     TopExp::MapShapes(shape, TopAbs_EDGE, edges);
     summary.solids = static_cast<std::uint32_t>(solids.Extent());
     summary.faces = static_cast<std::uint32_t>(faces.Extent());
     summary.edges = static_cast<std::uint32_t>(edges.Extent());
-
     Bnd_Box box;
     BRepBndLib::Add(shape, box);
     if (!box.IsVoid()) {
@@ -121,13 +171,13 @@ void fill_geometry_summary(const TopoDS_Shape& shape, StepImportSummary& summary
 
 } // namespace
 
-StepImportResult import_step_summary(const std::filesystem::path& file) {
+StepImportResult import_step(const std::filesystem::path& file) {
     StepImportResult result;
-    const std::lock_guard<std::mutex> lock(occt_import_mutex());
+    const std::lock_guard<std::mutex> lock(occt_repository_mutex());
     try {
         // 读取器逐次新建：失败路径不残留会话状态，重复导入互不影响。
         STEPControl_Reader reader;
-        switch (const IFSelect_ReturnStatus read = reader.ReadFile(file.string().c_str())) {
+        switch (reader.ReadFile(file.string().c_str())) {
         case IFSelect_RetDone:
             break;
         case IFSelect_RetVoid:
@@ -141,6 +191,10 @@ StepImportResult import_step_summary(const std::filesystem::path& file) {
         case IFSelect_RetFail:
             result.status = StepImportStatus::kParseFailed;
             result.detail = "ReadFile ran but failed to parse the input";
+            return result;
+        case IFSelect_RetStop:
+            result.status = StepImportStatus::kParseFailed;
+            result.detail = "ReadFile stopped before producing a complete model";
             return result;
         }
 
@@ -171,18 +225,110 @@ StepImportResult import_step_summary(const std::filesystem::path& file) {
             result.detail = "transferred shapes collapsed to a null shape";
             return result;
         }
-        fill_geometry_summary(shape, result.summary);
+        detail::ShapeFaceMap result_shape_faces;
+        fill_geometry_summary(shape, result.summary, result_shape_faces);
+        if (result.status != StepImportStatus::kNone)
+            return result;
+        result.shape = store_shape(shape, result_shape_faces, result.summary);
+        if (result.shape.id == 0) {
+            result.status = StepImportStatus::kInternalFailure;
+            result.detail = "shape repository exhausted its identifier space";
+            result.summary = {};
+        }
         return result;
     } catch (const Standard_Failure& failure) {
         result.status = StepImportStatus::kInternalFailure;
-        result.detail = failure.GetMessageString() != nullptr ? failure.GetMessageString()
-                                                              : "Standard_Failure without message";
+        result.detail = failure.what();
         return result;
     } catch (const std::exception& error) {
         result.status = StepImportStatus::kInternalFailure;
         result.detail = error.what();
         return result;
+    } catch (...) {
+        result.status = StepImportStatus::kInternalFailure;
+        result.detail = "unknown exception while importing STEP";
+        return result;
     }
 }
+
+ShapeSummaryResult query_shape_summary(ShapeRef shape) {
+    ShapeSummaryResult result;
+    const std::lock_guard<std::mutex> lock(occt_repository_mutex());
+    const ShapeEntry* entry = find_shape(shape, result.status);
+    if (!entry) {
+        result.detail = result.status == ShapeRepositoryStatus::kRevisionMismatch
+                            ? "shape revision does not match"
+                            : "shape handle was not found";
+        return result;
+    }
+    result.summary = entry->summary;
+    return result;
+}
+
+ShapeFacesResult query_shape_faces(ShapeRef shape) {
+    ShapeFacesResult result;
+    const std::lock_guard<std::mutex> lock(occt_repository_mutex());
+    const ShapeEntry* entry = find_shape(shape, result.status);
+    if (!entry) {
+        result.detail = result.status == ShapeRepositoryStatus::kRevisionMismatch
+                            ? "shape revision does not match"
+                            : "shape handle was not found";
+        return result;
+    }
+    try {
+        result.face_summaries.reserve(static_cast<std::size_t>(entry->faces.Extent()));
+        for (int face_index = 1; face_index <= entry->faces.Extent(); ++face_index) {
+            Bnd_Box face_box;
+            BRepBndLib::Add(entry->faces(face_index), face_box);
+            ShapeFaceSummary face_summary;
+            face_summary.id = static_cast<FaceId>(face_index - 1);
+            if (!face_box.IsVoid()) {
+                face_box.Get(face_summary.bbox_min[0], face_summary.bbox_min[1],
+                             face_summary.bbox_min[2], face_summary.bbox_max[0],
+                             face_summary.bbox_max[1], face_summary.bbox_max[2]);
+                face_summary.has_bounds = true;
+            }
+            result.face_summaries.push_back(face_summary);
+        }
+    } catch (const Standard_Failure& error) {
+        result.status = ShapeRepositoryStatus::kInternalFailure;
+        result.detail = error.what();
+        result.face_summaries.clear();
+    } catch (const std::exception& error) {
+        result.status = ShapeRepositoryStatus::kInternalFailure;
+        result.detail = error.what();
+        result.face_summaries.clear();
+    } catch (...) {
+        result.status = ShapeRepositoryStatus::kInternalFailure;
+        result.detail = "unknown exception while querying shape faces";
+        result.face_summaries.clear();
+    }
+    return result;
+}
+
+ShapeRepositoryStatus release_shape(ShapeRef shape) {
+    const std::lock_guard<std::mutex> lock(occt_repository_mutex());
+    ShapeRepositoryStatus status = ShapeRepositoryStatus::kNone;
+    if (!find_shape(shape, status))
+        return status;
+    shape_repository().erase(shape.id);
+    return ShapeRepositoryStatus::kNone;
+}
+
+namespace detail {
+
+ShapeRepositoryStatus with_shape(ShapeRef shape, ShapeConsumer consumer, void* context) {
+    if (consumer == nullptr)
+        return ShapeRepositoryStatus::kNotFound;
+    const std::lock_guard<std::mutex> lock(occt_repository_mutex());
+    ShapeRepositoryStatus status = ShapeRepositoryStatus::kNone;
+    const ShapeEntry* entry = find_shape(shape, status);
+    if (!entry)
+        return status;
+    consumer(entry->shape, entry->faces, context);
+    return ShapeRepositoryStatus::kNone;
+}
+
+} // namespace detail
 
 } // namespace panta::geometry

@@ -1,6 +1,6 @@
 # 分层与依赖方向
 
-更新日期：2026-10-16。来源：维护者给定结构与任务 066、118 的边界审计，对全部任务生效；违反即评审问题。当前实现与迁移顺序见 [重库适配与 Rust 领域模块](../architecture/native-domain-boundaries.md)。
+更新日期：2026-10-18。来源：维护者给定结构与任务 066、118、126 的边界审计，对全部任务生效；违反即评审问题。当前实现与迁移顺序见 [重库适配与 Rust 领域模块](../architecture/native-domain-boundaries.md)。
 
 ## 结构
 
@@ -14,7 +14,7 @@ Rust 资产 / 显示快照 → CXX → C++ RenderScene / ViewportBackend → VTK
 Rust Solver Client → 进程协议 → [External] MoldSolver
 ```
 
-这是目标职责，不代表五个规划领域 crate 已建立。当前 STEP 摘要仍是 native 适配冒烟；Netgen Mesh IR 已由 067 接入 Rust 权威模型与校验。
+这是目标职责，不代表五个规划领域 crate 已建立。当前 STEP shape 仓库和 Netgen 消费仍是 native 适配冒烟（126）；Netgen Mesh IR 已由 067 接入 Rust 权威模型与校验。
 
 ## 当前分层与允许方向
 
@@ -35,8 +35,8 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 
 | 层级 | 当前成员 | 允许的 Native target 依赖 | 跨语言边界 |
 |---|---|---|---|
-| Native L1：适配与基础服务 | `panta_foundation`、`panta_geometry`、`panta_mesh`、`panta_qt_adapter`、`panta_i18n`、`panta_visualization` | 这些 target 之间当前无直接自有 native 库链接；各自可依赖职责范围内的 Qt、OCCT、Netgen、VTK 或平台库 | `panta_mesh` 还链接 Rust FFI staticlib，属于显式 Rust/C++ 边界，不据此建立 Native L1 内部反向层级 |
-| Native L2：UI bridge 与 QML | `panta_bridge` / `panta::bridge`、`panta_shell` / `Panta.Shell` | Bridge → `panta::visualization`、`panta::qt_adapter`；QML module 启用 Bridge 时 → `panta_bridge`、`panta_visualization` | Bridge 调用 Rust FFI；QML 只经 ViewModel/Bridge 使用服务 |
+| Native L1：适配与基础服务 | `panta_foundation`、`panta_geometry`、`panta_qt_adapter`、`panta_i18n`、`panta_visualization` | 各自依赖职责范围内的 Qt、OCCT、Netgen、VTK 或平台库 | 无 Rust/C++ 依赖逆转 |
+| Native L2：领域适配与 UI bridge | `panta_mesh`、`panta_bridge` / `panta::bridge`、`panta_shell` / `Panta.Shell` | Mesh → `panta::geometry`；Bridge → `panta::visualization`、`panta::qt_adapter`；QML module 启用 Bridge 时 → `panta_bridge`、`panta_visualization` | `panta_mesh` 还链接 Rust FFI staticlib，属于显式 Rust/C++ 边界；Bridge 调用 Rust FFI；QML 只经 ViewModel/Bridge 使用服务 |
 | Native L3：应用组合根 | `panta_native_app` | → `panta::foundation`、`panta::shell`、`panta_shellplugin`、`panta::i18n`；启用 Bridge 时还 → `panta::visualization`、Bridge/Visualization plugins | 直接链接 Rust FFI staticlib，并通过 Qt/CXX 连接运行时 |
 | 测试与性能（生产层外） | native test、benchmark targets | 可依赖被测生产 target，不进入生产依赖图 | 性能基准由单独入口运行 |
 

@@ -110,9 +110,9 @@ Rust 工作区由 `panta-import` 承担统一的**导入服务契约**，不要�
 
 ## OCCT / Netgen 当前边界
 
-- `native/geometry/src/occt/step_reader.cpp` 的 `import_step_summary` 已实际调用 STEP reader、`TopExp` 和 `BRepBndLib`，保留适配器。几何资产、稳定 ID 和导入事务未来归 `panta-geom` / Rust 应用服务；摘要中的遍历计数不等于持久拓扑身份。
-- `native/mesh/src/netgen/netgen_mesher.cpp` 的 `generate_tet_mesh_from_step` 已调用 Netgen 的 STEP/OCC、边网格、表面网格、体网格流程。`convert_to_ir`、分组压缩和节点顺序归一化留在边界；映射须可追溯，不凭压缩序号建立持久身份。
-- 067 已将校验与总体积计算迁入 `panta-mesh`。`native/mesh/include/panta/mesh/mesh_ir.hpp` 的 `Native*Dto` 和 `validate_native_mesh_with_rust` 只是 CXX 适配输入与结果，不是第二套 Mesh IR 领域模型；native mesh 保留 Netgen 转换、为满足 Rust 契约而调整节点顺序及必要的数组长度检查。STEP 摘要尚未接入 Rust 几何服务。Netgen 当前资源释放的已知制品问题仍按 010/038 跟踪，本文不把所有权规则写成该问题已经修复。
+- `native/geometry/src/occt/step_reader.cpp` 的 `import_step` 一次读取 STEP、生成摘要并保存同一个 `TopoDS_Shape`。native 仓库返回的 `ShapeId + revision` 只是在当前进程中寻址的句柄，不是工程资产身份；调用方显式释放。该仓库负责 OCCT 对象的运行期所有权，不取代未来 Rust `panta-geom` 的资产与修订模型。
+- `native/mesh/src/netgen/netgen_mesher.cpp` 的 `generate_tet_mesh` 从 geometry 仓库借用 shape 构造 Netgen OCC 几何，不再重复解析 STEP。借用期间持有 OCCT 串行锁；Netgen 面通过拓扑对象映射到导入 revision 的 `FaceId`，Mesh DTO 的连续边界组另带组到 FaceId 的映射。压缩组序号本身不作为几何身份。
+- 067 已将校验与总体积计算迁入 `panta-mesh`。`native/mesh/include/panta/mesh/mesh_ir.hpp` 的 `Native*Dto` 和 `validate_native_mesh_with_rust` 只是 CXX 适配输入与结果，不是第二套 Mesh IR 领域模型；native mesh 保留 Netgen 转换、为满足 Rust 契约而调整节点顺序及必要的数组长度检查。私有 geometry→mesh shape 访问契约只供 native adapter 内部使用，不进入安装头文件或 CXX。Netgen 资源释放仍遵循 010/038 的版本特定清理约定。
 
 ## Rust crate 划分
 
