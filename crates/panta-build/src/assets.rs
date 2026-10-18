@@ -12,6 +12,29 @@ const NINJA_VERSION: &str = "1.13.2";
 pub const LLVM_VERSION: &str = "22.1.7";
 
 pub const UV_VERSION: &str = "0.12.18";
+pub const HYPERFINE_VERSION: &str = "2.0.0";
+
+fn hyperfine_asset() -> Option<ToolAsset> {
+    let (url, sha256) = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        (
+            "https://github.com/sharkdp/hyperfine/releases/download/v2.0.0/hyperfine-v2.0.0-aarch64-apple-darwin.tar.gz",
+            "590b839cfea386b384ce0b42d16daf2910277cf30950656194bb3a5f20dea81e",
+        )
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        (
+            "https://github.com/sharkdp/hyperfine/releases/download/v2.0.0/hyperfine-v2.0.0-x86_64-unknown-linux-gnu.tar.gz",
+            "ae2beda2ac99c098427e4f755244552daf20e514422889cca6d44421e2d93c87",
+        )
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        (
+            "https://github.com/sharkdp/hyperfine/releases/download/v2.0.0/hyperfine-v2.0.0-x86_64-pc-windows-msvc.zip",
+            "3dec51acee1060908e67948838d6bc0a7aacde0774acebfa4afb220dcf0bc078",
+        )
+    } else {
+        return None;
+    };
+    Some(ToolAsset { url, sha256 })
+}
 
 fn cmake_asset() -> Option<ToolAsset> {
     // macOS 资产为 universal（arm64/x86_64）；Linux/Windows 官方仅 x86_64，
@@ -87,6 +110,7 @@ pub(super) enum Tool {
     Ninja,
     Llvm,
     Uv,
+    Hyperfine,
 }
 
 impl Tool {
@@ -96,6 +120,7 @@ impl Tool {
             Tool::Ninja => "ninja",
             Tool::Llvm => "llvm",
             Tool::Uv => "uv",
+            Tool::Hyperfine => "hyperfine",
         }
     }
 
@@ -105,6 +130,7 @@ impl Tool {
             Tool::Ninja => NINJA_VERSION,
             Tool::Llvm => LLVM_VERSION,
             Tool::Uv => UV_VERSION,
+            Tool::Hyperfine => HYPERFINE_VERSION,
         }
     }
 
@@ -114,6 +140,7 @@ impl Tool {
             Tool::Ninja => ninja_asset(),
             Tool::Llvm => llvm_asset(),
             Tool::Uv => uv_asset(),
+            Tool::Hyperfine => hyperfine_asset(),
         }
     }
 }
@@ -157,7 +184,13 @@ mod tests {
 
     #[test]
     fn host_platform_has_well_formed_assets() {
-        for asset in [cmake_asset(), ninja_asset(), llvm_asset(), uv_asset()] {
+        for asset in [
+            cmake_asset(),
+            ninja_asset(),
+            llvm_asset(),
+            uv_asset(),
+            hyperfine_asset(),
+        ] {
             let asset = match asset {
                 Some(asset) => asset,
                 None => panic!("宿主平台应有固定资产"),

@@ -40,7 +40,7 @@ fn main() -> ExitCode {
         Some("sanitize") => sanitize::sanitize(),
         // 对外叫 ub-check：别名 `miri` 会遮蔽 cargo-miri 外部子命令。
         Some("ub-check") => miri::miri(),
-        Some("toolchain") => toolchain::verify_toolchain(),
+        Some("toolchain") => toolchain::run(arguments.collect()),
         Some("lint") => {
             let mut rest: Vec<String> = arguments.collect();
             let check = take_check_flag(&mut rest);
@@ -51,12 +51,12 @@ fn main() -> ExitCode {
         }
         Some(command) => Err(format!(
             "未知命令 '{command}'；可用：quality、verify-changed、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、\
-             ub-check、toolchain、performance"
+             ub-check、toolchain [hyperfine <参数>…]、performance"
         )
         .into()),
         None => Err(
             "缺少命令；可用：quality、verify-changed、test、test-plan、test-scope、audit、lint、format、coverage、sanitize、ub-check、\
-                 toolchain、performance"
+                 toolchain [hyperfine <参数>…]、performance"
                 .into(),
         ),
     };

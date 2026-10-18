@@ -18,7 +18,13 @@ panta-import.workspace = true
 panta-dsl-core.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 panta-dsl-core.workspace = true
+
+[[bench]]
+name = "core_workspace_criterion"
+path = "../../tests/performance/cpu/core_workspace_criterion.rs"
+harness = false
 
 [lints]
 workspace = true

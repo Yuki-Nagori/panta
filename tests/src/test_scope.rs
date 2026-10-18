@@ -187,6 +187,7 @@ fn is_rust_package_path(path: &str) -> bool {
         || path.starts_with("tests/rust/")
         || path.starts_with("tests/src/")
         || path.starts_with("tests/integration/")
+        || (path.starts_with("tests/performance/cpu/") && path.ends_with(".rs"))
         || matches!(
             path,
             "Cargo.toml" | "Cargo.lock" | "rust-toolchain.toml" | "rustfmt.toml" | ".rustfmt.toml"
@@ -390,6 +391,17 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             continue;
         }
         if path.starts_with("crates/") || path.starts_with("tests/rust/") {
+            plan.rust = true;
+            if let Some(package) = package_for_path(path, &packages, root) {
+                changed_packages.insert(package);
+            } else {
+                plan.full = true;
+                plan.native = true;
+                plan.qml = true;
+            }
+            continue;
+        }
+        if path.starts_with("tests/performance/cpu/") && path.ends_with(".rs") {
             plan.rust = true;
             if let Some(package) = package_for_path(path, &packages, root) {
                 changed_packages.insert(package);
@@ -824,6 +836,29 @@ mod tests {
         assert!(core.packages_l1.contains("panta-core"));
         assert!(core.packages_l2.contains("panta-cli"));
         assert!(!core.full);
+        Ok(())
+    }
+
+    #[test]
+    fn criterion_benches_select_their_registered_cargo_packages() -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for (path, package) in [
+            (
+                "tests/performance/cpu/dsl_core_criterion.rs",
+                "panta-dsl-core",
+            ),
+            (
+                "tests/performance/cpu/core_workspace_criterion.rs",
+                "panta-core",
+            ),
+        ] {
+            assert!(is_rust_package_path(path), "{path}");
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.rust, "{path}");
+            assert!(plan.packages_l1.contains(package), "{plan:?}");
+            assert!(!plan.full, "{path} should stay package-scoped");
+        }
+        assert!(!is_rust_package_path("tests/performance/cpu/example.cpp"));
         Ok(())
     }
 

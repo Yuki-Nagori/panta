@@ -49,7 +49,8 @@ Cargo 会按锁定清单自动获取 CMake、Ninja、Qt 和 native SDK 到 `targ
 | `cargo lint` | 运行 Clippy、依赖、CMake、Rust/CMake 分层、QML、C++ 静态检查。 |
 | `cargo quality` | 依次运行格式、lint、依赖审计和测试。 |
 | `cargo coverage` | 运行 Rust 覆盖率门禁，当前要求全局函数和行覆盖率均不低于 85%；CI 在 nightly 执行完整覆盖率。`cargo coverage native` 生成 C++ 报告 artifact，当前不设阈值。其余门槛规划见任务 032（deferred）。 |
-| `cargo performance` | 手动运行性能基准，不纳入常规测试门禁。 |
+| `cargo performance` | 手动运行 CPU / GPU 性能套件，不纳入常规测试门禁；Rust Criterion 微基准、剖析和对比命令见[性能模块](ai-docs/modules/performance.md)。 |
+| `cargo hyperfine --runs 15 <命令>` | 按需下载并校验托管的 hyperfine 2.0.0，再执行命令级性能测量。 |
 | `cargo run --locked --package panta-tests -- toolchain` | 检查 Cargo 托管的编译、格式和构建工具。 |
 | `cargo run -p panta-dslc -- check resources/i18n/panta-cn.pa` | 校验 `.pa` 语言字典；`format --check` 检查格式。 |
 
