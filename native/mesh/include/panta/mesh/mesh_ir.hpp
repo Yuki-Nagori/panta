@@ -10,6 +10,7 @@
 
 #include <array>
 #include <cstdint>
+#include <panta/geometry/step_import.hpp>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,8 @@ struct NativeTetMeshDto {
     std::vector<std::array<double, 3>> nodes;
     std::vector<NativeTetrahedronDto> tets;
     std::vector<NativeSurfaceTriangleDto> boundary;
+    /// 按连续 mesh group 索引映射至来源 ShapeRef revision 的 FaceId。
+    std::vector<panta::geometry::FaceId> boundary_group_face_ids;
     MeshIndex region_count = 0;
     MeshIndex boundary_group_count = 0;
 };

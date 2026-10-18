@@ -16,7 +16,7 @@ const NATIVE_LABELS: &[(&str, &[&str])] = &[
         "geometry",
         &["geometry", "mesh", "ffi", "bridge", "app", "qml"],
     ),
-    ("mesh", &["mesh", "ffi", "bridge", "app", "qml"]),
+    ("mesh", &["geometry", "mesh", "ffi", "bridge", "app", "qml"]),
     ("qt-adapter", &["qt-adapter", "bridge", "app", "qml"]),
     ("visualization", &["visualization", "bridge", "app", "qml"]),
     ("bridge", &["bridge", "app", "qml"]),
@@ -875,6 +875,16 @@ mod tests {
             assert!(plan.native, "{path}");
             assert!(plan.native_labels.contains("mesh"), "{path}");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn mesh_adapter_changes_select_geometry_and_mesh_tests() -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        let plan = make_plan(&["native/mesh/src/netgen/netgen_mesher.cpp".into()], &root)?;
+        assert!(plan.native_labels.contains("geometry"), "{plan:?}");
+        assert!(plan.native_labels.contains("mesh"), "{plan:?}");
+        assert!(!plan.full, "{plan:?}");
         Ok(())
     }
 

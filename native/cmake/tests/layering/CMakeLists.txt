@@ -28,13 +28,14 @@ foreach(_target IN ITEMS Experimental NightlyMemoryCheck all_qmltyperegistration
 endforeach()
 
 add_library(panta::foundation ALIAS panta_foundation)
+add_library(panta::geometry ALIAS panta_geometry)
 add_library(panta::qt_adapter ALIAS panta_qt_adapter)
 add_library(panta::i18n ALIAS panta_i18n)
 add_library(panta::visualization ALIAS panta_visualization)
 add_library(panta::bridge ALIAS panta_bridge)
 add_library(panta::shell ALIAS panta_shell)
 
-target_link_libraries(panta_mesh INTERFACE "${PANTA_FFI_STATIC_LIB}")
+target_link_libraries(panta_mesh INTERFACE panta::geometry "${PANTA_FFI_STATIC_LIB}")
 target_link_libraries(panta_bridge INTERFACE panta::visualization panta::qt_adapter
                                              "${PANTA_FFI_STATIC_LIB}")
 target_link_libraries(panta_shell INTERFACE panta::bridge panta::visualization)

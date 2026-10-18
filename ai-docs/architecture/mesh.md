@@ -18,7 +18,7 @@ STL source asset → panta-import → panta-mesh::SurfaceMesh（Rust 权威）
                                       ├─ B. 几何修复任务（规划）：C++ OCCT adapter → faceted B-rep
                                       │       → Rust 提交新 GeometryAsset / revision
                                       │       → OCCT 三角化 → vtkPolyData → VTK
-                                      └─ C. 体网格任务（规划）：C++ Netgen adapter → native DTO
+                                      └─ C. 体网格任务（STL 路径规划）：C++ Netgen adapter → native DTO
                                               → panta-mesh 体 Mesh 校验 / 提交
                                               → vtkUnstructuredGrid → VTK
 ```
@@ -27,7 +27,9 @@ Rust 拥有资产身份、来源 revision、转换 / 网格任务策略、领域
 
 场景 B 从 STL 三角面重建的是离散面片构成的 faceted B-rep；这不会恢复原始 CAD 的解析曲面、参数和设计历史。需要曲面拟合或拓扑修复时，任务必须定义容差、诊断、实体有效性、失败保留旧 GeometryAsset 和映射失效行为。GeometryAsset 的 ID 与 revision 由 Rust 持有；C++ OCCT shape 是运行期 native 对象，不能当成跨 FFI 的 Rust 领域对象。
 
-场景 C 首期按用户提出的路线以明确 `SurfaceMesh` revision 与参数快照为输入。固定 SDK Netgen 6.2.2604 的 `nglib.h` 提供 `Ng_STL_NewGeometry` / `Ng_STL_AddTriangle` / `Ng_STL_InitSTLGeometry` 接收三角面、`Ng_STL_GenerateSurfaceMesh` 生成表面网格，再由 `Ng_GenerateVolumeMesh` 生成体网格的 API 路径；这证明 C++ adapter 有直接传入三角面数据的 API 边界，但不证明任意 STL 都闭合、可定向或可成功生成体网格，需通过真实失败样例验收。Netgen 只在 C++ adapter 中运行；输出经 native DTO 交 Rust `panta-mesh` 校验，再按新资产 revision 提交为体 Mesh。当前领域类型为 `TetMesh`，接口若对产品使用 `VolumeMesh` 名称需在实施任务中统一术语，不维护第二份 Mesh IR。A/B/C 操作都不能覆盖其来源资产。
+场景 C 的 STL 路径仍按明确 `SurfaceMesh` revision 与参数快照规划。固定 SDK Netgen 6.2.2604 的 `nglib.h` 提供 `Ng_STL_NewGeometry` / `Ng_STL_AddTriangle` / `Ng_STL_InitSTLGeometry` 接收三角面、`Ng_STL_GenerateSurfaceMesh` 生成表面网格，再由 `Ng_GenerateVolumeMesh` 生成体网格的 API 路径；这证明 C++ adapter 有直接传入三角面数据的 API 边界，但不证明任意 STL 都闭合、可定向或可成功生成体网格，需通过真实失败样例验收。Netgen 只在 C++ adapter 中运行；输出经 native DTO 交 Rust `panta-mesh` 校验，再按新资产 revision 提交为体 Mesh。
+
+现有 STEP 冒烟路径由任务 126 建立：geometry adapter 一次读取并保留运行期 `TopoDS_Shape`，Netgen adapter 通过 `ShapeRef` 使用同一对象完成 OCC 体网格生成；Mesh DTO 另带连续边界组到导入 revision 内 `FaceId` 的映射。`ShapeRef` / `FaceId` 当前仅限 native 进程和该次导入，不是工程持久身份，Rust 资产服务接入前不能写入 `.panta`。当前领域体网格类型为 `TetMesh`，不维护第二份 Mesh IR。所有网格操作都不能覆盖其来源资产。
 
 Netgen API 依据：[v6.2.2604 `nglib.h`](https://github.com/NGSolve/netgen/blob/v6.2.2604/nglib/nglib.h)。最终能否对特定输入直接体网格化，仍由未来网格任务的封闭性、方向、容差及失败诊断测试决定。
 

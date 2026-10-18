@@ -8,7 +8,7 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
+#include <panta/geometry/step_import.hpp>
 #include <panta/mesh/mesh_ir.hpp>
 #include <string>
 
@@ -18,10 +18,6 @@ namespace panta::mesh {
 /// 不发布（architecture/mesh.md：失败不覆盖、不发布半成品）。
 enum class TetMeshGenerationStatus : std::uint8_t {
     kNone,
-    /// 路径不存在或不可读。
-    kFileNotFound,
-    /// 文件存在但无法解析为 OCC 几何（非 STEP 或空几何）。
-    kGeometryLoadFailed,
     /// Netgen 边/面/体生成阶段失败；detail 携带阶段与返回码。
     kMeshingFailed,
     /// 生成完成但没有得到可用单元。
@@ -32,6 +28,12 @@ enum class TetMeshGenerationStatus : std::uint8_t {
     kInvalidMesh,
     /// Netgen/OCCT 抛出的未预期异常；detail 携带异常原文。
     kInternalFailure,
+    /// shape ID 已释放或不存在。
+    kShapeNotFound,
+    /// shape ID 存在但 revision 已失效。
+    kShapeRevisionMismatch,
+    /// Netgen face map 中的拓扑面无法映射回来源 shape。
+    kFaceMappingFailed,
 };
 
 struct TetMeshGenerationParameters {
@@ -49,16 +51,15 @@ struct TetMeshGenerationResult {
     double volume_mm3 = 0.0;
 };
 
-/// 同步从 STEP 文件生成四面体网格并转换为 native DTO。
+/// 同步从已导入的 shape 生成四面体网格并转换为 native DTO。
 ///
 /// 适配器内部对全部 Netgen/OCCT 调用串行化（两者均为进程级全局状态，
 /// standards/netgen.md 首期保守串行），调用方无须额外加锁；当前不提供
 /// 中途取消，Netgen 生成阶段无安全中断点，异步任务与取消归后续业务任务。
-/// 失败返回结构化 status（Netgen 对不可解析输入抛异常，适配器在边界
-/// 捕获转换），不抛异常、不终止进程；边界分组 ID 为来源几何面在 Netgen
-/// 面映射中的序号压缩成的 0 起连续 ID，面到分组的映射表归后续网格
-/// 业务任务管理。
-TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path& file,
-                                                    const TetMeshGenerationParameters& parameters);
+/// 失败返回结构化 status，不抛异常、不终止进程；边界三角形使用连续 mesh
+/// group 索引，`mesh.boundary_group_face_ids[group]` 返回来源 shape revision
+/// 内对应的稳定 FaceId。调用期间 shape 仓库保持对象有效并串行化 OCCT 访问。
+TetMeshGenerationResult generate_tet_mesh(panta::geometry::ShapeRef shape,
+                                          const TetMeshGenerationParameters& parameters);
 
 } // namespace panta::mesh

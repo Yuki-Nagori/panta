@@ -45,8 +45,9 @@ add_library(panta_mesh STATIC)
 add_library(panta::mesh ALIAS panta_mesh)
 
 target_include_directories(panta_mesh PUBLIC include)
-target_include_directories(panta_mesh PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
-                                              "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
+target_include_directories(
+  panta_mesh PRIVATE "${PANTA_FFI_INCLUDE_DIR}" "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include"
+                     "${CMAKE_CURRENT_SOURCE_DIR}/../geometry/src/occt")
 
 target_sources(
   panta_mesh PRIVATE include/panta/mesh/mesh_ir.hpp include/panta/mesh/netgen_mesher.hpp
@@ -54,10 +55,12 @@ target_sources(
 
 panta_native_defaults(panta_mesh)
 # nglib 经其 INTERFACE_LINK_LIBRARIES 传递 ngcore；OCCT 工具链全集见上
-# 文说明。全部 PRIVATE：公共头零第三方类型（静态库符号经 LINK_ONLY
-# 传播给最终链接者）。
-target_link_libraries(panta_mesh PRIVATE nglib ${_panta_netgen_occt_toolkits}
-                                         "${PANTA_FFI_STATIC_LIB}")
+# 文说明。geometry 为公共头类型依赖，因此 PUBLIC；第三方库保持 PRIVATE
+# （静态库符号经 LINK_ONLY 传播给最终链接者）。
+target_link_libraries(
+  panta_mesh
+  PUBLIC panta::geometry
+  PRIVATE nglib ${_panta_netgen_occt_toolkits} "${PANTA_FFI_STATIC_LIB}")
 if(UNIX)
   find_package(Threads REQUIRED)
   target_link_libraries(panta_mesh PRIVATE Threads::Threads ${CMAKE_DL_LIBS})

@@ -8,7 +8,7 @@
 
 V1 先保证导入与检查闭环，不预设完整 CAD 建模、布尔编辑或自动修复能力。原始输入和派生显示数据应分开管理，不能把三角化表面当成完整 B-rep 替代品。
 
-规划中 `panta-geom` 拥有几何领域身份、修订和后端契约；C++ 继续调用 OCCT 并持有 native 对象。当前仅有 STEP 摘要适配，完整资产服务尚未接入 Rust；所有权与依赖规则见 [适配边界](native-domain-boundaries.md)。
+规划中的 `panta-geom` 将拥有工程几何身份、修订和后端契约；C++ 继续调用 OCCT 并持有 native 对象。当前 STEP adapter 的 `import_step` 会把读取器生成的 shape 存入进程内仓库，并返回 `ShapeId + revision` 句柄供摘要查询和 Netgen 消费。句柄不是持久化资产 ID，必须显式释放；Rust 工程资产服务仍未接入。所有权与依赖规则见 [适配边界](native-domain-boundaries.md) 和任务 [126](../task/126-native-shape-repository-and-netgen-reuse.md)。
 
 ## 从 STL 表面构造 B-rep
 
@@ -28,7 +28,7 @@ V1 先保证导入与检查闭环，不预设完整 CAD 建模、布尔编辑或
 
 ## 拓扑身份与选择
 
-至少区分实体、面、边以及显示用图元。视口拾取结果需要映射回工程实体 ID，网格边界分组也引用这些 ID，而不是保存 VTK actor 指针或 OCCT 对象地址。
+至少区分实体、面、边以及显示用图元。当前 native `FaceId` 是导入 revision 内由去重拓扑遍历生成的零起 ID；常规 shape 摘要查询只复制缓存元数据，只有显式请求面级信息时才遍历并返回面边界盒。Netgen 边界分组通过拓扑对象相等性映射回同 revision 的 `FaceId`。它用于本次运行期转换，不保证跨导入或拓扑修改稳定，也不是工程持久 ID。视口拾取结果最终需要映射回 Rust 工程实体 ID，而不是保存 VTK actor 指针或 OCCT 对象地址。
 
 重新导入或拓扑修改可能破坏原有面/边映射。没有稳定映射证据时，将相关 Study 边界选择标记为失效，要求重新确认；不能假设数组索引不变。几何修订号用于识别派生网格和缓存是否过期。
 

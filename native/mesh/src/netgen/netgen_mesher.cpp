@@ -9,18 +9,24 @@
 /// 本适配器 TU；自有代码保持限定名。
 #include <mystdlib.h>
 
+#include <Standard_Failure.hxx>
+#include <TopoDS_Shape.hxx>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <exception>
-#include <filesystem>
+#include <memory>
 #include <meshing/meshclass.hpp>
 #include <meshing/meshtype.hpp>
 #include <mutex>
+// Netgen 的 OCC C++ API 只在启用此宏后由 occgeom.hpp 声明。
+#define OCCGEOMETRY
+#include <occ/occgeom.hpp>
+#include <panta/geometry/step_import.hpp>
 #include <panta/mesh/mesh_ir.hpp>
 #include <panta/mesh/netgen_mesher.hpp>
+#include <shape_repository_internal.hpp>
 #include <string>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -86,10 +92,12 @@ double six_times_tet_volume(const std::array<double, 3>& p0, const std::array<do
 
 /// 把 netgen::Mesh 的节点、四面体与边界面元转换为 IR；区域取自体单元
 /// 的域号，边界分组取自面描述子的 OCC 面序号（SurfNr）。
-bool convert_to_native_dto(const netgen::Mesh& source, TetMeshGenerationResult& result) {
+bool convert_to_native_dto(const netgen::Mesh& source,
+                           const std::vector<panta::geometry::FaceId>& face_ids_by_netgen_index,
+                           TetMeshGenerationResult& result) {
     result.mesh.nodes.reserve(static_cast<std::size_t>(source.GetNP()));
-    for (int i = 1; i <= source.GetNP(); ++i) {
-        const auto& point = source.Point(i);
+    for (std::size_t i = 1; i <= source.GetNP(); ++i) {
+        const auto& point = source.Point(static_cast<int>(i));
         result.mesh.nodes.push_back({point(0), point(1), point(2)});
     }
 
@@ -114,6 +122,12 @@ bool convert_to_native_dto(const netgen::Mesh& source, TetMeshGenerationResult& 
             return false;
         }
         const netgen::FaceDescriptor& descriptor = source.GetFaceDescriptor(element);
+        if (descriptor.SurfNr() < 1 ||
+            static_cast<std::size_t>(descriptor.SurfNr()) > face_ids_by_netgen_index.size()) {
+            result.status = TetMeshGenerationStatus::kFaceMappingFailed;
+            result.detail = "Netgen surface element refers to an unknown OCC face";
+            return false;
+        }
         face_ids.push_back(descriptor.SurfNr());
     }
 
@@ -121,6 +135,15 @@ bool convert_to_native_dto(const netgen::Mesh& source, TetMeshGenerationResult& 
     const std::vector<MeshIndex> face_mapping = compact_ids(std::move(face_ids));
     result.mesh.region_count = static_cast<MeshIndex>(domain_mapping.size());
     result.mesh.boundary_group_count = static_cast<MeshIndex>(face_mapping.size());
+    result.mesh.boundary_group_face_ids.reserve(face_mapping.size());
+    for (const MeshIndex netgen_face_index : face_mapping) {
+        if (netgen_face_index >= face_ids_by_netgen_index.size()) {
+            result.status = TetMeshGenerationStatus::kFaceMappingFailed;
+            result.detail = "Netgen face descriptor refers outside its OCC face map";
+            return false;
+        }
+        result.mesh.boundary_group_face_ids.push_back(face_ids_by_netgen_index[netgen_face_index]);
+    }
 
     result.mesh.tets.reserve(static_cast<std::size_t>(source.GetNE()));
     for (const auto& element : source.VolumeElements()) {
@@ -144,6 +167,30 @@ bool convert_to_native_dto(const netgen::Mesh& source, TetMeshGenerationResult& 
             {{static_cast<MeshIndex>(element[0]) - 1U, static_cast<MeshIndex>(element[1]) - 1U,
               static_cast<MeshIndex>(element[2]) - 1U},
              group});
+    }
+    return true;
+}
+
+bool map_netgen_faces(const netgen::OCCGeometry& geometry,
+                      const panta::geometry::detail::ShapeFaceMap& source_faces,
+                      std::vector<panta::geometry::FaceId>& face_ids,
+                      TetMeshGenerationResult& result) {
+    if (geometry.fmap.Extent() != source_faces.Extent()) {
+        result.status = TetMeshGenerationStatus::kFaceMappingFailed;
+        result.detail = "Netgen and source shape contain different face counts";
+        return false;
+    }
+
+    face_ids.reserve(static_cast<std::size_t>(geometry.fmap.Extent()));
+    for (int netgen_index = 1; netgen_index <= geometry.fmap.Extent(); ++netgen_index) {
+        const int source_index = source_faces.FindIndex(geometry.fmap(netgen_index));
+        if (source_index < 1) {
+            result.status = TetMeshGenerationStatus::kFaceMappingFailed;
+            result.detail = "Netgen face cannot be matched to the imported shape topology";
+            face_ids.clear();
+            return false;
+        }
+        face_ids.push_back(static_cast<panta::geometry::FaceId>(source_index - 1));
     }
     return true;
 }
@@ -195,74 +242,66 @@ void delete_native_mesh(nglib::Ng_Mesh* native_mesh) {
     delete &mesh;
 }
 
-} // namespace
+void delete_occ_geometry(netgen::OCCGeometry* geometry) {
+    if (geometry != nullptr)
+        nglib::Ng_OCC_DeleteGeometry(reinterpret_cast<nglib::Ng_OCC_Geometry*>(geometry));
+}
 
-TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path& file,
-                                                    const TetMeshGenerationParameters& parameters) {
+TetMeshGenerationResult
+generate_for_shape(const TopoDS_Shape& shape,
+                   const panta::geometry::detail::ShapeFaceMap& source_faces,
+                   const TetMeshGenerationParameters& parameters) {
     TetMeshGenerationResult result;
-    const std::lock_guard<std::mutex> lock(netgen_mutex());
-    init_netgen_once();
+    using OccGeometryOwner = std::unique_ptr<netgen::OCCGeometry, decltype(&delete_occ_geometry)>;
+    OccGeometryOwner occ_geometry(new netgen::OCCGeometry(shape, 3, false), delete_occ_geometry);
+    auto* const geometry = reinterpret_cast<nglib::Ng_OCC_Geometry*>(occ_geometry.get());
+    using NativeMeshOwner = std::unique_ptr<nglib::Ng_Mesh, decltype(&delete_native_mesh)>;
+    NativeMeshOwner native_mesh(nullptr, delete_native_mesh);
 
-    std::error_code existence;
-    if (!std::filesystem::is_regular_file(file, existence)) {
-        result.status = TetMeshGenerationStatus::kFileNotFound;
-        result.detail = "input is not a readable regular file";
-        return result;
-    }
-
-    // 加载：Netgen 对不可解析输入不返回空指针而是抛异常（实测文本垃圾
-    // 抛 "Couldn't load OCC geometry"），在此边界捕获转结构化状态。
-    nglib::Ng_OCC_Geometry* geometry = nullptr;
     try {
-        geometry = nglib::Ng_OCC_Load_STEP(file.string().c_str());
-    } catch (const std::exception& error) {
-        result.status = TetMeshGenerationStatus::kGeometryLoadFailed;
-        result.detail = error.what();
-        return result;
-    }
-    if (geometry == nullptr) {
-        result.status = TetMeshGenerationStatus::kGeometryLoadFailed;
-        result.detail = "Ng_OCC_Load_STEP returned no geometry";
-        return result;
-    }
-
-    nglib::Ng_Mesh* native_mesh = nglib::Ng_NewMesh();
-    try {
-        nglib::Ng_Meshing_Parameters native_parameters;
-        if (parameters.max_length_mm > 0.0)
-            native_parameters.maxh = parameters.max_length_mm;
-        // Netgen 内部节点顺序与标准 FEM 正体积约定相反（box 实测 236/236
-        // 为负，且 nglib 的 invert_tets 在该制品 OCC 路径未生效）；方向
-        // 归一化在 convert_to_native_dto 内完成，满足 Mesh IR 的方向契约。
-
-        const nglib::Ng_Result set_size =
-            nglib::Ng_OCC_SetLocalMeshSize(geometry, native_mesh, &native_parameters);
-        if (set_size != nglib::NG_OK) {
-            result.status = TetMeshGenerationStatus::kMeshingFailed;
-            result.detail = meshing_failure_detail("Ng_OCC_SetLocalMeshSize", set_size);
-        } else if (const nglib::Ng_Result edges =
-                       nglib::Ng_OCC_GenerateEdgeMesh(geometry, native_mesh, &native_parameters);
-                   edges != nglib::NG_OK) {
-            result.status = TetMeshGenerationStatus::kMeshingFailed;
-            result.detail = meshing_failure_detail("Ng_OCC_GenerateEdgeMesh", edges);
-        } else if (const nglib::Ng_Result surfaces =
-                       nglib::Ng_OCC_GenerateSurfaceMesh(geometry, native_mesh, &native_parameters);
-                   surfaces != nglib::NG_OK) {
-            result.status = TetMeshGenerationStatus::kMeshingFailed;
-            result.detail = meshing_failure_detail("Ng_OCC_GenerateSurfaceMesh", surfaces);
-        } else if (const nglib::Ng_Result volume =
-                       nglib::Ng_GenerateVolumeMesh(native_mesh, &native_parameters);
-                   volume != nglib::NG_OK) {
-            result.status = TetMeshGenerationStatus::kMeshingFailed;
-            result.detail = meshing_failure_detail("Ng_GenerateVolumeMesh", volume);
+        std::vector<panta::geometry::FaceId> face_ids_by_netgen_index;
+        if (map_netgen_faces(*occ_geometry, source_faces, face_ids_by_netgen_index, result)) {
+            native_mesh.reset(nglib::Ng_NewMesh());
+        }
+        if (result.status == TetMeshGenerationStatus::kNone && native_mesh == nullptr) {
+            result.status = TetMeshGenerationStatus::kInternalFailure;
+            result.detail = "Ng_NewMesh returned no mesh";
         }
 
         if (result.status == TetMeshGenerationStatus::kNone) {
-            const auto* mesh = reinterpret_cast<const netgen::Mesh*>(native_mesh);
+            nglib::Ng_Meshing_Parameters native_parameters;
+            if (parameters.max_length_mm > 0.0)
+                native_parameters.maxh = parameters.max_length_mm;
+            // Netgen OCC 的四面体方向按 Mesh IR 契约在转换时归一化。
+            const nglib::Ng_Result set_size =
+                nglib::Ng_OCC_SetLocalMeshSize(geometry, native_mesh.get(), &native_parameters);
+            if (set_size != nglib::NG_OK) {
+                result.status = TetMeshGenerationStatus::kMeshingFailed;
+                result.detail = meshing_failure_detail("Ng_OCC_SetLocalMeshSize", set_size);
+            } else if (const nglib::Ng_Result edges = nglib::Ng_OCC_GenerateEdgeMesh(
+                           geometry, native_mesh.get(), &native_parameters);
+                       edges != nglib::NG_OK) {
+                result.status = TetMeshGenerationStatus::kMeshingFailed;
+                result.detail = meshing_failure_detail("Ng_OCC_GenerateEdgeMesh", edges);
+            } else if (const nglib::Ng_Result surfaces = nglib::Ng_OCC_GenerateSurfaceMesh(
+                           geometry, native_mesh.get(), &native_parameters);
+                       surfaces != nglib::NG_OK) {
+                result.status = TetMeshGenerationStatus::kMeshingFailed;
+                result.detail = meshing_failure_detail("Ng_OCC_GenerateSurfaceMesh", surfaces);
+            } else if (const nglib::Ng_Result volume =
+                           nglib::Ng_GenerateVolumeMesh(native_mesh.get(), &native_parameters);
+                       volume != nglib::NG_OK) {
+                result.status = TetMeshGenerationStatus::kMeshingFailed;
+                result.detail = meshing_failure_detail("Ng_GenerateVolumeMesh", volume);
+            }
+        }
+
+        if (result.status == TetMeshGenerationStatus::kNone) {
+            const auto* mesh = reinterpret_cast<const netgen::Mesh*>(native_mesh.get());
             if (mesh->GetNP() == 0 || mesh->GetNE() == 0) {
                 result.status = TetMeshGenerationStatus::kEmptyMesh;
                 result.detail = "generation finished without a non-empty mesh";
-            } else if (!convert_to_native_dto(*mesh, result)) {
+            } else if (!convert_to_native_dto(*mesh, face_ids_by_netgen_index, result)) {
                 result.mesh = NativeTetMeshDto{};
             }
         }
@@ -270,27 +309,72 @@ TetMeshGenerationResult generate_tet_mesh_from_step(const std::filesystem::path&
         if (result.status == TetMeshGenerationStatus::kNone) {
             const RustMeshValidationResult report = validate_native_mesh_with_rust(result.mesh);
             if (!report.ok) {
-                // 候选网格不发布：校验失败即丢弃并携带首个问题。
                 result.status = TetMeshGenerationStatus::kInvalidMesh;
                 result.detail = report.issues.front();
                 result.mesh = NativeTetMeshDto{};
-                result.volume_mm3 = 0.0;
             } else {
                 result.volume_mm3 = report.volume_mm3;
             }
         }
-    } catch (const std::exception& error) {
-        // 网格库异常的统一兜底：丢弃候选输出，保留异常原文作为诊断。
+    } catch (const Standard_Failure& error) {
         result.status = TetMeshGenerationStatus::kInternalFailure;
         result.detail = error.what();
+    } catch (const std::exception& error) {
+        result.status = TetMeshGenerationStatus::kInternalFailure;
+        result.detail = error.what();
+    } catch (...) {
+        result.status = TetMeshGenerationStatus::kInternalFailure;
+        result.detail = "unknown exception during Netgen generation";
+    }
+
+    // 声明顺序保证先销毁借用 OCC 几何的 Netgen mesh，再释放几何对象。
+    if (result.status != TetMeshGenerationStatus::kNone) {
         result.mesh = NativeTetMeshDto{};
         result.volume_mm3 = 0.0;
     }
-
-    // Mesh 内部对 OCC 几何仅持非拥有引用，因此必须先销毁 mesh。
-    delete_native_mesh(native_mesh);
-    nglib::Ng_OCC_DeleteGeometry(geometry);
     return result;
+}
+
+struct ShapeGenerationContext {
+    const TetMeshGenerationParameters& parameters;
+    TetMeshGenerationResult result;
+};
+
+void generate_shape_callback(const TopoDS_Shape& shape,
+                             const panta::geometry::detail::ShapeFaceMap& source_faces,
+                             void* context) {
+    auto& generation = *static_cast<ShapeGenerationContext*>(context);
+    generation.result = generate_for_shape(shape, source_faces, generation.parameters);
+}
+
+} // namespace
+
+TetMeshGenerationResult generate_tet_mesh(panta::geometry::ShapeRef shape,
+                                          const TetMeshGenerationParameters& parameters) {
+    ShapeGenerationContext context{parameters, {}};
+    const std::lock_guard<std::mutex> lock(netgen_mutex());
+    try {
+        init_netgen_once();
+        const auto access =
+            panta::geometry::detail::with_shape(shape, generate_shape_callback, &context);
+        if (access == panta::geometry::ShapeRepositoryStatus::kNotFound) {
+            context.result.status = TetMeshGenerationStatus::kShapeNotFound;
+            context.result.detail = "shape handle was not found";
+        } else if (access == panta::geometry::ShapeRepositoryStatus::kRevisionMismatch) {
+            context.result.status = TetMeshGenerationStatus::kShapeRevisionMismatch;
+            context.result.detail = "shape revision does not match";
+        }
+    } catch (const Standard_Failure& error) {
+        context.result.status = TetMeshGenerationStatus::kInternalFailure;
+        context.result.detail = error.what();
+    } catch (const std::exception& error) {
+        context.result.status = TetMeshGenerationStatus::kInternalFailure;
+        context.result.detail = error.what();
+    } catch (...) {
+        context.result.status = TetMeshGenerationStatus::kInternalFailure;
+        context.result.detail = "unknown exception during shape lookup or meshing";
+    }
+    return context.result;
 }
 
 } // namespace panta::mesh
