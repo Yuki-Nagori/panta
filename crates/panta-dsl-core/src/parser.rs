@@ -417,7 +417,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                     );
                     continue;
                 }
-                let (value_type, expression) = typed_entry(value_pair, source, &mut diagnostics);
+                let (value_type, expression, expression_start, expression_end) =
+                    typed_entry(value_pair, source, &mut diagnostics);
                 if result.values.iter().any(|item| item.name == key) {
                     push_diagnostic(
                         &mut diagnostics,
@@ -431,6 +432,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostics> {
                         name: key,
                         value_type,
                         expression,
+                        expression_start,
+                        expression_end,
                     });
                 }
             }
@@ -592,7 +595,7 @@ fn typed_entry(
     value_pair: Pair<'_, Rule>,
     source: &str,
     diagnostics: &mut Vec<Diagnostic>,
-) -> (Option<ValueType>, String) {
+) -> (Option<ValueType>, String, usize, usize) {
     if value_pair.as_rule() != Rule::typed_value {
         push_diagnostic(
             diagnostics,
@@ -601,14 +604,42 @@ fn typed_entry(
             0,
             source,
         );
-        return (None, String::new());
+        return (None, String::new(), 0, 0);
     }
     let value_type =
         find_text(value_pair.clone(), Rule::type_name).and_then(|value| parse_value_type(&value));
-    let expression = find_pair(value_pair, Rule::scalar)
-        .map(|pair| decode_pair_value(pair, source, diagnostics))
-        .unwrap_or_default();
-    (value_type, expression)
+    let expression = find_pair(value_pair, Rule::scalar);
+    let (expression, start, end) = expression.map_or_else(
+        || (String::new(), 0, 0),
+        |pair| {
+            let span = pair.as_span();
+            let expression = trim_unescaped_trailing_whitespace(pair.as_str());
+            (
+                expression.to_owned(),
+                span.start(),
+                span.start() + expression.len(),
+            )
+        },
+    );
+    (value_type, expression, start, end)
+}
+
+fn trim_unescaped_trailing_whitespace(value: &str) -> &str {
+    let bytes = value.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 && matches!(bytes[end - 1], b' ' | b'\t') {
+        let mut slash_count = 0;
+        let mut cursor = end - 1;
+        while cursor > 0 && bytes[cursor - 1] == b'\\' {
+            slash_count += 1;
+            cursor -= 1;
+        }
+        if slash_count % 2 == 1 {
+            break;
+        }
+        end -= 1;
+    }
+    &value[..end]
 }
 
 fn decode_pair_value(

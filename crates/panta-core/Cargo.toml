@@ -13,13 +13,13 @@ serde.workspace = true
 serde_json.workspace = true
 panta-mesh.workspace = true
 panta-import.workspace = true
+panta-dsl-core.workspace = true
 
 [build-dependencies]
 panta-dsl-core.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-panta-dsl-core.workspace = true
 
 [[bench]]
 name = "core_workspace_criterion"

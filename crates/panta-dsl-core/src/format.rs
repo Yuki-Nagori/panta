@@ -118,7 +118,7 @@ fn format_values(document: &Document, lines: &mut Vec<String>) {
             "  {}: {} = {}",
             value.name,
             value_type_name(&value.value_type),
-            render_scalar(&value.expression)
+            value.expression
         ));
     }
 }

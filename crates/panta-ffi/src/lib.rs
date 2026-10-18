@@ -67,10 +67,12 @@ use project::{
     project_service_execute, project_service_finish_fill_settings_confirmation,
     project_service_finish_gate_location_settings_confirmation,
     project_service_finish_material_confirmation, project_service_finish_stl_import,
-    project_service_import_stl, project_service_imports, project_service_mesh_snapshot_for_import,
-    project_service_new, project_service_open, project_service_plan_settings,
-    project_service_release_mesh_document, project_service_resident_mesh_ids, project_service_save,
-    project_service_set_analysis_sequence, project_service_workspace_activate,
+    project_service_import_stl, project_service_imports, project_service_load_variable_document,
+    project_service_mesh_snapshot_for_import, project_service_new, project_service_open,
+    project_service_plan_settings, project_service_release_mesh_document,
+    project_service_resident_mesh_ids, project_service_save,
+    project_service_save_variable_document, project_service_set_analysis_sequence,
+    project_service_variable_document_generation, project_service_workspace_activate,
     project_service_workspace_close, project_service_workspace_move,
     project_service_workspace_open_import, project_service_workspace_publish_import,
     project_service_workspace_reset, project_service_workspace_snapshot, stl_import_preview,
@@ -392,6 +394,34 @@ pub mod bridge {
         pub error: ProjectDiagnostic,
     }
 
+    /// 已校验的变量快照条目；值使用文本传输，`value_type` 保留其领域类型。
+    pub struct VariableValue {
+        pub name: String,
+        pub value_type: String,
+        pub value: String,
+    }
+
+    /// DSL 源码诊断，范围为 UTF-8 字节偏移，行列从 1 开始。
+    pub struct VariableDiagnostic {
+        pub code: String,
+        pub message: String,
+        pub start_offset: u64,
+        pub end_offset: u64,
+        pub line: u64,
+        pub column: u64,
+    }
+
+    /// 变量文件载入或保存的结果；失败时调用方保留之前的值快照。
+    #[derive(Default)]
+    pub struct VariableDocumentResult {
+        pub source: String,
+        pub generation: u64,
+        pub revision: u64,
+        pub values: Vec<VariableValue>,
+        pub diagnostics: Vec<VariableDiagnostic>,
+        pub error: ProjectDiagnostic,
+    }
+
     /// 只读预检的运行期请求编号；失败 value 不可消费。
     #[derive(Default)]
     pub struct StlPreviewRequestResult {
@@ -538,6 +568,18 @@ pub mod bridge {
         ) -> ProjectSnapshotResult;
         #[rust_name = "project_service_save_response"]
         fn project_service_save(service: &mut ProjectService) -> ProjectSnapshotResult;
+        fn project_service_variable_document_generation(service: &ProjectService) -> u64;
+        fn project_service_load_variable_document(
+            service: &mut ProjectService,
+            expected_generation: u64,
+            expected_revision: u64,
+        ) -> VariableDocumentResult;
+        fn project_service_save_variable_document(
+            service: &mut ProjectService,
+            expected_generation: u64,
+            expected_revision: u64,
+            source: String,
+        ) -> VariableDocumentResult;
         #[rust_name = "project_service_execute_response"]
         fn project_service_execute(
             service: &mut ProjectService,

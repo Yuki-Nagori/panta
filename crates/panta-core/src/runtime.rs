@@ -207,6 +207,16 @@ impl RuntimeContext {
             .map_err(RuntimeResourceError::Path)
     }
 
+    /// 校验资源引用与根授权，但不要求资源文件已经存在。
+    pub fn validate_reference(&self, reference: &ResourceRef) -> Result<(), RuntimeResourceError> {
+        if self.closed {
+            return Err(RuntimeResourceError::ContextClosed);
+        }
+        self.paths
+            .validate_reference(reference)
+            .map_err(RuntimeResourceError::Path)
+    }
+
     /// 关闭会话并请求其所有任务作用域停止。
     pub fn close(&mut self) {
         self.closed = true;
@@ -285,6 +295,16 @@ impl RuntimeTaskScope {
         }
         self.paths
             .resolve_existing(reference)
+            .map_err(RuntimeResourceError::Path)
+    }
+
+    /// 在捕获时的根授权中校验逻辑引用；不检查文件是否存在。
+    pub fn validate_reference(&self, reference: &ResourceRef) -> Result<(), RuntimeResourceError> {
+        if self.is_cancelled() {
+            return Err(RuntimeResourceError::TaskCancelled);
+        }
+        self.paths
+            .validate_reference(reference)
             .map_err(RuntimeResourceError::Path)
     }
 }

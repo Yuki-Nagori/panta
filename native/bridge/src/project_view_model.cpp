@@ -91,6 +91,33 @@ QVariantMap material_definition(const panta::ffi::MaterialDefinition& material) 
             {QStringLiteral("properties"), properties}};
 }
 
+QVariantList variable_values(const rust::Vec<panta::ffi::VariableValue>& values) {
+    QVariantList result;
+    result.reserve(static_cast<qsizetype>(values.size()));
+    for (const auto& value : values) {
+        result.append(QVariantMap{{QStringLiteral("name"), QString::fromUtf8(value.name)},
+                                  {QStringLiteral("type"), QString::fromUtf8(value.value_type)},
+                                  {QStringLiteral("value"), QString::fromUtf8(value.value)}});
+    }
+    return result;
+}
+
+QVariantList variable_diagnostics(const rust::Vec<panta::ffi::VariableDiagnostic>& diagnostics) {
+    QVariantList result;
+    result.reserve(static_cast<qsizetype>(diagnostics.size()));
+    for (const auto& diagnostic : diagnostics) {
+        result.append(QVariantMap{
+            {QStringLiteral("code"), QString::fromUtf8(diagnostic.code)},
+            {QStringLiteral("message"), QString::fromUtf8(diagnostic.message)},
+            {QStringLiteral("startOffset"),
+             QVariant::fromValue<qulonglong>(diagnostic.start_offset)},
+            {QStringLiteral("endOffset"), QVariant::fromValue<qulonglong>(diagnostic.end_offset)},
+            {QStringLiteral("line"), QVariant::fromValue<qulonglong>(diagnostic.line)},
+            {QStringLiteral("column"), QVariant::fromValue<qulonglong>(diagnostic.column)}});
+    }
+    return result;
+}
+
 } // namespace
 
 ProjectViewModel::ProjectViewModel(QObject* parent)
@@ -576,6 +603,7 @@ bool ProjectViewModel::createProject(const QString& rawName, const QString& rawL
     if (!refreshImports()) {
         return false;
     }
+    resetVariableDocument();
     reset_documents();
     m_lastCreatedPath = m_currentPath;
     emit projectCreated(m_lastCreatedPath);
@@ -623,6 +651,7 @@ bool ProjectViewModel::openProject(const QString& path) {
     if (!refreshImports()) {
         return false;
     }
+    resetVariableDocument();
     reset_documents();
     emit projectOpened(m_currentPath);
     return true;
@@ -645,6 +674,28 @@ bool ProjectViewModel::saveProject() {
     }
     emit projectSaved(m_currentPath);
     return true;
+}
+
+bool ProjectViewModel::loadVariableDocument(quint64 expectedGeneration, quint64 expectedRevision) {
+    clearError();
+    const auto result = panta::ffi::project_service_load_variable_document(
+        *m_service, static_cast<std::uint64_t>(expectedGeneration),
+        static_cast<std::uint64_t>(expectedRevision));
+    return applyVariableDocument(result);
+}
+
+bool ProjectViewModel::saveVariableDocument(const QString& source, quint64 expectedGeneration,
+                                            quint64 expectedRevision) {
+    clearError();
+    std::string boundarySource;
+    QString conversionError;
+    if (!toBoundaryText(source, &boundarySource, &conversionError)) {
+        return fail(conversionError);
+    }
+    const auto result = panta::ffi::project_service_save_variable_document(
+        *m_service, static_cast<std::uint64_t>(expectedGeneration),
+        static_cast<std::uint64_t>(expectedRevision), boundarySource);
+    return applyVariableDocument(result);
 }
 
 bool ProjectViewModel::renameProject(const QString& name) {
@@ -825,6 +876,47 @@ bool ProjectViewModel::applySnapshot(const panta::ffi::ProjectSnapshotResult& re
     return result.error.code.empty() ? applySnapshot(result.value) : fail(result.error);
 }
 
+bool ProjectViewModel::applyVariableDocument(const panta::ffi::VariableDocumentResult& result) {
+    if (!result.error.code.empty()) {
+        if (!m_variableDiagnostics.isEmpty()) {
+            m_variableDiagnostics.clear();
+            emit variableDocumentChanged();
+        }
+        return fail(result.error);
+    }
+    const auto diagnostics = variable_diagnostics(result.diagnostics);
+    if (!diagnostics.isEmpty()) {
+        m_variableDiagnostics = diagnostics;
+        emit variableDocumentChanged();
+        const auto first = diagnostics.constFirst().toMap();
+        return fail(first.value(QStringLiteral("code")).toString(), QStringLiteral("validation"),
+                    first.value(QStringLiteral("message")).toString());
+    }
+    m_variableSource = QString::fromUtf8(result.source);
+    m_variableValues = variable_values(result.values);
+    m_variableDiagnostics.clear();
+    m_variableGeneration = static_cast<quint64>(result.generation);
+    m_variableRevision = static_cast<quint64>(result.revision);
+    emit variableDocumentChanged();
+    return true;
+}
+
+void ProjectViewModel::resetVariableDocument() {
+    const auto generation =
+        static_cast<quint64>(panta::ffi::project_service_variable_document_generation(*m_service));
+    if (m_variableSource.isEmpty() && m_variableValues.isEmpty() &&
+        m_variableDiagnostics.isEmpty() && m_variableGeneration == generation &&
+        m_variableRevision == 0) {
+        return;
+    }
+    m_variableSource.clear();
+    m_variableValues.clear();
+    m_variableDiagnostics.clear();
+    m_variableGeneration = generation;
+    m_variableRevision = 0;
+    emit variableDocumentChanged();
+}
+
 bool ProjectViewModel::fail(const QString& code, const QString& category, const QString& detail) {
     const QString message = translated_project_error(code);
     if (m_errorCode != code || m_error != message || m_errorCategory != category ||
@@ -931,6 +1023,16 @@ QString ProjectViewModel::activeDocumentTitle() const {
     }
     return QString{};
 }
+
+const QString& ProjectViewModel::variableSource() const { return m_variableSource; }
+
+QVariantList ProjectViewModel::variableValues() const { return m_variableValues; }
+
+QVariantList ProjectViewModel::variableDiagnostics() const { return m_variableDiagnostics; }
+
+quint64 ProjectViewModel::variableRevision() const { return m_variableRevision; }
+
+quint64 ProjectViewModel::variableGeneration() const { return m_variableGeneration; }
 
 QStringList ProjectViewModel::importedPartIds() const { return m_importedPartIds; }
 

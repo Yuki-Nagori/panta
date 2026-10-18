@@ -226,6 +226,110 @@ impl ProjectService {
         context.commit_task_variables(scope, values).cloned()
     }
 
+    /// 解析变量 DSL、校验逻辑资源引用并按捕获修订原子提交快照。
+    pub fn commit_variable_document(
+        &mut self,
+        scope: &crate::runtime::RuntimeTaskScope,
+        source: &str,
+    ) -> Result<crate::runtime::VariableSnapshot, VariableDocumentError> {
+        let values = variable_runtime_values(scope, source)?;
+        self.commit_runtime_variables(scope, values)
+            .map_err(VariableDocumentError::Commit)
+    }
+
+    /// 从工程固定的 `variables.pa` 读取、校验并提交变量快照。
+    pub fn load_variable_document(
+        &mut self,
+        expected_generation: u64,
+        expected_revision: u64,
+    ) -> Result<(String, crate::runtime::VariableSnapshot), VariableDocumentError> {
+        let scope = self.variable_scope(expected_generation, expected_revision)?;
+        let project_path = self
+            .current
+            .as_ref()
+            .ok_or(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::NoContext,
+            ))?
+            .path
+            .clone();
+        let path = super::variable_document::path(&project_path)
+            .map_err(VariableDocumentError::Project)?;
+        let source =
+            super::variable_document::read(&path).map_err(VariableDocumentError::Project)?;
+        let snapshot = self.commit_variable_document(&scope, &source)?;
+        Ok((source, snapshot))
+    }
+
+    /// 规范化并原子保存变量源码；文件替换成功后发布预先验证的快照。
+    pub fn save_variable_document(
+        &mut self,
+        expected_generation: u64,
+        expected_revision: u64,
+        source: &str,
+    ) -> Result<(String, crate::runtime::VariableSnapshot), VariableDocumentError> {
+        let scope = self.variable_scope(expected_generation, expected_revision)?;
+        let values = variable_runtime_values(&scope, source)?;
+        let normalized =
+            panta_dsl_core::format_source(source).map_err(VariableDocumentError::Diagnostics)?;
+        if normalized.len() > panta_dsl_core::MAX_SOURCE_BYTES {
+            return Err(VariableDocumentError::SourceTooLarge {
+                size: normalized.len(),
+                limit: panta_dsl_core::MAX_SOURCE_BYTES,
+            });
+        }
+        scope
+            .variables()
+            .revision()
+            .checked_add(1)
+            .ok_or(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::RevisionExhausted,
+            ))?;
+        let project_path = self
+            .current
+            .as_ref()
+            .ok_or(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::NoContext,
+            ))?
+            .path
+            .clone();
+        let path = super::variable_document::path(&project_path)
+            .map_err(VariableDocumentError::Project)?;
+        super::variable_document::write_atomically(&path, normalized.as_bytes())
+            .map_err(VariableDocumentError::Project)?;
+        let snapshot = self
+            .commit_runtime_variables(&scope, values)
+            .map_err(VariableDocumentError::Commit)?;
+        Ok((normalized, snapshot))
+    }
+
+    fn variable_scope(
+        &self,
+        expected_generation: u64,
+        expected_revision: u64,
+    ) -> Result<crate::runtime::RuntimeTaskScope, VariableDocumentError> {
+        let scope = self
+            .runtime_context
+            .as_ref()
+            .ok_or(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::NoContext,
+            ))?
+            .capture_task_scope();
+        if scope.generation() != expected_generation {
+            return Err(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::StaleContext,
+            ));
+        }
+        if scope.variables().revision() != expected_revision {
+            return Err(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::StaleRevision {
+                    expected: expected_revision,
+                    current: scope.variables().revision(),
+                },
+            ));
+        }
+        Ok(scope)
+    }
+
     fn replace_runtime_context(&mut self, context: Option<crate::runtime::RuntimeContext>) {
         if let Some(previous) = &mut self.runtime_context {
             previous.close();
@@ -603,6 +707,13 @@ impl ProjectService {
             .and_then(|id| self.mesh_cache.get(id))
     }
 
+    /// 当前工程运行时会话的代次；工程切换会使先前的编辑请求失效。
+    pub fn variable_document_generation(&self) -> u64 {
+        self.runtime_context
+            .as_ref()
+            .map_or(0, crate::runtime::RuntimeContext::generation)
+    }
+
     pub(super) fn snapshot(&self) -> Result<ProjectSnapshot, ProjectError> {
         self.current
             .as_ref()
@@ -614,6 +725,124 @@ impl ProjectService {
             })
             .ok_or(ProjectError::NoProject)
     }
+}
+
+/// 变量文档解析、资源引用转换或运行时提交失败。
+#[derive(Debug)]
+pub enum VariableDocumentError {
+    Diagnostics(panta_dsl_core::Diagnostics),
+    SourceTooLarge {
+        size: usize,
+        limit: usize,
+    },
+    InvalidResource {
+        name: String,
+        reference: String,
+        source_range: std::ops::Range<usize>,
+        line: usize,
+        column: usize,
+        error: crate::path::PathError,
+    },
+    Commit(crate::runtime::RuntimeCommitError),
+    Project(ProjectError),
+}
+
+impl std::fmt::Display for VariableDocumentError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Diagnostics(error) => write!(formatter, "{error}"),
+            Self::SourceTooLarge { size, limit } => {
+                write!(
+                    formatter,
+                    "normalized variable source is {size} bytes; limit is {limit}"
+                )
+            }
+            Self::InvalidResource {
+                name,
+                reference,
+                error,
+                ..
+            } => write!(
+                formatter,
+                "invalid resource for variable '{name}' ({reference}): {error}"
+            ),
+            Self::Commit(error) => write!(formatter, "{error}"),
+            Self::Project(error) => write!(formatter, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for VariableDocumentError {}
+
+fn variable_runtime_values(
+    scope: &crate::runtime::RuntimeTaskScope,
+    source: &str,
+) -> Result<BTreeMap<String, crate::runtime::RuntimeValue>, VariableDocumentError> {
+    let evaluated =
+        panta_dsl_core::evaluate_variables(source).map_err(VariableDocumentError::Diagnostics)?;
+    let mut values = BTreeMap::new();
+    for (name, value) in evaluated.iter() {
+        let value = match value {
+            panta_dsl_core::EvaluatedValue::Bool(value) => {
+                crate::runtime::RuntimeValue::Boolean(*value)
+            }
+            panta_dsl_core::EvaluatedValue::Int(value) => {
+                crate::runtime::RuntimeValue::Integer(*value)
+            }
+            panta_dsl_core::EvaluatedValue::Real(value) => {
+                crate::runtime::RuntimeValue::Real(*value)
+            }
+            panta_dsl_core::EvaluatedValue::String(value) => {
+                crate::runtime::RuntimeValue::String(value.clone())
+            }
+            panta_dsl_core::EvaluatedValue::Resource(reference) => {
+                let resource = crate::path::ResourceRef::parse(reference).map_err(|error| {
+                    let source_range = evaluated.source_range(name).unwrap_or_default();
+                    let (line, column) = source_position(source, source_range.start);
+                    VariableDocumentError::InvalidResource {
+                        name: name.to_owned(),
+                        reference: reference.to_owned(),
+                        source_range,
+                        line,
+                        column,
+                        error,
+                    }
+                })?;
+                scope
+                    .validate_reference(&resource)
+                    .map_err(|error| match error {
+                        crate::runtime::RuntimeResourceError::Path(error) => {
+                            let source_range = evaluated.source_range(name).unwrap_or_default();
+                            let (line, column) = source_position(source, source_range.start);
+                            VariableDocumentError::InvalidResource {
+                                name: name.to_owned(),
+                                reference: reference.to_owned(),
+                                source_range,
+                                line,
+                                column,
+                                error,
+                            }
+                        }
+                        _ => VariableDocumentError::Commit(
+                            crate::runtime::RuntimeCommitError::StaleContext,
+                        ),
+                    })?;
+                crate::runtime::RuntimeValue::Resource(resource)
+            }
+        };
+        values.insert(name.to_owned(), value);
+    }
+    Ok(values)
+}
+
+fn source_position(source: &str, offset: usize) -> (usize, usize) {
+    let before = &source[..offset.min(source.len())];
+    let line = before.bytes().filter(|byte| *byte == b'\n').count() + 1;
+    let column = before
+        .rsplit('\n')
+        .next()
+        .map_or(1, |last| last.chars().count() + 1);
+    (line, column)
 }
 
 fn validate_schema_four_mesh_assets(

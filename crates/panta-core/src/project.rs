@@ -9,6 +9,7 @@ mod mesh_cache;
 mod model;
 mod repository;
 mod service;
+mod variable_document;
 mod workspace;
 pub use error::ProjectError;
 use mesh_cache::SurfaceMeshCache;
@@ -18,7 +19,7 @@ pub use panta_import::{
     DEFAULT_MESH_TYPE, IMPORT_RECORD_VERSION, ImportRecord, MESH_TYPES, STL_IMPORT_PARSER_VERSION,
     StlImportPreview, default_display_name,
 };
-pub use service::ProjectService;
+pub use service::{ProjectService, VariableDocumentError};
 pub use workspace::{
     ActivationRequest as WorkspaceActivationRequest, ActivationResultKind, CloseDocumentResult,
     DocumentDiagnostic, DocumentKind, DocumentState, DocumentWorkspace, WorkspaceDocument,

@@ -30,14 +30,14 @@ Qt `PathHost` 将 user-config 映射到 `AppConfigLocation`、app-data 映射到
 
 任务 024 在 `panta-core::runtime` 提供 `RuntimeContext`、`VariableSnapshot` 和 `RuntimeTaskScope`。`ProjectService` 拥有当前上下文：成功创建或打开工程时替换上下文，销毁服务时关闭上下文。当前没有显式关闭工程命令；现有服务生命周期关闭由销毁服务表示。
 
-`RuntimeContext` 持有工程会话 generation、根解析服务及当前变量快照。`ProjectService` 当前只为上下文注入工程包根；标准用户目录等根仍由独立 `PathHost` 管理，尚未注入项目运行时。上下文只开放现存资源解析，不提供任意写入、进程启动或网络能力；持有 `ResourceRef` 不等于获得这些权限。
+`RuntimeContext` 持有工程会话 generation、根解析服务及当前变量快照。`ProjectService` 当前只为上下文注入工程包根；标准用户目录等根仍由独立 `PathHost` 管理，尚未注入项目运行时。上下文只开放现存资源解析，不提供任意写入、进程启动或网络能力；持有 `ResourceRef` 不等于获得这些权限。任务 025 的 `ProjectService` 会在工程根固定读写 `variables.pa`，这是工程存储操作，不向运行时任务或 QML 暴露任意写入路径。
 
 `VariableSnapshot` 以共享不可变有序表保存 bool、int、有限 real、string、resource 基础值。变量 revision 独立于工程清单 revision。提交时必须提供预期 revision；空名称、非有限数值、旧 revision 或已关闭上下文都会拒绝，失败时保留当前快照。DSL 标识符和类型语义校验由[任务 025](../task/025-variable-dsl.md)负责；024 不解析 DSL，也不把内存快照写入 `.panta`。
 
 后台任务通过 `RuntimeTaskScope` 捕获会话身份、generation、变量 revision、不可变快照和只读路径服务。变量更新后，旧任务仍能读取提交时的值，但当前上下文拒收其结果。工程替换、上下文关闭或销毁会设置共享取消标志；任务需在安全检查点轮询，已进入的文件系统调用无法强制中断。取消信号当前没有接入 008 的演示型 `TaskManager`，也不代表真实任务已迁移到该管理器。
 
-上下文完全由 Rust 管理，独立于 `QQmlEngine`。目前没有跨 CXX 的运行时消费者，因此不新增桥接句柄。C++ ViewModel 不得把 QObject、JS 值或裸指针存入运行时上下文；QML 重载不应隐式重复提交任务。开发热重载行为由[任务 027](../task/027-qml-state-reload.md)验收。
+上下文完全由 Rust 管理，独立于 `QQmlEngine`。CXX 不暴露运行时上下文句柄；任务 025 通过 `ProjectService` 将已验证变量值、generation、revision 和结构化诊断投影到 `ProjectViewModel`。调用方提交修改时同时回传捕获的 generation/revision，阻止工程切换后旧编辑请求写入新工程。C++ ViewModel 不得把 QObject、JS 值或裸指针存入运行时上下文；QML 重载不应隐式重复提交任务。开发热重载行为由[任务 027](../task/027-qml-state-reload.md)验收。
 
 ## 状态与后续
 
-023 路径服务已完成；024 运行时基础正在实施。两者都不代表完整工程持久化或任务执行框架已实现。024 使用内存会话夹具验证快照、失效和取消；完整工程数据的读写由各自工程任务负责。打包与安装验收归任务 013。
+023 路径服务与 024 运行时基础已完成。两者都不代表完整工程持久化或任务执行框架已实现。024 使用内存会话夹具验证快照、失效和取消；完整工程数据的读写由各自工程任务负责。打包与安装验收归任务 013。

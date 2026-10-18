@@ -3,6 +3,7 @@ use panta_core::project::{
     FillSettings, IMPORT_RECORD_VERSION, PROJECT_SCHEMA_VERSION, ProjectCommand, ProjectError,
     ProjectService, STL_IMPORT_PARSER_VERSION,
 };
+use panta_core::runtime::RuntimeValue;
 use std::fs;
 use std::path::Path;
 
@@ -34,6 +35,45 @@ fn create_command_save_open_and_model_command_round_trip() -> Result<(), Box<dyn
     assert_eq!(opened.name, "Renamed");
     assert_eq!(opened.revision, 1);
     assert!(!opened.dirty);
+    Ok(())
+}
+
+#[test]
+fn variable_dsl_commits_evaluated_values_atomically() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let mut service = ProjectService::new();
+    service.create(&fixture.root, "Variables")?;
+    let scope = service
+        .runtime_context()
+        .ok_or("project runtime context missing")?
+        .capture_task_scope();
+    let source = "version: 1\nkind: variables\n\nvalues:\n  doubled: int = width * 2\n  width: int = 12\n  mesh: resource = project:/assets/mesh.vtu\n";
+
+    let committed = service.commit_variable_document(&scope, source)?;
+    assert_eq!(committed.revision(), 1);
+    assert_eq!(committed.get("doubled"), Some(&RuntimeValue::Integer(24)));
+    assert_eq!(
+        committed.get("mesh"),
+        Some(&RuntimeValue::Resource(panta_core::path::ResourceRef {
+            category: panta_core::path::RootCategory::Project,
+            relative: "assets/mesh.vtu".to_owned(),
+        }))
+    );
+
+    let invalid_resource = source.replace("project:/assets/mesh.vtu", "project:/../escape");
+    let error = match service.commit_variable_document(&scope, &invalid_resource) {
+        Ok(_) => return Err("out-of-root resource was accepted".into()),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        panta_core::project::VariableDocumentError::InvalidResource { .. }
+    ));
+    assert_eq!(
+        service.runtime_context().map(|context| context.variables()),
+        Some(&committed)
+    );
+
     Ok(())
 }
 

@@ -43,6 +43,11 @@ pub struct Variable {
     pub name: String,
     pub value_type: ValueType,
     pub expression: String,
+    /// 源码中的表达式字节范围；仅供诊断定位，不进入序列化 AST。
+    #[serde(skip)]
+    pub expression_start: usize,
+    #[serde(skip)]
+    pub expression_end: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
