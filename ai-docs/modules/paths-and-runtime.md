@@ -1,41 +1,43 @@
-# 跨平台路径与轻量运行时（规划；路径层已落地）
+# 跨平台路径与轻量运行时
 
 [模块导航](README.md) · [023 路径服务](../task/023-cross-platform-paths.md) · [024 运行时上下文](../task/024-runtime-context.md)
 
-## 是否需要类虚拟机底座
+## 边界
 
-仅为跨平台路径管理，不需要虚拟机。建议先建立 PathService，再提供轻量 RuntimeContext：统一工程身份、变量快照、资源解析和任务作用域。这里的“运行时”是应用内服务上下文，不包含虚拟 CPU、操作系统、字节码 VM 或安全沙箱。
+这里只描述应用内路径和会话状态。路径层不依赖 DSL；运行时不依赖 DSL 解析器；变量 DSL 将已校验的值提交给运行时。当前运行时不是虚拟 CPU、操作系统、字节码 VM 或安全沙箱。只有出现可测量的执行瓶颈、暂停脚本或第三方代码隔离需求时，才另行评估解释器、字节码或进程隔离。
 
-路径服务不依赖 DSL；运行时不依赖 DSL 解析器；DSL 最终向运行时提交经过验证的值。只有出现可度量的执行性能瓶颈、可暂停脚本或第三方代码隔离需求时，再单独立项评估解释器、字节码或独立进程，避免把“未来可能有用”变成当前依赖。
+## 路径层
 
-## 路径层：逻辑地址与本机位置
-
-| 类别 | 规划契约 |
+| 类别 | 当前契约与实现 |
 |---|---|
-| 工程资产 | 持久化工程相对引用，绑定显式工程根，不依赖 cwd |
-| 用户配置、应用数据、缓存、会话状态 | Qt 宿主通过 QStandardPaths 获取不同类别目录，分别注入服务 |
-| 内置资源 | `qrc:` 只读，由 Qt 资源读取入口访问，不伪装为本机文件路径 |
-| 临时工作目录 | 每个任务独立作用域，明确创建、保留诊断和清理责任 |
-| 外部导入文件 | 显式 file URL 或本机路径，经批准的导入操作转换为工程资产/外部引用 |
+| 工程资产 | `project:/...` 绑定工程包根，不依赖 cwd。`ProjectService` 创建的运行时上下文注入当前工程根。 |
+| 用户配置、应用数据、缓存、会话根 | 任务 023 的 Qt `PathHost` 通过 Qt adapter 获取标准目录，创建并验证目录后注入 `PathService`。当前 `ProjectService` 上下文只注入工程根。 |
+| 内置资源 | `qrc:` 是只读类别，Rust 路径服务拒绝把它解析成本机路径；Qt 资源通过 Qt 入口读取。 |
+| 临时工作目录 | `session` 根映射到 Qt `TempLocation`。当前没有通用的按任务创建、保留诊断和清理目录的管理器。 |
+| 外部导入文件 | 本机路径或 file URL 通过显式导入流程读取；来源快照与工程内资产分开保存。 |
 
-[QStandardPaths](https://doc.qt.io/qt-6/qstandardpaths.html) 提供平台标准目录类别（查阅 2026-09-16，Qt 6.11）。实际读写前检查目录创建结果与权限；空结果、不可写位置和磁盘错误必须返回可解释错误。
+`panta-core::path` 定义 `project`、`user-config`、`app-data`、`cache`、`session`、`qrc` 六类根，使用 `scheme:/relative` 结构化引用，并提供三种解析：
 
-项目候选逻辑地址为 `project:/assets/...`、`cache:/...`；它们是应用自定义引用，尚未注册为 QML URL handler。领域资源引用优先保存结构化的根类别与相对片段，解析后才生成本机路径。大文件以句柄/资产 ID 传递，不能把完整内容塞进路径 DTO。
+- `resolve` 只校验引用并拼接绝对路径，不访问文件系统。
+- `resolve_existing` 要求目标存在，规范化后仍位于对应根目录内。
+- `resolve_write_target` 允许目标尚不存在，但要求最深现存祖先仍位于根目录内。
 
-C++ Qt 宿主负责平台目录发现与 URL/QString 转换；Rust 应用层负责工程引用规则和运行时服务，跨语言契约通过 006 明确。Rust 使用 Path/PathBuf，C++ 不在业务层手工拼分隔符。FFI 必须明确可表示范围：若当前契约仅支持可往返的 Unicode 路径，应明确拒绝非 Unicode 路径，禁止有损转换后访问其他文件。
+路径校验拒绝空引用、NUL、绝对路径、越界 `..`、Windows 保留设备名、尾随点或空格组件及逻辑引用中的反斜杠。文件系统检查覆盖符号链接/junction 越界；这不构成对恶意并发文件系统修改的安全隔离。拒绝矩阵和平台验收见[任务 023](../task/023-cross-platform-paths.md)。
 
-处理 Windows 盘符、UNC 与保留名称、Linux 大小写、macOS Unicode 文件名差异；不全局转小写或擅自规范化磁盘文件名。file URL 只解码一次，区分 URL 与路径字符串。逻辑引用只接受 `/` 分隔符；反斜杠在 Rust 校验处统一拒绝（`path.backslash_rejected`），避免 Windows 将逻辑组件重新解释为本机 UNC、盘符或父级路径。本机路径与 file URL 不受该分隔符规则影响。默认拒绝工程相对引用中的绝对路径和根外跳转；结合符号链接、Windows junction、未创建目标的现存父目录检查边界。逻辑根检查不等于对恶意并发文件系统操作的安全隔离。
+Qt `PathHost` 将 user-config 映射到 `AppConfigLocation`、app-data 映射到 `AppDataLocation`、cache 映射到 `CacheLocation`、session 映射到 `TempLocation`。它在 `native/qt-adapter` 获取标准目录，检查绝对路径、创建缺失目录并用临时文件验证可写性。`QString` 转 UTF-8 必须往返一致；file URL 只通过 `QUrl::toLocalFile` 解码一次。`PathService`/`PathRef` 经 `panta-ffi` 传递；逻辑引用不是 QML URL handler，不能直接交给 QML 或操作系统打开。大文件通过资产 ID 或句柄传递，不放进路径 DTO。
 
-路径层实现已落地（023，2026-09-17）：`panta-core::path` 提供根类别（`project`/`user-config`/`app-data`/`cache`/`session`/`qrc`）、逻辑引用 `scheme:/relative` 与三层解析（纯逻辑 `resolve`、存在性 + 规范化包含的 `resolve_existing`、未创建目标按最深现存祖先检查的 `resolve_write_target`）；拒绝矩阵见任务记录。FFI 经 `panta-ffi` 的 `PathService`/`PathRef` 传递（仅可往返 UTF-8，越界枚举值按 `path.invalid_kind` 拒绝）；Qt 宿主适配在 `native/bridge` 的 `PathHost`：QStandardPaths 注入（user-config→AppConfigLocation、app-data→AppDataLocation、cache→CacheLocation、session→TempLocation——此映射即 013 打包时的安装布局接口）、QString↔UTF-8 往返校验（不可往返即 `path.non_unicode` 拒绝，非 Unicode 策略落点）、file URL 单次解码（`QUrl::toLocalFile`，qrc/其它 scheme 拒绝为本机路径）。024 的 RuntimeContext 以 `PathService` 为资源解析起点。
+## 运行时层
 
-## 运行时层：状态和权限边界
+任务 024 在 `panta-core::runtime` 提供 `RuntimeContext`、`VariableSnapshot` 和 `RuntimeTaskScope`。`ProjectService` 拥有当前上下文：成功创建或打开工程时替换上下文，销毁服务时关闭上下文。当前没有显式关闭工程命令；现有服务生命周期关闭由销毁服务表示。
 
-RuntimeContext（示意）持有工程 ID、generation/revision、不可变变量快照、资源解析器和能力集合；由应用服务管理，生命周期独立于 QQmlEngine。C++ ViewModel 持有受控句柄，不能将引擎拥有的 QObject、JS 值或裸指针存入上下文。
+`RuntimeContext` 持有工程会话 generation、根解析服务及当前变量快照。`ProjectService` 当前只为上下文注入工程包根；标准用户目录等根仍由独立 `PathHost` 管理，尚未注入项目运行时。上下文只开放现存资源解析，不提供任意写入、进程启动或网络能力；持有 `ResourceRef` 不等于获得这些权限。
 
-一个命令/后台任务捕获一份上下文快照；打开另一工程、关闭工程或提交新变量修订后，以工程 ID 和 generation 判断迟到结果。关闭时撤销作用域并触发 008 的取消逻辑；UI 重载不会隐式重复任务。
+`VariableSnapshot` 以共享不可变有序表保存 bool、int、有限 real、string、resource 基础值。变量 revision 独立于工程清单 revision。提交时必须提供预期 revision；空名称、非有限数值、旧 revision 或已关闭上下文都会拒绝，失败时保留当前快照。DSL 标识符和类型语义校验由[任务 025](../task/025-variable-dsl.md)负责；024 不解析 DSL，也不把内存快照写入 `.panta`。
 
-首期能力是变量读取与受控资源解析。写入、进程启动、网络不因持有路径字符串而自动授权。上下文和数据快照的序列化契约与 UI 会话状态区分；缓存可重建，不能作为唯一工程存储。
+后台任务通过 `RuntimeTaskScope` 捕获会话身份、generation、变量 revision、不可变快照和只读路径服务。变量更新后，旧任务仍能读取提交时的值，但当前上下文拒收其结果。工程替换、上下文关闭或销毁会设置共享取消标志；任务需在安全检查点轮询，已进入的文件系统调用无法强制中断。取消信号当前没有接入 008 的演示型 `TaskManager`，也不代表真实任务已迁移到该管理器。
 
-## 演进与验收
+上下文完全由 Rust 管理，独立于 `QQmlEngine`。目前没有跨 CXX 的运行时消费者，因此不新增桥接句柄。C++ ViewModel 不得把 QObject、JS 值或裸指针存入运行时上下文；QML 重载不应隐式重复提交任务。开发热重载行为由[任务 027](../task/027-qml-state-reload.md)验收。
 
-023 独立验证三平台解析、搬迁工程、任意 cwd、不可写目录和根外跳转。024 使用内存中的最小工程会话夹具验证快照与取消，不要求先完成完整工程存储。完整打包/安装验证仍由 013 负责；运行时和 DSL 的验收不能被当作完整项目保存已实现。
+## 状态与后续
+
+023 路径服务已完成；024 运行时基础正在实施。两者都不代表完整工程持久化或任务执行框架已实现。024 使用内存会话夹具验证快照、失效和取消；完整工程数据的读写由各自工程任务负责。打包与安装验收归任务 013。

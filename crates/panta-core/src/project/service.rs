@@ -36,6 +36,7 @@ pub struct ProjectService {
     pub(super) import_request: u64,
     pub(super) execution: crate::execution::ProjectExecution,
     pub(super) workspace: DocumentWorkspace,
+    pub(super) runtime_context: Option<crate::runtime::RuntimeContext>,
 }
 
 impl ProjectService {
@@ -125,7 +126,11 @@ impl ProjectService {
         self.latest_mesh_id = None;
         self.mesh_cache.clear();
         self.activation_attempts.clear();
-        self.activation.advance_generation();
+        let generation = self.activation.advance_generation();
+        self.replace_runtime_context(Some(
+            crate::runtime::RuntimeContext::for_project(generation, &project_root)
+                .map_err(|error| ProjectError::Io(error.to_string()))?,
+        ));
         self.reset_document_workspace("Welcome");
         self.snapshot()
     }
@@ -194,9 +199,38 @@ impl ProjectService {
         self.mesh_cache.clear();
         self.activation_attempts.clear();
         self.clear_stl_preview();
-        self.activation.advance_generation();
+        let generation = self.activation.advance_generation();
+        self.replace_runtime_context(Some(
+            crate::runtime::RuntimeContext::for_project(generation, project_root)
+                .map_err(|error| ProjectError::Io(error.to_string()))?,
+        ));
         self.reset_document_workspace("Welcome");
         self.snapshot()
+    }
+
+    /// 当前工程的 Rust 运行时上下文；未打开工程时为空。
+    pub fn runtime_context(&self) -> Option<&crate::runtime::RuntimeContext> {
+        self.runtime_context.as_ref()
+    }
+
+    /// 以预期修订原子提交变量快照；未打开工程或上下文失效时拒绝提交。
+    pub fn commit_runtime_variables(
+        &mut self,
+        scope: &crate::runtime::RuntimeTaskScope,
+        values: BTreeMap<String, crate::runtime::RuntimeValue>,
+    ) -> Result<crate::runtime::VariableSnapshot, crate::runtime::RuntimeCommitError> {
+        let context = self
+            .runtime_context
+            .as_mut()
+            .ok_or(crate::runtime::RuntimeCommitError::NoContext)?;
+        context.commit_task_variables(scope, values).cloned()
+    }
+
+    fn replace_runtime_context(&mut self, context: Option<crate::runtime::RuntimeContext>) {
+        if let Some(previous) = &mut self.runtime_context {
+            previous.close();
+        }
+        self.runtime_context = context;
     }
 
     /// 将当前模型以同目录临时文件写入后替换 `.panta` 主文件。
@@ -646,6 +680,7 @@ impl Drop for ProjectService {
     fn drop(&mut self) {
         // 读取取消及过期结果释放不等待解析；已接受的写入由执行通道持有候选。
         self.clear_stl_preview();
+        self.replace_runtime_context(None);
         self.activation.advance_generation();
         self.activation.drain();
     }
