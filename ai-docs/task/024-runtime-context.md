@@ -52,7 +52,7 @@
 - [x] 运行时状态由 Rust 服务持有，不保存 JS 值或引擎对象；QML 订阅不拥有运行时上下文。
 - [x] 资源能力仅解析注入根内的现存资源；旧 revision、空变量名、非有限数值和已关闭上下文的提交被拒绝且不替换当前快照。
 - [x] 代码、测试和模块说明一致；不新增无消费者的 FFI/QML API。
-- [ ] CI 验收通过并同步最终状态。
+- [x] CI 验收通过；PR #64 的三平台构建、测试及适用质量检查通过。
 
 ## 验证计划与结果
 
@@ -62,6 +62,7 @@
 |---|---|---|
 | 2026-10-18 | 仓库根目录；macOS 26.3.1 arm64、Rust/Cargo 1.98.1；`cargo verify-changed` | 通过。格式检查通过；受影响 Rust 包 `panta-core`、`panta-cli`、`panta-ffi`、`panta-launcher` 测试通过；相关 CTest 标签 `app`、`bridge`、`ffi`、`i18n`、`mesh`、`qml`、`qt-adapter` 共 67 项通过；未运行 workspace 全量测试。 |
 | 2026-10-18 | `cargo test -p panta-core runtime::tests`；独立只读评审（`gpt-6.1-sol`, medium） | 运行时单元测试通过；评审复核完整变更与模块文档，未发现待处理问题。 |
+| 2026-10-18 | PR #64；GitHub Actions run [39122955410](https://github.com/Yuki-Nagori/panta/actions/runs/39122955410) | macOS、Linux、Windows 构建与受影响测试通过；format、Clippy、clang-tidy、CMake、cppcheck、includes、layering、machete、qmllint 及变更路径检查通过。`cargo audit` 按路径条件跳过。 |
 
 ## 风险与回退
 
@@ -75,4 +76,4 @@
 
 ## 完成摘要
 
-实现与本地适用验证已完成；等待 CI 验收后同步最终状态。
+实现、本地适用验证和 PR CI 均已通过；等待 PR 合并后将任务状态同步为 done。
