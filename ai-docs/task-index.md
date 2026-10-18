@@ -135,7 +135,7 @@ ai-docs/
 | 123 | [Rust CLI 检查 STL](task/123-rust-cli-stl-inspection.md) | CAE 领域模块迁移 | 063, 067, 121 | done |
 | 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | done |
 | 125 | [设置服务与 Qt 持久化适配](task/125-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
-| 126 | [OCCT Shape 仓库与 Netgen 复用](task/126-native-shape-repository-and-netgen-reuse.md) | CAE 领域模块迁移 | 009, 010, 066, 067, 119 | in-progress |
+| 126 | [OCCT Shape 仓库与 Netgen 复用](task/126-native-shape-repository-and-netgen-reuse.md) | CAE 领域模块迁移 | 009, 010, 066, 067, 119 | done |
 
 ## 验证与质量扩展队列
 

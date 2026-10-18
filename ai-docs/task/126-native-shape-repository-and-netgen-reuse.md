@@ -1,6 +1,6 @@
 # 126 — OCCT Shape 仓库与 Netgen 复用
 
-- 状态：in-progress
+- 状态：done
 - 阶段：CAE 领域模块迁移
 - 依赖：009、010、066、067、119
 - 优先级：P1
@@ -65,7 +65,7 @@
 - [x] Netgen 输入面与 geometry face ID 通过拓扑身份映射，不依赖独立遍历顺序；`box_mm.step` 的 6 个面各自映射到唯一面 ID，所有边界三角面都引用有效分组。
 - [x] 失败路径不发布部分 DTO；RAII 清理网格资源，释放与 shape 借用由同一把锁串行，返回时仓库已移除句柄；Netgen/OCCT 按其进程级约束串行执行。错误路径和重复生成测试通过。
 - [x] `panta_geometry_step_import_test`、`panta_mesh_netgen_test`、`panta_mesh_ir_test` 与完整 native/QML CTest 通过；现有性能基准没有调用被替换的 STEP/Netgen API。
-- [ ] macOS、Linux、Windows PR CI 通过。
+- [x] macOS、Linux、Windows PR CI 通过。
 - [x] Issue #58 的国际化模块标题/现状、模块导航后续说明、任务 022 PR #57 合并记录与实际一致。
 - [x] 架构、分层、任务索引与代码一致；已完成独立只读架构评审并更新本任务结果。
 
@@ -73,13 +73,14 @@
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-10-18 | geometry/mesh CTest：`StepImport|NetgenMesher` | shape→Netgen 复用、释放/错误路径及面映射回归通过 | 15/15 通过；当前 macOS arm64 SDK。本地链接出现 Rust 静态库最低系统版本高于 native target 的既有 warning，不影响测试结果 |
-| 2026-10-18 | `cargo verify-changed` | 本地 L1/L2 选择器、完整适用测试与质量检查通过 | 通过：当前 CMake 公共构建边界触发完整范围；Rust workspace、native/QML CTest 79/79、9 项 lint/format 检查均通过。macOS arm64；CI 尚待 PR 验收 |
-| 2026-10-18 | 官方 Netgen 源码与锁定 SDK API 核对 | 确认构造器和 `fmap` 生命周期/顺序假设 | 本地 Netgen 6.2.2604 头文件含公开 `OCCGeometry(shape, dim, copy)` 构造器和 `fmap`；上游实现说明 `copy=false` 保存传入 shape 并构建 Netgen 面表。最终以锁定 SDK 实测验收。 |
+| 2026-10-18 | geometry/mesh CTest：`StepImport`、`NetgenMesher` | shape→Netgen 复用、释放/错误路径及面映射回归通过 | 15/15 通过；macOS arm64。本地链接提示 Rust 静态库最低系统版本高于 native target，不影响测试结果 |
+| 2026-10-18 | `cargo verify-changed` | 本地 L1/L2 选择器、完整适用测试与质量检查通过 | 通过：公共 CMake 构建边界触发完整范围；Rust workspace、native/QML CTest 79/79、9 项 lint/format 检查均通过；macOS arm64 |
+| 2026-10-18 | 官方 Netgen 源码与锁定 SDK API 核对 | 确认构造器和 `fmap` 生命周期/顺序假设 | 本地 Netgen 6.2.2604 头文件含公开 `OCCGeometry(shape, dim, copy)` 构造器和 `fmap`；上游实现说明 `copy=false` 保存传入 shape 并构建 Netgen 面表 |
+| 2026-10-18 | PR [#62](https://github.com/Yuki-Nagori/panta/pull/62) CI | macOS、Linux、Windows 构建及所需质量检查全部通过 | 全部 14 项检查通过；Actions run [39110444126](https://github.com/Yuki-Nagori/panta/actions/runs/39110444126) |
 
 ## 风险与回退
 
-Netgen face map 与 OCCT face map 的遍历顺序可能不同，必须按拓扑身份匹配并用多面夹具验证；不能假定序号一致。仓库释放若与网格生成并发会造成悬空引用，借用期间需锁住 shape 所有者或提供等价的强引用生命周期。若 SDK 构造器在锁定 ABI 下不可安全消费，则任务应停止并修订接口决策，不能退回重复读取 STEP 的静默旁路。
+Netgen face map 与 OCCT face map 的遍历顺序可能不同，必须按拓扑身份匹配并用多面夹具验证；不能假定序号一致。当前用一把锁串行保护 shape 借用、网格操作与释放；未来若调整并发模型，必须保留等价的生命周期保障。若 SDK 构造器在锁定 ABI 下不可安全消费，则任务应停止并修订接口决策，不能退回重复读取 STEP 的静默旁路。
 
 ## 决策与工作记录
 
@@ -89,4 +90,4 @@ Netgen face map 与 OCCT face map 的遍历顺序可能不同，必须按拓扑�
 
 ## 完成摘要
 
-未完成。
+PR #62 的 macOS、Linux、Windows 构建及 14 项 CI 检查全部通过。issue #58 文档状态已同步；issue #59 的 shape 仓库、单次 STEP 读取、Netgen shape 复用和 revision 内面映射均已实现并通过测试。
