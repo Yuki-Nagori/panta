@@ -28,7 +28,7 @@ ApplicationWindow {
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property real nativeControlsLeftInset: WindowChromeMetrics.leadingSystemControlsInset
     readonly property bool layersDockShown: layersPanel.dockOpen
-    readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : viewModel.error
+    readonly property string statusMessage: projectModel.error
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
     property string activeRibbonTab: "start-learn"
 
@@ -38,10 +38,6 @@ ApplicationWindow {
         // 工程工具仅在打开工程后可达，开始页始终可达。
         if (tab === "start-learn" || ((tab === "home" || tab === "results" || tab === "tools" || tab === "view") && projectOpen))
             activeRibbonTab = tab;
-    }
-
-    ShellViewModel {
-        id: viewModel
     }
 
     ProjectViewModel {
@@ -73,7 +69,6 @@ ApplicationWindow {
         target: Settings
         function onLanguageChanged() {
             projectModel.retranslateError();
-            viewModel.retranslateCaption();
         }
     }
 
@@ -154,7 +149,7 @@ ApplicationWindow {
         TopChromePanel {
             objectName: "titleChromePanel"
             Layout.fillWidth: true
-            caption: shellWindow.projectOpen ? "panta 2027 · " + projectModel.currentName : viewModel.caption.length > 0 ? viewModel.caption : "panta 2027"
+            caption: shellWindow.projectOpen ? "panta 2027 · " + projectModel.currentName : "panta 2027"
             projectOpen: shellWindow.projectOpen
             activeRibbonTab: shellWindow.activeRibbonTab
             nativeControlsLeftInset: shellWindow.nativeControlsLeftInset
@@ -206,7 +201,6 @@ ApplicationWindow {
                     onLogsRequested: viewportPane.logsOpen = !viewportPane.logsOpen
                     importedPartNames: projectModel.importedPartNames
                     importedPartIds: projectModel.importedPartIds
-                    importedPartName: projectModel.importedPartName
                     activeDocumentId: projectModel.activeDocumentId
                     activeDocumentTitle: projectModel.activeDocumentTitle
                     analysisSequenceText: qsTranslate("AnalysisSequence", projectModel.planSettings.sequenceSourceText ?? "")

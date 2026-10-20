@@ -189,26 +189,32 @@ mod tests {
     }
 
     #[test]
-    fn activating_resident_mesh_updates_the_service_current_mesh_view() {
-        let mut service = ProjectService::new();
-        service.cache_activated_mesh("a".to_owned(), mesh(1));
-        service.cache_activated_mesh("b".to_owned(), mesh(2));
+    fn activating_resident_mesh_keeps_the_selected_asset_resident() {
+        let triangle_bytes = std::mem::size_of::<[[f64; 3]; 3]>();
+        let mut service = ProjectService::with_mesh_cache_budget(triangle_bytes * 3);
+        service.mesh_cache.insert_active("a".to_owned(), mesh(1));
+        service.mesh_cache.insert_active("b".to_owned(), mesh(1));
 
         assert!(service.activate_mesh_document("a"));
-        assert_eq!(
-            service.current_mesh().map(|mesh| mesh.triangles.len()),
-            Some(1)
-        );
+        service.mesh_cache.insert_active("c".to_owned(), mesh(2));
+
+        assert!(service.mesh_for_import("a").is_some());
+        assert!(service.mesh_for_import("b").is_none());
+        assert!(service.mesh_for_import("c").is_some());
     }
 
     #[test]
     fn activating_missing_mesh_keeps_the_current_mesh_unchanged() {
         let mut service = ProjectService::new();
-        service.cache_activated_mesh("resident".to_owned(), mesh(1));
+        service
+            .mesh_cache
+            .insert_active("resident".to_owned(), mesh(1));
 
         assert!(!service.activate_mesh_document("missing"));
         assert_eq!(
-            service.current_mesh().map(|mesh| mesh.triangles.len()),
+            service
+                .mesh_for_import("resident")
+                .map(|mesh| mesh.triangles.len()),
             Some(1)
         );
         assert_eq!(service.resident_mesh_ids(), ["resident"]);
@@ -220,13 +226,11 @@ mod tests {
         service
             .mesh_cache
             .insert_active("import-1".to_owned(), mesh(1));
-        service.latest_mesh_id = Some("import-1".to_owned());
         service.activation_attempts.insert("import-1".to_owned(), 7);
 
         service.release_mesh_document("import-1");
 
         assert!(service.mesh_for_import("import-1").is_none());
-        assert!(service.current_mesh().is_none());
         assert!(service.resident_mesh_ids().is_empty());
         assert!(!service.is_current_activation_attempt("import-1", 7));
     }
@@ -500,7 +504,9 @@ mod tests {
         let mut service = ProjectService::with_mesh_cache_budget(0);
         service.reset_document_workspace("Welcome");
         assert!(service.workspace.open_ready_import("large", "large"));
-        service.cache_activated_mesh("large".to_owned(), mesh(1));
+        service
+            .mesh_cache
+            .insert_active("large".to_owned(), mesh(1));
         service.sync_workspace_residency();
         assert_eq!(
             service.document_workspace().documents[1].state,

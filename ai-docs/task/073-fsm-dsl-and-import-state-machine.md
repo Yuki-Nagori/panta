@@ -55,7 +55,7 @@
 - [x] `ALL_STATES × ALL_EVENTS` 对实际手写决策做双向结构校验；每个 guard 有真 / 假及边界场景，生产 API 不开放任意设状态。
 - [x] 从初态到解析就绪、失败、取消和过期丢弃的资源激活事件路径可重放；结果与已提交 ImportRecord 一致，ProjectManifest、revision 与 dirty 原值不变。
 - [x] 覆盖关闭待加载 tab、连续切换目标、工程关闭 / 重开、project generation 变化、旧 attempt 与重复 / 迟到结果；过期事件不发布快照且解析资源得到释放。
-- [x] Task 成功只表示网格快照已加载并可供 ViewModel 使用；失败和取消各终止一次；长解析不阻塞 GUI，GUI 线程不等待 worker join。
+- [x] 激活成功只表示网格快照已加载并可供 ViewModel 使用；失败和取消各终止一次；长解析不阻塞 GUI，GUI 线程不等待 worker join。
 - [x] 可控解析器接缝覆盖读取失败、格式错误、取消和 worker 启动失败；当前活动视口与工程持久状态按契约保留。
 - [x] 无重复 parser、工程事务反向依赖或遗留执行路径；现有真实窗口和三平台验证均有记录。本轮 Cargo fixture 已随 PR #19 通过 macOS、Linux、Windows 构建与测试。
 

@@ -50,7 +50,7 @@ fn sanitize_profile(name: &str, flags: &str) -> Result<(), Box<dyn Error>> {
     // QML 引擎跨模块对象生命周期触发 bad-free。
     let exclude = match (name, cfg!(windows)) {
         ("tsan", _) => Some(concat!(
-            "^(TaskHost|Ffi|Qml)\\.|^ProjectViewModelTest\\.(",
+            "^(Ffi|Qml)\\.|^ProjectViewModelTest\\.(",
             "ConfirmedImportCompletesThroughBackgroundViewModelRequest|",
             "DuplicateImportOrdinalsFollowImportOrderAcrossActivationAndClose|",
             "ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand|",

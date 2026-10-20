@@ -176,8 +176,6 @@ class QmlPerformanceBenchmark final : public QObject {
                 QVariantMap properties = names_property;
                 properties.insert(QStringLiteral("projectOpen"), true);
                 properties.insert(QStringLiteral("projectName"), QStringLiteral("benchmark"));
-                properties.insert(QStringLiteral("importedPartName"),
-                                  names.isEmpty() ? QString{} : names.constLast());
                 tasks = create(m_tasksComponent, properties, owner);
             }
             if (panels == Panels::Layers || panels == Panels::Both) {

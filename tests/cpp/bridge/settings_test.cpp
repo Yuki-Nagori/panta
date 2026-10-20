@@ -1,7 +1,6 @@
 /// 验证 Settings 跨 Rust locale、Qt translator 与 QML 翻译绑定的行为。
 #include "project_view_model.hpp"
 #include "settings.hpp"
-#include "shell_view_model.hpp"
 #include <QCoreApplication>
 #include <QDir>
 #include <QJSEngine>
@@ -35,17 +34,13 @@ class SettingsTest final : public QObject {
         QVERIFY(settings != nullptr);
 
         panta::bridge::ProjectViewModel projectModel;
-        panta::bridge::ShellViewModel shellModel;
-        shellModel.tick();
         engine.rootContext()->setContextProperty("projectModel", &projectModel);
-        engine.rootContext()->setContextProperty("shellModel", &shellModel);
         QQmlComponent errorComponent(&engine);
         errorComponent.setData("import QtQml\nimport Panta.Test 1.0\nQtObject {"
                                " property string errorText: projectModel.error;"
                                " property Connections languageConnection: Connections {"
                                " target: Settings; function onLanguageChanged() {"
-                               " projectModel.retranslateError();"
-                               " shellModel.retranslateCaption() } } }",
+                               " projectModel.retranslateError() } } }",
                                QUrl());
         std::unique_ptr<QObject> errorObject(errorComponent.create());
         QVERIFY2(errorObject != nullptr, qPrintable(errorComponent.errorString()));
@@ -86,7 +81,6 @@ class SettingsTest final : public QObject {
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("就绪"));
         QCOMPARE(errorObject->property("errorText").toString(),
                  QStringLiteral("请输入有效的工程名称。"));
-        QCOMPARE(shellModel.caption(), QStringLiteral("修订 1"));
 
         QVERIFY(!settings->setLanguage(QStringLiteral("zh_CN")));
         QCOMPARE(settings->language(), QStringLiteral("zh-CN"));
@@ -106,7 +100,6 @@ class SettingsTest final : public QObject {
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("Ready"));
         QCOMPARE(errorObject->property("errorText").toString(),
                  QStringLiteral("Enter a valid project name."));
-        QCOMPARE(shellModel.caption(), QStringLiteral("Revision 1"));
     }
 };
 

@@ -12,7 +12,6 @@ PanelSurface {
     property alias activeDocumentId: tasksPage.activeDocumentId
     property alias activeDocumentTitle: tasksPage.activeDocumentTitle
     property alias importedPartAvailable: tasksPage.importedPartAvailable
-    property alias importedPartName: tasksPage.importedPartName
     property alias analysisSequenceText: tasksPage.analysisSequenceText
     property alias analysisSequenceId: tasksPage.analysisSequenceId
     property alias materialText: tasksPage.materialText

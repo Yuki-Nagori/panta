@@ -11,7 +11,7 @@
 
 建立单一后台任务生命周期和诊断路径，为导入/网格生成复用。
 
-008 已完成初始 Rust / FFI / Qt 任务生命周期。当前容量与关闭语义由 [109](109-bounded-background-execution.md) 更新：共享有界执行、终态消费后回收、销毁关闭领域状态并协作停止；不在 UI 线程等待 worker。下方 2026-09-17 的 join 记录描述原实现。日志持久化 / 真正业务执行体按对应消费任务推进。
+008 记录早期后台任务与诊断方案。当前后台工程操作由 `ProjectExecution` 调度，各自的领域服务和状态机管理生命周期；仓库尚无通用任务面板或共享任务服务。日志持久化由实际消费场景决定。
 
 ## 必读
 
@@ -45,7 +45,7 @@
 
 crates/core 或 workflow 的实际必要部分、native service/bridge、诊断配置。执行前根据真实结构修订；不得顺手实现非目标功能。
 
-本轮实际边界：新增 `crates/panta-core`（任务状态机、Progress/终态事件、结构化日志环、销毁 join）；`panta-ffi` 桥接 `TaskService` opaque 与 `TaskEvent`/`TaskLogLine` DTO（拉取式，无跨语言回调）；`native/bridge` 新增 `TaskHost`（QML 可注册，GUI 线程 QTimer 轮询转 Qt 信号）；`native/ffi` 新增 `task_service_test`、`native/bridge` 新增 `task_host_test`；launcher build.rs 重建追踪补 panta-core。staticlib 仍只有 `panta_ffi.a` 一个（panta-core 被打包其中），040 的双边顺序约束不变。错误摘要的界面本地化归 022；QML 面板消费与日志落盘由后续任务承接。
+早期实现曾包含 Rust 模拟任务状态机、FFI `TaskService`、Qt `TaskHost` 和各层专属测试。当前边界以本节完成摘要及现行源码为准；本任务下方日期记录保留当时实施与验证事实。
 
 ## 清理与兼容例外
 
@@ -94,4 +94,4 @@ crates/core 或 workflow 的实际必要部分、native service/bridge、诊断�
 
 ## 完成摘要
 
-已完成。单一任务生命周期落地三层：panta-core 状态机（Started/Progress/终态事件、协作取消、终态不可回退、结构化日志环；当前关闭及执行容量见 109）、panta-ffi `TaskService` 拉取式桥接、`TaskHost`（GUI 线程转 Qt 信号，QML 可注册）。证据：Rust 26 测试、本机 CTest 15/15（TaskHost 5 用例含 GUI 心跳证明慢任务不阻塞事件循环）、三平台 CI run `35210392688` 与 `35212142062`。错误为稳定码（task.*）+ 诊断 detail；与用户摘要的分离已建立，摘要本地化由 022 承接，真实导入/网格任务接入时替换模拟执行体（契约不变），日志落盘/Console 通路在首个真实消费任务中决策。
+当前工程操作由 `ProjectExecution` 提供有界调度，由领域服务 / 状态机拥有请求身份、取消与结果裁决。仓库尚无通用任务 / 作业服务；若多个实际消费者出现共同需求，再据此设计共享接口。

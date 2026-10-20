@@ -174,11 +174,6 @@ pub(crate) fn writes() -> Arc<Executor> {
     static EXECUTOR: OnceLock<Arc<Executor>> = OnceLock::new();
     Arc::clone(EXECUTOR.get_or_init(|| Executor::new("panta-write", 1, 32)))
 }
-pub(crate) fn tasks() -> Arc<Executor> {
-    static EXECUTOR: OnceLock<Arc<Executor>> = OnceLock::new();
-    Arc::clone(EXECUTOR.get_or_init(|| Executor::new("panta-task", 2, 64)))
-}
-
 #[cfg(test)]
 mod tests {
     use super::Executor;

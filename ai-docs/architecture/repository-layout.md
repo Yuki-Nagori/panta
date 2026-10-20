@@ -49,7 +49,7 @@ panta/
 │   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
 │   ├── qt-adapter/            # Qt 平台服务与系统目录/偏好适配
 │   ├── i18n/                  # QM 资源构建与 QTranslator 适配
-│   ├── bridge/                # ViewModel（ShellViewModel + GTest 信号测试，005 已落地）
+│   ├── bridge/                # Qt ViewModel 与应用桥接（GTest 行为测试）
 │   ├── app/                   # Qt 桌面入口 panta（005 已落地 Qt 实现）
 │   ├── geometry/{include,src/occt}/       # 当前：自有摘要契约与 OCCT adapter
 │   ├── mesh/{include,src/netgen}/         # 当前：native 网格 DTO、CXX 校验适配与 Netgen adapter

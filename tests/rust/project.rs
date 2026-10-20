@@ -402,7 +402,7 @@ fn imports_ascii_stl_and_round_trips_record_and_asset() -> Result<(), Box<dyn st
     reopened.open(&project_path)?;
     assert_eq!(reopened.imports()?, vec![record]);
     // 打开只读清单；已保存资产由只读激活按需恢复（见 activation.rs）。
-    assert!(reopened.current_mesh().is_none());
+    assert!(reopened.mesh_for_import("import-1").is_none());
     Ok(())
 }
 
@@ -526,7 +526,7 @@ fn import_asset_collision_uses_a_recovery_path_without_overwriting()
     assert_eq!(imported.mesh_asset_id, "mesh-import-1-recovery-1");
     assert_eq!(fs::read(&occupied_asset)?, b"preserve this unrelated file");
     assert_eq!(service.imports()?.len(), 1);
-    assert!(service.current_mesh().is_some());
+    assert!(service.mesh_for_import(&imported.id).is_some());
     assert_ne!(fs::read(&created.path)?, b"");
     Ok(())
 }
@@ -550,7 +550,7 @@ fn import_directory_failure_preserves_the_project() -> Result<(), Box<dyn std::e
     assert_eq!(fs::read(&blocking_file)?, b"preserve this file");
     assert_eq!(service.current()?, before);
     assert!(service.imports()?.is_empty());
-    assert!(service.current_mesh().is_none());
+    assert!(service.resident_mesh_ids().is_empty());
     assert_eq!(fs::read(&created.path)?, manifest_before);
     Ok(())
 }
@@ -640,15 +640,17 @@ fn changed_preview_requires_review_and_failed_import_preserves_mesh()
         Err(ProjectError::ImportSourceChanged(_))
     ));
     assert_eq!(service.current()?.revision, 0);
-    assert!(service.current_mesh().is_none());
+    assert!(service.resident_mesh_ids().is_empty());
 
     service.inspect_stl(&source)?;
-    service.import_stl(&source, "solid-3d", "centimeters", false)?;
+    let first_record = service.import_stl(&source, "solid-3d", "centimeters", false)?;
     assert_eq!(
-        service.current_mesh().map(|mesh| mesh.summary().dimensions),
+        service
+            .mesh_for_import(&first_record.id)
+            .map(|mesh| mesh.summary().dimensions),
         Some([20.0, 10.0, 0.0])
     );
-    let committed = service.current_mesh().cloned();
+    let committed = service.mesh_for_import(&first_record.id).cloned();
     let revision = service.current()?.revision;
     fs::write(&source, b"not an stl")?;
     assert!(matches!(
@@ -656,16 +658,21 @@ fn changed_preview_requires_review_and_failed_import_preserves_mesh()
         Err(ProjectError::ImportParseFailed(_))
     ));
     assert_eq!(service.current()?.revision, revision);
-    assert_eq!(service.current_mesh().cloned(), committed);
+    assert_eq!(
+        service.mesh_for_import(&first_record.id).cloned(),
+        committed
+    );
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
-    assert!(reopened.current_mesh().is_none());
+    assert!(reopened.mesh_for_import(&first_record.id).is_none());
 
     let second = fixture.root.join("second.stl");
     fs::write(&second, b"vertex 0 0 0\nvertex 3 0 0\nvertex 0 4 0\n")?;
     let second_record = service.import_stl(&second, "solid-3d", "millimeters", false)?;
     assert_eq!(
-        service.current_mesh().map(|mesh| mesh.summary().dimensions),
+        service
+            .mesh_for_import(&second_record.id)
+            .map(|mesh| mesh.summary().dimensions),
         Some([3.0, 4.0, 0.0])
     );
     assert_eq!(service.imports()?.len(), 2);
@@ -678,7 +685,7 @@ fn changed_preview_requires_review_and_failed_import_preserves_mesh()
             .is_file()
     );
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
-    assert!(reopened.current_mesh().is_none());
+    assert!(reopened.mesh_for_import(&second_record.id).is_none());
     Ok(())
 }
 
@@ -699,7 +706,7 @@ fn converted_coordinate_overflow_leaves_project_unchanged() -> Result<(), Box<dy
     ));
     assert_eq!(service.current()?.revision, 0);
     assert!(service.imports()?.is_empty());
-    assert!(service.current_mesh().is_none());
+    assert!(service.resident_mesh_ids().is_empty());
     Ok(())
 }
 
@@ -734,9 +741,9 @@ fn failed_manifest_commit_preserves_previous_asset_and_mesh()
     fs::write(&source, b"vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n")?;
     let mut service = ProjectService::new();
     let created = service.create(&fixture.root, "Demo")?;
-    service.import_stl(&source, "solid-3d", "millimeters", false)?;
+    let first_record = service.import_stl(&source, "solid-3d", "millimeters", false)?;
     let snapshot = service.current()?;
-    let mesh = service.current_mesh().cloned();
+    let mesh = service.mesh_for_import(&first_record.id).cloned();
     let manifest = fs::read(&created.path)?;
     fs::remove_dir(created.path.with_extension("panta.write"))?;
     fs::write(
@@ -749,7 +756,7 @@ fn failed_manifest_commit_preserves_previous_asset_and_mesh()
             .is_err()
     );
     assert_eq!(service.current()?, snapshot);
-    assert_eq!(service.current_mesh().cloned(), mesh);
+    assert_eq!(service.mesh_for_import(&first_record.id).cloned(), mesh);
     assert_eq!(service.imports()?.len(), 1);
     assert_eq!(fs::read(&created.path)?, manifest);
     assert!(
