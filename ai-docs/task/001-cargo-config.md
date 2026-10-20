@@ -1,15 +1,17 @@
 # 001 — Cargo workspace 与 Rust 工具链
 
-- 状态：done
+- 状态：in-progress
 - 阶段：M0
 - 依赖：无
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-10-20
 
 ## 目标与背景
 
 建立可检查的最小 Rust workspace，为后续统一构建入口提供可靠起点。
+
+原始骨架验收已于 2026-09-16 完成，下文保留当时证据。2026-10-20 按维护者要求将锁定工具链从 1.98.1 升至 1.99.0，保持 edition 2024 和依赖锁文件；迁移已弃用的原子更新 API 后，将 MSRV 提升至 1.95；本批升级单独提交，等待适用验证和 PR CI 后恢复 done。
 
 ## 必读
 
@@ -54,11 +56,15 @@ Cargo.toml、Cargo.lock、rust-toolchain.toml、最小 crates/、按需 .cargo/ 
 - [x] 已同步相关架构/规范、当前可用命令和 task-index 状态，未将规划能力写成已完成。
 
 - [x] 旧实现及失效引用已清理，无未登记兼容代码；每次提交按 [提交规范](../standards/commits.md) 同步 task 与实际行为。
+- [x] 2026-10-20：锁定 1.99.0，新编译器格式 / Clippy / workspace 构建 / 聚合测试通过；Rust 1.95 core all-targets 编译检查通过。
+- [ ] 本批三平台 PR CI 通过，状态与索引同步。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
+| 2026-10-20 | macOS 26.3.1 arm64，Rust 1.99.0：`cargo format --check`、`cargo lint clippy --check`、`cargo build --locked --workspace`、`cargo test-scope all` | 均退出 0；Rust package 回归及 native/QML CTest 93/93 通过。初次 Clippy 报 4 处原子 API 弃用，迁移后复验通过。 |
+| 2026-10-20 | `cargo +1.95.0 check --locked -p panta-core --all-targets` | 退出 0；仅证明 core 及其依赖 / 测试 target 的 MSRV 编译。首次因本机工具链安装不完整失败，rustup 修复安装后通过；未宣称全部 workspace 在 MSRV 实测。 |
 | 2026-09-16 | macOS 26.3.1 arm64；`rustup show active-toolchain`（仓库内） | `1.98.1-aarch64-apple-darwin (overridden by '.../rust-toolchain.toml')`，固定生效；clippy/rustfmt 组件已装 |
 | 2026-09-16 | `cargo metadata --no-deps --format-version 1`（rustup run 1.98.1） | workspace_members 与 default_members 均仅含 `panta-launcher@0.1.0`，运行目标唯一 |
 | 2026-09-16 | `cargo build --locked`（rustup run 1.98.1） | 成功（先 `cargo generate-lockfile` 生成锁文件，随后所有检查 `--locked`） |
@@ -84,6 +90,7 @@ Cargo.toml、Cargo.lock、rust-toolchain.toml、最小 crates/、按需 .cargo/ 
 - 2026-09-16（实施）launcher 契约：无参数时 stderr 输出未接入诊断并以 69（EX_UNAVAILABLE）退出；收到参数时输出用法诊断并以 64（EX_USAGE）退出；退出码为任务 004 重写前的过渡约定。
 - 2026-09-16（实施）范围调整：无。`.cargo/` 未创建（无需配置），未顺手引入 CXX 依赖（接入决策归 006，本次仅核对其 MSRV）。
 - 待记录：后续任务引用本任务退出码或工具链版本时的变更原因。
+- 2026-10-20：维护者决定保留 `rust-toolchain.toml` 并升级至 1.99.0；本机安装与 rustfmt / Clippy 组件检查通过，实际版本 `rustc 1.99.0 (b940084d7 2026-09-28)`。CI action 从该文件读取 channel，缓存键包含文件摘要，无需另维护版本副本。原始验证中的 1.98.1 数字保留为历史证据。维护者随后确认迁移新 API 并提高 MSRV：本机 1.99 标准库源码将 `try_update` 标记为 1.95.0 稳定，4 处计数器保持原内存序和溢出拒绝语义，MSRV 同步为 1.95，不屏蔽弃用告警。
 
 ## 完成摘要
 

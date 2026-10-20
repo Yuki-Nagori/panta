@@ -4,7 +4,7 @@
 
 ## 当前可用范围
 
-Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3、默认成员 `panta-launcher`）、launcher、DSL 和 FFI 成员与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.98.1。`cargo build --locked`、`cargo test --locked --workspace`、`cargo fmt --all -- --check` 可运行。
+Rust workspace 骨架已落地（任务 001）：根 [Cargo.toml](../../Cargo.toml)（edition 2024、resolver 3、默认成员 `panta-launcher`）、launcher、DSL 和 FFI 成员与 [rust-toolchain.toml](../../rust-toolchain.toml) 固定的 stable 1.99.0（2026-10-20 升级，验证见任务 001）。`cargo build --locked`、`cargo test --locked --workspace`、`cargo fmt --all -- --check` 可运行。
 
 native 构建骨架已落地（任务 003）：[native/](../../native/CMakeLists.txt) 顶层 CMakeLists、`panta_foundation` 库、`native/app` 可执行骨架与 CTest 测试；单配置 Ninja presets（`debug`/`release`），安装树可被 `find_package(panta-native)` 消费。
 

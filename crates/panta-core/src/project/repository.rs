@@ -143,7 +143,7 @@ impl Temporary {
         // create_new 不覆盖遗留文件；碰撞重试有上限，避免在途租约无限等待。
         for _ in 0..TEMPORARY_ATTEMPTS {
             let id = counter
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
                 .map_err(|_| ProjectError::Io("temporary file identifiers exhausted".to_owned()))?;
             let path = directory.join(format!("{}-{id}.tmp", std::process::id()));
             match OpenOptions::new().write(true).create_new(true).open(&path) {

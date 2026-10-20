@@ -1,6 +1,6 @@
 # 依赖获取与主平台环境
 
-查阅 / 决策日期：2026-10-18。状态：主平台与固定清单已由任务 002 记录，同日按维护者要求升级至各上游最新稳定版并核对依赖间版本关系；CI 三平台矩阵由任务 018 建立。Cargo→CMake 调度已由任务 004 接通；工具二进制供给拆分为任务 020。Qt 已验证采用预编译包，VTK/OCCT/Netgen 的应用接入必须优先消费预编译 SDK，统一供给任务见 [031](../task/031-prebuilt-native-dependencies.md)。版本与兼容性结论的维护规则见 [技术基线](baseline.md)，本文只负责可复核的获取、重建、升级与回退步骤。
+更新日期：2026-10-20（Rust 1.99.0）。主平台与 native 固定清单沿用任务 002 及 2026-10-18 的核对记录；CI 三平台矩阵由任务 018 建立。Cargo→CMake 调度已由任务 004 接通；工具二进制供给拆分为任务 020。Qt 已验证采用预编译包，VTK/OCCT/Netgen 的应用接入必须优先消费预编译 SDK，统一供给任务见 [031](../task/031-prebuilt-native-dependencies.md)。版本与兼容性结论的维护规则见 [技术基线](baseline.md)，本文只负责可复核的获取、重建、升级与回退步骤。
 
 ## 托管原则（2026-09-16 决策）
 
@@ -45,7 +45,7 @@
 - **Netgen ↔ OCCT**：netgen v6.2.2604 的 OCCT 适配经 `find_package(OpenCASCADE)`，源码内版本守卫为 `NETGEN_OCC_VERSION_AT_LEAST` 风格（如 ≥7.4、≥7.8 走 TKDE 新目标名），对 8.0 为"大于等于"语义，未发现排除 8.x 的守卫或上游 issue；因此采用 OCCT 8.0.1。该组合**未经构建实测**：010 必须用真实几何到网格验证；若不兼容，回退固定 OCCT `V7_9_3`（commit `a016080bf673`）并在此记录原因。**制品层配对（2026-09-18 维护者决策）**：OCCT 不承诺跨版本 C++ ABI 稳定，Netgen 制品只与构建时所链接的 OCCT 兼容，混用会在加载/链接期失败或静默出错；因此两者由 038 同管线、同工具链生产并**合并为一个 Release 成对发布**（`sdk-occt-netgen-<occt>-<netgen>`），升级必须成对重建发布，不允许只换一侧。
 - **VTK ↔ Qt**：VTK 9.7.0 WebGPU SDK 不依赖 Qt VTK GUI 模块；Qt 6.11.2 只提供 QML/Quick 宿主，原生 view/layer/surface 由 `src/vtk/` 平台桥接接入。SDK 必须提供 `VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn` 和对应 hardware window；007 负责实际窗口、事件与运行时加载验证。没有匹配 SDK 时，先由 031/038 评估项目制品，不在开发机把 VTK 源码构建作为普通消费路径。
 - **全体 ↔ CMake 4.4**：清单内项目声明的 CMake 下限均 ≥3.10，高于 CMake 4 移除的 <3.5 兼容线；首次 configure 由 003/004 实测。
-- Rust 侧无 native 版本耦合；CXX 的 MSRV（1.88）低于固定工具链 1.98.1，约束见 [Rust 规范](rust.md)。
+- Rust 侧无 native 版本耦合；CXX 的 MSRV（1.88）低于固定工具链 1.99.0，约束见 [Rust 规范](rust.md)。
 
 ## CI（018）
 
@@ -60,7 +60,7 @@
 当前流程（004 已接通调度；Qt 预编译供给由 005 落地，VTK/OCCT/Netgen 预编译供给由 031 负责，工具二进制由 020 负责）：
 
 1. 按 [README 系统要求](../../README.md#系统要求) 安装平台前置（macOS：Apple CLT；Linux：C 编译器与 OpenGL 前置；Windows：MSVC）与 rustup；CMake/Ninja/Qt/VTK/OCCT/Netgen 由固定预编译供给处理。
-2. 在仓库内执行 `rustup toolchain install 1.98.1`（或首次 cargo 命令时按 rustup 提示安装）。
+2. 在仓库内执行 `rustup toolchain install 1.99.0`（或首次 cargo 命令时按 rustup 提示安装）。
 3. `cargo build --locked`：launcher 的 build.rs 调度 CMake/Ninja，消费构建树内固定的预编译依赖（缺失或 ABI 不匹配时立即失败并给出诊断）；`cargo run` 启动 `panta`（Windows 为 `panta.exe`）并转发参数与退出码。VTK/OCCT/Netgen SDK 由 031 manifest 供应用例引擎消费；GoogleTest v1.18.0 也已在 `native/cmake/sdk-provision.cmake` 登记，仅构建测试时从 Release 下载并强校验，统一缓存于 `target/panta-deps/sdk/`。
 
 验证入口见 [构建与开发](../architecture/build-and-development.md)；每项依赖的集成验证任务见固定清单最后一列。
