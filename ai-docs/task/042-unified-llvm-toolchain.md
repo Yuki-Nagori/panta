@@ -5,7 +5,7 @@
 - 依赖：[018](018-cross-platform-ci.md)、[032](032-cross-language-quality-gates.md)、[038](038-native-sdk-artifact-production.md)
 - 优先级：P2
 - 负责人：待分配
-- 创建 / 更新：2026-09-18 / 2026-09-19
+- 创建 / 更新：2026-09-18 / 2026-10-20
 
 ## sanitizer 支持矩阵增量（2026-09-21，实施步骤 6）
 
@@ -24,11 +24,11 @@
 
 - **Windows ASan × 未插桩 CXX**：MSVC STL 的容器注解经 `detect_mismatch`（annotate_string/vector/optional）固化进目标文件，插桩对象 =1 与 panta_ffi 未插桩 C++ 对象 =0 在链接期 failifmismatch。按 STL 官方开关 `_DISABLE_STL_ANNOTATION` 在 sanitizer 树统一关闭注解（其文档场景即静态库混链），代价是 Windows 矩阵失去 STL 容器溢出检测；Rust 侧 C++ 维持不插桩口径。
 - **Windows ASan × 未插桩 Qt DLL**：clang ASan 在 Windows 用自有分配器，未插桩 Qt DLL 走 ucrt/RTL 堆，QML 引擎跨模块对象生命周期释放到错误堆触发 bad-free（abort，非报告，不可抑制）。Windows asan 组合经 runner 排除 `Qml.*`；纯自有 C++ 与 FFI 测试不受影响。
-- **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。tsan 组合经 runner 排除 `TaskHost.*`/`Ffi.*`（FFI 驱动 Rust 线程）、`Qml.*`（第三方栈噪声），以及经 FFI 消费 Rust 异步结果的 `ProjectViewModelTest`、Fill 后台确认用例（按精确测试名排除，新增范围见 2026-10-14 Issue #17 记录）。这些用例在普通 CTest 和 ASan/UBSan 中运行，Rust 协调器另由 Miri 检查；其余不涉及 Rust 后台结果交付的 `ProjectViewModelTest` 仍由 TSan 执行。`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。升级为 Rust/C++ 双侧 TSan 插桩后复查排除项。
+- **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。TSan 的早期 runner 曾排除 `TaskHost.*` 和 `Ffi.*`；模拟 `TaskHost` 测试随 128 删除。当前 `tests/src/sanitize.rs` 排除 `Ffi.*`、`Qml.*`，以及经 FFI 消费 Rust 异步结果的指定 `ProjectViewModelTest`（完整正则以源码为准，新增范围见 2026-10-14 Issue #17 记录），不再包含 `TaskHost.*`。当前被 TSan 排除的测试仍由普通 CTest 运行；ASan/UBSan 按平台组合覆盖，Windows ASan 另排除 `Qml.*`（见上一条）。Rust 协调器另由 Miri 检查；未列出的 `ProjectViewModelTest` 仍由 TSan 执行。`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。升级为 Rust/C++ 双侧 TSan 插桩后复查排除项。
 
 ### macOS dyld TLS 抑制（2026-10-10）
 
-GitHub Actions macOS 26 arm64 的 `Ffi.TaskServiceLifecycle` 在销毁仍有运行中任务的服务时报告 368 字节，分配栈落于 dyld `ThreadLocalVariables` 的 TLS 注册 / 实例化元数据及 Rust std spawn hook；该测试请求协作取消但不 join worker。抑制仅匹配 dyld TLS 管理符号，不匹配通用分配器，自有代码的其他泄漏仍受检查。普通 macOS / Linux 文件名测试也揭示 macOS 临时文件系统创建非 UTF-8 名称返回 EILSEQ；063 的测试现在将此类平台拒绝与 `PermissionDenied`、`InvalidInput` 同样处理，并验证路径校验仍拒绝该名称。本机 `cargo sanitize` 的 ASan/UBSan 72/72、TSan 51/51 通过；GitHub Actions [run 38039422235](https://github.com/Yuki-Nagori/panta/actions/runs/38039422235)（`afba765`）全平台 CI 成功。
+历史 CI 记录（`Ffi.TaskServiceLifecycle` 模拟测试已随 128 删除）：GitHub Actions macOS 26 arm64 曾在销毁仍有运行中任务的服务时报告 368 字节，分配栈落于 dyld `ThreadLocalVariables` 的 TLS 注册 / 实例化元数据及 Rust std spawn hook；当时该测试请求协作取消但不 join worker。抑制仅匹配 dyld TLS 管理符号，不匹配通用分配器，自有代码的其他泄漏仍受检查。普通 macOS / Linux 文件名测试也揭示 macOS 临时文件系统创建非 UTF-8 名称返回 EILSEQ；063 的测试现在将此类平台拒绝与 `PermissionDenied`、`InvalidInput` 同样处理，并验证路径校验仍拒绝该名称。本机 `cargo sanitize` 的 ASan/UBSan 72/72、TSan 51/51 通过；GitHub Actions [run 38039422235](https://github.com/Yuki-Nagori/panta/actions/runs/38039422235)（`afba765`）全平台 CI 成功。
 
 ### STL 预检排除补登记（2026-10-02，任务 063）
 
