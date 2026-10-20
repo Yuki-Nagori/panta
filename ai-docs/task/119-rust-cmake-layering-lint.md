@@ -42,10 +42,11 @@
 
 ## 验证计划与结果
 
-2026-10-20 复查修复：统一 native 静态检查的影响分类，纳入 QML CMake、公共 Rust 构建输入和 CXX 生成头；补齐 Objective-C++ 格式与 LLVM 检查，在构建前跳过明确无关的扫描。CI 增加 macOS 平台源码检查与独立质量工具缓存，选择器使用固定 Rust 工具链。以下追加本轮实际验证；GitHub 上的首次缓存保存/命中及 Linux/Windows 执行尚未运行。
+2026-10-20 复查修复：统一 native 静态检查的影响分类，纳入 QML CMake、公共 Rust 构建输入和 CXX 生成头；补齐 Objective-C++ 格式与 LLVM 检查，在构建前跳过明确无关的扫描。CI 增加 macOS 平台源码检查与独立质量工具缓存，选择器使用固定 Rust 工具链。本地适用验证、独立评审及本轮三平台 PR CI 均已通过；首次受信缓存保存/命中仍待 main 或 nightly 实际执行，不作为本 PR 通过的证据。
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
+| 2026-10-20 | [PR #69 CI](https://github.com/Yuki-Nagori/panta/actions/runs/39386991774)，实现提交 `971c33a` | 三平台构建测试、所有适用质量检查与新增平台检查通过 | 15 个 job 全部成功；macOS 对 4 个 `.mm` TU 分别执行 clang-tidy/includes。cargo-deny/machete 精确缓存冷启动未命中，工具安装及检查成功；PR 未保存缓存，不声称已验证受信保存或后续命中。 |
 | 2026-10-20 | macOS；`cargo verify-changed` 的格式、Clippy、machete、CMake、layering、qmllint、LLVM 阶段，修复后对两个受影响 TU 重跑 clang-tidy/includes，再执行 `cargo lint cppcheck --check` | 全部适用质量阶段通过 | 原聚合调用在 include-cleaner 报三处缺失 include 后终止；补齐直接依赖并完成受影响复验，其余 57 个 TU 不重复扫描。全量 LLVM 59 个 TU 已检查；Cppcheck、格式及其余阶段均通过，不将首次失败记录成聚合命令成功。 |
 | 2026-10-20 | `cargo test --locked -p panta-tests --bin panta-tests`；`cargo test --locked -p panta-build database::tests` | 资源/生成头/构建输入、未知源码回退、删除源码及 `.mm` 选择正确 | runner 30 项通过、3 项性能入口专属检查按既有规则忽略；数据库 4 项通过。纯 Rust 领域与纯 QML 输入实跑确认 LLVM/Cppcheck 在构建前跳过。 |
 | 2026-10-20 | `cargo lint clang-tidy --objcxx-only --check`、`cargo lint includes --objcxx-only --check` | 当前平台集合非空并完整分析 | 4 个 `.mm` TU 两项检查均通过；修复原 Cocoa 测试向非空事件参数传 `nil` 的问题，Qt WId 句柄转换精确例外登记在质量工具说明。 |

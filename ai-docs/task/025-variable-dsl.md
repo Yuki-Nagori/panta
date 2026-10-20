@@ -67,6 +67,7 @@
 
 | 日期 | 场景 | 实际结果 |
 |---|---|---|
+| 2026-10-20 | [PR #69 CI](https://github.com/Yuki-Nagori/panta/actions/runs/39386991774)，实现提交 `971c33a` | 15 个 job 全部成功，三平台构建、Rust 测试及 native/QML CTest 通过（macOS 86/86、Linux 85/85、Windows 83/83）。后台变量请求与 ViewModel 行为回归通过；Unix FIFO 专属测试不在 Windows 执行。 |
 | 2026-10-20 | 整合后的 `cargo test-scope all`；定向 Miri；Cocoa 生命周期回归 | core 139 项单元测试、FFI 33 项、包括 7 项变量 GUI 回归的 CTest 86/86 通过；固定 nightly 的变量模块 Miri 11 项通过、1 项 1 MiB 压力用例按既有策略忽略。沙箱内无法访问屏幕，沙箱外以 Cocoa 运行原生 surface 生命周期回归 3/3 通过；不将此称为真实 GPU 帧呈现验收。 |
 | 2026-10-18 | `cargo test --locked -p panta-dsl-core`、`cargo test --locked -p panta-core` | 通过；覆盖值类型、算术、前向引用、环/类型/范围错误、上限、资源根检查及快照原子提交 |
 | 2026-10-18 | `cargo verify-changed` | 六个受影响 Rust package 测试、81 项 native/QML CTest、变更范围格式/lint、完整 native clang-tidy 与依赖分层检查均通过 |
