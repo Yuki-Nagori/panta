@@ -38,7 +38,7 @@ Qt `PathHost` 将 user-config 映射到 `AppConfigLocation`、app-data 映射到
 
 `VariableSnapshot` 以共享不可变有序表保存 bool、int、有限 real、string、resource 基础值。变量 revision 独立于工程清单 revision。提交时必须提供预期 revision；空名称、非有限数值、旧 revision 或已关闭上下文都会拒绝，失败时保留当前快照。DSL 标识符和类型语义校验由[任务 025](../task/025-variable-dsl.md)负责；024 不解析 DSL，也不把内存快照写入 `.panta`。
 
-后台操作通过 `RuntimeTaskScope` 捕获会话身份、generation、变量 revision、不可变快照和只读路径服务。变量更新后，旧操作仍能读取提交时的值，但当前上下文拒收其结果。工程替换、上下文关闭或销毁会设置共享取消标志；工作需在安全检查点轮询，已进入的文件系统调用无法强制中断。当前没有通用任务管理器；各工程操作由领域服务管理取消与结果有效性。
+后台操作通过 `RuntimeTaskScope` 捕获会话身份、generation、变量 revision、不可变快照和只读路径服务。变量更新后，旧操作仍能读取提交时的值，但当前上下文拒收其结果。工程替换、上下文关闭或销毁会设置共享取消标志；工作需在安全检查点轮询，已进入的文件系统调用无法强制中断。取消与结果有效性由各工程服务管理。
 
 上下文完全由 Rust 管理，独立于 `QQmlEngine`。CXX 不暴露运行时上下文句柄；任务 025 通过 `ProjectService` 将已验证变量值、generation、revision 和结构化诊断投影到 `ProjectViewModel`。调用方提交修改时同时回传捕获的 generation/revision，阻止工程切换后旧编辑请求写入新工程。C++ ViewModel 不得把 QObject、JS 值或裸指针存入运行时上下文；QML 重载不应隐式重复提交任务。开发热重载行为由[任务 027](../task/027-qml-state-reload.md)验收。
 

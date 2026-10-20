@@ -17,7 +17,7 @@ Rust 已提交的资产 / 显示配置 → CXX → C++ RenderScene / ViewportBac
                                 （窗口、输入、逐帧更新在本地完成）
 ```
 
-Rust 管理工程身份、单位、修订、引用、任务与成功提交，C++ 适配器负责实际调用重库、转换输入输出及管理 native 资源。CXX 声明受支持的类型和签名、生成胶水，不决定业务行为。调用流程不等同于 crate 依赖图；领域层通过自有后端接口接收能力，不反向依赖桥接 crate。
+Rust 管理工程身份、单位、修订、引用、操作状态与成功提交，C++ 适配器负责实际调用重库、转换输入输出及管理 native 资源。CXX 声明受支持的类型和签名、生成胶水，不决定业务行为。调用流程不等同于 crate 依赖图；领域层通过自有后端接口接收能力，不反向依赖桥接 crate。
 
 Qt 是体量较大的原生 GUI 框架，在这条边界中单独作为**界面与平台运行时**看待，不与 OCCT / Netgen 的几何算法适配角色混为一谈。QML / Qt Quick 继续负责界面组合、布局、输入、动画和即时显示，使用 Qt scene graph、Controls、模型视图等已有的渲染与交互能力；C++ ViewModel / Controller 负责 Qt 对象生命周期、信号属性、模型 / 委托接口、线程亲和性、平台对话框及 QML 与服务 DTO 之间的类型适配。`native/qt-adapter` 集中标准目录、系统偏好等需要选择 Qt 平台 API 或操作系统 API 的服务，并以稳定值和 Qt 属性交给上层；该 target 不依赖 Rust、Bridge 或 VTK。Qt Quick 与 VTK hardware window 紧耦合的 surface 创建和同步仍由 Visualization 管理，避免把 VTK 窗口所有权抽到通用平台层。继续使用当前 Qt 基线和其已供给的界面、绘制及平台能力，包括 Qt 已有的高性能场景图和适用的绘图 / 可视化组件；不为语言统一而在 Rust 重写 Qt 的图形、事件循环或工具能力。
 
@@ -72,7 +72,7 @@ Gate Location 使用 Rust 的 `GateLocationSettings` 与 `GateLocatorAlgorithm`�
 
 | 现有位置 / 符号 | 结论与理由 |
 |---|---|
-| `native/visualization/src/vtk/stl_mesh.cpp`：`read_binary`、`read_ascii`、`finite_triangle`、`load_stl_mesh` 的文件读取 | 优先提取。Rust `crates/panta-core/src/project.rs` 的 `parse_stl` / `parse_binary_stl` / `parse_ascii_stl` 已做另一套解析与摘要；应统一为 Rust 网格导入入口，返回经校验的表面 Mesh 数据 |
+| 066 审计时的 `native/visualization/src/vtk/stl_mesh.cpp`：`read_binary`、`read_ascii`、`finite_triangle`、`load_stl_mesh` 文件读取（该文件已随 067 删除） | 当时的建议是统一到 Rust 网格导入入口；当前实现与验收见 [067](../task/067-rust-mesh-domain-migration.md) |
 | 同文件 `make_poly_data` | 保留 C++：只把 Mesh 坐标 / 连接关系转换成 `vtkPoints`、`vtkCellArray`、`vtkPolyData`，检查索引转换和缓冲区有效期 |
 | `RenderScene::mesh_path`、`CaeViewport::setMeshPath`、`VtkViewport::apply_state` / `update_mesh_actor` | 067 将其改为修订化 Mesh 显示快照；工程路径解析、I/O、导入提交归 Rust。此行记录 066 审计时的基线 |
 | `navigation/viewport_camera.cpp`：`ViewportCamera`、`ViewportCameraTransition` | 保留 C++：操作 VTK 相机，状态仅用于即时导航；数学虽可移植，但当前无独立 Rust 消费者，不增加每帧 FFI |
@@ -147,7 +147,7 @@ visualization → geom / mesh（仅显示来源契约）
 geom、material → 无其他上述领域 crate
 ```
 
-当前 `panta-core` 包含 project/path/task 和工程存储实现，不能同时被当成底层共享类型库又依赖这些领域 crate。过渡期 `panta-core` 只保留应用服务与工程存储，领域 crate **不得反向依赖 `panta-core`**。ID、单位和错误等类型先留在各自的拥有者中；出现第二个实际消费者、且确认语义相同时才考虑抽出低层契约 crate。禁止为将来可能复用而提前建立 `panta-common`。后续随真实消费关系拆分 project/workflow/storage，再收缩 core。
+当前 `panta-core` 拥有工程应用服务、路径与运行时、工程存储和操作编排；它不是底层共享类型库，领域 crate **不得反向依赖 `panta-core`**。ID、单位和错误等类型留在各自拥有者中；出现第二个实际消费者且语义一致时才考虑抽出低层契约 crate。禁止为将来可能复用而提前建立 `panta-common`。后续只在真实消费关系要求时拆分服务模块。
 
 `panta-ffi` 当前依赖 `panta-core`，因此不能让 core 再依赖 ffi 来调用重库。规划做法是在领域 / 服务层声明窄后端接口，ffi 的组装层实现该接口并注入服务；CXX 模块只声明绑定，组装函数只转发与转换。编译依赖无环，运行时服务仍可请求 native 工作。具体接口、线程和最终链接须在首个实现任务验证。
 

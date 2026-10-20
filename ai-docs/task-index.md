@@ -1,30 +1,6 @@
 # Task 索引
 
-任务详情是范围、验收与证据的主记录；本页提供队列、依赖和状态总览，状态变化时两处一起更新。当前能力见 [README](../README.md)，历史批次盘点见 [077](task/077-active-task-status-audit.md)、[084](task/084-active-task-status-followup.md) 与 [101](task/101-active-task-ci-acceptance.md)。
-
-验证入口与当前覆盖率门禁见[验证规范](standards/validation-and-review.md)；任务 032 的后续覆盖率规划保持 deferred。部署与窗口剩余实机条件分别见 013 / 007，本批工具链升级与 GPU 基准修复见 001 / 127；详细结果不在索引重复。
-
-## 目录与使用方式
-
-```text
-ai-docs/
-├── architecture/                 # README.md 为总览与主题导航
-├── modules/                      # 重要模块设计与任务导航
-├── standards/                    # 技术规范与官方依据
-├── task-index.md                 # 全部任务索引
-└── task/
-    ├── _template.md              # 创建任务时复制
-    └── 001-cargo-config.md       # 一个任务一个 Markdown 文件
-```
-
-新增任务使用未占用的三位递增编号和 kebab-case 名称；编号稳定，不因执行顺序调整而重排。每个任务直接保存为 `task/NNN-name.md`，无需单独创建目录。设计、决策和验证记录写在任务文件内；必要时链接外部证据，不要提交临时大型日志或构建产物。
-
-1. 从 [模板](task/_template.md) 建立任务，填写目标、边界、依赖、必读规范和可判断的验收条件。
-2. 在本索引登记，核对依赖无环；信息充分且依赖完成后标 ready。日常“开始任务 001”即可指向对应任务，不需要另建应用里的 task。
-3. 开始实现时标 in-progress；只按该任务范围工作。范围明显变化先更新任务，额外功能先创建新任务。
-4. 每次 commit 更新 task 的实际进展、验证与清理/兼容记录；状态、依赖或标题变化时同步索引。当前可用平台验收已完成、只待明确列出的跨平台实机验收时标 implemented；此状态不阻塞依赖任务。全部验收完成才标 done，文档已写好不等于实现完成。
-
-提交的最小完整性及消息格式见 [提交规范](standards/commits.md)，代码删除和兼容例外见 [代码生命周期](standards/code-lifecycle.md)。
+任务文件是范围、验收、决策与证据的唯一详细记录；本页只提供编号、依赖、阶段和状态。当前产品能力见 [README](../README.md)，规范入口见[技术规范](standards/README.md)。新增任务从[模板](task/_template.md)创建；任务状态或依赖变化时同步本页。
 
 ## 状态约定
 
@@ -39,10 +15,6 @@ ai-docs/
 | done | 验收完成且有证据 |
 | deferred | 暂不排入当前交付 |
 | cancelled | 已取消，保留编号和原因 |
-
-## 验证节奏
-
-每个基础设施任务随实现完成自己的验收与失败路径检查，不等待 011。018 已建立三平台 CI，push/PR 时自动执行当前可用检查；011 已把已有检查聚合到统一入口（043 收敛根质量入口），012 已交付依赖缓存与可复现 CI 基础。任务记录是验证证据的来源，索引状态只是摘要。
 
 ## 基础设施队列
 
@@ -86,7 +58,7 @@ ai-docs/
 | 026 | [C++ 静态库边界与 QML 自动注册](task/026-static-qml-modules.md) | 应用平台扩展 | 005 | done |
 | 027 | [开发模式 QML 重载与状态恢复](task/027-qml-state-reload.md) | 应用平台扩展 | 007, 024, 026 | planned |
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | done |
-| 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | planned |
+| 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | ready |
 | 050 | [QML 页面设计 HTML 先行复刻](task/050-qml-html-page-replica.md) | 应用平台扩展 | 028, 029 | done |
 | 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | deferred |
 | 052 | [QML 图标规范与首页布局优化](task/052-qml-icon-and-layout-polish.md) | 应用平台扩展 | 029, 050 | done |
@@ -106,7 +78,7 @@ ai-docs/
 | 068 | [QML 工程 / 任务 Dock 与 Layers Dock](task/068-qml-project-and-layers-docks.md) | 应用平台扩展 | 063, 060, 062 | done |
 | 069 | [工程 / Tasks / Layers 面板整体 Review 与性能消融](task/069-project-docks-review-and-ablation.md) | 应用平台扩展 | 068 | done |
 | 073 | [FSM DSL 与首个异步 STL 视口资源激活](task/073-fsm-dsl-and-import-state-machine.md) | CAE 业务编排 | 008, 034, 035, 067, 072；首个消费者 080 | done |
-| 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | planned |
+| 074 | [Qt StateMachine 与导入窗口交互编排](task/074-qt-interaction-state-machine.md) | 应用平台扩展 | 026, 063, 072 | ready |
 | 080 | [视口文档页签与 STL 按需激活](task/080-qml-viewport-document-tabs.md) | 应用平台扩展 | 007, 063, 068, 073, 086 | done |
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | deferred |
 | 085 | [Qt reduced-motion 原生属性迁移](task/085-qt-reduced-motion-preference-migration.md) | 应用平台扩展 | 080, 086, 002 | planned |
@@ -193,21 +165,4 @@ ai-docs/
 | 110 | [DSL AST、解析、校验与输出模块整理](task/110-dsl-module-boundaries.md) | Rust 架构整理 | 107 | done |
 | 111 | [构建供给与质量命令模块整理](task/111-build-and-quality-module-boundaries.md) | Rust 架构整理 | 107 | done |
 | 112 | [FFI 私有单元测试归属修正](task/112-ffi-unit-test-placement.md) | Rust 架构整理 | 107 | done |
-
-## 执行顺序与交付边界
-
-主线：001 → 002 → 003 → 004 → 005 → 031 → 038 → 007，完成 Cargo 启动 Qt/QML + 预编译 VTK WebGPU 硬件窗口 SDK 的 M0 集成；若 031 找到可直接消费的全平台官方 SDK，038 可只完成资产登记与自检决策。
-
-平台分支：004 → 006；005 + 006 → 008 → 009 → 010，先建立 FFI、任务生命周期，再验证 OCCT 和 Netgen。两个分支的集成冒烟接入已交付的统一聚合（011、012 已完成）；013 的桌面部署验收暂缓。这里是依赖图，编号相邻不意味着必须等待不相关任务；是否并行执行由实际工作安排决定。
-
-主题分支：005 → 029；025 + 029 → 030。先迁移组件及尺寸参数，再接主题 DSL；主题切换不依赖工程打开或引擎重载。
-
-新增分支：001 → 034；005 + 034 → 022；005 → 026；005 + 006 → 023；008 + 023 → 024，024 + 034 → 025；007 + 024 + 026 → 027。022（语言切换）和 025（变量提交）不依赖热重载；这些扩展不阻塞原有 M0 主线。031 为 007、009、010 提供预编译 native SDK；当上游没有完整资产时由 038 生产可缓存制品；032 在 011 统一入口上补齐跨语言质量工具，并转向行为 / 契约测试与适度覆盖率底线（当前 deferred）。
-
-014 已完成最小 Python/uv 质量工具环境：仅锁定 cmakelang 并供 `cargo format` 调用，不接入 Python 运行时/API，也不阻塞 OpenCASCADE、Netgen、自研 CFD 与 VTK 主链路。009/010 仅是适配器与小样例验证，完整 STEP UI、工程存储、网格编辑、Study、求解器客户端仍要另写业务 task；不包含外部 MoldSolver 或 Mold Protocol 的实现。
-
-FSM 分支由 [072 设计评估](task/072-flow-state-machine-planning.md) 与 [073 实施规划](task/073-fsm-dsl-and-import-state-machine.md) 跟踪：复用 034/035 的 DSL 内核，首个消费者是 [080](task/080-qml-viewport-document-tabs.md) 的只读 STL 视口资源激活，不改写工程或修订。后续 STEP 等写入型导入事务另行登记消费者并冻结提交边界；不追加 067 同步 STL 改造，也不阻塞当前 M0 主线。
-
-Qt 交互分支由 [074](task/074-qt-interaction-state-machine.md) 跟踪，先接入 Qt StateMachine 模块与现有导入窗口交互；它与 073 的 Rust 核心实现没有互相完成依赖。073 提供实际异步能力后再联调，Qt 只协调意图与展示，提交 / 取消决定权保持在 Rust。
-
-后续新任务使用当前最大编号加一，不复用已有编号。主线里 [007 VTK WebGPU 硬件窗口原生视口](task/007-vtk-quick-viewport.md) 已暂时延后，恢复时再补跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口。[031 预编译 native 依赖供给](task/031-prebuilt-native-dependencies.md) 仍为 deferred。[038 SDK 制品生产](task/038-native-sdk-artifact-production.md) 于 2026-10-02 暂时延后，恢复时再补运行时分发、Linux glibc 基线与 SBOM/provenance。任务 010 已完成，Netgen SDK 特例的移除由任务 079 跟踪。任务 077 记录 2026-09-24 的盘点；最近一次复查为 2026-10-09，见 [101 当前复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查)。技术规则见 [规范索引](standards/README.md)，产品目标见 [架构里程碑](architecture/milestones-and-validation.md)。
+| 129 | [仓库文档去重与实现对齐](task/129-repository-docs-alignment.md) | 仓库与文档维护 | 128 | done |

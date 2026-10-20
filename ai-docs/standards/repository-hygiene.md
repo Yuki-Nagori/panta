@@ -1,6 +1,6 @@
 # 仓库文件、产物与忽略规则
 
-更新 / 查阅日期：2026-10-09。适用于代码、构建配置、样例和本机产物；当前仅落地忽略规则，构建目录仍须由相应任务实现。
+更新日期：2026-10-20。适用于代码、构建配置、样例和本机产物；忽略规则以外的具体构建布局见 Cargo、CMake 与构建说明。
 
 ## Git 行为依据
 
@@ -12,7 +12,7 @@
 |---|---|
 | 源码、QML、资源、schema | 提交；生成输入必须可追溯 |
 | Cargo.lock、工具链、共享 CMake presets | 提交；保持可复现 |
-| 未来 Python 依赖锁 | 工具选定后提交，不笼统忽略所有 lock |
+| Python 质量工具依赖 | `pyproject.toml` 与 `uv.lock` 提交并保持一致 |
 | CMakeUserPresets.json、本机环境覆盖 | 不提交；示例可提交，不能包含个人路径 |
 | 编译/生成的 CXX、moc、rcc 文件 | 放构建树，不手工维护或默认提交 |
 | 小型测试夹具 | 放根 `tests/fixtures/<module>/` 的明确路径，记录来源、单位及预期 |
@@ -25,7 +25,7 @@
 
 ## 目录与规则维护
 
-Cargo workspace 默认产物在根 `target/`；CMake 使用源码树外目录，如根 `build/` 或 `native/build/`。Cargo build script 遵守 `OUT_DIR` 约定，不因为此处列出 build/ 就允许脚本任意写源码树。
+Cargo 与 native 构建产物统一位于根 `target/` 下；Cargo build script 遵守 `OUT_DIR` 约定，不允许脚本任意写源码树。
 
 根 build/out/dist 与局部 native/python 产物目录被忽略；源码中名为 `build` 的业务目录不会被全仓库通配误排除。Qt/QML 与 CXX 的生成文件随构建树排除，不使用 `moc_*`、`*.h` 等宽泛源码匹配。
 

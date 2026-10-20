@@ -4,12 +4,7 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置、`ai-docs/`、`prototypes/shell/`、Cargo workspace、
-`panta-foundation` 进程基础设施、`panta-core` 工程服务、`panta-ffi` CXX
-边界，以及已实现的 `.pa` DSL parser/CLI（034/035）与工程/STL CLI（121–124）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt
-桌面骨架；任务 007 的 VTK WebGPU 原生视口已接入默认窗口，065 补齐导航。
-真实窗口的跨平台覆盖仍见各任务。下图标为规划的部分不应据此
-创建无用途的占位模块。
+下图只列出仓库中实际存在的主要目录；crate 与 native target 的依赖关系以[分层规范](../standards/layering.md)及其自动检查为准。几何、材料、工作流等尚未创建的 crate 不列入目录树。
 
 ```text
 panta/
@@ -22,48 +17,30 @@ panta/
 │   ├── task-index.md          # 任务队列与状态
 │   └── task/                 # 模板与 NNN-name.md
 ├── Cargo.toml / Cargo.lock    # Rust workspace 与依赖锁（任务 001 已落地）
-├── rust-toolchain.toml        # 固定 stable 工具链（任务 001 已落地）
+├── rust-toolchain.toml        # 固定 Rust 工具链
 ├── crates/
-│   ├── launcher/              # 统一运行入口与 native 构建调度
-│   ├── panta-foundation/      # 进程级设施；当前为崩溃信号与日志（047）
-│   ├── panta-build/           # 托管工具、安装与编译数据库支持
-│   ├── panta-core/            # 工程、运行时、任务、Mesh 驻留与持久化
-│   ├── panta-ffi/             # CXX DTO/句柄/错误边界与 staticlib（006/047）
-│   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034）
-│   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035）
-│   ├── panta-cli/             # 工程创建/检查与 STL 检查/导入 CLI
-│   ├── panta-geom/            # 规划：几何身份、修订与后端契约
-│   ├── panta-import/          # 当前：格式识别、来源快照与 STL 导入准备
-│   ├── panta-mesh/            # 当前：STL 网格数据、Mesh IR 与领域校验
-│   ├── panta-bc/              # 规划：边界条件与目标引用
-│   ├── panta-material/        # 规划：材料数据、单位与版本
-│   ├── panta-visualization/   # 规划：显示配置、字段与选择语义
-│   ├── project/               # 规划：工程模型与命令
-│   ├── workflow/              # 规划：任务、作业和流程编排
-│   ├── solver-client/         # 规划：外部求解器客户端
-│   └── storage/               # 规划：持久化与数据资产索引
+│   ├── launcher/              # 应用入口与 native 构建调度
+│   ├── panta-build/           # 工具供给、构建与质量 runner 支持
+│   ├── panta-cli/、panta-dslc/ # 应用命令与 .pa CLI
+│   ├── panta-core/            # 工程服务、运行时与操作编排
+│   ├── panta-dsl-core/        # .pa parser、Artifact、诊断与生成
+│   ├── panta-ffi/             # CXX 契约与 Rust staticlib
+│   ├── panta-foundation/      # 进程级设施
+│   ├── panta-import/          # 导入准备与来源快照
+│   └── panta-mesh/            # Surface/Volume Mesh IR 与校验
 ├── native/
-│   ├── CMakeLists.txt         # native 顶层构建（003/004/005 演进：Qt 供给、defaults 函数）
-│   ├── CMakePresets.json      # 单配置 Ninja presets：debug / release（任务 003 已落地）
-│   ├── cmake/                 # 安装包配置模板与 Qt 供给脚本（qt-provision.cmake，005 已落地）
-│   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
-│   ├── qt-adapter/            # Qt 平台服务与系统目录/偏好适配
-│   ├── i18n/                  # QM 资源构建与 QTranslator 适配
-│   ├── bridge/                # Qt ViewModel 与应用桥接（GTest 行为测试）
-│   ├── app/                   # Qt 桌面入口 panta（005 已落地 Qt 实现）
-│   ├── geometry/{include,src/occt}/       # 当前：自有摘要契约与 OCCT adapter
-│   ├── mesh/{include,src/netgen}/         # 当前：native 网格 DTO、CXX 校验适配与 Netgen adapter
-│   └── visualization/{include,src/vtk}/   # 当前：显示契约与 VTK 后端（含 navigation/）
+│   ├── CMakeLists.txt、CMakePresets.json
+│   ├── app/、bridge/、ffi/、qt-adapter/、i18n/
+│   ├── foundation/、geometry/、mesh/、visualization/
+│   ├── cmake/                 # Qt / SDK 供给与构建辅助
+│   └── performance/           # 手动运行的性能 target
 ├── qml/
-│   ├── App.qml                # 主窗口；静态 Panta.Shell 模块含平台单例插件
-│   ├── Components/
-│   ├── Panels/                # Ribbon、工程工具树与 dock 面板
-│   ├── Viewport/
-│   └── Themes/                # Theme 单例（005 已落地）
+│   ├── App.qml
+│   ├── Components/{Atoms,Composites}/
+│   ├── Dialogs/、Panels/{Ribbon,Sidebar}/、Themes/
+│   ├── branding/、icons/
 ├── prototypes/shell/          # HTML/SVG 原型；shell.js 也是 QML 回归资源输入
-├── python/                    # 规划：后续 Python API，包名待定
-├── schemas/                   # 规划：本地工程 schema、外部契约版本引用
-├── resources/                 # 图标、.pa 源文件与样例；TS/QM 只进构建树
+├── resources/{i18n,materials}/
 └── tests/                     # Cargo 编排及测试；详见 tests/README.md
     ├── rust/、cpp/、qml/       # 按语言 / 模块组织功能回归
     ├── integration/           # Cargo native/QML 聚合入口
@@ -72,31 +49,7 @@ panta/
     └── performance/           # cpu/、gpu/、support/；cargo performance 手动运行
 ```
 
-## 模块归属
-
-当前 `panta-core` 已包含 project/path/task 与工程存储服务；导入格式入口在 `panta-import`，STL 网格解析与领域校验在 `panta-mesh`。`panta-foundation` 拥有进程设施，`panta-ffi` 负责跨语言契约和服务转发。规划的五个领域 crate 按实际功能建立，其职责、依赖方向和迁移门槛以 [重库适配与 Rust 领域模块](native-domain-boundaries.md) 为准；领域 crate 不反向依赖承载应用服务的 core，避免循环。
-
-`project`、`workflow`、`storage` 与 `solver-client` 是后续职责拆分方向，不是已存在的独立 crate。当前不再规划另一份含义重叠的 `crates/core/`；共享基础类型有真实消费者后才确定归属。C++ `include/panta/<module>/` 暴露自有 native 契约，`src/occt`、`src/netgen` 封装重库；`src/vtk` 同时承载显示后端，导航内部归 `navigation/`。业务状态逐步归 Rust；保留本地相机、命中和窗口生命周期。ViewModel 只适配 UI，QML 处理布局、展示与绑定。
-
-`schemas/` 若包含共享协议，应明确其上游来源、版本及生成方式，不能与候选外部协议仓库分别维护两个权威版本。跨语言 FFI 优先验证 CXX；任务 006 的 `crates/panta-ffi` 生成桥接头和 Rust staticlib，native CMake 通过 launcher 传入它们，不在 CMake 中回调 Cargo。QML 模块可在 qml/ 下设置自己的 CMakeLists.txt，由 native 顶层纳入构建。
-
-`.pa` 源文件由 `panta-dsl-core` 统一解析，按 `kind` 聚合成 language、theme 或 variables Artifact；`panta-dslc` 编排 check、format/format --check 和 TS 输出。格式化复用核心 AST，写回前通过临时文件同步并替换；国际化构建树中的临时 TS 由 quick-xml 生成、QM 由预编译 QtTools 生成，源码目录不保存这两类产物。格式化/校验规则和 fixtures 归 035，不能在各业务目录复制 parser。
-
-## 当前依赖分组
-
-依赖方向以 `Cargo.toml` workspace metadata、各 native target 的直接链接关系和 QML module 为准；详细允许表及 adapter 边界见[分层标准](../standards/layering.md)。
-
-| 分组 | 当前成员与职责 |
-|---|---|
-| Rust 基础/构建 | `panta-foundation` 进程设施；`panta-build` 工具供给与构建调度；`panta-dsl-core` DSL 解析 / 生成核心 |
-| Rust 领域 | `panta-mesh` 网格 IR；`panta-import` 格式导入编排；`panta-core` 工程与服务。现有依赖是 `core → import/mesh/dsl-core`、`import → mesh` |
-| Rust 工具入口 | `panta-dslc → panta-dsl-core`；`panta-launcher` 组合 Rust 服务与 native 产品；`panta-tests` 承载质量/测试调度 |
-| FFI | `panta-ffi` 通过 CXX 暴露并转发 Rust 服务，不承载领域算法 |
-| Native adapter | `foundation`、`geometry`、`mesh`、`qt-adapter`、`i18n`、`visualization` 按职责封装 OS、OCCT、Netgen、Qt、VTK；当前 adapter 间没有自有库直接依赖 |
-| Bridge 与 UI | `native/bridge` 适配 Rust FFI、Qt 与 native 显示/平台服务；`qml/` 构成 `Panta.Shell`，通过 Bridge 暴露对象交互 |
-| 组合根与测试 | `native/app` 组装 native 库、插件与 QML；`tests/` 和性能 target 消费被测模块，不进入生产依赖图 |
-
-规划中的独立 `panta-geom`、材料、工作流等领域 crate 尚未建立。Rust 应用命令层的当前状态和 GUI/CLI 共享边界见[命令层设计](command-layer.md)。
+目录树只用于定位当前文件。crate、native target 与 QML module 的职责和允许依赖集中维护在[分层标准](../standards/layering.md)；`.pa` 工具链见[DSL 模块说明](../modules/dsl-engine-and-toolchain.md)，CXX 构建边界见[构建说明](build-and-development.md)。新增职责只在相应架构主题和 task 中记录，避免在目录图重复维护依赖表。
 
 ## 新增文件原则
 

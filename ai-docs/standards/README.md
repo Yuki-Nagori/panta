@@ -28,7 +28,7 @@
 | Cargo | [Cargo](cargo.md) | workspace 与调度 |
 | CMake | [CMake](cmake.md) | native 构建图 |
 | Ninja | [Ninja](ninja.md) | 构建执行 |
-| Python 3.12+ | [Python](python.md) | 后续工具/自动化 |
+| Python 工具环境 | [Python](python.md) | CMake 与 native 质量工具；业务 runtime/binding 尚未接入 |
 | 图标设计 | [SVG 图标](icons.md) | QML 图标资源、着色与可访问性 |
 | QML | [QML](qml.md) | 界面组件 |
 | Qt 6 | [Qt](qt.md) | QObject、线程、部署 |

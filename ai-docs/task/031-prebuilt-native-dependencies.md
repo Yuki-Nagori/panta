@@ -5,11 +5,11 @@
 - 依赖：[002](002-dependency-baseline.md)、[004](004-cargo-native-orchestration.md)
 - 优先级：P0
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-10-02
+- 创建 / 更新：2026-09-16 / 2026-10-20
 
 ## 目标与背景
 
-建立 VTK、OpenCASCADE、Netgen 及工具链的预编译优先供给，使开发者和 CI 消费固定 SDK，而不是每次本地从源码编译第三方库。供给脚本、manifest、CMake package 注入和三平台制品自检已落地；VTK WebGPU 制品由 [038](038-native-sdk-artifact-production.md) 生产并完成三平台 Release。当前剩余为 007/009/010 的真实消费与运行集成证据。
+建立 VTK、OpenCASCADE、Netgen 及工具链的预编译优先供给，使开发者和 CI 消费固定 SDK，而不是每次本地从源码编译第三方库。供给脚本、manifest、CMake package 注入和三平台制品自检已落地；VTK WebGPU 制品由 [038](038-native-sdk-artifact-production.md) 生产并完成三平台 Release。009/010 的 native adapter 冒烟已完成；本任务剩余为桌面产品运行时分发、Linux glibc 基线及制品 provenance/SBOM。
 
 ## 必读
 
@@ -59,7 +59,7 @@
 
 ## 验证计划与结果
 
-执行供给脚本/manifest 的哈希、缓存、离线和失败诊断测试；对每个平台运行 CMake configure 与最小链接/运行冒烟。fixture 级供给路径、三平台 SDK 制品生产/自检、macOS 生产 consumer 以及 run 36001859191 的三平台 SDK 消费和 CTest 均有记录。剩余应用运行时分发与真实窗口/引擎集成由 007/009/010 验收，不因 SDK configure 成功而视为闭环。
+执行供给脚本/manifest 的哈希、缓存、离线和失败诊断测试；对每个平台运行 CMake configure 与最小链接/运行冒烟。fixture 级供给路径、三平台 SDK 制品生产/自检、macOS 生产 consumer 以及 run 36001859191 的三平台 SDK 消费和 CTest 均有记录。它们证明 native targets 可消费制品，不等同于桌面安装包的运行时部署或真实窗口验收。
 
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
@@ -78,13 +78,13 @@
 
 - 2026-09-16–17：确定预编译 SDK 优先。因上游资产不能覆盖三平台 ABI，落地 `sdk-provision.cmake`，以 manifest、SHA256、隔离缓存、原子 staging 和 imported-target 自检供给依赖；fixture 与早期构建证据见验证表。
 - 2026-09-18–20：VTK WebGPU、OCCT 与 Netgen 三平台制品发布并登记；OCCT/Netgen 作为 ABI 配对制品，VTK 则独立发布。旧 VTK Qt/OpenGL manifest 已替换。
-- 2026-09-24：run 360018 提供三平台 SDK 消费和 native CTest 证据。应用运行时分发、真实窗口/引擎集成、Linux glibc 基线及 SBOM/provenance 仍由本任务与 007/009/010 收尾。
+- 2026-09-24：run 360018 提供三平台 SDK 消费和 native CTest 证据。应用运行时分发、真实窗口验收、Linux glibc 基线及 SBOM/provenance 仍未完成；009/010 的 adapter 冒烟已通过，不列为当前待办。
 - 2026-10-14：VTK/Dawn、OCCT/Netgen 与 GoogleTest 发布资产按 macOS 13.0 最低部署目标重产并替换；三组共 12 个归档的本地 SHA256 与 sidecar、manifest 一致，归档目录表检查通过。新摘要的消费端 CI 待复验；任务维持 deferred，安装分发与真实引擎集成范围仍未完成。
 - 2026-09-25：Windows 本地供给两处修复：LLVM NSIS 安装器经 `__COMPAT_LAYER=RunAsInvoker` 免提权运行（登记于 042）；Qt 供给（`qt-provision.cmake`）官方源失败时自动回退清华 TUNA 镜像，`PANTA_QT_MIRROR` 可置其他同构镜像根优先，来源切换不改 SHA256 强校验。按 IP/地域自动选镜像被否决：`download.qt.io` 自身已按 IP 做 geo-CDN（本机被解析到 JAIST 仍中断），IP 猜测不可靠且掩盖实际失败信号；回退触发在真实下载失败上，行为可在 configure 输出观察。TUNA 路径同构性已 HEAD 实测（qtdeclarative 字节数与官方一致）。
 
 ## 完成摘要
 
-未完成；按 2026-10-02 用户决定延后（deferred）。VTK WebGPU、OCCT 和 Netgen 的固定资产、SHA256、ABI、模块、许可证与 CMake package 入口均已登记；旧 VTK Qt/OpenGL 条目已被新 WebGPU manifest 替换。当前剩余项是 007/009/010 的真实链接/运行冒烟、Linux glibc 有效基线回写，以及消费侧 SBOM/provenance 自动化。
+未完成；按 2026-10-02 用户决定延后（deferred）。VTK WebGPU、OCCT 和 Netgen 的固定资产、SHA256、ABI、模块、许可证与 CMake package 入口均已登记；旧 VTK Qt/OpenGL 条目已被新 WebGPU manifest 替换。当前剩余项是桌面产品运行时分发与真实窗口验收、Linux glibc 有效基线，以及消费侧 SBOM/provenance 自动化。009/010 adapter 冒烟已完成。
 
 ## 2026-10-02 优先级跟进
 

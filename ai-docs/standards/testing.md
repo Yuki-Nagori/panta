@@ -1,6 +1,6 @@
 # 测试目录与入口规范
 
-更新日期：2026-10-16。本文定义测试代码的归属、发现方式和统一命令；具体领域断言仍由 [验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
+更新日期：2026-10-20。本文定义测试代码归属、发现方式和当前入口；具体领域断言由[验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
 
 ## 目录职责
 
@@ -56,12 +56,14 @@ cargo test-plan                   # 显示当前工作树的受影响 L1/L2 范�
 cargo test-scope l1               # 执行直接受影响的 Rust package 测试
 cargo test-scope l2               # 执行受影响消费者及 native/QML 测试
 cargo test-scope all              # 执行 L1、L2 与 native/QML 受影响测试
-cargo performance # 性能辅助正确性测试 → CPU → GPU，不纳入 CI 时间门禁
-cargo format     # Rust、C++/CXX、QML 格式
-cargo lint       # Clippy、machete、cmake-lint、qmllint、Clang-Tidy、include-cleaner、Cppcheck
+cargo performance # 辅助正确性测试 → CPU → GPU；nightly 收集 CPU 样本，不设性能阈值
+cargo format     # Rust、C++/Objective-C++/CXX、CMake、QML 与 .pa 格式
+cargo lint       # Clippy、machete、cmake-lint、layering、qmllint、Clang-Tidy、include-cleaner、Cppcheck
 cargo audit      # cargo-deny 依赖、许可证和 RustSec 审计
 cargo coverage   # cargo-llvm-cov Rust 覆盖率门禁
 ```
+
+PR 与 main 的 check job 按受影响范围运行测试；workspace 全量测试、lint 与覆盖率在 nightly 执行。Rust coverage nightly 门槛为函数 / 行各 85%；native coverage 仅归档报告。性能基准不设 CI 失败阈值。
 
 `cargo test-scope` 默认将工作树与 `origin/main` 的 merge-base 比较；可传 `--base <ref>` 选择其他基线。运行 native 范围时，命令会先准备 launcher/native 构建树，再只构建并执行所选 CTest labels。
 

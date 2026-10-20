@@ -1,6 +1,6 @@
 # CMake target 与依赖规范
 
-查阅日期：2026-09-17。状态：Cargo/CMake 与 Qt 构建已落地；Windows ABI 策略本轮修正，最终链接仍需 runner 验证。
+官方资料查阅日期：2026-09-17；项目实现状态更新日期：2026-10-20。Cargo 调度的 CMake/Ninja 构建、Qt/native 配置和三平台 CI 已接通；工具链 ABI、sanitizer 与 SDK 消费剩余证据分别见任务 042、031、038。
 
 适用于 `native/` 和其包含的 QML 模块构建。CMake/Ninja 的精确版本由依赖基线任务确定，在线文档的 latest 不等于项目锁定版本。
 

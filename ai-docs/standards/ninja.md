@@ -1,6 +1,6 @@
 # Ninja 构建执行规范
 
-查阅日期：2026-09-16。状态：项目规范草案，尚未完成工具链集成验证。
+官方资料查阅日期：2026-09-16；项目实现状态更新日期：2026-10-20。Ninja 1.13.2 由 Cargo 托管供给，并由 CMake presets 用于 native 构建；平台供给规则见[依赖获取规范](dependency-acquisition.md)。
 
 适用于 CMake 生成的 Ninja 构建，Ninja 不拥有项目依赖选型或用户配置。
 
