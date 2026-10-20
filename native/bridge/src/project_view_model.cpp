@@ -5,7 +5,6 @@
 #include "path_host.hpp"
 #include <QCoreApplication>
 #include <QDir>
-#include <QFileInfo>
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QLatin1Char>
@@ -145,8 +144,7 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
             &ProjectViewModel::refreshPlanSettings);
     connect(this, &ProjectViewModel::projectChanged, this, &ProjectViewModel::refreshPlanSettings);
 
-    // 激活结果为拉取式队列（073）；10ms 轮询与 TaskHost 节奏一致，仅在
-    // 存在 Loading 文档时运转。
+    // 激活结果为拉取式队列（073）；10ms 轮询仅在存在 Loading 文档时运转。
     m_activationPoll.setInterval(10);
     connect(&m_activationPoll, &QTimer::timeout, this, &ProjectViewModel::drain_activations);
     m_metadataConfirmationPoll.setInterval(10);
@@ -200,10 +198,6 @@ const QString& ProjectViewModel::currentName() const { return m_currentName; }
 bool ProjectViewModel::dirty() const { return m_dirty; }
 
 const QStringList& ProjectViewModel::importedPartNames() const { return m_importedPartNames; }
-
-const QString& ProjectViewModel::importedPartName() const { return m_importedPartName; }
-
-const QString& ProjectViewModel::importedAssetPath() const { return m_importedAssetPath; }
 
 QVariantList ProjectViewModel::meshTypes() const { return m_meshTypes; }
 
@@ -538,14 +532,6 @@ void ProjectViewModel::finish_metadata_confirmation() {
         emit gateLocationSettingsConfirmationFinished(succeeded);
     }
 }
-
-const QString& ProjectViewModel::importedMeshType() const { return m_importedMeshType; }
-
-const QString& ProjectViewModel::importedUnits() const { return m_importedUnits; }
-
-const QString& ProjectViewModel::importedDimensions() const { return m_importedDimensions; }
-
-quint64 ProjectViewModel::importedTriangleCount() const { return m_importedTriangleCount; }
 
 bool ProjectViewModel::importPreviewPending() const { return m_importPreviewPending; }
 
@@ -986,7 +972,7 @@ bool ProjectViewModel::publish_import(const panta::ffi::ProjectImport& imported)
     panta::ffi::project_service_workspace_publish_import(*m_service, imported.id,
                                                          imported.display_name);
     refresh_workspace();
-    emit projectImported(m_importedAssetPath);
+    emit projectImported();
     return true;
 }
 
@@ -1134,48 +1120,16 @@ bool ProjectViewModel::applySnapshot(const panta::ffi::ProjectSnapshot& snapshot
 void ProjectViewModel::applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports) {
     QStringList nextImportedPartNames;
     QStringList nextPartIds;
-    const QDir projectDirectory(QFileInfo(m_currentPath).absolutePath());
     for (std::size_t index = 0; index < imports.size(); ++index) {
         const auto& imported = imports[index];
         nextImportedPartNames.append(QString::fromUtf8(imported.display_name));
         nextPartIds.append(QString::fromUtf8(imported.id));
     }
 
-    QString nextPartName;
-    QString nextAssetPath;
-    QString nextMeshType;
-    QString nextUnits;
-    QString nextDimensions;
-    quint64 nextTriangleCount = 0;
-
-    if (imports.size() > 0) {
-        const auto& imported = imports[imports.size() - 1];
-        nextPartName = QString::fromUtf8(imported.display_name);
-        nextAssetPath = projectDirectory.filePath(QString::fromUtf8(imported.mesh_asset_path));
-        nextMeshType = QString::fromUtf8(imported.mesh_type);
-        nextUnits = QString::fromUtf8(imported.units);
-        nextTriangleCount = imported.triangle_count;
-        const QString unitLabel = nextUnits == QStringLiteral("millimeters") ? QStringLiteral("mm")
-                                  : nextUnits == QStringLiteral("centimeters")
-                                      ? QStringLiteral("cm")
-                                      : QStringLiteral("in");
-        nextDimensions = QString::fromUtf8(panta::ffi::format_project_dimensions(
-            imported.size_x, imported.size_y, imported.size_z, unitLabel.toStdString()));
-    }
-
     const bool changed =
-        m_importedPartNames != nextImportedPartNames || m_importedPartIds != nextPartIds ||
-        m_importedPartName != nextPartName || m_importedAssetPath != nextAssetPath ||
-        m_importedMeshType != nextMeshType || m_importedUnits != nextUnits ||
-        m_importedDimensions != nextDimensions || m_importedTriangleCount != nextTriangleCount;
+        m_importedPartNames != nextImportedPartNames || m_importedPartIds != nextPartIds;
     m_importedPartNames = std::move(nextImportedPartNames);
     m_importedPartIds = std::move(nextPartIds);
-    m_importedPartName = nextPartName;
-    m_importedAssetPath = nextAssetPath;
-    m_importedMeshType = nextMeshType;
-    m_importedUnits = nextUnits;
-    m_importedDimensions = nextDimensions;
-    m_importedTriangleCount = nextTriangleCount;
     if (changed) {
         emit importsChanged();
     }
@@ -1298,8 +1252,7 @@ void ProjectViewModel::moveDocument(int fromIndex, int toIndex) {
 }
 
 void ProjectViewModel::drain_activations() {
-    [[maybe_unused]] const auto outcomes =
-        panta::ffi::project_service_drain_workspace_activations(*m_service);
+    panta::ffi::project_service_drain_workspace_activations(*m_service);
     refresh_workspace();
 }
 

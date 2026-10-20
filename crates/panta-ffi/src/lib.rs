@@ -1,6 +1,5 @@
 //! 最小 CXX 双向边界：验证 DTO、opaque 句柄所有权、错误转换、C++ 实现
-//! 调用，以及 Rust 拥有的任务生命周期（任务 008）、路径服务（任务 023）
-//! 与工程 application service（任务 057）。
+//! 调用，以及路径服务（任务 023）与工程 application service（任务 057）。
 
 mod project_response;
 
@@ -29,12 +28,6 @@ pub use support::Session;
 use support::{
     finish_background_writes, install_crash_handler, panic_probe, process, session_close,
     session_create, session_label, session_live_count,
-};
-mod task;
-pub use task::TaskService;
-use task::{
-    task_service_cancel, task_service_drain, task_service_new, task_service_recent_logs,
-    task_service_running, task_service_submit,
 };
 mod language;
 pub use language::LanguageService;
@@ -113,33 +106,6 @@ pub mod bridge {
         pub repeat: u32,
     }
 
-    /// 任务生命周期事件种类，与 panta_core::task::TaskEventKind 一一对应。
-    pub enum TaskEventKind {
-        Started = 0,
-        Progress = 1,
-        Succeeded = 2,
-        Failed = 3,
-        Cancelled = 4,
-    }
-
-    /// 一次状态转换的事件；`code` 为机器可读错误码（仅 Failed 非空），
-    /// `detail` 为诊断上下文，面向日志/Console 而非用户摘要；
-    /// `percent` 仅 Progress 事件有意义（0-100）。
-    /// CXX 共享枚举不支持自定义 derive，因此本结构不派生 Debug/Clone。
-    pub struct TaskEvent {
-        pub task_id: u64,
-        pub kind: TaskEventKind,
-        pub percent: u32,
-        pub code: String,
-        pub detail: String,
-    }
-
-    /// 结构化日志行：跨语言与 UI 侧凭 `task_id` 关联同一任务。
-    pub struct TaskLogLine {
-        pub task_id: u64,
-        pub message: String,
-    }
-
     /// 逻辑根类别（任务 023），与 panta_core::path::RootCategory 一一对应；
     /// qrc 只读、无本机根。跨语言按数值传递。
     pub enum PathRootKind {
@@ -153,7 +119,7 @@ pub mod bridge {
 
     /// 结构化逻辑资源引用；字符串形态 `scheme:/relative`（`path_ref_parse`
     /// /`path_ref_to_logical` 互逆）。相对片段只跨边界传可往返 UTF-8。
-    /// CXX 共享枚举不支持自定义 derive，与 TaskEvent 同规则不派生 Debug。
+    /// CXX 共享枚举不支持自定义 derive，因此不派生 Debug。
     #[derive(Clone, PartialEq, Eq)]
     pub struct PathRef {
         pub kind: PathRootKind,
@@ -517,22 +483,6 @@ pub mod bridge {
         fn session_close(session: Box<Session>) -> u32;
         fn session_live_count() -> u32;
 
-        /// 任务生命周期管理器（panta_core::task::TaskManager 的包装）：
-        /// 事件为拉取式队列，无跨语言回调；Box 析构关闭领域状态并请求协作停止，不在宿主线程 join。
-        type TaskService;
-
-        fn task_service_new() -> Box<TaskService>;
-        fn task_service_submit(
-            service: &TaskService,
-            label: String,
-            duration_ms: u64,
-            fail: bool,
-        ) -> Result<u64>;
-        fn task_service_cancel(service: &TaskService, task_id: u64) -> bool;
-        fn task_service_drain(service: &TaskService) -> Vec<TaskEvent>;
-        fn task_service_recent_logs(service: &TaskService) -> Vec<TaskLogLine>;
-        fn task_service_running(service: &TaskService) -> u32;
-
         /// locale 标识和当前语言属于应用领域状态。C++ 先校验、安装 Qt
         /// 字典，再提交当前 locale。
         type LanguageService;
@@ -790,9 +740,7 @@ pub mod bridge {
         fn project_service_drain_asset_activations(
             service: &mut ProjectService,
         ) -> Vec<ActivationOutcome>;
-        fn project_service_drain_workspace_activations(
-            service: &mut ProjectService,
-        ) -> Vec<ActivationOutcome>;
+        fn project_service_drain_workspace_activations(service: &mut ProjectService);
         fn mesh_validate_tet(data: TetMeshData) -> TetMeshValidation;
 
         /// QML 服务销毁、事件循环退出后等待已接受写入；禁止在写入 worker 调用。

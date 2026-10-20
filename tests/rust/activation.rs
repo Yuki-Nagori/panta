@@ -103,7 +103,7 @@ fn activation_restores_saved_asset_without_touching_manifest()
     let mut reopened = ProjectService::new();
     reopened.open(&fixture.root.join("Demo/Demo.panta"))?;
     // 打开不再同步解析资产；网格只能经只读激活恢复。
-    assert!(reopened.current_mesh().is_none());
+    assert!(reopened.mesh_for_import(&record_id).is_none());
     let attempt = reopened.begin_asset_activation(&record_id)?;
     let outcome = wait_for_outcome(&mut reopened, Duration::from_secs(10))?;
     assert_eq!(outcome.kind, OutcomeKind::Succeeded);

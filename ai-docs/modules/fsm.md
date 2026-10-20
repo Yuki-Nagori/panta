@@ -12,7 +12,7 @@
 
 - [`panta-dsl-core`](../../crates/panta-dsl-core/src/grammar.pest) 与 `panta-dslc` 共用冒号语法、AST、诊断与格式化；kind 为 `language`、`variables`、`theme`，`fsm` 由 `panta-dsl-core::fsm` 独立 schema 入口承接，CLI `check` / `format` 按头部 kind 行分发。
 - [`panta-import`](../../crates/panta-import/src/lib.rs) 已负责来源快照、STL 预览和导入准备；[`panta-core::project`](../../crates/panta-core/src/project/import.rs) 写资产与清单、维护修订，成功后替换当前网格。
-- [`panta-core::task`](../../crates/panta-core/src/task.rs) 已有 `Running / Succeeded / Failed / Cancelled` 生命周期、取消请求和拉取式事件队列。当前执行体仍为模拟任务，不能把它当作已经接入 STEP 的异步事务。
+- [`ProjectExecution`](../../crates/panta-core/src/execution.rs) 为工程操作提供私有有界执行能力；具体生命周期、取消与提交结果由各领域服务和状态机拥有。当前没有通用任务管理器或任务面板。
 
 因此，067 已完成的 STL 导入路径不追加 FSM 改造；首个 FSM 消费者改为任务 080 中按需读取已提交 STL 资产并重建视口网格的异步激活流程。它只读工程，不承担提交；未来 STEP 等写入型导入事务另行登记消费者并明确后端、提交和取消边界。
 
@@ -25,7 +25,7 @@
 | `kind = "fsm"`、内联对象数组 | 与既有 `.pa` 不一致；沿用 `key: value` 和两格缩进，在公共 parser 内新增 schema，不引入 TOML / YAML 方言 |
 | 首个 parser 放 `panta-import/src/parser` | 已有公共 DSL 内核，不再另写 parser。FSM schema、格式化和确定性生成放 `panta-dsl-core` 的独立模块，由领域 crate 的 build-dependency 使用 |
 | 生成到 `src/fsm/generated` | 改为 `OUT_DIR`，源码只保留输入与手写实现，避免多配置构建改写同一源码树 |
-| 导入事务与 task lifecycle 都放 import | 导入准备放 `panta-import`；工程提交和通用任务生命周期留在 `panta-core`，不形成反向依赖 |
+| 导入事务与 task lifecycle 都放 import | 导入准备放 `panta-import`；工程事务和资产激活由 `panta-core` 协调，不引入无真实消费者的通用任务生命周期 |
 | 只生成三元组和 guard 字符串常量 | 转移表必须保留每条边的 guard 关联；生成强类型 `Guard` 和 `Option<Guard>`，避免只声明名字却无法校验使用位置 |
 | 先写 `state = next` 再调用 `on_entry` | 不采用。`commit()` 失败时不能已经处于 `Committed`，任意可失败 entry/exit hook 也不能充当通用事务保证 |
 | 枚举全部转移即双向证明 | 只能验证有限结构一致性；guard、payload、写盘失败、事件顺序与竞态需要独立行为测试 |
@@ -40,12 +40,12 @@
 | 来源固定、格式分发、解析完成与取消 | `panta-import` / 数据领域 crate 的准备或读取服务 | 产出拥有明确所有权的准备结果；首个 073 消费者只读取已提交 STL 资产 |
 | 工程身份、资产定位与只读激活请求相关性 | `panta-core::project` | 校验 session / generation 与 ImportRecord ID；只读激活不改 revision 或 dirty |
 | 修订校验、资产发布与提交终态 | `panta-core::project` 的未来写入型导入事务 | 调用准备服务并协调工程存储；重试建立新事务 |
-| TaskId、执行状态、进度、取消请求、终态事件 | 现有 `panta-core::task` | 与领域阶段关联，不能把准备完成直接当作工程提交成功 |
+| 执行请求身份、领域状态、取消与结果裁决 | 各工程操作的 Rust 服务 / 状态机 | 与工程 session、generation 和提交语义绑定；执行器只负责有界调度 |
 | 展示属性、加载动画、按钮启用、弹窗阶段 | C++ ViewModel / QML | 消费 Rust 快照与事件；UI 禁用按钮不能代替 Rust 校验 |
 
 编译依赖维持 `panta-core → panta-import → panta-mesh / 未来 panta-geom`。各 FSM 消费者只在构建期依赖公共 DSL 内核；运行期不加载 FSM 源码。首个只读激活 flow 由 `panta-core` 持有请求身份和工程 session 上下文，解析复用 `panta-mesh`；未来的导入准备 flow 可留在 `panta-import`，跨工程提交的写入事务由 core 编排。不以一个公共 FSM 对象跨 crate 持有所有上下文。
 
-通用任务状态机已存在，不在 import 内再造 `task_lifecycle`。073 首期复用任务身份、队列与展示契约，使 Task 成功表示只读网格快照就绪；旧模拟执行体不能独立覆盖取消、过期请求或资源释放结果。首个流程没有工程提交，不能套用写事务终态。对未来一次写入型导入，core 事务协调者唯一裁决提交 / 取消及最终结果，Task 状态只是结果投影；通用 worker 的取消标志、超时或 shutdown 不得独立覆盖事务结论。是否将该生命周期也描述成 `.pa`，以实际复杂度和重复维护成本决定，另记消费者任务后实施。
+073 的只读资产激活由 `ActivationCoordinator` 持有请求身份、generation、取消和结果状态；`ProjectExecution` 仅调度工作，不替领域服务裁决结果。当前没有通用任务管理器或任务面板。写入型导入仍须由 core 事务协调者唯一裁决提交、取消及最终结果；若未来多个业务形成共享任务 / 作业需求，再据实际契约增加相应 API。
 
 ## FSM V1 语法草案
 
@@ -171,7 +171,7 @@ Cargo 的 [build script 规则](https://doc.rust-lang.org/cargo/reference/build-
 
 复杂 UI 交互明确采用 Qt 自带的 `QStateMachine`，由 [074](../task/074-qt-interaction-state-machine.md) 独立接入，设计见 [Qt 交互状态机](qt-interaction-state-machines.md)。首期由 C++ ViewModel / 控制器管理导入窗口的选文件、预览、等待回执与关闭；Qt 拥有这些局部交互状态，业务结果仍来自 Rust。Qt StateMachine 当前尚未在构建供给与链接中登记，不把本决策写成已实现。
 
-简单展示继续使用属性绑定和 QML `states / transitions`；[Qt Quick States](https://doc.qt.io/qt-6/qtquick-statesanimations-states.html) 描述对象 / 属性配置，不等同于领域事务执行器。Qt 状态机依赖事件循环，不能替代业务工作线程，也不自动使当前 STL 同步调用异步化。
+简单展示继续使用属性绑定和 QML `states / transitions`；[Qt Quick States](https://doc.qt.io/qt-6/qtquick-statesanimations-states.html) 描述对象 / 属性配置，不等同于领域事务执行器。Qt 状态机依赖事件循环，不能替代业务工作线程或 Rust 领域状态机。
 
 UI 关闭、重建或重载后的业务展示以 Rust 快照为准，表单草稿和 UI 服务会话的存续范围由 074 / 027 明确，不能根据动画结束、按钮点击或本地状态推断工程已提交。任何 Qt 状态方案都不读取 FSM `.pa`，不重复 guard 或工程提交规则。
 

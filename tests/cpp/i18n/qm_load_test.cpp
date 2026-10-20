@@ -73,8 +73,6 @@ void QmLoadTest::zhCnDictionaryTranslates() {
              QStringLiteral("请输入有效的工程名称。"));
     QCOMPARE(translator.translate("ViewRibbonAccessibility", "Model Display"),
              QStringLiteral("模型显示"));
-    QCOMPARE(translator.translate("ShellViewModel", "Revision %1").arg(3),
-             QStringLiteral("修订 3"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {
@@ -116,7 +114,6 @@ void QmLoadTest::enBaselineDictionaryLoads() {
              QStringLiteral("Enter a valid project name."));
     QCOMPARE(translator.translate("ViewRibbonAccessibility", "Model Display"),
              QStringLiteral("Model Display"));
-    QCOMPARE(translator.translate("ShellViewModel", "Revision %1"), QStringLiteral("Revision %1"));
 }
 
 QTEST_GUILESS_MAIN(QmLoadTest)

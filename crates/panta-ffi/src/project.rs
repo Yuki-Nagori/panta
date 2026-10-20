@@ -673,30 +673,20 @@ pub(super) fn project_service_cancel_asset_activation(
 pub(super) fn project_service_drain_asset_activations(
     service: &mut ProjectService,
 ) -> Vec<bridge::ActivationOutcome> {
-    drain_asset_activations(service, true)
-}
-
-pub(super) fn project_service_drain_workspace_activations(
-    service: &mut ProjectService,
-) -> Vec<bridge::ActivationOutcome> {
-    drain_asset_activations(service, false)
-}
-
-fn drain_asset_activations(
-    service: &mut ProjectService,
-    include_coordinates: bool,
-) -> Vec<bridge::ActivationOutcome> {
     service
         .service
         .drain_asset_activations()
         .into_iter()
-        .map(|outcome| activation_outcome_to_bridge(outcome, include_coordinates))
+        .map(activation_outcome_to_bridge)
         .collect()
+}
+
+pub(super) fn project_service_drain_workspace_activations(service: &mut ProjectService) {
+    service.service.drain_workspace_activations();
 }
 
 fn activation_outcome_to_bridge(
     outcome: panta_core::project::CompletedActivation,
-    include_coordinates: bool,
 ) -> bridge::ActivationOutcome {
     let mut result = bridge::ActivationOutcome {
         attempt: outcome.attempt,
@@ -710,7 +700,7 @@ fn activation_outcome_to_bridge(
         },
         coordinates: Vec::new(),
     };
-    if include_coordinates && let Some(mesh) = outcome.mesh {
+    if let Some(mesh) = outcome.mesh {
         match mesh_coordinates(&mesh) {
             Ok(coordinates) => result.coordinates = coordinates,
             Err(detail) => {
@@ -1575,7 +1565,7 @@ endsolid
             detail: "C:\\资产: read denied".into(),
             mesh: None,
         };
-        let result = activation_outcome_to_bridge(outcome, true);
+        let result = activation_outcome_to_bridge(outcome);
         assert!(result.kind == bridge::ActivationOutcomeKind::Failed);
         assert_eq!(result.attempt, 7);
         assert_eq!(result.generation, 3);

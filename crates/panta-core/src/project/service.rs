@@ -22,7 +22,6 @@ use std::sync::Arc;
 pub struct ProjectService {
     pub(super) current: Option<ProjectState>,
     pub(super) import_session: StlImportSession,
-    pub(super) latest_mesh_id: Option<String>,
     pub(super) mesh_cache: SurfaceMeshCache,
     pub(super) activation_attempts: HashMap<String, u64>,
     pub(super) activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
@@ -102,7 +101,6 @@ impl ProjectService {
     ) -> Result<ProjectSnapshot, ProjectError> {
         self.current = Some(prepared.state);
         self.clear_stl_preview();
-        self.latest_mesh_id = None;
         self.mesh_cache.clear();
         self.activation_attempts.clear();
         let generation = self.activation.advance_generation();
@@ -372,11 +370,20 @@ impl ProjectService {
 
     /// 消费终态并完成过期校验、缓存发布和工作区更新；消费者只读取最终结果。
     pub fn drain_asset_activations(&mut self) -> Vec<super::CompletedActivation> {
-        self.activation
-            .drain()
-            .into_iter()
-            .map(|outcome| self.complete_asset_activation(outcome))
-            .collect()
+        let mut completed = Vec::new();
+        self.consume_asset_activations(|outcome| completed.push(outcome));
+        completed
+    }
+
+    /// 消费工作区激活终态而不构造结果向量；Qt 通过工作区快照读取状态。
+    pub fn drain_workspace_activations(&mut self) {
+        self.consume_asset_activations(drop);
+    }
+
+    fn consume_asset_activations(&mut self, mut consume: impl FnMut(super::CompletedActivation)) {
+        for outcome in self.activation.drain() {
+            consume(self.complete_asset_activation(outcome));
+        }
     }
 
     /// 抛弃已关闭页签的 attempt，避免其迟到成功结果进入 Mesh 缓存。
@@ -407,15 +414,8 @@ impl ProjectService {
             return false;
         }
         self.finish_asset_activation(import_id, attempt);
-        self.latest_mesh_id = Some(import_id.to_owned());
         self.mesh_cache.insert_active(import_id.to_owned(), mesh);
         true
-    }
-
-    /// 将新导入成功提交的 Mesh 移交给工程运行期缓存，并标记为活动项。
-    pub fn cache_activated_mesh(&mut self, import_id: String, mesh: SurfaceMesh) {
-        self.latest_mesh_id = Some(import_id.clone());
-        self.mesh_cache.insert_active(import_id, mesh);
     }
 
     /// 选择 Rust 缓存中的活动网格；未驻留时由调用方启动异步资产激活。
@@ -423,7 +423,6 @@ impl ProjectService {
         if !self.mesh_cache.activate(import_id) {
             return false;
         }
-        self.latest_mesh_id = Some(import_id.to_owned());
         true
     }
 
@@ -442,9 +441,6 @@ impl ProjectService {
         self.forget_asset_activation(import_id);
         self.mesh_cache.remove(import_id);
         self.mesh_cache.trim();
-        if self.latest_mesh_id.as_deref() == Some(import_id) {
-            self.latest_mesh_id = None;
-        }
     }
 
     /// 活动文档切到 Welcome / 空白时取消 Mesh pin，再按预算回收缓存。
@@ -615,13 +611,6 @@ impl ProjectService {
                 );
             }
         }
-    }
-
-    /// 最近一次成功导入或激活的网格；供 Rust 工程服务测试读取。
-    pub fn current_mesh(&self) -> Option<&SurfaceMesh> {
-        self.latest_mesh_id
-            .as_deref()
-            .and_then(|id| self.mesh_cache.get(id))
     }
 
     /// 当前工程运行时会话的代次；工程切换会使先前的编辑请求失效。

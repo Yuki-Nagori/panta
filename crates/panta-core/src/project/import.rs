@@ -160,7 +160,6 @@ impl ProjectService {
         };
         self.pending_import = None;
         let (state, record, mesh) = result?;
-        self.latest_mesh_id = Some(record.id.clone());
         self.mesh_cache.insert_active(record.id.clone(), mesh);
         self.current = Some(state);
         Ok(Some(record))
@@ -345,7 +344,6 @@ impl ProjectService {
             &phase,
         )?;
         self.current = Some(candidate);
-        self.latest_mesh_id = Some(record.id.clone());
         self.mesh_cache.insert_active(record.id.clone(), mesh);
         Ok(record)
     }
@@ -529,7 +527,7 @@ mod tests {
         assert_eq!(fs::read(&project.path)?, manifest);
         assert!(service.imports()?.is_empty());
         assert_eq!(service.current()?.revision, 0);
-        assert!(service.current_mesh().is_none());
+        assert!(service.resident_mesh_ids().is_empty());
         assert!(
             service
                 .execute(crate::project::ProjectCommand::Rename {
@@ -543,7 +541,7 @@ mod tests {
         assert_eq!(record.id, "import-1");
         assert_eq!(service.current()?.revision, 1);
         assert_eq!(service.imports()?, vec![record.clone()]);
-        assert!(service.current_mesh().is_some());
+        assert!(service.mesh_for_import(&record.id).is_some());
         let asset_path = service
             .current
             .as_ref()
@@ -704,7 +702,7 @@ mod tests {
                 .exists()
         );
         assert!(service.imports()?.is_empty());
-        assert!(service.current_mesh().is_none());
+        assert!(service.resident_mesh_ids().is_empty());
         Ok(())
     }
 

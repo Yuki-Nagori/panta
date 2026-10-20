@@ -17,10 +17,6 @@ function(panta_add_ffi_test name source)
 endfunction()
 
 panta_add_ffi_test(panta_ffi_boundary_test ../../tests/cpp/ffi/boundary_test.cpp)
-panta_add_ffi_test(panta_ffi_task_service_test ../../tests/cpp/ffi/task_service_test.cpp)
 
 add_test(NAME Ffi.RustCppBoundary COMMAND panta_ffi_boundary_test)
 set_tests_properties(Ffi.RustCppBoundary PROPERTIES LABELS "ffi")
-
-add_test(NAME Ffi.TaskServiceLifecycle COMMAND panta_ffi_task_service_test)
-set_tests_properties(Ffi.TaskServiceLifecycle PROPERTIES LABELS "ffi")

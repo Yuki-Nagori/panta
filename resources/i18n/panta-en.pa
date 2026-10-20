@@ -660,11 +660,6 @@ label:
   src: Community
   tr: Community
 
-[ShellViewModel]
-revision:
-  src: Revision %1
-  tr: Revision %1
-
 [TaskPanelTitle]
 label:
   src: Tasks

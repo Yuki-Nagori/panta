@@ -16,7 +16,6 @@ ColumnLayout {
     property string activeDocumentId: ""
     property string activeDocumentTitle: ""
     property bool importedPartAvailable: importedPartNames.length > 0
-    property string importedPartName: ""
     property string analysisSequenceText: ""
     property string analysisSequenceId: ""
     property string materialText: ""

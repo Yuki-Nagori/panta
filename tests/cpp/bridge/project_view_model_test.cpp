@@ -835,12 +835,6 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
                                      QStringLiteral("millimeters"), true));
     ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     EXPECT_EQ(view_model.importedPartNames(), QStringList{QStringLiteral("sample")});
-    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample"));
-    EXPECT_EQ(view_model.importedMeshType(), QStringLiteral("dual-domain"));
-    EXPECT_EQ(view_model.importedUnits(), QStringLiteral("millimeters"));
-    EXPECT_EQ(view_model.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
-    EXPECT_EQ(view_model.importedTriangleCount(), 1U);
-    EXPECT_TRUE(QFile::exists(view_model.importedAssetPath()));
     const auto mesh = view_model.mesh_snapshot();
     ASSERT_NE(mesh, nullptr);
     EXPECT_EQ(mesh->vertices.size(), 3U);
@@ -867,7 +861,6 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     EXPECT_EQ(view_model.importedPartNames(),
               QStringList({QStringLiteral("sample"), QStringLiteral("sample-second")}));
-    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample-second"));
 
     EXPECT_EQ(view_model.planSettings().value(QStringLiteral("meshType")).toString(),
               QStringLiteral("solid-3d"));
@@ -887,9 +880,6 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(view_model.currentPath())));
     EXPECT_EQ(reopened.importedPartNames(),
               QStringList({QStringLiteral("sample"), QStringLiteral("sample-second")}));
-    EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample-second"));
-    EXPECT_EQ(reopened.importedAssetPath(), view_model.importedAssetPath());
-    EXPECT_EQ(reopened.importedDimensions(), QStringLiteral("1.00 × 1.00 × 0.00 mm"));
     // 打开工程只读清单（073/080）：已保存网格须经只读 FSM 激活异步恢复，
     // 重开后视口快照为空；记录投影与修订不变。
     const auto reopened_mesh = reopened.mesh_snapshot();
@@ -905,7 +895,6 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     EXPECT_EQ(view_model.importedPartNames(),
               QStringList({QStringLiteral("sample"), QStringLiteral("sample-second"),
                            QStringLiteral("sample")}));
-    EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample"));
     EXPECT_EQ(mesh_changed.count(), 2);
     const auto replacement = view_model.mesh_snapshot();
     ASSERT_NE(replacement, nullptr);
@@ -1385,7 +1374,8 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
                                      QStringLiteral("millimeters"), false));
     ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     ASSERT_TRUE(finish_project_operation(view_model, view_model.saveProject()));
-    const auto assetPath = view_model.importedAssetPath();
+    const auto assetPath = QDir(QFileInfo(view_model.currentPath()).absolutePath())
+                               .filePath(QStringLiteral("assets/meshes/mesh-import-1-r1.pmesh"));
 
     ProjectViewModel reopened;
     ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(view_model.currentPath())));

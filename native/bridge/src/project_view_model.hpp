@@ -39,12 +39,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QString lastCreatedPath READ lastCreatedPath NOTIFY projectCreated)
     Q_PROPERTY(QStringList importedPartNames READ importedPartNames NOTIFY importsChanged)
     Q_PROPERTY(QStringList importedPartIds READ importedPartIds NOTIFY importsChanged)
-    Q_PROPERTY(QString importedPartName READ importedPartName NOTIFY importsChanged)
-    Q_PROPERTY(QString importedAssetPath READ importedAssetPath NOTIFY importsChanged)
-    Q_PROPERTY(QString importedMeshType READ importedMeshType NOTIFY importsChanged)
-    Q_PROPERTY(QString importedUnits READ importedUnits NOTIFY importsChanged)
-    Q_PROPERTY(QString importedDimensions READ importedDimensions NOTIFY importsChanged)
-    Q_PROPERTY(quint64 importedTriangleCount READ importedTriangleCount NOTIFY importsChanged)
     Q_PROPERTY(QVariantList meshTypes READ meshTypes CONSTANT)
     Q_PROPERTY(QString defaultMeshType READ defaultMeshType CONSTANT)
     Q_PROPERTY(QVariantMap defaultMaterial READ defaultMaterial CONSTANT)
@@ -108,12 +102,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 名称按 Rust 工程导入记录顺序排列；QML 只负责呈现，不派生领域状态。
     [[nodiscard]] const QStringList& importedPartNames() const;
     [[nodiscard]] QStringList importedPartIds() const;
-    [[nodiscard]] const QString& importedPartName() const;
-    [[nodiscard]] const QString& importedAssetPath() const;
-    [[nodiscard]] const QString& importedMeshType() const;
-    [[nodiscard]] const QString& importedUnits() const;
-    [[nodiscard]] const QString& importedDimensions() const;
-    [[nodiscard]] quint64 importedTriangleCount() const;
     [[nodiscard]] bool importPreviewPending() const;
     [[nodiscard]] bool importPreviewReady() const;
     [[nodiscard]] const QString& importPreviewName() const;
@@ -252,7 +240,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void fillSettingsConfirmationFinished(bool succeeded);
     void gateLocationSettingsConfirmationPendingChanged();
     void gateLocationSettingsConfirmationFinished(bool succeeded);
-    void projectImported(const QString& path);
+    void projectImported();
     void importPendingChanged();
     void projectImportFinished(quint64 requestId, bool succeeded);
     void importPreviewChanged();
@@ -323,12 +311,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_importPreviewExpandedBytes = 0;
     QStringList m_importedPartNames;
     QStringList m_importedPartIds;
-    QString m_importedPartName;
-    QString m_importedAssetPath;
-    QString m_importedMeshType;
-    QString m_importedUnits;
-    QString m_importedDimensions;
-    quint64 m_importedTriangleCount = 0;
     bool m_importPreviewReady = false;
     QString m_importPreviewName;
     QString m_importPreviewDimensions;

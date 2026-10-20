@@ -275,8 +275,6 @@ class ProjectDocksGpuBenchmark final : public QObject {
                 QVariantMap properties = names_property;
                 properties.insert(QStringLiteral("projectOpen"), true);
                 properties.insert(QStringLiteral("projectName"), QStringLiteral("benchmark"));
-                properties.insert(QStringLiteral("importedPartName"),
-                                  names.isEmpty() ? QString{} : names.constLast());
                 tasks_item = qobject_cast<QQuickItem*>(
                     create(m_tasksComponent, properties, owner, QPoint(0, 0),
                            QSize(440, scenario.panels == Panels::Both ? 420 : 700)));
