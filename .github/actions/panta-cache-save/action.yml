@@ -2,7 +2,8 @@
 # PR 只恢复不保存，避免条目按 PR 数量膨胀。缓存瘦身在供给层完成：
 # panta-build 安装归档发布即删并按白名单裁剪 LLVM，Qt/SDK CMake 供给发布
 # 即删归档；cargo-home 键不缓存 registry src/ 解包副本。改键时与
-# panta-cache-restore 两处必须同步。
+# panta-cache-restore 两处必须同步。Cargo 扩展由 panta-cargo-tool-cache
+# 按工具独立保存；不缓存其 cargo-build 临时编译树。
 name: Save panta caches
 description: 输出缓存体积并保存 cargo-home 与 tools/deps 两键缓存
 runs:
@@ -30,4 +31,5 @@ runs:
         path: |
           target/panta-tools
           target/panta-deps
+          !target/panta-tools/cargo-*
         key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}

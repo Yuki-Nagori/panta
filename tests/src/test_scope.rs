@@ -87,6 +87,56 @@ struct Package {
 
 type Packages = BTreeMap<String, Package>;
 
+/// 共享头、构建或生成输入改变时扫描全部消费者；纯源文件只扫描自身。
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum NativeLintScope {
+    All,
+    Sources(BTreeSet<String>),
+}
+
+impl NativeLintScope {
+    pub(super) fn is_empty(&self) -> bool {
+        matches!(self, Self::Sources(sources) if sources.is_empty())
+    }
+}
+
+pub(super) fn native_lint_scope() -> Result<NativeLintScope, Box<dyn Error>> {
+    if force_full_scope() {
+        return Ok(NativeLintScope::All);
+    }
+    Ok(native_scope_for_paths(&changed_paths()?))
+}
+
+fn native_scope_for_paths(paths: &[String]) -> NativeLintScope {
+    let shared_input = paths.iter().any(|path| {
+        let source = Path::new(path);
+        panta_build::database::is_header(source)
+            || is_cmake_path(path)
+            || path.starts_with("crates/panta-build/")
+            || path.starts_with("crates/launcher/")
+            || (path.starts_with("crates/panta-ffi/")
+                && (path.ends_with(".rs") || path.ends_with("/Cargo.toml")))
+    });
+    if shared_input {
+        NativeLintScope::All
+    } else {
+        NativeLintScope::Sources(
+            paths
+                .iter()
+                .filter(|path| panta_build::database::is_source(Path::new(path)))
+                .cloned()
+                .collect(),
+        )
+    }
+}
+
+pub(super) fn is_cmake_path(path: &str) -> bool {
+    Path::new(path)
+        .file_name()
+        .is_some_and(|name| name == "CMakeLists.txt")
+        || path.ends_with(".cmake")
+}
+
 pub(super) fn print_plan(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
     let ci_input = arguments.as_slice() == ["--ci"];
@@ -471,7 +521,10 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             plan.native_labels.extend(all_native_labels.iter().cloned());
             continue;
         }
-        if path.starts_with("qml/") || path.starts_with("tests/qml/") {
+        if path.starts_with("qml/")
+            || path.starts_with("tests/qml/")
+            || path.starts_with("prototypes/shell/")
+        {
             plan.qml = true;
             plan.native = true;
             plan.native_labels
@@ -519,6 +572,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             .any(|name| matches!(name.as_str(), "panta-build" | "panta-launcher"))
         {
             plan.full = true;
+            plan.full_quality = true;
             plan.native = true;
             plan.qml = true;
             plan.packages_l1.clear();
@@ -541,14 +595,7 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
 
 fn cargo_packages(root: &Path) -> Result<Packages, Box<dyn Error>> {
     let output = Command::new("cargo")
-        .args([
-            "+stable",
-            "metadata",
-            "--locked",
-            "--format-version",
-            "1",
-            "--no-deps",
-        ])
+        .args(["metadata", "--locked", "--format-version", "1", "--no-deps"])
         .current_dir(root)
         .output()?;
     if !output.status.success() {
@@ -680,9 +727,7 @@ fn is_document_path(path: &str) -> bool {
     {
         return false;
     }
-    path.ends_with(".md")
-        || path.starts_with("ai-docs/")
-        || matches!(path, "LICENSE" | ".gitignore")
+    path.ends_with(".md") || matches!(path, "LICENSE" | ".gitignore")
 }
 
 fn all_native_labels() -> BTreeSet<String> {
@@ -799,6 +844,46 @@ mod tests {
         assert!(is_document_path("README.md"));
         assert!(!is_document_path("tests/fixtures/readme.md"));
         assert!(!is_document_path("native/foundation/README.md"));
+        assert!(!is_document_path("ai-docs/unregistered-input.js"));
+    }
+
+    #[test]
+    fn prototype_input_runs_qml_tests_and_unknown_document_inputs_fail_closed()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        let prototype = make_plan(&["prototypes/shell/shell.js".into()], &root)?;
+        assert!(prototype.code && prototype.native && prototype.qml);
+        assert!(prototype.native_labels.contains("qml"));
+        assert!(!prototype.full);
+        let unknown = make_plan(&["ai-docs/unregistered-input.js".into()], &root)?;
+        assert!(unknown.full && unknown.full_quality);
+        Ok(())
+    }
+
+    #[test]
+    fn native_analysis_follows_build_and_generated_header_inputs() {
+        for input in [
+            "qml/CMakeLists.txt",
+            "tools/sdk/toolchain.cmake",
+            "native/removed_header.hpp",
+            "crates/panta-ffi/src/lib.rs",
+            "crates/panta-ffi/Cargo.toml",
+            "crates/launcher/build.rs",
+            "crates/panta-build/src/assets.rs",
+        ] {
+            assert_eq!(
+                native_scope_for_paths(&[input.into()]),
+                NativeLintScope::All,
+                "{input}"
+            );
+        }
+        let source = "native/app/window_chrome_metrics_mac.mm";
+        assert_eq!(
+            native_scope_for_paths(&[source.into()]),
+            NativeLintScope::Sources(BTreeSet::from([source.into()]))
+        );
+        assert!(native_scope_for_paths(&["crates/panta-core/src/project.rs".into()]).is_empty());
+        assert!(native_scope_for_paths(&["qml/App.qml".into()]).is_empty());
     }
 
     #[test]
@@ -920,6 +1005,19 @@ mod tests {
             assert_eq!(plan.packages_l1.len(), 0);
             assert_eq!(plan.packages_l2.len(), cargo_packages(&root)?.len());
             assert_eq!(plan.native_labels, all_native_labels());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn public_rust_build_inputs_expand_quality_together_with_tests() -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for path in [
+            "crates/launcher/build.rs",
+            "crates/panta-build/src/assets.rs",
+        ] {
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.full && plan.full_quality, "{path}");
         }
         Ok(())
     }

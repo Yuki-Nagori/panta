@@ -1,19 +1,31 @@
 //! 各质量工具执行顺序、检查 / 修复模式及扫描诊断。
 
 use std::error::Error;
+use std::path::Path;
 use std::process::Command;
 
 use crate::build::{build_benchmark_moc, build_launcher, run_qmllint};
 use crate::command::{cargo, cargo_scanner, run, run_scanner};
 use crate::format::run_cmake_tool;
 use crate::paths::{native_build_dir, repository_root, target_root};
+use crate::test_scope::{NativeLintScope, is_cmake_path};
 
 pub(super) fn lint(
     tool: Option<&str>,
     check: bool,
     changed: bool,
-    _arguments: &[String],
+    arguments: &[String],
 ) -> Result<(), Box<dyn Error>> {
+    let objcxx_only = match arguments {
+        [] => false,
+        [argument] if argument == "--objcxx-only" => true,
+        _ => return Err("lint 仅接受工具名及 --check、--changed、--objcxx-only".into()),
+    };
+    if objcxx_only
+        && (!matches!(tool, Some("clang-tidy" | "includes")) || !cfg!(target_os = "macos"))
+    {
+        return Err("--objcxx-only 仅用于 macOS 的 clang-tidy/includes".into());
+    }
     match tool {
         None if changed => lint_changed(check),
         None => {
@@ -31,9 +43,9 @@ pub(super) fn lint(
             run_qmllint()?;
             build_benchmark_moc()?;
             eprintln!("cargo lint [7/9] clang-tidy");
-            scan_clang_tidy(false, check, false)?;
+            scan_clang_tidy(false, check, &NativeLintScope::All, false)?;
             eprintln!("cargo lint [8/9] include-cleaner");
-            scan_clang_tidy(true, check, false)?;
+            scan_clang_tidy(true, check, &NativeLintScope::All, false)?;
             eprintln!("cargo lint [9/9] cppcheck");
             scan_cppcheck()
         }
@@ -72,9 +84,9 @@ pub(super) fn lint(
             build_launcher()?;
             run_qmllint()
         }
-        Some("clang-tidy") => run_clang_tidy(false, check, changed),
-        Some("includes") => run_clang_tidy(true, check, changed),
-        Some("cppcheck") => run_cppcheck(),
+        Some("clang-tidy") => run_clang_tidy(false, check, changed, objcxx_only),
+        Some("includes") => run_clang_tidy(true, check, changed, objcxx_only),
+        Some("cppcheck") => run_cppcheck(changed),
         Some(other) => Err(format!(
             "未知 lint 工具 '{other}'；可用：clippy、machete、cmake、layering、qmllint、clang-tidy、\
              includes、cppcheck；--check 只检查不修复"
@@ -103,29 +115,21 @@ fn lint_changed(check: bool) -> Result<(), Box<dyn Error>> {
         crate::layering::check()?;
     }
 
-    let native_changed = paths.iter().any(|path| path.starts_with("native/"));
-    let cpp_changed = paths.iter().any(|path| is_cpp_path(path));
-    let native_build_configuration_changed = paths.iter().any(|path| {
-        path.starts_with("native/")
-            && (path.ends_with("CMakeLists.txt") || path.ends_with(".cmake"))
-    });
-    let qml_changed = paths
-        .iter()
-        .any(|path| path.starts_with("qml/") || path.starts_with("tests/qml/") || native_changed);
+    let native_scope = active_native_scope(crate::test_scope::native_lint_scope()?, false);
+    let qml_changed = paths.iter().any(|path| {
+        path.starts_with("qml/") || path.starts_with("tests/qml/") || path.starts_with("native/")
+    }) || matches!(native_scope, NativeLintScope::All);
 
-    if cpp_changed || native_changed || qml_changed {
-        // clang-tidy、qmllint 与 cppcheck 共用一次 launcher configure/build；
-        // benchmark moc 只在 C++ 扫描需要完整编译数据库时生成。
+    if !native_scope.is_empty() || qml_changed {
+        // 当前平台共用一次构建；没有静态分析输入时不准备 LLVM/编译数据库。
         build_launcher()?;
     }
-    if cpp_changed || native_changed {
+    if !native_scope.is_empty() {
         build_benchmark_moc()?;
-        scan_clang_tidy(false, check, true)?;
-        scan_clang_tidy(true, check, true)?;
-        if cpp_changed || native_build_configuration_changed {
-            // unusedFunction 是跨翻译单元诊断。改动编译单元集合也要完整扫描。
-            scan_cppcheck()?;
-        }
+        scan_clang_tidy(false, check, &native_scope, false)?;
+        scan_clang_tidy(true, check, &native_scope, false)?;
+        // unusedFunction 依赖跨翻译单元信息，源文件集合或共享输入变化均完整检查。
+        scan_cppcheck()?;
     }
 
     if qml_changed {
@@ -134,27 +138,11 @@ fn lint_changed(check: bool) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn is_cmake_path(path: &str) -> bool {
-    std::path::Path::new(path)
-        .file_name()
-        .is_some_and(|name| name == "CMakeLists.txt")
-        || path.ends_with(".cmake")
-}
-
 fn is_layering_path(path: &str) -> bool {
     is_cmake_path(path)
         || path == "Cargo.toml"
         || path.ends_with("/Cargo.toml")
         || path == "Cargo.lock"
-}
-
-fn is_cpp_path(path: &str) -> bool {
-    matches!(
-        std::path::Path::new(path)
-            .extension()
-            .and_then(|extension| extension.to_str()),
-        Some("cpp" | "cc" | "cxx" | "h" | "hpp")
-    )
 }
 
 fn run_changed_clippy(check: bool) -> Result<(), Box<dyn Error>> {
@@ -218,67 +206,110 @@ fn run_changed_cmake_lint() -> Result<(), Box<dyn Error>> {
     run_scanner("cmake-lint 变更文件", command)
 }
 
-fn run_clang_tidy(includes_only: bool, check: bool, changed: bool) -> Result<(), Box<dyn Error>> {
-    build_launcher()?;
-    build_benchmark_moc()?;
-    scan_clang_tidy(includes_only, check, changed)
+fn active_native_scope(mut scope: NativeLintScope, objcxx_only: bool) -> NativeLintScope {
+    if let NativeLintScope::Sources(sources) = &mut scope {
+        sources.retain(|source| {
+            let objcxx = Path::new(source).extension().is_some_and(|ext| ext == "mm");
+            if objcxx_only {
+                objcxx
+            } else {
+                !objcxx || cfg!(target_os = "macos")
+            }
+        });
+    }
+    scope
 }
 
-fn scan_clang_tidy(includes_only: bool, check: bool, changed: bool) -> Result<(), Box<dyn Error>> {
+fn run_clang_tidy(
+    includes_only: bool,
+    check: bool,
+    changed: bool,
+    objcxx_only: bool,
+) -> Result<(), Box<dyn Error>> {
+    let scope = active_native_scope(
+        if changed {
+            crate::test_scope::native_lint_scope()?
+        } else {
+            NativeLintScope::All
+        },
+        objcxx_only,
+    );
+    if scope.is_empty() {
+        println!("LLVM 变更检查：没有当前平台的静态分析输入，跳过构建");
+        return Ok(());
+    }
+    build_launcher()?;
+    if !objcxx_only {
+        build_benchmark_moc()?;
+    }
+    scan_clang_tidy(includes_only, check, &scope, objcxx_only)
+}
+
+/// 输入已由共享影响规则分类；已有源码无法映射到编译图时保守扩大扫描。
+fn select_native_commands(
+    mut commands: Vec<panta_build::database::CompileCommand>,
+    scope: &NativeLintScope,
+    root: &Path,
+    objcxx_only: bool,
+) -> Result<Vec<panta_build::database::CompileCommand>, Box<dyn Error>> {
+    if commands.is_empty() {
+        return Err("clang-tidy 翻译单元清单为空".into());
+    }
+    if objcxx_only {
+        commands.retain(|entry| entry.source().extension().is_some_and(|ext| ext == "mm"));
+        if commands.is_empty() {
+            return Err("Objective-C++ 翻译单元清单为空".into());
+        }
+    }
+    if let NativeLintScope::Sources(sources) = scope {
+        let selected = sources
+            .iter()
+            .map(|source| root.join(source))
+            .filter(|source| source.is_file())
+            .map(|source| source.canonicalize().unwrap_or(source))
+            .collect::<std::collections::BTreeSet<_>>();
+        let registered = commands
+            .iter()
+            .map(|entry| {
+                let source = entry.source();
+                source.canonicalize().unwrap_or(source)
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        if selected.is_subset(&registered) {
+            commands.retain(|entry| {
+                let source = entry.source();
+                selected.contains(&source.canonicalize().unwrap_or(source))
+            });
+        } else {
+            println!("变更源码未完整登记在编译图中，扩大到当前平台完整 LLVM 扫描");
+        }
+    }
+    Ok(commands)
+}
+
+fn scan_clang_tidy(
+    includes_only: bool,
+    check: bool,
+    scope: &NativeLintScope,
+    objcxx_only: bool,
+) -> Result<(), Box<dyn Error>> {
+    let directory = native_build_dir().join("quality");
+    let commands = select_native_commands(
+        panta_build::database::read(&directory.join("compile_commands.json"))?,
+        scope,
+        repository_root()?,
+        objcxx_only,
+    )?;
+    if commands.is_empty() {
+        println!("LLVM 变更检查：已删除的源码不在当前编译图中");
+        return Ok(());
+    }
+    println!("LLVM 检查：{} 个自有翻译单元", commands.len());
     let llvm = panta_build::resolve_llvm_compilers(target_root())?;
     let tool = llvm
         .root
         .join("bin")
         .join(panta_build::exe_name("clang-tidy"));
-    let directory = native_build_dir().join("quality");
-    let mut commands = panta_build::database::read(&directory.join("compile_commands.json"))?;
-    if commands.is_empty() {
-        return Err("clang-tidy 翻译单元清单为空".into());
-    }
-    if changed && !crate::test_scope::force_full_scope() {
-        let root = repository_root()?;
-        let paths = crate::test_scope::changed_paths()?;
-        let changed_sources = paths
-            .iter()
-            .map(|path| root.join(path))
-            .filter(|path| path.is_file())
-            .collect::<Vec<_>>();
-        let changed_headers = changed_sources.iter().any(|path| {
-            matches!(
-                path.extension().and_then(|extension| extension.to_str()),
-                Some("h" | "hpp")
-            )
-        });
-        let build_configuration_changed = paths.iter().any(|path| {
-            path.starts_with("native/")
-                && (path.ends_with("CMakeLists.txt") || path.ends_with(".cmake"))
-        });
-        if !changed_headers && !build_configuration_changed {
-            let selected = changed_sources
-                .iter()
-                .filter(|path| {
-                    matches!(
-                        path.extension().and_then(|extension| extension.to_str()),
-                        Some("cpp" | "cc" | "cxx")
-                    )
-                })
-                .map(|path| path.canonicalize().unwrap_or_else(|_| path.clone()))
-                .collect::<std::collections::BTreeSet<_>>();
-            commands.retain(|entry| {
-                let source = entry
-                    .source()
-                    .canonicalize()
-                    .unwrap_or_else(|_| entry.source());
-                selected.contains(&source)
-            });
-            if commands.is_empty() {
-                println!("clang-tidy 变更检查：没有受影响的 C++ 翻译单元");
-                return Ok(());
-            }
-        } else {
-            println!("clang-tidy 变更检查扩大到完整 native 翻译单元（头文件或 CMake 配置变更）");
-        }
-    }
     let env = panta_build::native_test_env(target_root(), env!("PANTA_TEST_HOST"))?;
     // TU 之间相互独立、--fix 也只写各自源文件，按核数分片并行缩短最重
     // 门禁（单遍串行要数分钟）；单 TU 失败不短路，聚合后原样转发完整
@@ -335,7 +366,11 @@ fn scan_clang_tidy(includes_only: bool, check: bool, changed: bool) -> Result<()
     }
 }
 
-fn run_cppcheck() -> Result<(), Box<dyn Error>> {
+fn run_cppcheck(changed: bool) -> Result<(), Box<dyn Error>> {
+    if changed && active_native_scope(crate::test_scope::native_lint_scope()?, false).is_empty() {
+        println!("Cppcheck 变更检查：没有静态分析输入，跳过构建");
+        return Ok(());
+    }
     build_launcher()?;
     build_benchmark_moc()?;
     scan_cppcheck()
@@ -385,4 +420,73 @@ fn scan_cppcheck() -> Result<(), Box<dyn Error>> {
             .display()
     ));
     run_scanner("cppcheck", command)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use panta_build::database::CompileCommand;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn native_scan_preserves_shared_consumers_and_rejects_an_empty_platform_graph()
+    -> Result<(), Box<dyn Error>> {
+        let root = std::env::temp_dir().join(format!("panta-native-scope-{}", std::process::id()));
+        std::fs::create_dir_all(&root)?;
+        for source in ["a.cpp", "b.mm", "unregistered.cpp"] {
+            std::fs::write(root.join(source), "")?;
+        }
+        let commands = ["a.cpp", "b.mm"]
+            .map(|file| CompileCommand {
+                directory: root.clone(),
+                file: file.into(),
+                arguments: Some(vec!["clang++".into()]),
+                command: None,
+            })
+            .to_vec();
+        let scope = |source: &str| NativeLintScope::Sources(BTreeSet::from([source.to_owned()]));
+        let result = (|| -> Result<(), Box<dyn Error>> {
+            let changed = select_native_commands(commands.clone(), &scope("a.cpp"), &root, false)?;
+            assert_eq!(changed.len(), 1);
+            assert!(changed[0].source().ends_with("a.cpp"));
+            assert_eq!(
+                select_native_commands(commands.clone(), &NativeLintScope::All, &root, false)?
+                    .len(),
+                2
+            );
+            // 已存在但未登记的源文件不能成功筛空；删除的源文件则无需再分析。
+            assert_eq!(
+                select_native_commands(commands.clone(), &scope("unregistered.cpp"), &root, false)?
+                    .len(),
+                2
+            );
+            assert!(
+                select_native_commands(commands.clone(), &scope("deleted.cpp"), &root, false)?
+                    .is_empty()
+            );
+            let objcxx =
+                select_native_commands(commands.clone(), &NativeLintScope::All, &root, true)?;
+            assert_eq!(objcxx.len(), 1);
+            assert!(objcxx[0].source().ends_with("b.mm"));
+            assert!(
+                select_native_commands(
+                    vec![commands[0].clone()],
+                    &NativeLintScope::All,
+                    &root,
+                    true
+                )
+                .is_err()
+            );
+            assert!(select_native_commands(vec![], &NativeLintScope::All, &root, false).is_err());
+            Ok(())
+        })();
+        std::fs::remove_dir_all(root)?;
+        result
+    }
+
+    #[test]
+    fn lint_rejects_unrecognized_options_without_running_tools() {
+        assert!(lint(Some("clippy"), true, true, &["--unknown".into()]).is_err());
+        assert!(lint(None, true, true, &["--objcxx-only".into()]).is_err());
+    }
 }

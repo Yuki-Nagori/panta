@@ -2,6 +2,8 @@
 
 采用“先写 task，再做实现”的工作方式。001–006、008–012、014、018–020、026、036、039–041、043–046、113、114 已完成，对应实现与验证见各任务记录。GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)（commit `48ea4b4`）三平台成功，覆盖 Cargo 测试、native CTest、覆盖率门槛和格式检查。2026-09-24 `cargo coverage` 函数/行覆盖率为 90.34% / 93.95%，超过当时 89% / 92% 门槛；2026-10-16 按维护者要求将现行门槛调整为 85% / 85%。Issue #11 更新了任务 032 的后续计划，取消追求 100% 与逐文件阈值，拟保留适度全局下限并转向行为 / 契约测试；任务整体保持 deferred。031 已登记三平台 VTK WebGPU 与 OCCT/Netgen SDK manifest。007 已实现硬件窗口视口，并在 2026-10-02 延后：adapter 预检已落地，跨显示器 DPR、`cargo run` 画面操作和 Linux Wayland 真实窗口留到恢复时再验。010 的 Netgen 适配与调用侧销毁 workaround 已由维护者确认通过 commit `376f338` 三平台 CI。任务 079 跟踪 SDK 修复进入消费基线后的兼容特例清理。2026-09-24 的 [077 状态盘点](task/077-active-task-status-audit.md) 保留为当时快照；2026-09-28 的 [084 复查](task/084-active-task-status-followup.md) 对照了当时 15 个进行中项，未发现具备全部关闭证据的任务。2026-10-02 的 [101 CI 验收复查](task/101-active-task-ci-acceptance.md) 核对 [最新 CI run 36890328640](https://github.com/Yuki-Nagori/panta/actions/runs/36890328640)（`a0f0872`），19 个 job 全部成功；只差 CI 的 089、098 已关闭，其余任务保留尚未完成的验收。2026-10-09 的 [101 最新复查](task/101-active-task-ci-acceptance.md#2026-10-09-当前复查) 核对 CI 37910040544（19 作业全部成功）和当前 10 个 in-progress 项：本次 0 项可关闭，均仍有非 CI 条件；详细剩余条件见该复查表及各任务记录。013 的剩余部署验收由维护者于 2026-10-17 暂缓，见该任务记录。其他剩余条件见下方 task 表和各任务记录。任务详情是范围、验收与证据的主记录，索引提供队列总览，状态变更时两处一起更新。
 
+2026-10-20 架构复查修复见 [119](task/119-rust-cmake-layering-lint.md)、[120](task/120-pr-affected-test-selection.md) 与 [025](task/025-variable-dsl.md)：原型目录迁移、质量范围补齐、独立工具缓存及变量后台读写已完成本地适用验证和独立评审；本轮 GitHub CI 尚未运行。三个任务保留原交付状态，新增证据在各任务中单列。
+
 ## 目录与使用方式
 
 ```text

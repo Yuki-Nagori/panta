@@ -85,5 +85,5 @@
 
 - 已完成（macOS，仓库根目录）：`git diff HEAD --check` 通过；全文 `rg` 检查无旧目录引用（保留任务 050 文件名）；23 份 Markdown 的 213 个本地链接均有效；迁移的 6 份 HTML/CSS/JS 与 `HEAD` 原文件字节一致，HTML 相对资源均存在。未运行完整门禁或真实窗口。
 - 迁移独立提交评审：`gpt-6.1-sol` medium 只读核对文件字节、142 个 SVG 来源注释、Markdown/HTML 相对链接、QtTest 资源 URL 与 Cargo 重建追踪，未发现阻断问题。新原型路径已实测触发全量保守回退，不依赖后续精细分类；构建与资源行为测试在本轮后续修复完成后统一验证。
-- 待完成：新原型路径的 L1/L2 与质量范围分类回归、资源加载验证、适用 `cargo verify-changed` 和独立只读评审。
-- 待补记录：本轮实际执行命令、环境、结果及评审修复后的复验；不复用历史通过记录作为本轮证据。
+- 新原型路径实跑 `cargo test-plan --ci` 选择 `bridge/qml`，不再当文档跳过，也不需全量回退；未知 `ai-docs/` 非 Markdown 输入仍完整回退。选择器 16 项回归通过；runner 共 30 项通过，另 3 项性能入口专属检查保持忽略。
+- `cargo test-scope all` 通过本轮选中的全部 Rust package 与 CTest 86/86，包含迁移后的 `Qml.ThemeComponentParameters` 资源加载和比对。适用质量阶段按 119 的本轮记录完成；`gpt-6.1-sol` medium 独立只读评审最终完整分支，未发现未解决问题。本轮尚未创建 PR 或运行其 GitHub CI。

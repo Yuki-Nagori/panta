@@ -55,12 +55,51 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        with:
+          tool: cargo-machete
+
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        with:
+          tool: cargo-deny
+
       - name: Run full format, lint and dependency audit
         shell: bash
         run: |
           cargo format --check
           cargo lint --check
           cargo audit
+
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        if: always()
+        with:
+          tool: cargo-machete
+          mode: save
+
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        if: always()
+        with:
+          tool: cargo-deny
+          mode: save
+
+  objcxx-lint:
+    name: full Objective-C++ checks (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Check all handwritten Objective-C++ translation units
+        shell: bash
+        run: |
+          cargo lint clang-tidy --objcxx-only --check
+          cargo lint includes --objcxx-only --check
 
   rust-coverage:
     name: full Rust coverage gate (ubuntu)
@@ -75,9 +114,19 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        with:
+          tool: cargo-llvm-cov
+
       - name: Run Rust coverage gate
         shell: bash
         run: cargo coverage
+
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        if: always()
+        with:
+          tool: cargo-llvm-cov
+          mode: save
 
       - name: Upload Rust coverage reports
         if: always()

@@ -1,11 +1,8 @@
 #include "window_chrome_metrics.hpp"
-
 #import <AppKit/AppKit.h>
-
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <algorithm>
-#include <cstdint>
 
 namespace panta {
 
@@ -18,7 +15,8 @@ auto WindowChromeMetrics::leadingSystemControlsInset() const -> qreal {
 
     // macOS 的 QWindow 原生句柄是其 NSView；从实际标准标题栏按钮位置计算避让，
     // 不把 safeAreaInsets 或平台固定像素当作交通灯宽度。
-    auto* view = reinterpret_cast<NSView*>(static_cast<std::uintptr_t>(window->winId()));
+    // Cocoa 的 WId 编码 NSView*；这里只恢复 Qt 的句柄，不计算数值地址。
+    auto* view = reinterpret_cast<NSView*>(window->winId()); // NOLINT(performance-no-int-to-ptr)
     NSWindow* native_window = view.window;
     NSView* content_view = native_window.contentView;
     if (native_window == nil || content_view == nil) {
@@ -28,8 +26,8 @@ auto WindowChromeMetrics::leadingSystemControlsInset() const -> qreal {
     qreal left_edge = 0;
     qreal right_edge = 0;
     bool has_button = false;
-    for (const NSWindowButton button_type : {NSWindowCloseButton, NSWindowMiniaturizeButton,
-                                              NSWindowZoomButton}) {
+    for (const NSWindowButton button_type :
+         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
         NSButton* button = [native_window standardWindowButton:button_type];
         if (button == nil || button.superview == nil) {
             continue;

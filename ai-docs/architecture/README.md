@@ -31,7 +31,7 @@
 `panta-ffi` 负责 CXX 边界；VTK 视口的旧 Qt OpenGL/QQuickVTKItem 模块、适配器和
 创建级测试曾落地，但由于 macOS 26 窗口化渲染路径崩溃，任务 007 已切换到
 VTK WebGPU + 平台 hardware window 路线（Linux Wayland、macOS Cocoa、Windows Win32）。
-`sdk-vtk-9.7.0-webgpu` 已由受信 CI 发布并登记，原生 surface 宿主也已接入 native 工程；真实窗口与三平台运行冒烟仍由 007 收口。`App.qml` 已改为实际创建 `CaeViewport`。其余业务服务尚未完成。本组文档
+`sdk-vtk-9.7.0-webgpu` 已由受信 CI 发布并登记，原生 surface 宿主也已接入 native 工程；`App.qml` 已实际创建 `CaeViewport`。macOS Cocoa/Metal 与 Windows 已有真实窗口证据；Linux Wayland、跨显示器 DPR 及 007 列明的剩余场景尚未收口，007 当前为 deferred。工程新建/打开/保存、STL 预检与导入已由 063 实现，088 已交付 schema 4 工程清单与 Mesh sidecar 旁置存储、按需激活；121–124 的窄 CLI 与 GUI 共用 Rust 应用命令。024 的工程运行时上下文、不可变快照与协作取消也已接入 `ProjectService`。STEP 导入到工程、实际 Create Mesh、Study 与真实求解器流程仍未交付。本组文档
 描述目标架构与已验证的边界，不把规划能力写成已实现；具体依赖版本、协议
 编码和持久化格式仍须在实施时验证并确定。文档中的字段名和 API 名用于说明
 语义，不是已发布接口。
@@ -42,8 +42,8 @@ VTK WebGPU + 平台 hardware window 路线（Linux Wayland、macOS Cocoa、Windo
 
 V1 应覆盖工程新建、打开、保存，STEP 导入，面/边/实体选择，Netgen 网格生成，
 表面与体网格显示，属性编辑，相机、裁剪、色标和求解器占位入口。当前 VTK
-视口已完成 WebGPU/platform-surface 适配边界、最小测试图元和 native configure/build 验证；
-真实窗口化、高 DPI、事件和三平台运行证据仍待完成，见[任务 007](../task/007-vtk-quick-viewport.md)，不能据此宣称 V1 视口已交付。
+视口已完成 WebGPU/platform-surface 适配边界、STL 网格显示与输入协调，macOS 和 Windows 已有窗口与生命周期记录；
+Linux Wayland 真实窗口、跨显示器 DPR 及剩余窗口场景仍待完成，见[任务 007](../task/007-vtk-quick-viewport.md)，不能据此宣称完整 V1 视口已交付。
 V1 不实现 AI、自研 GPU 计算后端或物理求解内核。VTK/Qt 正常使用图形硬件
 不属于排除范围中的 GPU 计算开发。
 

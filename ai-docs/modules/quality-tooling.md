@@ -6,14 +6,14 @@
 
 质量工具链覆盖已经存在的 Rust、C++20、QML/Qt 和 CMake。Python/Node 源码真正进入仓库后才引入相应工具。以下区分当前门禁与规划目标，工具或文档就绪不代表任务验收完成。
 
-## 完成情况（2026-10-17）
+## 完成情况（2026-10-20）
 
 **Rust 覆盖率门槛只在 nightly 执行，跨语言覆盖率规划仍未全部验收。** Cargo 入口、CMake 原生构建图与根质量入口已接通；032 保持 `deferred`，042 仍为 `in-progress`。Rust 覆盖率函数/行下限为 85%/85%；native coverage 只生成报告，尚无阈值门禁。
 
 | 检查面 | 当前实现 | 验证边界 |
 |---|---|---|
 | Rust | rustfmt、Clippy、deny、machete、测试、覆盖率 | 全局阶段下限不保证逐模块或逐提交不下降 |
-| C++ / CXX | 托管 LLVM、clang-tidy、include-cleaner、Cppcheck、GTest/QtTest | 合并 CMake/CXX 编译命令，分析自有翻译单元；仍需三平台冷构建证据 |
+| C++ / Objective-C++ / CXX | 托管 LLVM、clang-tidy、include-cleaner、Cppcheck、GTest/QtTest | 合并 CMake/CXX 编译命令，分析自有翻译单元；仍需三平台冷构建证据 |
 | C++ 动态检测 | sanitizer 矩阵：ASan+UBSan 三平台、TSan 仅 Linux/macOS；`cargo sanitize` 每组合独立插桩树并完整执行 CTest | Qt/SDK 预编译库与 Cargo CXX adapter 不插桩，检测边界为自有 C++；错误经非零退出阻断，矩阵依据见任务 042 |
 | Rust 动态检测 | Miri（固定日期 nightly）解释纯 Rust crate 测试：`cargo ub-check`；关闭隔离放行文件系统夹具 | CXX FFI 与进程/构建类 crate 不可解释；crash 模块进程测试在 Miri 下跳过，真实平台照常执行 |
 | QML / CMake | qmlformat、qmllint、行为测试、cmake-format/lint | QML 源码级覆盖率未实现 |
@@ -47,18 +47,22 @@ Cppcheck 从真实数据库保留编译宏、自有头文件及 moc/CXX 生成�
 
 `.clang-tidy` 对 Qt 基础转发链 `QtGlobal/qglobal.h/qtypes.h/qminmax.h/qnumeric.h` 以及 `qstringliteral.h` 配置精确 include-cleaner 例外：Qt 公开 API 约定允许通过聚合/转发头使用 `qreal`、`qMax`、`qRound`、`QStringLiteral` 等基础定义，检查器不应迫使源码改用标准库替代品；范围不扩展到 Qt 业务模块或自有头。源码仍优先写稳定的 Qt 聚合入口（如 `<QtGlobal>`、`<QString>`）。另对 QtTest `qtest.h` 保留 `QTRY_*` 宏例外，因为检查器不跟踪宏内部声明。头文件列表保持连续且无注释；这些例外不屏蔽其他缺失或多余 include。
 
+macOS 的 `window_chrome_metrics_mac.mm` 与 `vtk_native_surface.mm` 从 Qt Cocoa 的 `WId` 恢复 `NSView*`，不执行数值地址计算。两处 API 句柄转换逐行标记 `NOLINT(performance-no-int-to-ptr)` 并说明理由，替代验证为 Cocoa 窗口及原生 surface 生命周期测试；若 Qt 提供可替换的稳定指针接口时复查，不扩展到其他整数/指针转换。
+
 ## 当前执行入口
 
 - `cargo build` 准备构建所需 LLVM、CMake/Ninja、Qt/GoogleTest 并完整链接；`cargo test --workspace` 保留原生 Cargo 语义，根集成测试执行 qmllint 和完整 CTest。根目录默认成员是 `panta-launcher`，裸 `cargo build`/`cargo test` 只覆盖该包及其依赖。Debug/Release 与显式本机 `--target` 的目录保持一致；跨目标构建明确拒绝。
-- `cargo format` 就地修复 Rust、C++/CXX、CMake、应用及测试 QML 的格式；`cargo format --check` 只验证不改动。Qt 格式工具直接供给，不配置或编译 native 工程。
+- `cargo format` 就地修复 Rust、C++/Objective-C++/CXX、CMake、应用及测试 QML 的格式；`cargo format --check` 只验证不改动。Qt 格式工具直接供给，不配置或编译 native 工程。
 - `cargo lint clippy|machete|cmake|layering|qmllint|clang-tidy|includes|cppcheck` 按需准备工具；不带工具名顺序执行全部，并在每个阶段开始时打印进度。`layering` 每次完整核对 Cargo 与配置后的 CMake 依赖图；clang-tidy 对自有翻译单元逐文件检查，最多 8 个 worker；成功的文件默认不输出，长时间停留在该阶段时可查看 worker 活动或单独重跑 `cargo lint clang-tidy --check` 定位慢项。不要按“测试代码复杂”整体排除测试文件；只有确认工具本身无法处理的单文件才可按具体诊断设置精确例外。缺省为修复模式（clippy/clang-tidy 应用可自动修复项后回落检查，其余工具只报告），`--check` 只验证不改动；CI 与 pre-commit 一律使用 `--check`。audit/machete 编译 runner 时不下载 LLVM/CMake。
 - `cargo format --changed` 与 `cargo lint <tool> --changed` 复用 `cargo test-plan` 的变更路径；本地从 Git 状态计算，CI 由 `changed-paths` action 传入同一选择器输出。CI 设置 `PANTA_CHANGED_PATHS_JSON` 提供路径 JSON、`PANTA_FORCE_FULL` 传递完整回退标志；未知路径、公共质量配置或无法安全缩小的检查会扩大到完整范围。Clippy 检查 L1/L2 受影响包，Rust 格式只检查直接变更包，文件级格式与适用 lint 检查变更文件；分层图、跨翻译单元 cppcheck 和完整 qmllint 仍完整扫描。`cargo lint layering --check` 单独检查时始终扫描完整依赖图。
+- macOS 的 `cargo lint clang-tidy --objcxx-only --check` 与 `cargo lint includes --objcxx-only --check` 只扫描真实编译数据库中的手写 `.mm` 集合；未指定 `--changed` 时完整扫描，完整集合为空时报错，避免 Apple 条件编译源文件被成功筛空。CI 配合 `--changed`，nightly 完整补扫；普通完整 lint 仍扫描当前平台全部自有翻译单元。Cppcheck 不解析 Objective-C++，其数据库明确排除 `.mm`；这些文件由 macOS LLVM 检查覆盖。
 - `cargo audit`、`cargo coverage`、`cargo coverage native` 分别负责依赖审计、Rust 门禁和 native 覆盖率报告。`cargo quality` 聚合格式、lint、审计、测试，不包含 coverage。
 - `cargo sanitize` 按平台固定 sanitizer 矩阵（Linux/macOS：ASan+UBSan 与 TSan 独立树；Windows：ASan），每组合一个 `target/native/debug-sanitizer-<组合>` 插桩树并完整执行 CTest；组合合法性在 configure 期校验，TSan 互斥与平台缺口按官方文档注明，矩阵与依据见任务 042。`cargo ub-check` 以固定 nightly 解释执行 panta-core、panta-dsl-core、panta-foundation 测试，产物在 `target/miri`；CXX FFI 与进程类 crate 不在其语义内。
 - `cargo run --locked -p panta-tests -- toolchain` 检查托管工具版本、Qt/GoogleTest 文件、CMakeCache 的 C/C++ 编译器/CMake/Ninja 路径，以及合并编译数据库中包括手写 CXX adapter 在内的实际编译器。系统旁路不能作为该检查的通过证据。
 - [111](../task/111-build-and-quality-module-boundaries.md) 整理模块边界：`panta-build` 的根门面重导出原 API，`assets / archive / install / paths / compiler / environment` 分别承接固定清单、归档处理、安装事务、文件定位、编译器与平台环境。`database / python` 的公共入口保持。质量 runner 的 `main.rs` 只分发并编排顶层命令，`command / paths / build / format / lint / toolchain / sanitize / miri / coverage / performance` 承接各自职责；模块不绕过 Cargo / CMake 或新增安装入口。私有回归内联于被测模块，性能 CLI 检查仍由手动性能入口运行。
 - runner、FFI 与 launcher 共用 `panta-build`，无需通过 `#[path]` 导入其他 crate 私有文件或整体关闭 dead-code 告警。质量数据库位于 `target/native/<profile>/quality/compile_commands.json`；只选自有翻译单元，头文件不单独伪造编译命令。
-- PR 与 main push 的 CI 三平台顺序执行 check、build、工具核验与 L1/L2 影响范围测试；lint 按工具与变更路径域拆分触发（machete→rust、cmake→native、layering→rust/native/Cargo 依赖、qmllint→qml/native），dependency-audit 仅随依赖清单触发。Clippy、CMake lint 与文件级格式检查通过 `--changed` 使用共享变更路径；分层图 lint 和跨翻译单元检查仍全量运行。纯 Markdown 的 push / PR 由事件层路径过滤，不创建 CI run；含其他路径的变更进入 changes 分类，分类为文档的路径仍只运行 changes，其余 job 跳过。Nightly 执行三平台完整 workspace 测试、完整 lint 和 Rust/native coverage；Rust coverage 以函数/行各 85% 作为门槛，native coverage 归档报告但不设阈值。Cargo 工具缓存仅由 main push 的 check job 保存，其余 job 只恢复；缓存瘦身在供给代码完成——panta-build 安装归档发布即删并按白名单裁剪 LLVM，Qt/SDK CMake 供给发布即删归档，三平台条目合计控制在仓库 10 GB 配额内。CI 不单独安装非 Rust 质量工具。Cargo aliases 和内部 Cargo 调用默认 `--locked`，直接 `cargo build/test/check` 按原生 Cargo 语义由调用者选择 `--locked`。
+- PR 与 main push 的 CI 三平台顺序执行 check、build、工具核验与 L1/L2 影响范围测试；lint 按工具与变更路径域拆分触发（machete→rust、cmake→native、layering→rust/native/Cargo 依赖、qmllint→qml/native），dependency-audit 仅随依赖清单触发。Clippy、CMake lint 与文件级格式检查通过 `--changed` 使用共享变更路径；分层图 lint 和跨翻译单元检查仍全量运行。纯 Markdown 的 push / PR 由事件层路径过滤，不创建 CI run；含其他路径的变更进入 changes 分类，分类为文档的路径仍只运行 changes，其余 job 跳过。macOS 按同一影响范围规则补充手写 Objective-C++ 的 clang-tidy 与 include-cleaner；Ubuntu 的扫描无法覆盖 Apple 条件编译的翻译单元。Nightly 执行三平台完整 workspace 测试、完整 lint、macOS Objective-C++ 静态检查和 Rust/native coverage；Rust coverage 以函数/行各 85% 作为门槛，native coverage 归档报告但不设阈值。
+- Cargo home 与 SDK 缓存由 main push 的 check job 保存，其余 job 只恢复；`changes` 也安装 `rust-toolchain.toml` 固定工具链并仅恢复 Cargo home，不使用浮动 stable 或下载 SDK。`cargo-deny`、`cargo-machete` 和 `cargo-llvm-cov` 的成品通过 `panta-cargo-tool-cache` 按工具独立缓存，键包含 OS、架构、从 Rust 常量读取的锁定版本和固定 Rust 工具链摘要；PR 只恢复，main push 和 main 上的 nightly 可保存。每键只保存该版本已完成安装的目录，避免 SDK 缓存先发布后无法填入质量工具；SDK 缓存排除全部 `cargo-*`，不重复存储成品或 `cargo-build` 临时编译树。缓存瘦身同时在供给代码完成——panta-build 安装归档发布即删并按白名单裁剪 LLVM，Qt/SDK CMake 供给发布即删归档，三平台条目合计控制在仓库 10 GB 配额内。CI 不单独安装非 Rust 质量工具。Cargo aliases 和内部 Cargo 调用默认 `--locked`，直接 `cargo build/test/check` 按原生 Cargo 语义由调用者选择 `--locked`。
 
 真实窗口、DPR、多显示屏、GPU、线程及 ABI 检查单独留证。无头组件测试不能代替所有平台的真实图形生命周期验证。
 

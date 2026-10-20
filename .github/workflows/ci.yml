@@ -1,10 +1,11 @@
 # 质量与构建门禁（任务 011/018/032/043/046）。公共步骤封装在
 # .github/actions/*：changed-paths（路径分类门控）、panta-toolchain、
-# linux-gl-prereqs、panta-cache-restore / panta-cache-save（缓存两键，
-# 仅 check 在 main push 保存，其余 job 只恢复）。
+# linux-gl-prereqs、panta-cache-restore / panta-cache-save（cargo-home 与 SDK 缓存，
+# 仅 check 在 main push 保存）、panta-cargo-tool-cache（质量工具独立缓存）。
 # - changes：按变更路径拆分触发，未知路径一律保守触发全量检查并输出测试闭包；
-# - check：唯一跨平台 job；每个平台执行 check/build/工具核验和受影响测试；
+# - check：每个平台执行 check/build/工具核验和受影响测试；
 # - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位，按域触发；
+# - lint-objcxx：macOS 按影响范围补扫手写 Objective-C++ 的 clang-tidy 与 include；
 # - format：Ubuntu 上通过 cargo format --check 检查 Rust、C++/CXX、CMake、QML 和 `.pa`；
 # - dependency-audit：仅在依赖清单/审计配置变更时运行；
 # - 完整 Rust/native coverage 与长时动态检查由 nightly.yml 每日运行；
@@ -37,6 +38,9 @@ on:
       - ".github/**/*.md"
       - ".cargo/**/*.md"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -66,6 +70,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/panta-cache-restore
+        with:
+          tools_deps: "false"
+
       - id: filter
         uses: ./.github/actions/changed-paths
 
@@ -84,9 +94,19 @@ jobs:
         with:
           tools_deps: "false"
 
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        with:
+          tool: cargo-deny
+
       - name: Dependency and license audit
         shell: bash
         run: cargo audit
+
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        if: always()
+        with:
+          tool: cargo-deny
+          mode: save
 
   lint-clippy:
     name: cargo lint (clippy, ubuntu)
@@ -145,6 +165,31 @@ jobs:
           PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
         run: cargo lint "${{ matrix.tool }}" --changed --check
 
+  # Apple 条件编译的 .mm 不会出现在 Ubuntu 编译数据库；仅补扫这一集合。
+  lint-objcxx:
+    name: cargo lint (Objective-C++, macOS)
+    needs: [changes]
+    if: needs.changes.outputs.native == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/panta-cache-restore
+
+      - name: Check affected handwritten Objective-C++ translation units
+        shell: bash
+        env:
+          PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
+          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
+        run: |
+          cargo lint clang-tidy --objcxx-only --changed --check
+          cargo lint includes --objcxx-only --changed --check
+
   # machete 只读 Rust 清单与源码，不进 native 构建图：按 rust 域触发，
   # 且不需要托管工具/依赖缓存。
   lint-machete:
@@ -162,9 +207,19 @@ jobs:
         with:
           tools_deps: "false"
 
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        with:
+          tool: cargo-machete
+
       - name: Run cargo machete
         shell: bash
         run: cargo lint machete --check
+
+      - uses: ./.github/actions/panta-cargo-tool-cache
+        if: always()
+        with:
+          tool: cargo-machete
+          mode: save
 
   # cmake-lint 只检查 native CMake 文件：按 native 域触发。
   lint-cmake:
@@ -242,7 +297,7 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
-      - name: Run changed-file format checks (Rust, C++/CXX, CMake and QML)
+      - name: Run changed-file format checks (Rust, C++/Objective-C++/CXX, CMake and QML)
         shell: bash
         env:
           PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
