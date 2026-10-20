@@ -1,4 +1,5 @@
 // 080 / 088 的手动真实工程基准；测量 Mesh sidecar 激活/重载、页签快切与快照内存。
+#include "project_operation_helpers.hpp"
 #include "project_view_model.hpp"
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -44,6 +45,8 @@
 #include <psapi.h>
 #include <windows.h>
 #endif
+
+using panta::test::finish_project_operation;
 
 namespace {
 
@@ -359,6 +362,7 @@ bool wait_for_activation(ProjectViewModel& view_model, Predicate&& ready, int ti
         QObject::connect(&view_model, &ProjectViewModel::activeDocumentChanged, &loop, check);
     const auto documents_connection =
         QObject::connect(&view_model, &ProjectViewModel::documentsChanged, &loop, check);
+    QObject::connect(&view_model, &ProjectViewModel::meshChanged, &loop, check);
     QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
     timeout.start(timeout_ms);
     loop.exec();
@@ -415,37 +419,52 @@ int main(int argc, char* argv[]) try {
 
     const std::filesystem::path manifest_path(arguments[1].toStdU16String());
     std::vector<TimedSample> project_open_samples;
+    std::vector<TimedSample> project_open_admission_samples;
+    project_open_admission_samples.reserve(static_cast<std::size_t>(reload_iterations));
     project_open_samples.reserve(static_cast<std::size_t>(reload_iterations));
     for (int sample = 0; sample < reload_iterations; ++sample) {
         const auto start = start_measurement();
         ProjectViewModel probe;
-        if (!probe.openProject(arguments[1])) {
+        const bool accepted = probe.openProject(arguments[1]);
+        project_open_admission_samples.push_back(finish_measurement(start));
+        if (!finish_project_operation(probe, accepted)) {
             return fail("openProject failed: " + probe.error().toStdString());
         }
         project_open_samples.push_back(finish_measurement(start));
     }
+    print_samples("project_open_admission", project_open_admission_samples,
+                  "new_ProjectViewModel+background_command_admission;excludes_completion_wait");
     print_samples("project_open", project_open_samples,
-                  "new_ProjectViewModel+manifest_read_validate;warm_os_page_cache");
+                  "new_ProjectViewModel+worker_admission+manifest_read_validate+queued_publication;"
+                  "warm_os_page_cache");
 
     auto view_model = std::make_unique<ProjectViewModel>();
     auto& vm = *view_model;
     const auto baseline_memory = sample_memory();
     print_memory("service_baseline", baseline_memory, 0);
-    if (!vm.openProject(arguments[1])) {
+    if (!finish_project_operation(vm, vm.openProject(arguments[1]))) {
         return fail("openProject failed: " + vm.error().toStdString());
     }
     print_project_storage(manifest_path);
 
     std::vector<TimedSample> save_samples;
+    std::vector<TimedSample> save_admission_samples;
+    save_admission_samples.reserve(static_cast<std::size_t>(reload_iterations));
     save_samples.reserve(static_cast<std::size_t>(reload_iterations));
     for (int sample = 0; sample < reload_iterations; ++sample) {
         const auto start = start_measurement();
-        if (!vm.saveProject()) {
+        const bool accepted = vm.saveProject();
+        save_admission_samples.push_back(finish_measurement(start));
+        if (!finish_project_operation(vm, accepted)) {
             return fail("saveProject failed: " + vm.error().toStdString());
         }
         save_samples.push_back(finish_measurement(start));
     }
-    print_samples("project_save", save_samples, "atomic_manifest_write+sync;sidecars_unchanged");
+    print_samples("project_save_admission", save_admission_samples,
+                  "background_command_admission;excludes_completion_wait");
+    print_samples(
+        "project_save", save_samples,
+        "worker_admission+atomic_manifest_write+sync+queued_publication;sidecars_unchanged");
 
     const auto ids = vm.importedPartIds();
     const auto names = vm.importedPartNames();

@@ -141,7 +141,7 @@ if(BUILD_TESTING)
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototypes/shell/shell.js")
   panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
-    target_link_libraries(panta_qml_theme_component_test PRIVATE panta::bridge)
+    target_link_libraries(panta_qml_theme_component_test PRIVATE panta::bridge panta_bridgeplugin)
     target_compile_definitions(panta_qml_theme_component_test PRIVATE PANTA_TEST_WITH_BRIDGE=1)
   endif()
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint

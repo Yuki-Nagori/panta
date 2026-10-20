@@ -22,13 +22,13 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <future>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <panta/qt_adapter/standard_paths.hpp>
-#include <qlogging.h>
 #include <rust/cxx.h>
 #include <string>
 #include <system_error>
@@ -177,30 +177,6 @@ bool ProjectViewModel::placeholder_visible() const {
     return false;
 }
 
-std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
-ProjectViewModel::pull_service_mesh(const QString& importId) const {
-    const auto result =
-        panta::ffi::project_service_mesh_snapshot_for_import(*m_service, importId.toStdString());
-    if (!result.error.code.empty()) {
-        qWarning("ProjectViewModel mesh snapshot failed: %s: %s",
-                 QString::fromUtf8(result.error.code).toStdString().c_str(),
-                 QString::fromUtf8(result.error.detail).toStdString().c_str());
-        return nullptr;
-    }
-    const auto& snapshot = result.value;
-    if (snapshot.coordinates.empty() || snapshot.coordinates.size() % 9 != 0) {
-        return nullptr;
-    }
-    auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
-    mesh->project_revision = snapshot.revision;
-    mesh->vertices.reserve(snapshot.coordinates.size() / 3);
-    for (std::size_t offset = 0; offset < snapshot.coordinates.size(); offset += 3) {
-        mesh->vertices.push_back({snapshot.coordinates[offset], snapshot.coordinates[offset + 1],
-                                  snapshot.coordinates[offset + 2]});
-    }
-    return mesh;
-}
-
 const QString& ProjectViewModel::defaultLocation() const { return m_defaultLocation; }
 
 QUrl ProjectViewModel::defaultLocationUrl() const {
@@ -320,13 +296,9 @@ bool ProjectViewModel::setAnalysisSequence(const QString& projectPath, quint64 r
         !toBoundaryText(sequenceId, &sequence, &conversionError)) {
         return fail(conversionError);
     }
-    if (!applySnapshot(panta::ffi::project_service_set_analysis_sequence(*m_service, path, revision,
-                                                                         id, sequence))) {
-        return false;
-    }
-    refreshPlanSettings();
-    clearError();
-    return true;
+    return beginProjectOperation(
+        {panta::ffi::ProjectOperationKind::AnalysisSequence, path, {}, revision, id, sequence},
+        QStringLiteral("analysis-sequence"));
 }
 
 bool ProjectViewModel::setMaterial(const QString& projectPath, quint64 revision,
@@ -603,20 +575,9 @@ bool ProjectViewModel::createProject(const QString& rawName, const QString& rawL
                         &location, &conversionError)) {
         return fail(conversionError);
     }
-    const auto snapshot = panta::ffi::project_service_create(*m_service, location, name);
-    if (snapshot.error.code.empty())
-        cancelImportPreview();
-    if (!applySnapshot(snapshot)) {
-        return false;
-    }
-    if (!refreshImports()) {
-        return false;
-    }
-    resetVariableDocument();
-    reset_documents();
-    m_lastCreatedPath = m_currentPath;
-    emit projectCreated(m_lastCreatedPath);
-    return true;
+    return beginProjectOperation(
+        {panta::ffi::ProjectOperationKind::Create, location, name, 0, {}, {}},
+        QStringLiteral("create"));
 }
 
 void ProjectViewModel::clearError() {
@@ -651,19 +612,9 @@ bool ProjectViewModel::openProject(const QString& path) {
                         &conversionError)) {
         return fail(conversionError);
     }
-    const auto snapshot = panta::ffi::project_service_open(*m_service, boundaryPath);
-    if (snapshot.error.code.empty())
-        cancelImportPreview();
-    if (!applySnapshot(snapshot)) {
-        return false;
-    }
-    if (!refreshImports()) {
-        return false;
-    }
-    resetVariableDocument();
-    reset_documents();
-    emit projectOpened(m_currentPath);
-    return true;
+    return beginProjectOperation(
+        {panta::ffi::ProjectOperationKind::Open, boundaryPath, {}, 0, {}, {}},
+        QStringLiteral("open"));
 }
 
 bool ProjectViewModel::openProjectUrl(const QUrl& url) {
@@ -677,12 +628,8 @@ QString ProjectViewModel::localPath(const QUrl& url) const {
 
 bool ProjectViewModel::saveProject() {
     clearError();
-    const auto snapshot = panta::ffi::project_service_save(*m_service);
-    if (!applySnapshot(snapshot)) {
-        return false;
-    }
-    emit projectSaved(m_currentPath);
-    return true;
+    return beginProjectOperation({panta::ffi::ProjectOperationKind::Save, {}, {}, 0, {}, {}},
+                                 QStringLiteral("save"));
 }
 
 bool ProjectViewModel::beginLoadVariableDocument(quint64 expectedGeneration,
@@ -702,7 +649,7 @@ bool ProjectViewModel::beginSaveVariableDocument(const QString& source, quint64 
     return beginVariableDocument(boundarySource, true, expectedGeneration, expectedRevision);
 }
 
-void ProjectViewModel::startVariableWaiter(std::function<void()> work) {
+void ProjectViewModel::startBackgroundWaiter(std::function<void()> work) {
     std::thread(std::move(work)).detach();
 }
 
@@ -737,7 +684,7 @@ bool ProjectViewModel::beginVariableDocument(const std::string& source, bool sav
     try {
         // 先确保等待线程存在，再准入可能写盘的 Rust 请求。gate 不持有 QObject/服务。
         // std::thread 构造失败会抛异常；Qt 的 QThread::start 则可能仅 warning 且永不发 finished。
-        startVariableWaiter([ready, result] {
+        startBackgroundWaiter([ready, result] {
             auto request = ready->get();
             if (request) {
                 result->addResult(std::make_shared<Completion>(
@@ -763,6 +710,175 @@ bool ProjectViewModel::beginVariableDocument(const std::string& source, bool sav
     }
     input->set_value(std::move(request));
     return true;
+}
+
+bool ProjectViewModel::beginProjectOperation(panta::ffi::ProjectOperationInput input,
+                                             const QString& operation) {
+    if (m_projectOperationPending) {
+        return fail(QStringLiteral("project.command_invalid"), QStringLiteral("state"),
+                    QStringLiteral("project operation pending"));
+    }
+    using Request = rust::Box<panta::ffi::ProjectOperationRequest>;
+    using Completion = rust::Box<panta::ffi::ProjectOperationCompletion>;
+    using Result = std::shared_ptr<Completion>;
+    using Watcher = QFutureWatcher<Result>;
+    const auto gate = std::make_shared<std::promise<std::optional<Request>>>();
+    const auto ready = std::make_shared<std::future<std::optional<Request>>>(gate->get_future());
+    const auto result = std::make_shared<QPromise<Result>>();
+    auto watcher = std::make_unique<Watcher>();
+    result->start();
+    watcher->setFuture(result->future());
+    connect(watcher.get(), &Watcher::finished, watcher.get(), &QObject::deleteLater);
+    connect(
+        watcher.get(), &Watcher::finished, this,
+        [this, future = result->future(), operation] {
+            if (future.resultCount() == 0)
+                return;
+            const auto completion = future.result();
+            const auto snapshot =
+                panta::ffi::project_service_finish_operation(*m_service, std::move(*completion));
+            bool succeeded = applySnapshot(snapshot);
+            if (succeeded &&
+                (operation == QStringLiteral("create") || operation == QStringLiteral("open"))) {
+                cancelImportPreview();
+                succeeded = refreshImports();
+                resetVariableDocument();
+                reset_documents();
+            } else if (succeeded) {
+                refreshPlanSettings();
+            }
+            // 先完成本次错误投影，再允许 pendingChanged 接收者准入下一命令。
+            if (succeeded)
+                clearError();
+            m_projectOperationPending = false;
+            emit projectOperationPendingChanged();
+            if (succeeded) {
+                if (operation == QStringLiteral("create")) {
+                    m_lastCreatedPath = m_currentPath;
+                    emit projectCreated(m_lastCreatedPath);
+                } else if (operation == QStringLiteral("open")) {
+                    emit projectOpened(m_currentPath);
+                } else if (operation == QStringLiteral("save")) {
+                    emit projectSaved(m_currentPath);
+                }
+            }
+            emit projectOperationFinished(operation, succeeded);
+        },
+        Qt::QueuedConnection);
+    try {
+        // 等待线程先启动，避免 Rust 已接受持久化命令后无人消费终态。
+        startBackgroundWaiter([ready, result] {
+            auto request = ready->get();
+            if (request)
+                result->addResult(std::make_shared<Completion>(
+                    panta::ffi::project_operation_wait(std::move(*request))));
+            result->finish();
+        });
+    } catch (const std::system_error& error) {
+        return fail(QStringLiteral("project.io"), QStringLiteral("io"),
+                    QString::fromUtf8(error.what()));
+    }
+    watcher.release()->setParent(this);
+    auto request = panta::ffi::project_service_begin_operation(*m_service, std::move(input));
+    if (!panta::ffi::project_operation_accepted(*request)) {
+        gate->set_value(std::nullopt);
+        return applySnapshot(panta::ffi::project_service_finish_operation(
+            *m_service, panta::ffi::project_operation_wait(std::move(request))));
+    }
+    m_projectOperationPending = true;
+    gate->set_value(std::move(request));
+    emit projectOperationPendingChanged();
+    return true;
+}
+
+void ProjectViewModel::prepareActiveMesh() {
+    // 最多一个后台显示缓冲在准备；连续选择合并为最新意图，不无限创建线程/快照。
+    if (m_meshPreparationPending || m_activeDocumentId.isEmpty())
+        return;
+    const auto found = std::find_if(
+        m_openDocuments.cbegin(), m_openDocuments.cend(), [this](const QVariant& item) {
+            const auto document = item.toMap();
+            return document.value(QStringLiteral("id")).toString() == m_activeDocumentId &&
+                   document.value(QStringLiteral("kind")).toString() == QStringLiteral("import") &&
+                   document.value(QStringLiteral("state")).toString() == QStringLiteral("ready");
+        });
+    if (found == m_openDocuments.cend())
+        return;
+    using Input = rust::Box<panta::ffi::MeshDisplayInput>;
+    struct Prepared {
+        std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> mesh;
+        panta::ffi::ProjectDiagnostic error;
+    };
+    using Result = std::shared_ptr<Prepared>;
+    using Watcher = QFutureWatcher<Result>;
+    const auto gate = std::make_shared<std::promise<Input>>();
+    const auto ready = std::make_shared<std::future<Input>>(gate->get_future());
+    const auto result = std::make_shared<QPromise<Result>>();
+    auto watcher = std::make_unique<Watcher>();
+    result->start();
+    watcher->setFuture(result->future());
+    connect(watcher.get(), &Watcher::finished, watcher.get(), &QObject::deleteLater);
+    const auto selection = m_meshSelection;
+    const auto generation = m_variableGeneration;
+    connect(
+        watcher.get(), &Watcher::finished, this,
+        [this, future = result->future(), selection, generation] {
+            m_meshPreparationPending = false;
+            const auto prepared = future.result();
+            if (selection != m_meshSelection || generation != m_variableGeneration) {
+                prepared->mesh.reset();
+                prepareActiveMesh();
+                return;
+            }
+            if (!prepared->error.code.empty()) {
+                fail(prepared->error);
+                return;
+            }
+            const auto current = panta::ffi::project_service_current(*m_service);
+            if (!current.error.code.empty())
+                return;
+            if (prepared->mesh && prepared->mesh->project_revision != current.value.revision) {
+                prepared->mesh.reset();
+                prepareActiveMesh();
+                return;
+            }
+            m_activeMesh = std::move(prepared->mesh);
+            emit meshChanged();
+        },
+        Qt::QueuedConnection);
+    try {
+        startBackgroundWaiter([ready, result] {
+            auto prepared = std::make_shared<Prepared>();
+            auto source = panta::ffi::prepare_mesh_display(ready->get());
+            prepared->error = std::move(source.error);
+            if (prepared->error.code.empty()) {
+                try {
+                    auto mesh = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
+                    mesh->project_revision = source.value.revision;
+                    mesh->vertices.reserve(source.value.coordinates.size() / 3);
+                    for (std::size_t offset = 0; offset < source.value.coordinates.size();
+                         offset += 3) {
+                        mesh->vertices.push_back({source.value.coordinates[offset],
+                                                  source.value.coordinates[offset + 1],
+                                                  source.value.coordinates[offset + 2]});
+                    }
+                    prepared->mesh = std::move(mesh);
+                } catch (const std::exception& error) {
+                    prepared->error = {rust::String("project.mesh_allocation_failed"),
+                                       rust::String("resource"), rust::String(error.what())};
+                }
+            }
+            result->addResult(prepared);
+            result->finish();
+        });
+    } catch (const std::system_error& error) {
+        fail(QStringLiteral("project.io"), QStringLiteral("io"), QString::fromUtf8(error.what()));
+        return;
+    }
+    watcher.release()->setParent(this);
+    m_meshPreparationPending = true;
+    gate->set_value(panta::ffi::project_service_mesh_display_input(
+        *m_service, m_activeDocumentId.toStdString()));
 }
 
 bool ProjectViewModel::renameProject(const QString& name) {
@@ -886,6 +1002,8 @@ void ProjectViewModel::cancelImportPreview() {
     m_importPreviewName.clear();
     m_importPreviewDimensions.clear();
     m_importPreviewTriangleCount = 0;
+    m_importPreviewLargeMeshWarning = false;
+    m_importPreviewExpandedBytes = 0;
     if (changed)
         emit importPreviewChanged();
 }
@@ -923,6 +1041,8 @@ void ProjectViewModel::finish_import_preview() {
         m_importPreviewDimensions = QString::fromUtf8(panta::ffi::format_project_dimensions(
             result.value.size_x, result.value.size_y, result.value.size_z, ""));
         m_importPreviewTriangleCount = result.value.triangle_count;
+        m_importPreviewLargeMeshWarning = result.value.large_mesh_warning;
+        m_importPreviewExpandedBytes = result.value.expanded_mesh_bytes;
     } else {
         fail(result.error);
     }
@@ -1139,17 +1259,9 @@ void ProjectViewModel::refresh_workspace(bool forceActiveNotification) {
     m_openDocuments = std::move(nextDocuments);
     if (activeChanged) {
         m_activeDocumentId = nextActiveId;
-        std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot> nextMesh;
-        for (const auto& item : m_openDocuments) {
-            const auto document = item.toMap();
-            if (document.value(QStringLiteral("id")).toString() == nextActiveId &&
-                document.value(QStringLiteral("kind")).toString() == QStringLiteral("import") &&
-                document.value(QStringLiteral("state")).toString() == QStringLiteral("ready")) {
-                nextMesh = pull_service_mesh(nextActiveId);
-                break;
-            }
-        }
-        m_activeMesh = std::move(nextMesh);
+        ++m_meshSelection;
+        m_activeMesh.reset();
+        prepareActiveMesh();
         emit activeDocumentChanged();
         emit meshChanged();
     }
@@ -1161,7 +1273,7 @@ void ProjectViewModel::refresh_workspace(bool forceActiveNotification) {
 
 void ProjectViewModel::activateDocument(const QString& documentId) {
     panta::ffi::project_service_workspace_activate(*m_service, documentId.toStdString());
-    refresh_workspace();
+    refresh_workspace(!m_activeMesh);
 }
 
 void ProjectViewModel::closeDocument(const QString& documentId) {

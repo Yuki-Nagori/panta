@@ -1,6 +1,6 @@
 # 分层与依赖方向
 
-更新日期：2026-10-18。来源：维护者给定结构与任务 066、118、126 的边界审计，对全部任务生效；违反即评审问题。当前实现与迁移顺序见 [重库适配与 Rust 领域模块](../architecture/native-domain-boundaries.md)。
+更新日期：2026-10-20。来源：维护者给定结构与任务 066、118、126、127 的边界审计，对全部任务生效；违反即评审问题。当前实现与迁移顺序见 [重库适配与 Rust 领域模块](../architecture/native-domain-boundaries.md)。
 
 ## 结构
 
@@ -53,6 +53,7 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 - Rust 拥有业务逻辑、领域数据、单位 / 引用 / 修订校验、轻量算法与任务编排。OCCT / Netgen 的几何和网格核心算法必须通过 C++ adapter 实际调用重库，不在 Rust 或 adapter 重写。
 - C++ adapter 负责第三方类型转换、异常归一化、具体模板实例化、迭代器到数组、所有权和库调用次序 / 锁；不决定工程事务、材料 / 边界业务规则或分析质量阈值。索引起点、局部节点顺序和布局归一化属于转换，可进行必要计算。
 - `#[cxx::bridge]` 只声明类型映射和函数签名。`panta-ffi` 的实现仅转换 DTO / 错误 / 句柄、组装并转发服务，不承载领域算法。CXX 不自动证明生命周期、线程安全或业务正确性。
+- 资产激活的过期裁决、缓存提交、attempt 收尾和工作区更新属于 core 的完整用例；FFI 不把这些步骤拼成另一套提交流程。GUI 工程 I/O 通过独占请求的 begin / 后台 wait / 服务线程 finish 适配，准入与最终成功分别通知；CLI 同步入口复用相同事务。收尾实施及验证见 [127](../task/127-rust-qt-boundary-followup.md)。
 - Rust 业务代码不直接链接调用重库 ABI，不手写 unsafe FFI；最终程序仍通过 native 构建链接重库。适配器对外不暴露 `TopoDS_Shape`、OCCT Handle、`netgen::Mesh`、`vtkActor` 等原始类型，包括把其 typedef 成自有名字。
 - 小数据使用值语义；大对象可使用自有 opaque 所有者。接口必须说明创建、释放、跨调用有效期、借用、可否共享 / 修改、线程以及失效后的行为。只保存整数句柄时必须拒绝释放后复用导致的陈旧引用；进程句柄不能持久化为工程身份。
 - 可恢复 C++ 错误在适配边界统一成结构化错误或受控 CXX Result；非标准库异常也须显式覆盖。panic 不作可恢复错误，CXX Result 不承诺捕获 Rust panic。具体约束见 [CXX](cxx.md) 与 [FFI](ffi.md)。
@@ -64,7 +65,8 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 - `panta-import` 是格式入口：识别 STEP / IGES / STL、读取 / 固定来源快照、按格式选择实际后端、持有预览与导入准备状态、记录格式专属诊断和导入选项。当前已接入 STL；STEP / IGES 只有格式识别，读取仍待 `panta-geom` 与 OCCT adapter 的真实业务任务。
 - `panta-mesh` 拥有表面 / 体 Mesh IR、STL 字节解析、网格领域校验及总体积摘要。它不管理工程包、Qt、VTK 或 OCCT；STL 不被冒充为 B-rep。
 - `panta-core` 拥有工程清单、资产写入、修订和原子提交。它调用 `panta-import` 取得已验证的输入，提交成功才替换当前网格。工程包事务不由格式解析器自行完成。
-- 运行期 `SurfaceMesh` 的预算、LRU、驻留 ID 和按页签关闭释放由 `panta-core::ProjectService` 管理；活动页签 ID 仍是 ViewModel 的 UI 选择状态，Rust 只接收 pin / unpin 提示并返回批量驻留状态。ViewModel 只保留当前活动显示 DTO，不能按文档另建 Mesh 缓存。
+- 运行期 `SurfaceMesh` 的预算、LRU、驻留 ID 和按页签关闭释放由 `panta-core::ProjectService` 管理；其 `DocumentWorkspace` 已按 117 拥有打开页签、活动 ID、加载状态、重排与关闭回退。ViewModel 转发粗粒度意图并批量投影工作区快照，只保留当前活动显示 DTO，不能另建页签选择权威或按文档维护 Mesh 缓存。
+- 展开 Mesh 字节估算由 `panta-mesh` 根据编码布局提供，导入提醒策略由 `panta-import` 随预览返回；GUI / CLI 不重复公式或阈值。2 GiB 仅为非阻断提醒，不是导入或存储上限。
 - 后续 `panta-geom` 拥有 Shape / Face / Edge 的领域身份及 STEP / IGES 结果契约；C++ OCCT adapter 真正执行这两种几何格式的读取、转换与所需底层算法。`panta-import` 负责分发，不在 Rust 复制 OCCT 解析器。
 - 依赖方向为 `panta-core → panta-import → panta-mesh`；`panta-core` 在持有网格快照时可直接依赖 `panta-mesh`。`panta-ffi → panta-core / panta-mesh` 负责跨语言 DTO。反向依赖禁止。未来 `panta-import → panta-geom` 只在 STEP / IGES 服务接入时添加。
 - 公共导入结果应保留格式、数据类别、单位、来源修订与诊断；共享导入编排不抹平 STL 表面网格和 STEP / IGES B-rep 的语义。新增格式需要实际后端和端到端消费者，不为统一名称创建空 parser。
@@ -76,6 +78,7 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 - Rust 管理可持久化的显示配置、字段语义、选择引用及工程相机书签；C++ `RenderScene` 是显示快照和可恢复 CPU 状态，不成为第二份工程领域模型。临时鼠标导航留在 C++，确需保存时提交快照。
 - 几何解析与资产提交不放进 VTK 显示后端；067 已删除 VTK STL parser，由 Rust 网格后端解码，VTK 只构造显示对象。历史差异与审计依据见 066 / 067。
 - 数据按资产 / 修订批量跨边界，不逐点、逐单元调用 FFI。借用缓冲区必须证明有效期；异步工作拥有快照，先确保所有权再按测量优化复制。第三方缓冲区和借用不能逃逸到 QML。
+- 大 Mesh 显示准备应先捕获 `Arc<SurfaceMesh>` 及其身份，在后台展开并构造拥有式 C++ DTO；最多一个在途准备，完成时按最新选择与 generation/revision 丢弃迟到结果。GUI 只发布有效快照，Qt / VTK / GPU 对象仍在原线程创建和释放，不新增完成轮询器。旧同步路径的历史性能记录不能替代 127 的异步路径验收。
 - 长任务不阻塞 GUI。每个 native 操作明确线程、串行 / 并行与取消阶段；不能为跨线程转移句柄盲目声明 Send/Sync。工程关闭或修订改变后拒绝迟到结果，失败 / 取消不覆盖有效资产。
 
 ## 平台与配置

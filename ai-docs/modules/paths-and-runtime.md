@@ -2,6 +2,8 @@
 
 [模块导航](README.md) · [023 路径服务](../task/023-cross-platform-paths.md) · [024 运行时上下文](../task/024-runtime-context.md)
 
+更新日期：2026-10-20。
+
 ## 边界
 
 这里只描述应用内路径和会话状态。路径层不依赖 DSL；运行时不依赖 DSL 解析器；变量 DSL 将已校验的值提交给运行时。当前运行时不是虚拟 CPU、操作系统、字节码 VM 或安全沙箱。只有出现可测量的执行瓶颈、暂停脚本或第三方代码隔离需求时，才另行评估解释器、字节码或进程隔离。
@@ -29,6 +31,8 @@ Qt `PathHost` 将 user-config 映射到 `AppConfigLocation`、app-data 映射到
 ## 运行时层
 
 任务 024 在 `panta-core::runtime` 提供 `RuntimeContext`、`VariableSnapshot` 和 `RuntimeTaskScope`。`ProjectService` 拥有当前上下文：成功创建或打开工程时替换上下文，销毁服务时关闭上下文。当前没有显式关闭工程命令；现有服务生命周期关闭由销毁服务表示。
+
+[127](../task/127-rust-qt-boundary-followup.md) 收尾 GUI 创建、打开、保存与分析序列确认的后台 I/O 契约：begin 捕获拥有式命令输入，后台独占 request 执行 wait，服务线程 finish 校验身份和修订后发布结果。begin 准入不表示工程已切换或保存成功；失败保留旧工程与运行时，成功的创建 / 打开才替换上下文并使旧 scope 失效。Qt 完成通知不新增轮询器，也不把 QObject 放入 Rust 后台任务。该收尾的实现与验证状态以任务 127 为准，CLI 同步命令继续复用相同领域事务。
 
 `RuntimeContext` 持有工程会话 generation、根解析服务及当前变量快照。`ProjectService` 当前只为上下文注入工程包根；标准用户目录等根仍由独立 `PathHost` 管理，尚未注入项目运行时。上下文只开放现存资源解析，不提供任意写入、进程启动或网络能力；持有 `ResourceRef` 不等于获得这些权限。任务 025 的 `ProjectService` 会在工程根固定读写 `variables.pa`，这是工程存储操作，不向运行时任务或 QML 暴露任意写入路径。
 

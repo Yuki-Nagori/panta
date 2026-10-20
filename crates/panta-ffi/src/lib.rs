@@ -50,8 +50,6 @@ use path::{
 };
 mod project;
 #[cfg(test)]
-use project::activation_outcome_to_bridge;
-#[cfg(test)]
 use project::project_service_inspect_stl;
 pub use project::{ProjectService, VariableDocumentCompletion, VariableDocumentRequest};
 use project::{
@@ -79,6 +77,15 @@ use project::{
     validate_fill_settings_draft, validate_gate_location_settings_draft,
     validate_holding_profile_draft, variable_document_request_accepted, variable_document_wait,
 };
+mod project_operation;
+pub use project_operation::{ProjectOperationCompletion, ProjectOperationRequest};
+use project_operation::{
+    project_operation_accepted, project_operation_wait, project_service_begin_operation,
+    project_service_finish_operation,
+};
+mod display;
+pub use display::MeshDisplayInput;
+use display::{prepare_mesh_display, project_service_mesh_display_input};
 mod mesh;
 use mesh::{mesh_coordinates, mesh_validate_tet};
 
@@ -288,9 +295,29 @@ pub mod bridge {
         process_constraints: ProcessConstraints,
     }
 
+    #[derive(Default)]
+    enum ProjectOperationKind {
+        #[default]
+        Create,
+        Open,
+        Save,
+        AnalysisSequence,
+    }
+    #[derive(Default)]
+    struct ProjectOperationInput {
+        kind: ProjectOperationKind,
+        path: String,
+        name: String,
+        revision: u64,
+        import_id: String,
+        sequence_id: String,
+    }
+
     /// 源文件尚未复制时供导入弹窗展示的 STL 元数据。
     #[derive(Default, Clone, PartialEq)]
     pub struct StlImportPreview {
+        pub expanded_mesh_bytes: u64,
+        pub large_mesh_warning: bool,
         pub source_name: String,
         pub triangle_count: u64,
         pub size_x: f64,
@@ -553,6 +580,27 @@ pub mod bridge {
         /// Rust 拥有的工程 application service：目录、清单和模型状态不由
         /// QML/C++ 持有；C++ 只负责 Qt 字符串/URL 适配和 ViewModel 通知。
         type ProjectService;
+
+        type ProjectOperationRequest;
+        type ProjectOperationCompletion;
+        type MeshDisplayInput;
+        fn project_service_begin_operation(
+            service: &mut ProjectService,
+            input: ProjectOperationInput,
+        ) -> Box<ProjectOperationRequest>;
+        fn project_operation_accepted(request: &ProjectOperationRequest) -> bool;
+        fn project_operation_wait(
+            request: Box<ProjectOperationRequest>,
+        ) -> Box<ProjectOperationCompletion>;
+        fn project_service_finish_operation(
+            service: &mut ProjectService,
+            completion: Box<ProjectOperationCompletion>,
+        ) -> ProjectSnapshotResult;
+        fn project_service_mesh_display_input(
+            service: &ProjectService,
+            import_id: &str,
+        ) -> Box<MeshDisplayInput>;
+        fn prepare_mesh_display(input: Box<MeshDisplayInput>) -> SurfaceMeshSnapshotResult;
 
         fn project_service_new() -> Box<ProjectService>;
         #[rust_name = "project_service_create_response"]

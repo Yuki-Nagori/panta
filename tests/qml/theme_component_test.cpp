@@ -29,6 +29,7 @@
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
+#include <QTemporaryDir>
 #include <QTranslator>
 #include <QUrl>
 #include <QVariantMap>
@@ -50,6 +51,9 @@
 #include <qtestsupport_gui.h>
 
 Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
+#ifdef PANTA_TEST_WITH_BRIDGE
+Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
+#endif
 
 namespace {
 
@@ -633,6 +637,66 @@ class ThemeComponentTest final : public QObject {
 #endif
     }
 
+    void new_project_dialog_waits_for_creation_and_preserves_failed_input() {
+#if !defined(PANTA_TEST_WITH_BRIDGE)
+        QSKIP("Project commands require the enabled Bridge module");
+#else
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        panta::bridge::ProjectViewModel model;
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QQmlComponent component(
+            &engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Dialogs/NewProjectDialog.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QObject owner;
+        auto* dialog = component.createWithInitialProperties(
+            {{QStringLiteral("projectModel"), QVariant::fromValue(&model)}});
+        QVERIFY2(dialog != nullptr, qPrintable(component.errorString()));
+        dialog->setParent(&owner);
+        auto* window = qobject_cast<QQuickWindow*>(dialog);
+        QVERIFY(window != nullptr);
+        auto* name = visual_item(window->contentItem(), QStringLiteral("projectNameField"));
+        auto* location = visual_item(window->contentItem(), QStringLiteral("projectLocationField"));
+        auto* accept = visual_item(window->contentItem(), QStringLiteral("newProjectAccept"));
+        auto* cancel = visual_item(window->contentItem(), QStringLiteral("newProjectCancel"));
+        QVERIFY(name && location && accept && cancel);
+        QSignalSpy created(dialog, SIGNAL(projectCreated(QString)));
+        QVERIFY(created.isValid());
+
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        name->setProperty("text", QStringLiteral("Created"));
+        location->setProperty("text", fixture.path());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QVERIFY(window->isVisible());
+        QVERIFY(dialog->property("submitting").toBool());
+        QVERIFY(!name->isEnabled());
+        QVERIFY(!location->isEnabled());
+        QVERIFY(!accept->isEnabled());
+        QVERIFY(!cancel->isEnabled());
+        QVERIFY(!window->close());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QCOMPARE(created.count(), 0);
+        QTRY_COMPARE(created.count(), 1);
+        QTRY_VERIFY(!window->isVisible());
+        QVERIFY(!created.constFirst().constFirst().toString().isEmpty());
+
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        name->setProperty("text", QStringLiteral("Created"));
+        location->setProperty("text", fixture.path());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QTRY_VERIFY(!model.projectOperationPending());
+        QVERIFY(window->isVisible());
+        QVERIFY(!dialog->property("submitting").toBool());
+        QCOMPARE(created.count(), 1);
+        QCOMPARE(name->property("text").toString(), QStringLiteral("Created"));
+        QCOMPARE(location->property("text").toString(), fixture.path());
+        QVERIFY(!model.error().isEmpty());
+        QVERIFY(accept->isEnabled());
+        QVERIFY(window->close());
+#endif
+    }
+
     void analysis_sequence_confirmation_and_cancel() {
 #if !defined(PANTA_TEST_WITH_BRIDGE)
         QSKIP("Analysis sequence catalog requires the enabled Bridge module");
@@ -663,11 +727,27 @@ class ThemeComponentTest final : public QObject {
         QTest::keyClick(window, Qt::Key_Return);
         QCOMPARE(selection.count(), 1);
         QCOMPARE(selection.at(0).at(3).toString(), QStringLiteral("fill-pack"));
-        panel->setProperty("selectedIndex", 4);
+        dialog->setProperty("saving", true);
+        auto* accept = dialog->findChild<QObject*>(QStringLiteral("analysisSequenceAccept"));
         auto* cancel = dialog->findChild<QObject*>(QStringLiteral("analysisSequenceCancel"));
-        QVERIFY(cancel != nullptr);
-        QVERIFY(QMetaObject::invokeMethod(cancel, "clicked"));
+        QVERIFY(accept && cancel);
+        QVERIFY(!accept->property("enabled").toBool());
+        QVERIFY(!cancel->property("enabled").toBool());
+        QVERIFY(!panel->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        QTest::keyClick(window, Qt::Key_Return);
         QCOMPARE(selection.count(), 1);
+        QVERIFY(!window->close());
+        dialog->setProperty("errorText", QStringLiteral("Write failed"));
+        dialog->setProperty("saving", false);
+        QVERIFY(window->isVisible());
+        QCOMPARE(panel->property("selectedIndex").toInt(), 1);
+        QVERIFY(accept->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        QCOMPARE(selection.count(), 2);
+        panel->setProperty("selectedIndex", 4);
+        QVERIFY(QMetaObject::invokeMethod(cancel, "clicked"));
+        QCOMPARE(selection.count(), 2);
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
         QCOMPARE(panel->property("selectedIndex").toInt(), 0);
         dialog->setProperty("visible", false);

@@ -1,7 +1,7 @@
 //! 073/080 只读 STL 资产激活的集成行为：成功、失败、取消、工程切换失效、
 //! 去重与工程持久状态不变式。经 `ProjectService` 公共 API 驱动，worker 为
 //! 真实线程；结果以 `drain_asset_activations` 轮询拉取。
-use panta_core::project::{Outcome, OutcomeKind, ProjectError, ProjectService};
+use panta_core::project::{CompletedActivation, OutcomeKind, ProjectError, ProjectService};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -75,7 +75,7 @@ fn asset_path(
 fn wait_for_outcome(
     service: &mut ProjectService,
     timeout: Duration,
-) -> Result<Outcome, Box<dyn std::error::Error>> {
+) -> Result<CompletedActivation, Box<dyn std::error::Error>> {
     let deadline = Instant::now() + timeout;
     loop {
         let outcomes = service.drain_asset_activations();

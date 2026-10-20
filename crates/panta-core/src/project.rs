@@ -4,7 +4,9 @@
 //! CXX adapter 传递 UTF-8 路径、名称和命令，不直接读写清单文件。
 
 use panta_import::StlImportSession;
+mod activation_result;
 mod error;
+pub use activation_result::CompletedActivation;
 mod mesh_cache;
 mod model;
 mod repository;
@@ -19,6 +21,7 @@ pub use panta_import::{
     DEFAULT_MESH_TYPE, IMPORT_RECORD_VERSION, ImportRecord, MESH_TYPES, STL_IMPORT_PARSER_VERSION,
     StlImportPreview, default_display_name,
 };
+pub(crate) use service::resolve_asset_path;
 pub use service::{ProjectService, VariableDocumentError};
 pub use variable_document::{VariableDocumentCompletion, VariableDocumentRequest};
 pub use workspace::{
@@ -27,6 +30,9 @@ pub use workspace::{
     WorkspaceSnapshot, activation_error_message_key,
     format_dimensions as format_project_dimensions, project_error_message_key,
 };
+
+mod command_job;
+pub use command_job::{ProjectOperation, ProjectOperationCompletion, ProjectOperationRequest};
 
 mod analysis_sequence;
 pub use analysis_sequence::{ANALYSIS_SEQUENCES, AnalysisSequenceDefinition};
@@ -295,7 +301,8 @@ mod tests {
                     .begin_with(
                         &import_id,
                         ActivationRequest {
-                            asset_path: PathBuf::from("unused.stl"),
+                            project_root: PathBuf::from("unused-project"),
+                            relative_path: "unused.pmesh".to_owned(),
                             expected_digest: "sha256:test".to_owned(),
                         },
                         |_, _, _, _| Ok(()),
@@ -305,6 +312,13 @@ mod tests {
             );
         }
         service.activation = coordinator;
+
+        // 元数据投影和准入不探测文件系统；路径校验只由已准入 worker 执行。
+        std::fs::remove_dir_all(fixture.root.join("Activation backlog"))?;
+        assert_eq!(
+            service.mesh_asset_path_for_import("import-overflow")?,
+            "assets/meshes/overflow.pmesh"
+        );
 
         let error = service
             .begin_asset_activation("import-overflow")
@@ -417,10 +431,11 @@ mod tests {
     }
 
     #[test]
-    fn synchronous_workspace_activation_failure_uses_saved_asset_message()
+    fn background_workspace_activation_failure_uses_saved_asset_message()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = temp_directory::Fixture::new()?;
         let mut service = ProjectService::new();
+        service.execution.reads = crate::execution::Executor::new("asset-path-test", 1, 1);
         service.create(&fixture.root, "Invalid saved asset")?;
         let state = service
             .current
@@ -459,6 +474,11 @@ mod tests {
         );
 
         service.open_import_document("invalid-saved-import", "part");
+        service.execution.reads.close_and_wait();
+        let outcomes = service.drain_asset_activations();
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].kind, super::OutcomeKind::Failed);
+        assert_eq!(outcomes[0].code, "project.manifest_invalid");
 
         let document = service
             .document_workspace()

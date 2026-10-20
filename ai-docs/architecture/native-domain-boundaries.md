@@ -2,7 +2,7 @@
 
 [架构总览](README.md) · [分层规则](../standards/layering.md) · [任务 066](../task/066-native-domain-boundaries.md)
 
-更新日期：2026-10-16。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，Mesh sidecar 持久化与按需激活由 [088](../task/088-mesh-asset-sidecar-storage.md) 实施，其余领域模块按实际功能建立。
+更新日期：2026-10-20。本文记录目标边界与 066 的代码审计；STL 与 Mesh IR 迁移由 [067](../task/067-rust-mesh-domain-migration.md) 实施，Mesh sidecar 持久化与按需激活由 [088](../task/088-mesh-asset-sidecar-storage.md) 实施，文档工作区权威由 [117](../task/117-rust-project-document-workspace.md) 迁入 Rust。本轮异步用例与桥接职责收尾见 [127](../task/127-rust-qt-boundary-followup.md)，其实施和验收状态以任务记录为准。
 
 ## 分层与调用
 
@@ -23,7 +23,9 @@ Qt 是体量较大的原生 GUI 框架，在这条边界中单独作为**界面�
 
 Qt 边界不改变领域权威归属：工程身份与持久化、导入解析、单位 / 修订 / 引用规则、成功提交、业务任务和支持 locale/当前 locale 状态由 Rust 服务管理；QML 表达展示与用户意图，C++ ViewModel / Controller 只做 Qt 适配并转发粗粒度命令。翻译目录和 locale 校验由 Rust 提供；Bridge `Settings` 将已校验 locale 映射到构建资源命名并请求 QML 重翻译，通用 Qt adapter 管理 `QTranslator` 安装/卸载。Rust 不引入 Qt 类型、事件循环或 QM 资源 URL。Rust 服务应按用例返回拥有内存的批量快照 / DTO；C++ 可把 DTO 映射为 Qt 属性或 `QAbstractItemModel` 角色供 QML 使用，但不能让 ViewModel 通过逐行 FFI 查询拼装业务对象，也不能把 Rust 领域状态藏入 QObject 或 QML 作为第二份权威数据。跨过 CXX 边界后，传给 Qt 的数据必须由 C++ 值对象或具有明确共享所有权的不可变快照承载；不能把借用的 Rust 缓冲区直接放进排队信号。跨线程信号参数须满足 Qt queued connection 的类型和生命周期要求，并按 Qt 要求注册元类型；具体 payload 大小时，在对应任务中确定复制、移动或共享快照策略。
 
-运行期 Mesh 驻留策略也属于 Rust 工程服务：`ProjectService` 持有解析后的 `SurfaceMesh`，决定缓存预算、LRU 淘汰、活动文档 pin、缓存命中和关闭释放；它向 Bridge 批量报告驻留 ID。ViewModel 仍拥有打开页签与当前活动文档选择，只把驻留 ID 投影为 `ready/unloaded`，并在视口活动时持有单份 C++ 显示 DTO。`MeshSource::mesh_snapshot()` 是本地共享指针读取，VTK / Qt Quick 的刷新与逐帧路径不得通过此 getter 调用 CXX/Rust；跨边界复制仅在导入、选中、关闭或异步激活等粗粒度状态变化时发生。C++ VTK 后端负责把活动 DTO 转成 `vtkPolyData` 和管理显示资源；不得在 ViewModel 再维护第二份按文档索引的 Mesh 缓存或自行实施预算 / LRU。
+运行期 Mesh 驻留策略也属于 Rust 工程服务：`ProjectService` 持有解析后的 `SurfaceMesh`，决定缓存预算、LRU 淘汰、活动文档 pin、缓存命中和关闭释放；其 `DocumentWorkspace` 拥有打开页签、当前活动文档、关闭回退和加载状态，向 Bridge 批量报告工作区与驻留快照。ViewModel 只投影 Qt 属性，并在视口活动时持有单份 C++ 显示 DTO。激活结果的过期判断、缓存提交、attempt 收尾与工作区更新应由 core 的完整用例处理；FFI 只转换最终结果，不编排这些业务步骤。`MeshSource::mesh_snapshot()` 是本地共享指针读取，VTK / Qt Quick 的刷新与逐帧路径不得通过此 getter 调用 CXX/Rust；跨边界复制仅在导入、选中、关闭或异步激活等粗粒度状态变化时发生。C++ VTK 后端负责把活动 DTO 转成 `vtkPolyData` 和管理显示资源；不得在 ViewModel 再维护第二份按文档索引的 Mesh 缓存或自行实施预算 / LRU。
+
+大网格的显示准备属于粗粒度数据适配，不应占用 GUI 线程。127 的收尾契约是在服务线程捕获拥有共享所有权的 `Arc<SurfaceMesh>` 和文档身份，在后台展开坐标并构造拥有数据的 C++ 显示 DTO；最多保留一个在途显示准备，完成后以最新选择及 generation/revision 校验拒绝迟到结果，再处理最新待显示选择。该过程不移动 QObject、VTK 或 GPU 资源，不改变它们的原线程生命周期，也不建立第二套领域 Mesh 缓存。080/088 已记录的同步物化测量是迁移前基线，不能当作异步实现的性能结论。
 
 鼠标悬停、当前行高亮和即时交互反馈属于 Qt / QML / VTK 显示状态。若用户选择的实体将影响网格操作、边界条件或工程提交，稳定实体 ID、所属修订和引用有效性由 Rust 建模与校验；Qt 保留命中反馈并把完整、粗粒度的选择意图交给服务。选择意图应携带稳定实体 ID 集合、所属修订和选择模式（如替换、追加、移除或清空）；不能只把易变化的行号、显示索引或像素位置当成领域身份。纯显示高亮则无需因此升级为 Rust 领域状态。
 
@@ -35,7 +37,7 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 
 “不直接链接 OCCT/Netgen”在此指 Rust 业务代码不得直接声明或调用重库 ABI、不得暴露其对象布局；桌面最终产物仍需链接重库。当前最终链接由 CMake 拥有，CXX 不消除链接和运行库部署要求。
 
-适配器对外使用小型值 DTO、连续数组或自有 opaque 所有者。大型 B-rep 无须强行完整复制到 Rust：未来由 C++ adapter 持有和释放 native shape，Rust 只保存 Shape/Face 的稳定领域 ID 与修订号。跨 FFI 只传 ID、修订和操作结果，不传裸句柄；修订不匹配时拒绝操作。当前 STEP 冒烟只返回摘要，没有持久 shape 服务。
+适配器对外使用小型值 DTO、连续数组或自有 opaque 所有者。大型 B-rep 无须强行完整复制到 Rust：126 已由 C++ adapter 的进程内仓库持有并显式释放 native shape，STEP 读取返回摘要及 `ShapeRef`，Netgen 可复用同一个 shape。`ShapeId`、revision 和该 revision 的 `FaceId` 仅在当前进程有效，不是工程几何资产持久化或 Rust 几何领域模型。后续工程资产通路应由 Rust 保存稳定领域身份和修订，跨 FFI 传 ID、修订和操作结果，不泄漏裸句柄，并拒绝旧修订。
 
 ## 适配器允许做什么
 
@@ -46,7 +48,7 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 | 网格生成、库提供的网格优化 | C++ adapter 调用 Netgen；Rust 选择领域参数、输入修订与任务策略，C++ 映射 Netgen 参数 | 适配层维护独立于领域层的网格有效性规则 |
 | 异常归一化、类型转换、数组展开、索引起点与单元节点顺序转换 | C++ adapter，属于接口语义转换 | 对外泄漏 OCCT/Netgen 类型或未声明所有权的指针 |
 | 工程网格有效性、应用质量阈值、区域 / 边界引用、资产失效 | Rust 领域层；边界仍保留必要长度 / 溢出 / 范围检查 | Rust 重写重库的几何修复或网格生成算法 |
-| 运行期 `SurfaceMesh` 缓存预算、LRU、驻留查询和关闭释放 | Rust `ProjectService`；C++ ViewModel 提供活动文档 pin 意图并投影批量驻留 ID | 在 ViewModel 按 ID 保留 Mesh 集合、计算预算或决定淘汰次序 |
+| 运行期 `SurfaceMesh` 缓存预算、LRU、驻留查询和关闭释放 | Rust `ProjectService`，其 `DocumentWorkspace` 管活动文档；C++ ViewModel 转发意图并投影批量工作区 / 驻留快照 | 在 ViewModel 按 ID 保留 Mesh 集合、计算预算、决定淘汰次序或另建活动文档权威 |
 | VTK 数据对象、mapper/filter/actor、相机及显示命中、GPU 资源 | C++ 显示后端；调用 VTK 的绘制和数据处理能力 | 由 Rust 驱动逐帧导航或管理 VTK/GPU 生命周期 |
 | 导入格式解析、领域网格 / 字段、显示选项与选择状态 | Rust；轻量解析 / 校验可自有实现 | 用泛型解析接口抹平不同格式的语义 |
 
@@ -54,9 +56,11 @@ Rust 服务和领域操作失败时应通过结构化错误 DTO 返回稳定错�
 
 ## 方案分析序列与网格类型
 
-`panta-core::project` 拥有分析序列目录、默认值及按导入记录 ID 保存的选择；目录选项属于配置，执行阶段和任务生命周期才属于 FSM。CXX 传递轻量目录 / 方案快照及确认命令，`ProjectViewModel` 缓存 Qt 投影，QML 仅翻译并维护弹窗候选值。确认命令校验打开时的工程身份和修订，持久化成功后才发布新状态。
+`panta-core::project` 拥有分析序列目录、默认值及按导入记录 ID 保存的选择；目录选项属于配置，执行阶段和任务生命周期才属于 FSM。CXX 传递轻量目录 / 方案快照及确认命令，`ProjectViewModel` 缓存 Qt 投影，QML 仅翻译并维护弹窗候选值。确认命令校验打开时的工程身份和修订，持久化成功后才发布新状态。127 将 GUI 的创建、打开、保存及分析序列确认统一纳入后台 I/O：begin 只表示准入，独占请求由后台 wait 消费，回到服务线程 finish 后才投影成功或失败。Qt 完成通知不依赖新增轮询器，GUI 不等待工作线程退出；CLI 的同步入口仍共用相同领域事务。
 
 网格类型目录及导入默认值由 `panta-import` 提供，导入弹窗和 Tasks 共用 Qt 目录投影。Tasks 的当前类型来自已经保存的 `ImportRecord.mesh_type`；它表示所选类型，不证明 Midplane、Dual Domain 或体网格已生成。当前以导入记录承接方案配置，独立方案实体和求解执行链路仍待后续任务。属性 getter 与渲染更新不经 Rust；只在工程 / 导入 / 活动文档变更或用户确认时读取领域快照。实施见 [092](../task/092-plan-analysis-sequence-and-mesh-settings.md)。
+
+导入资源提醒同样由 Rust 定义：`panta-mesh` 按实际未压缩 Mesh 资产布局提供字节估算，`panta-import::StlImportPreview` 返回 `expanded_mesh_bytes` 和 `large_mesh_warning`。GUI 与 CLI 仅展示同一预览结果，不各自计算面数公式或维护阈值。严格超过 2 GiB 只提醒，不阻止导入；估算不代表进程 RSS、来源文件大小或 GPU 内存。策略收敛与验证由 127 跟踪。
 
 Fill 工艺设置由 `panta-core::project::FillSettings` 提供默认值、字段单位和校验，按导入记录 ID 保存到 `.panta` 的 `fill_settings` 表。`PlanSettings` 一次返回配置及确认状态；QML 只编辑打开时冻结目标的候选，C++ 适配完整 DTO 并发起后台确认。材料与工艺设置复用 Rust 元数据写入锁、工作线程和成功发布流程；校验、序列化、写盘在工作线程进行，失败保留旧工程。Qt 仅在存在待完成命令时轮询，不接入渲染热路径。切换到其他分析序列保留 Fill 配置，但当前只在 Fill 下开放工艺入口；求解执行尚未接入。实施见 [094](../task/094-fill-process-settings.md)。
 

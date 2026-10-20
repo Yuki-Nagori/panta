@@ -82,6 +82,7 @@ if(BUILD_TESTING)
   add_executable(panta_bridge_project_view_model_test
                  ../../tests/cpp/bridge/project_view_model_test.cpp)
   panta_native_defaults(panta_bridge_project_view_model_test)
+  target_include_directories(panta_bridge_project_view_model_test PRIVATE ../../tests/support/qt)
   target_link_libraries(panta_bridge_project_view_model_test PRIVATE panta::bridge GTest::gtest
                                                                      Qt6::Test)
   gtest_discover_tests(panta_bridge_project_view_model_test DISCOVERY_MODE POST_BUILD

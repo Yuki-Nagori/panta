@@ -9,6 +9,7 @@ DialogWindow {
     objectName: "newProjectDialog"
 
     required property ProjectViewModel projectModel
+    property bool submitting: false
     signal projectCreated(string path)
 
     width: Theme.newProjectDialogWidth
@@ -16,6 +17,10 @@ DialogWindow {
     minimumWidth: Theme.newProjectDialogMinimumWidth
     minimumHeight: Theme.newProjectDialogMinimumHeight
     title: qsTranslate("NewProjectDialog", "Create New Project")
+    onClosing: event => {
+        if (submitting)
+            event.accepted = false;
+    }
 
     function resetFields() {
         projectModel.clearError();
@@ -24,6 +29,8 @@ DialogWindow {
     }
 
     function open() {
+        if (projectModel.projectOperationPending)
+            return;
         resetFields();
         centerOnOwner();
         visible = true;
@@ -32,12 +39,27 @@ DialogWindow {
     }
 
     function submit() {
-        if (projectModel.createProject(projectNameField.text, locationField.text)) {
-            const path = projectModel.lastCreatedPath;
+        if (!visible || submitting || projectModel.projectOperationPending)
+            return;
+        submitting = projectModel.createProject(projectNameField.text, locationField.text);
+        if (!submitting)
+            projectNameField.forceActiveFocus();
+    }
+
+    Connections {
+        target: dialog.projectModel
+        function onProjectCreated(path) {
+            if (!dialog.submitting)
+                return;
+            dialog.submitting = false;
             dialog.projectCreated(path);
             dialog.close();
-        } else {
-            projectNameField.forceActiveFocus();
+        }
+        function onProjectOperationFinished(operation, succeeded) {
+            if (operation === "create" && !succeeded && dialog.submitting) {
+                dialog.submitting = false;
+                projectNameField.forceActiveFocus();
+            }
         }
     }
 
@@ -68,7 +90,7 @@ DialogWindow {
 
     DialogFrame {
         window: dialog
-        closeEnabled: true
+        closeEnabled: !dialog.submitting
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -89,6 +111,7 @@ DialogWindow {
 
             GridLayout {
                 Layout.fillWidth: true
+                enabled: !dialog.projectModel.projectOperationPending
                 columns: 2
                 columnSpacing: Theme.spacingMedium
                 rowSpacing: Theme.spacingMedium
@@ -165,6 +188,8 @@ DialogWindow {
                 spacing: Theme.spacingSmall
 
                 ThemedButton {
+                    objectName: "newProjectAccept"
+                    enabled: !dialog.projectModel.projectOperationPending
                     text: qsTranslate("DialogAction", "OK")
                     primaryAction: true
                     contentColor: Theme.colorText
@@ -172,6 +197,8 @@ DialogWindow {
                     onClicked: dialog.submit()
                 }
                 ThemedButton {
+                    objectName: "newProjectCancel"
+                    enabled: !dialog.submitting
                     text: qsTranslate("DialogAction", "Cancel")
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
@@ -187,6 +214,8 @@ DialogWindow {
         title: qsTranslate("NewProjectDialog", "Choose Project Location")
         currentFolder: dialog.projectModel.defaultLocationUrl
         onAccepted: {
+            if (dialog.projectModel.projectOperationPending)
+                return;
             const selectedPath = dialog.projectModel.localPath(selectedFolder);
             if (selectedPath.length > 0) {
                 locationField.text = selectedPath;
@@ -196,6 +225,7 @@ DialogWindow {
     }
 
     Shortcut {
+        enabled: dialog.visible && !dialog.submitting
         sequence: "Esc"
         onActivated: dialog.close()
     }

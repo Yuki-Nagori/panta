@@ -1,7 +1,7 @@
 /// 工程服务的 Qt 适配层与运行期视口文档状态。
 ///
 /// Rust application service 持有工程清单、导入记录和异步资产激活；
-/// 本类型持有当前打开的页签、活动 ID 与显示快照，并向 QML/视口投影状态。
+/// 本类型缓存工作区的 Qt 投影与当前活动显示 DTO，不拥有第二份领域选择。
 #pragma once
 
 #include "panta_ffi.h"
@@ -30,6 +30,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     Q_PROPERTY(QString currentPath READ currentPath NOTIFY projectChanged)
     Q_PROPERTY(QString currentName READ currentName NOTIFY projectChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY projectChanged)
+    Q_PROPERTY(bool projectOperationPending READ projectOperationPending NOTIFY
+                   projectOperationPendingChanged)
+    Q_PROPERTY(bool importPreviewLargeMeshWarning READ importPreviewLargeMeshWarning NOTIFY
+                   importPreviewChanged)
+    Q_PROPERTY(quint64 importPreviewExpandedBytes READ importPreviewExpandedBytes NOTIFY
+                   importPreviewChanged)
     Q_PROPERTY(QString lastCreatedPath READ lastCreatedPath NOTIFY projectCreated)
     Q_PROPERTY(QStringList importedPartNames READ importedPartNames NOTIFY importsChanged)
     Q_PROPERTY(QStringList importedPartIds READ importedPartIds NOTIFY importsChanged)
@@ -72,6 +78,13 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
   public:
     explicit ProjectViewModel(QObject* parent = nullptr);
+    [[nodiscard]] bool projectOperationPending() const { return m_projectOperationPending; }
+    [[nodiscard]] bool importPreviewLargeMeshWarning() const {
+        return m_importPreviewLargeMeshWarning;
+    }
+    [[nodiscard]] quint64 importPreviewExpandedBytes() const {
+        return m_importPreviewExpandedBytes;
+    }
     [[nodiscard]] std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
     mesh_snapshot() const override;
 
@@ -130,9 +143,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
     /// 通过 Rust 工程服务创建目录和初始清单；工程资产由后续命令负责。
     ///
-    /// 成功时发出 projectCreated(path) 并返回 true；失败时保留输入目录，
-    /// 设置 error 并返回 false。调用发生在 GUI 线程，操作只包含短小的目录
-    /// 创建和元数据检查，不执行工程解析或大型文件读写。
+    /// 返回请求准入结果；projectCreated 仅在后台成功提交后发出。
+    /// 文件系统和清单处理不占用 GUI，失败保留当前工程和对话框输入。
     Q_INVOKABLE bool createProject(const QString& name, const QString& location);
 
     /// 清除当前错误，供对话框每次打开时重置显示状态。
@@ -140,7 +152,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 语言目录切换后重算缓存的工程错误文案并通知 QML。
     Q_INVOKABLE void retranslateError();
 
-    /// 打开已有工程并读取 Rust 清单。
+    /// 后台打开工程；返回准入结果，成功由 projectOpened 通知。
     Q_INVOKABLE bool openProject(const QString& path);
 
     /// 将 Qt 文件 URL 转成本地路径并打开；QML 不自行解析 URL 字符串。
@@ -149,7 +161,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// FolderDialog/FileDialog 共用的 URL 适配；非本地 URL 返回空串。
     Q_INVOKABLE QString localPath(const QUrl& url) const;
 
-    /// 保存当前 Rust 工程模型；无当前工程时返回可恢复错误。
+    /// 后台保存当前工程；返回准入结果，完成由 projectOperationFinished 通知。
     Q_INVOKABLE bool saveProject();
 
     /// 发起 Rust 后台加载；返回准入结果，完成由 variableDocumentFinished 通知。
@@ -205,8 +217,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 使用 Rust 领域约束同步验证当前 Gate Location 草稿。
     Q_INVOKABLE QVariantMap validateGateLocationSettingsDraft(const QVariantMap& settings) const;
 
-    /// 激活一个就绪文档（Welcome 或已就绪导入页签）；Loading/Failed 文档
-    /// 不可激活。同步 UI 操作，不经 Rust Flow。
+    /// 提交工作区选择意图；驻留 Mesh 的显示缓冲也在后台准备，完成后通知视口。
+    /// Welcome 仅切换显示状态，未驻留资产由 Rust 异步激活。
     Q_INVOKABLE void activateDocument(const QString& documentId);
 
     /// 关闭文档：仅结束本次运行期视图，不删 ImportRecord / 资产、不设
@@ -222,6 +234,9 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
   signals:
     void errorChanged();
+    void projectOperationPendingChanged();
+    /// operation 为 create/open/save/analysis-sequence；成功表示已提交并发布快照。
+    void projectOperationFinished(const QString& operation, bool succeeded);
     void projectChanged();
     void projectCreated(const QString& path);
     void projectOpened(const QString& path);
@@ -248,9 +263,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
 
   protected:
     /// 启动只等待独占 Rust 请求的线程；启动失败抛 system_error，调用方尚未准入领域任务。
-    virtual void startVariableWaiter(std::function<void()> work);
+    virtual void startBackgroundWaiter(std::function<void()> work);
 
   private:
+    bool beginProjectOperation(panta::ffi::ProjectOperationInput input, const QString& operation);
+    void prepareActiveMesh();
     bool fail(const panta::ffi::ProjectDiagnostic& diagnostic);
     bool fail(const QString& code, const QString& category = QStringLiteral("validation"),
               const QString& detail = {});
@@ -274,8 +291,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void set_pending_confirmation(ConfirmationKind kind);
     static bool toBoundaryText(const QString& text, std::string* out, QString* error);
 
-    std::shared_ptr<const panta::visualization::SurfaceMeshSnapshot>
-    pull_service_mesh(const QString& importId) const;
     void refresh_workspace(bool forceActiveNotification = false);
     void reset_documents();
     void drain_activations();
@@ -301,6 +316,11 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_variableRevision = 0;
     QString m_lastCreatedPath;
     bool m_dirty = false;
+    bool m_projectOperationPending = false;
+    bool m_meshPreparationPending = false;
+    quint64 m_meshSelection = 0;
+    bool m_importPreviewLargeMeshWarning = false;
+    quint64 m_importPreviewExpandedBytes = 0;
     QStringList m_importedPartNames;
     QStringList m_importedPartIds;
     QString m_importedPartName;

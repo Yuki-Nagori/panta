@@ -1,6 +1,7 @@
 /// ProjectViewModel 回归：工程命令、错误映射及任务 080 的视口文档生命周期。
 
 #include "panta/visualization/mesh_source.hpp"
+#include "project_operation_helpers.hpp"
 #include "project_view_model.hpp"
 #include <QCoreApplication>
 #include <QDir>
@@ -24,12 +25,15 @@
 #include <system_error>
 #include <thread>
 #include <utility>
+#include <vector>
 #ifdef Q_OS_UNIX
 #include <sys/stat.h>
 #endif
 #include <qtestcase.h>
 
 using panta::bridge::ProjectViewModel;
+using panta::test::finish_project_operation;
+using panta::test::wait_for_active_mesh;
 
 namespace {
 
@@ -38,12 +42,33 @@ class VariableWaiterFailureViewModel : public ProjectViewModel {
     bool failNextStart = false;
 
   protected:
-    void startVariableWaiter(std::function<void()> work) override {
+    void startBackgroundWaiter(std::function<void()> work) override {
         if (std::exchange(failNextStart, false)) {
             throw std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again),
                                     "injected variable waiter startup failure");
         }
-        ProjectViewModel::startVariableWaiter(std::move(work));
+        ProjectViewModel::startBackgroundWaiter(std::move(work));
+    }
+};
+
+class HeldBackgroundViewModel : public ProjectViewModel {
+  public:
+    bool holdWork = false;
+    std::vector<std::function<void()>> held;
+
+    void releaseFirst() {
+        auto work = std::move(held.front());
+        held.erase(held.begin());
+        std::thread(std::move(work)).join();
+    }
+
+  protected:
+    void startBackgroundWaiter(std::function<void()> work) override {
+        if (holdWork) {
+            held.push_back(std::move(work));
+        } else {
+            ProjectViewModel::startBackgroundWaiter(std::move(work));
+        }
     }
 };
 
@@ -72,7 +97,8 @@ TEST(ProjectViewModelTest, CreatesOpensRenamesAndSavesThroughRustService) {
     ProjectViewModel view_model;
     QSignalSpy created(&view_model, &ProjectViewModel::projectCreated);
     const QString location = QDir(fixture.path()).absolutePath();
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), location));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), location)));
     ASSERT_EQ(created.count(), 1);
     EXPECT_EQ(view_model.currentName(), QStringLiteral("Demo"));
     EXPECT_FALSE(view_model.dirty());
@@ -83,15 +109,173 @@ TEST(ProjectViewModelTest, CreatesOpensRenamesAndSavesThroughRustService) {
     EXPECT_TRUE(QFile::exists(project_path));
     EXPECT_TRUE(view_model.renameProject(QStringLiteral("Renamed")));
     EXPECT_TRUE(view_model.dirty());
-    EXPECT_TRUE(view_model.saveProject());
+    EXPECT_TRUE(finish_project_operation(view_model, view_model.saveProject()));
     EXPECT_FALSE(view_model.dirty());
 
     ProjectViewModel reopened;
     QSignalSpy opened(&reopened, &ProjectViewModel::projectOpened);
-    ASSERT_TRUE(reopened.openProjectUrl(QUrl::fromLocalFile(project_path)));
+    ASSERT_TRUE(finish_project_operation(
+        reopened, reopened.openProjectUrl(QUrl::fromLocalFile(project_path))));
     ASSERT_EQ(opened.count(), 1);
     EXPECT_EQ(reopened.currentName(), QStringLiteral("Renamed"));
     EXPECT_FALSE(reopened.dirty());
+}
+
+TEST(ProjectViewModelTest, ProjectCommandsReturnAdmissionAndPublishWithoutBlockingGuiEvents) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    HeldBackgroundViewModel model;
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("First"), fixture.path())));
+    ASSERT_TRUE(model.renameProject(QStringLiteral("Renamed")));
+    model.holdWork = true;
+    QSignalSpy finished(&model, &ProjectViewModel::projectOperationFinished);
+    ASSERT_TRUE(model.saveProject());
+    EXPECT_TRUE(model.projectOperationPending());
+    EXPECT_TRUE(model.dirty());
+    EXPECT_TRUE(finished.isEmpty());
+    ASSERT_EQ(model.held.size(), 1U);
+    EXPECT_FALSE(model.createProject(QStringLiteral("Conflicting"), fixture.path()));
+    EXPECT_FALSE(model.renameProject(QStringLiteral("Conflicting")));
+    EXPECT_FALSE(QDir(fixture.filePath(QStringLiteral("Conflicting"))).exists());
+    bool guiEventDelivered = false;
+    QTimer::singleShot(0, &model, [&guiEventDelivered] { guiEventDelivered = true; });
+    QTRY_VERIFY(guiEventDelivered);
+    EXPECT_TRUE(model.projectOperationPending());
+    model.releaseFirst();
+    QTRY_COMPARE(finished.count(), 1);
+    EXPECT_EQ(finished.at(0).at(0).toString(), QStringLiteral("save"));
+    EXPECT_TRUE(finished.at(0).at(1).toBool());
+    EXPECT_FALSE(model.projectOperationPending());
+    EXPECT_FALSE(model.dirty());
+    EXPECT_TRUE(model.errorCode().isEmpty());
+}
+
+TEST(ProjectViewModelTest, ProjectWaiterStartupFailureNeverAdmitsFilesystemWork) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    VariableWaiterFailureViewModel model;
+    model.failNextStart = true;
+    EXPECT_FALSE(model.createProject(QStringLiteral("NotCreated"), fixture.path()));
+    EXPECT_FALSE(model.projectOperationPending());
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.io"));
+    EXPECT_FALSE(QDir(fixture.filePath(QStringLiteral("NotCreated"))).exists());
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Existing"), fixture.path())));
+    QFile manifest(model.currentPath());
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    const auto original = manifest.readAll();
+    manifest.close();
+    ASSERT_TRUE(model.renameProject(QStringLiteral("Dirty")));
+    model.failNextStart = true;
+    EXPECT_FALSE(model.saveProject());
+    EXPECT_FALSE(model.projectOperationPending());
+    EXPECT_TRUE(model.dirty());
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    EXPECT_EQ(manifest.readAll(), original);
+    manifest.close();
+    model.failNextStart = true;
+    EXPECT_FALSE(model.openProject(model.currentPath()));
+    EXPECT_EQ(model.currentName(), QStringLiteral("Dirty"));
+    ASSERT_TRUE(finish_project_operation(model, model.saveProject()));
+}
+
+TEST(ProjectViewModelTest, CompletionDoesNotEraseAnErrorFromTheNextReentrantCommand) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    VariableWaiterFailureViewModel model;
+    QSignalSpy finished(&model, &ProjectViewModel::projectOperationFinished);
+    QSignalSpy created(&model, &ProjectViewModel::projectCreated);
+    bool attemptedSave = false;
+    bool acceptedSave = true;
+    QObject::connect(&model, &ProjectViewModel::projectOperationPendingChanged, &model, [&] {
+        if (model.projectOperationPending() || attemptedSave) {
+            return;
+        }
+        attemptedSave = true;
+        model.failNextStart = true;
+        acceptedSave = model.saveProject();
+    });
+    ASSERT_TRUE(model.createProject(QStringLiteral("Completed"), fixture.path()));
+    EXPECT_TRUE(model.projectOperationPending());
+    QTRY_COMPARE(finished.count(), 1);
+    EXPECT_EQ(finished.at(0).at(0).toString(), QStringLiteral("create"));
+    EXPECT_TRUE(finished.at(0).at(1).toBool());
+    EXPECT_TRUE(attemptedSave);
+    EXPECT_FALSE(acceptedSave);
+    EXPECT_FALSE(model.projectOperationPending());
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.io"));
+    EXPECT_TRUE(
+        model.errorDetail().contains(QStringLiteral("injected variable waiter startup failure")));
+    EXPECT_EQ(created.count(), 1);
+    EXPECT_EQ(model.currentName(), QStringLiteral("Completed"));
+    EXPECT_TRUE(QFile::exists(fixture.filePath(QStringLiteral("Completed/Completed.panta"))));
+}
+
+TEST(ProjectViewModelTest, DestroyingProjectRequestOwnerDoesNotAccessDeletedQtObjects) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    auto model = std::make_unique<HeldBackgroundViewModel>();
+    model->holdWork = true;
+    ASSERT_TRUE(model->createProject(QStringLiteral("Accepted"), fixture.path()));
+    ASSERT_EQ(model->held.size(), 1U);
+    auto work = std::move(model->held.front());
+    model.reset();
+    std::thread(std::move(work)).join();
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(QFile::exists(fixture.filePath(QStringLiteral("Accepted/Accepted.panta"))));
+}
+
+TEST(ProjectViewModelTest, DisplayPreparationCoalescesSelectionAndRejectsTheOldDisplayResult) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto sourcePath = fixture.filePath(QStringLiteral("part.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+    HeldBackgroundViewModel model;
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Display"), fixture.path())));
+    model.holdWork = true;
+    ASSERT_TRUE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                QStringLiteral("millimeters"), false));
+    ASSERT_EQ(model.held.size(), 1U);
+    EXPECT_EQ(model.mesh_snapshot(), nullptr);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 2 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+    ASSERT_TRUE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
+                                QStringLiteral("millimeters"), false));
+    EXPECT_EQ(model.activeDocumentId(), QStringLiteral("import-2"));
+    ASSERT_EQ(model.held.size(), 1U);
+    model.releaseFirst();
+    QTRY_COMPARE(model.held.size(), 1U);
+    EXPECT_EQ(model.mesh_snapshot(), nullptr);
+    model.releaseFirst();
+    ASSERT_TRUE(wait_for_active_mesh(model, QStringLiteral("import-2")));
+    EXPECT_EQ(model.mesh_snapshot()->vertices[1], (std::array<double, 3>{2.0, 0.0, 0.0}));
+}
+
+TEST(ProjectViewModelTest, DestroyingDisplayPreparationOwnerDoesNotAccessDeletedQtObjects) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto sourcePath = fixture.filePath(QStringLiteral("part.stl"));
+    QFile source(sourcePath);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+    auto model = std::make_unique<HeldBackgroundViewModel>();
+    ASSERT_TRUE(finish_project_operation(
+        *model, model->createProject(QStringLiteral("Display"), fixture.path())));
+    model->holdWork = true;
+    ASSERT_TRUE(model->importStl(sourcePath, QStringLiteral("solid-3d"),
+                                 QStringLiteral("millimeters"), false));
+    ASSERT_EQ(model->held.size(), 1U);
+    auto work = std::move(model->held.front());
+    model.reset();
+    std::thread(std::move(work)).join();
+    QCoreApplication::processEvents();
 }
 
 TEST(ProjectViewModelTest, CreatesAndOpensProjectThroughUnicodeFilesystemPaths) {
@@ -100,7 +284,8 @@ TEST(ProjectViewModelTest, CreatesAndOpensProjectThroughUnicodeFilesystemPaths) 
 
     const QString location = QDir(fixture.path()).filePath(QStringLiteral("项目资料"));
     ProjectViewModel created;
-    ASSERT_TRUE(created.createProject(QStringLiteral("工程-测试"), location))
+    ASSERT_TRUE(finish_project_operation(
+        created, created.createProject(QStringLiteral("工程-测试"), location)))
         << created.errorCode().toStdString() << ": " << created.errorDetail().toStdString();
 
     const QString projectPath = created.currentPath();
@@ -111,7 +296,7 @@ TEST(ProjectViewModelTest, CreatesAndOpensProjectThroughUnicodeFilesystemPaths) 
 
     ProjectViewModel reopened;
     const QUrl projectUrl = QUrl::fromLocalFile(projectPath);
-    ASSERT_TRUE(reopened.openProjectUrl(projectUrl))
+    ASSERT_TRUE(finish_project_operation(reopened, reopened.openProjectUrl(projectUrl)))
         << reopened.errorCode().toStdString() << ": " << reopened.errorDetail().toStdString();
     EXPECT_EQ(reopened.currentName(), QStringLiteral("工程-测试"));
     EXPECT_EQ(QFileInfo(reopened.currentPath()).canonicalFilePath(),
@@ -123,14 +308,15 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
     ASSERT_TRUE(fixture.isValid());
 
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("Variables"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Variables"), fixture.path())));
     QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
     const QString source = QStringLiteral(
         "version: 1\nkind: variables\n\nvalues:\n  count: int = 12\n  doubled: int = count * 2\n");
     ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0))
         << model.errorCode().toStdString() << ": " << model.errorDetail().toStdString();
     EXPECT_EQ(model.variableRevision(), 0U);
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     ASSERT_TRUE(finished.takeFirst().at(1).toBool());
     EXPECT_EQ(model.variableRevision(), 1U);
     EXPECT_EQ(model.variableSource(), source);
@@ -160,7 +346,7 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
     const QString invalidSource =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = unknown-name\n");
     ASSERT_TRUE(model.beginSaveVariableDocument(invalidSource, model.variableGeneration(), 1));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     EXPECT_FALSE(finished.takeFirst().at(1).toBool());
     ASSERT_EQ(model.variableDiagnostics().size(), 1);
     const auto diagnostic = model.variableDiagnostics().constFirst().toMap();
@@ -174,7 +360,7 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
     const QString invalidResource = QStringLiteral(
         "version: 1\nkind: variables\n\nvalues:\n  mesh: resource = project:/../outside.stl\n");
     ASSERT_TRUE(model.beginSaveVariableDocument(invalidResource, model.variableGeneration(), 1));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     EXPECT_FALSE(finished.takeFirst().at(1).toBool());
     ASSERT_EQ(model.variableDiagnostics().size(), 1);
     const auto resourceDiagnostic = model.variableDiagnostics().constFirst().toMap();
@@ -187,7 +373,7 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
     variableFile.close();
 
     ProjectViewModel reopened;
-    ASSERT_TRUE(reopened.openProject(model.currentPath()));
+    ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(model.currentPath())));
     QSignalSpy loaded(&reopened, &ProjectViewModel::variableDocumentFinished);
     ASSERT_TRUE(reopened.beginLoadVariableDocument(reopened.variableGeneration(), 0))
         << reopened.errorCode().toStdString() << ": " << reopened.errorDetail().toStdString();
@@ -203,9 +389,11 @@ TEST(ProjectViewModelTest, OldVariableRequestCannotWriteIntoAnotherProject) {
     ASSERT_TRUE(fixture.isValid());
 
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("First"), fixture.path())));
     const auto oldGeneration = model.variableGeneration();
-    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Second"), fixture.path())));
     EXPECT_NE(model.variableGeneration(), oldGeneration);
 
     const QString source =
@@ -223,12 +411,13 @@ TEST(ProjectViewModelTest, VariableWaiterStartupFailureDoesNotSubmitOrFreezeProj
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
     VariableWaiterFailureViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("First"), fixture.path())));
     QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
     const QString source =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
     ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     ASSERT_TRUE(finished.takeFirst().at(1).toBool());
     QFile variableFile(QDir(QFileInfo(model.currentPath()).absolutePath())
                            .filePath(QStringLiteral("variables.pa")));
@@ -253,9 +442,10 @@ TEST(ProjectViewModelTest, VariableWaiterStartupFailureDoesNotSubmitOrFreezeProj
     EXPECT_TRUE(finished.isEmpty());
 
     // 两类启动失败均未准入 Rust 任务；工程可切换，后续请求仍能正常完成。
-    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Second"), fixture.path())));
     ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     EXPECT_TRUE(finished.takeFirst().at(1).toBool());
     EXPECT_EQ(model.variableRevision(), 1U);
     ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
@@ -266,37 +456,42 @@ TEST(ProjectViewModelTest, VariableSaveRejectsConflictingSwitchUntilQueuedComple
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("First"), fixture.path())));
     QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
     const QString source =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
     ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
     // 即使 worker 已完成，GUI 尚未消费回执，冻结的候选仍不能被工程切换或另一次保存覆盖。
     EXPECT_EQ(model.variableRevision(), 0U);
-    EXPECT_FALSE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    EXPECT_FALSE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Second"), fixture.path())));
     EXPECT_EQ(model.currentName(), QStringLiteral("First"));
     EXPECT_FALSE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     EXPECT_TRUE(finished.takeFirst().at(1).toBool());
-    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Second"), fixture.path())));
 }
 
 TEST(ProjectViewModelTest, VariableReadCompletionFromOldProjectDoesNotReplaceNewProjection) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("First"), fixture.path())));
     QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
     const QString source =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
     ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     finished.clear();
     const auto oldGeneration = model.variableGeneration();
     ASSERT_TRUE(model.beginLoadVariableDocument(oldGeneration, 1));
-    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Second"), fixture.path())));
     const auto nextGeneration = model.variableGeneration();
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     const auto completion = finished.takeFirst();
     EXPECT_EQ(completion.at(0).toULongLong(), oldGeneration);
     EXPECT_FALSE(completion.at(1).toBool());
@@ -312,7 +507,8 @@ TEST(ProjectViewModelTest, VariableReadKeepsGuiResponsiveWhileFilesystemIsBlocke
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("BlockedRead"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("BlockedRead"), fixture.path())));
     const auto variablePath = QDir(QFileInfo(model.currentPath()).absolutePath())
                                   .filePath(QStringLiteral("variables.pa"));
     const auto nativePath = QFile::encodeName(variablePath);
@@ -332,7 +528,7 @@ TEST(ProjectViewModelTest, VariableReadKeepsGuiResponsiveWhileFilesystemIsBlocke
             }
         });
     });
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     EXPECT_TRUE(guiEventDelivered);
     EXPECT_TRUE(finished.takeFirst().at(1).toBool());
     EXPECT_EQ(model.variableRevision(), 1U);
@@ -343,7 +539,8 @@ TEST(ProjectViewModelTest, DestroyingVariableRequestOwnerDoesNotWaitForQtComplet
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
     auto model = std::make_unique<ProjectViewModel>();
-    ASSERT_TRUE(model->createProject(QStringLiteral("Dropped"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        *model, model->createProject(QStringLiteral("Dropped"), fixture.path())));
     ASSERT_TRUE(model->beginLoadVariableDocument(model->variableGeneration(), 0));
     model.reset();
     // worker 不拥有 Qt 对象；销毁后排队的完成通知由连接的 context 自动撤销。
@@ -357,23 +554,26 @@ TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {
     ProjectViewModel view_model;
     const QString location = QDir(fixture.path()).absolutePath();
 
-    EXPECT_FALSE(view_model.createProject(QStringLiteral("../escape"), location));
+    EXPECT_FALSE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("../escape"), location)));
     EXPECT_EQ(view_model.errorCode(), QStringLiteral("project.invalid_name"));
     EXPECT_EQ(view_model.errorCategory(), QStringLiteral("validation"));
     EXPECT_EQ(view_model.errorDetail(), QStringLiteral("../escape"));
     EXPECT_FALSE(view_model.error().isEmpty());
     EXPECT_FALSE(QDir(fixture.path()).exists(QStringLiteral("escape")));
 
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), location));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), location)));
     EXPECT_TRUE(view_model.errorCategory().isEmpty());
     EXPECT_TRUE(view_model.errorDetail().isEmpty());
-    EXPECT_FALSE(view_model.createProject(QStringLiteral("Demo"), location));
+    EXPECT_FALSE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), location)));
     EXPECT_EQ(view_model.errorCode(), QStringLiteral("project.already_exists"));
     EXPECT_EQ(view_model.errorCategory(), QStringLiteral("conflict"));
     EXPECT_FALSE(view_model.errorDetail().isEmpty());
 
     ProjectViewModel empty;
-    EXPECT_FALSE(empty.saveProject());
+    EXPECT_FALSE(finish_project_operation(empty, empty.saveProject()));
     EXPECT_EQ(empty.errorCode(), QStringLiteral("project.no_project"));
     EXPECT_EQ(empty.errorCategory(), QStringLiteral("state"));
     EXPECT_TRUE(empty.errorDetail().isEmpty());
@@ -426,9 +626,11 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
     source.close();
 
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                 QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(model, model.activeDocumentId()));
     const auto mesh = model.mesh_snapshot();
     ASSERT_NE(mesh, nullptr);
     const auto settings = model.planSettings();
@@ -479,8 +681,9 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
         EXPECT_EQ(model.errorCategory(), QStringLiteral("validation"));
         EXPECT_EQ(model.errorDetail(), QStringLiteral("plan settings changed"));
     };
-    expectStaleRequest(model.setAnalysisSequence(model.currentPath(), revision + 1, importId,
-                                                 QStringLiteral("fill")));
+    expectStaleRequest(finish_project_operation(
+        model, model.setAnalysisSequence(model.currentPath(), revision + 1, importId,
+                                         QStringLiteral("fill"))));
     expectStaleRequest(
         model.setMaterial(model.currentPath(), revision + 1, importId,
                           model.defaultMaterial().value(QStringLiteral("id")).toString()));
@@ -499,7 +702,8 @@ TEST(ProjectViewModelTest, StructuredImportFailuresPreserveTheCommittedProjectAn
     EXPECT_EQ(model.planSettings(), settings);
     EXPECT_EQ(model.mesh_snapshot(), mesh);
 
-    EXPECT_FALSE(model.openProject(fixture.filePath(QStringLiteral("missing.panta"))));
+    EXPECT_FALSE(finish_project_operation(
+        model, model.openProject(fixture.filePath(QStringLiteral("missing.panta")))));
     EXPECT_EQ(model.errorCode(), QStringLiteral("project.file_missing"));
     EXPECT_EQ(model.errorCategory(), QStringLiteral("missing"));
     EXPECT_EQ(model.planSettings(), settings);
@@ -559,7 +763,8 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     source.close();
 
     ProjectViewModel view_model;
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
     EXPECT_TRUE(view_model.importedPartNames().isEmpty());
     ASSERT_TRUE(view_model.inspectStl(sourcePath));
     EXPECT_TRUE(view_model.importPreviewPending());
@@ -571,6 +776,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
 
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), true));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     EXPECT_EQ(view_model.importedPartNames(), QStringList{QStringLiteral("sample")});
     EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample"));
     EXPECT_EQ(view_model.importedMeshType(), QStringLiteral("dual-domain"));
@@ -587,9 +793,11 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     QSignalSpy planChanged(&view_model, &ProjectViewModel::planSettingsChanged);
     EXPECT_EQ(firstPlan.value(QStringLiteral("meshType")).toString(),
               QStringLiteral("dual-domain"));
-    ASSERT_TRUE(view_model.setAnalysisSequence(
-        view_model.currentPath(), firstPlan.value(QStringLiteral("revision")).toULongLong(),
-        firstPlan.value(QStringLiteral("importId")).toString(), QStringLiteral("fill-pack")));
+    ASSERT_TRUE(finish_project_operation(
+        view_model,
+        view_model.setAnalysisSequence(
+            view_model.currentPath(), firstPlan.value(QStringLiteral("revision")).toULongLong(),
+            firstPlan.value(QStringLiteral("importId")).toString(), QStringLiteral("fill-pack"))));
     EXPECT_EQ(view_model.planSettings().value(QStringLiteral("sequenceId")).toString(),
               QStringLiteral("fill-pack"));
     EXPECT_EQ(planChanged.count(), 1);
@@ -599,6 +807,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     ASSERT_TRUE(QFile::copy(sourcePath, secondSourcePath));
     ASSERT_TRUE(view_model.importStl(secondSourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     EXPECT_EQ(view_model.importedPartNames(),
               QStringList({QStringLiteral("sample"), QStringLiteral("sample-second")}));
     EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample-second"));
@@ -608,6 +817,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     EXPECT_EQ(view_model.planSettings().value(QStringLiteral("sequenceId")).toString(),
               QStringLiteral("fill"));
     view_model.activateDocument(firstPlan.value(QStringLiteral("importId")).toString());
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     EXPECT_EQ(view_model.planSettings().value(QStringLiteral("meshType")).toString(),
               QStringLiteral("dual-domain"));
     EXPECT_EQ(view_model.planSettings().value(QStringLiteral("sequenceId")).toString(),
@@ -617,7 +827,7 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
               QStringLiteral("solid-3d"));
 
     ProjectViewModel reopened;
-    ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
+    ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(view_model.currentPath())));
     EXPECT_EQ(reopened.importedPartNames(),
               QStringList({QStringLiteral("sample"), QStringLiteral("sample-second")}));
     EXPECT_EQ(reopened.importedPartName(), QStringLiteral("sample-second"));
@@ -634,11 +844,12 @@ TEST(ProjectViewModelTest, PreviewsImportsAndPersistsLatestRecord) {
     QSignalSpy mesh_changed(&view_model, &panta::visualization::MeshSource::meshChanged);
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     EXPECT_EQ(view_model.importedPartNames(),
               QStringList({QStringLiteral("sample"), QStringLiteral("sample-second"),
                            QStringLiteral("sample")}));
     EXPECT_EQ(view_model.importedPartName(), QStringLiteral("sample"));
-    EXPECT_EQ(mesh_changed.count(), 1);
+    EXPECT_EQ(mesh_changed.count(), 2);
     const auto replacement = view_model.mesh_snapshot();
     ASSERT_NE(replacement, nullptr);
     EXPECT_EQ(replacement->vertices[1], (std::array<double, 3>{2.0, 0.0, 0.0}));
@@ -664,7 +875,8 @@ TEST(ProjectViewModelTest, PreviewCancellationReplacementAndProjectSwitchIgnoreO
         ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
     }
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Demo"), fixture.path())));
     const auto plan = model.planSettings();
     QSignalSpy finished(&model, &ProjectViewModel::importPreviewFinished);
     ASSERT_TRUE(model.inspectStl(a));
@@ -683,13 +895,15 @@ TEST(ProjectViewModelTest, PreviewCancellationReplacementAndProjectSwitchIgnoreO
     EXPECT_EQ(model.planSettings(), plan);
     EXPECT_TRUE(model.importedPartNames().isEmpty());
     ASSERT_TRUE(model.inspectStl(a));
-    ASSERT_TRUE(model.createProject(QStringLiteral("Other"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Other"), fixture.path())));
     EXPECT_FALSE(model.importPreviewPending());
     EXPECT_FALSE(model.importPreviewReady());
+    finished.clear();
     ASSERT_TRUE(model.inspectStl(b));
     QTRY_VERIFY(!model.importPreviewPending());
     EXPECT_EQ(model.importPreviewName(), QStringLiteral("b.stl"));
-    EXPECT_EQ(finished.count(), 2);
+    EXPECT_EQ(finished.count(), 1);
     EXPECT_EQ(model.currentName(), QStringLiteral("Other"));
 }
 
@@ -703,7 +917,8 @@ TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelReq
     source.close();
 
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(model.inspectStl(path));
     QTRY_VERIFY(!model.importPreviewPending());
     ASSERT_TRUE(model.importPreviewReady());
@@ -718,6 +933,7 @@ TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelReq
     EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("part")});
     EXPECT_EQ(model.openDocuments().size(), 2);
     EXPECT_EQ(model.activeDocumentId(), QStringLiteral("import-1"));
+    ASSERT_TRUE(wait_for_active_mesh(model, QStringLiteral("import-1")));
     EXPECT_NE(model.mesh_snapshot(), nullptr);
     EXPECT_EQ(model.errorCode(), QString{});
 
@@ -795,7 +1011,8 @@ TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
     ProjectViewModel view_model;
     QSignalSpy documentsChanged(&view_model, &ProjectViewModel::documentsChanged);
     QSignalSpy activeChanged(&view_model, &ProjectViewModel::activeDocumentChanged);
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
 
     // 进入工程工作区：默认只有就绪 Welcome 且为活动文档。
     EXPECT_EQ(view_model.openDocuments().size(), 1);
@@ -809,6 +1026,7 @@ TEST(ProjectViewModelTest, DocumentTabsFollowWelcomeImportAndClose) {
     // 导入成功：自动新增并激活就绪导入页签，快照复用导入产物。
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     ASSERT_EQ(view_model.openDocuments().size(), 2);
     const auto imported = view_model.openDocuments()[1].toMap();
     EXPECT_EQ(imported[QStringLiteral("id")].toString(), QStringLiteral("import-1"));
@@ -853,16 +1071,21 @@ TEST(ProjectViewModelTest, ReorderingAndClosingDocumentsPreservesActiveMeshSelec
     source.close();
 
     ProjectViewModel view_model;
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
 
     view_model.activateDocument(QStringLiteral("import-1"));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     const auto first_mesh = view_model.mesh_snapshot();
     ASSERT_NE(first_mesh, nullptr);
     view_model.activateDocument(QStringLiteral("import-2"));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     const auto second_mesh = view_model.mesh_snapshot();
     ASSERT_NE(second_mesh, nullptr);
     ASSERT_NE(first_mesh.get(), second_mesh.get());
@@ -882,6 +1105,7 @@ TEST(ProjectViewModelTest, ReorderingAndClosingDocumentsPreservesActiveMeshSelec
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-2"));
     EXPECT_EQ(view_model.mesh_snapshot().get(), second_mesh.get());
     view_model.closeDocument(QStringLiteral("import-2"));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, QStringLiteral("import-1")));
     EXPECT_EQ(view_model.activeDocumentId(), QStringLiteral("import-1"));
     EXPECT_NE(view_model.mesh_snapshot().get(), first_mesh.get());
     EXPECT_EQ(view_model.mesh_snapshot()->vertices, first_mesh->vertices);
@@ -912,13 +1136,15 @@ TEST(ProjectViewModelTest, ReopenLoadsWelcomeOnlyAndActivatesSavedRecordOnDemand
     source.close();
 
     ProjectViewModel view_model;
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
-    ASSERT_TRUE(view_model.saveProject());
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
+    ASSERT_TRUE(finish_project_operation(view_model, view_model.saveProject()));
 
     ProjectViewModel reopened;
-    ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
+    ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(view_model.currentPath())));
     // 重开工程只保留 Welcome 页签；不继承旧会话活动文档。
     EXPECT_EQ(reopened.openDocuments().size(), 1);
     EXPECT_EQ(reopened.activeDocumentId(), QStringLiteral("welcome"));
@@ -964,15 +1190,18 @@ TEST(ProjectViewModelTest, DuplicateImportOrdinalsFollowImportOrderAcrossActivat
     source.close();
 
     ProjectViewModel project;
-    ASSERT_TRUE(project.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        project, project.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(project.importStl(sourcePath, QStringLiteral("solid-3d"),
                                   QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(project, project.activeDocumentId()));
     ASSERT_TRUE(project.importStl(sourcePath, QStringLiteral("solid-3d"),
                                   QStringLiteral("millimeters"), false));
-    ASSERT_TRUE(project.saveProject());
+    ASSERT_TRUE(wait_for_active_mesh(project, project.activeDocumentId()));
+    ASSERT_TRUE(finish_project_operation(project, project.saveProject()));
 
     ProjectViewModel reopened;
-    ASSERT_TRUE(reopened.openProject(project.currentPath()));
+    ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(project.currentPath())));
     reopened.openImportRecord(QStringLiteral("import-2"));
     QTRY_COMPARE(reopened.activeDocumentId(), QStringLiteral("import-2"));
     reopened.openImportRecord(QStringLiteral("import-1"));
@@ -1015,15 +1244,18 @@ TEST(ProjectViewModelTest, ClosedDocumentsReleaseTheirMeshSnapshotsAfterRepeated
     source.close();
 
     ProjectViewModel view_model;
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> first_snapshot =
         view_model.mesh_snapshot();
     ASSERT_FALSE(first_snapshot.expired());
 
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
     const std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> second_snapshot =
         view_model.mesh_snapshot();
     ASSERT_FALSE(second_snapshot.expired());
@@ -1031,9 +1263,11 @@ TEST(ProjectViewModelTest, ClosedDocumentsReleaseTheirMeshSnapshotsAfterRepeated
 
     for (int round = 0; round < 32; ++round) {
         view_model.activateDocument(QStringLiteral("import-1"));
+        ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
         ASSERT_NE(view_model.mesh_snapshot(), nullptr);
         EXPECT_TRUE(second_snapshot.expired());
         view_model.activateDocument(QStringLiteral("import-2"));
+        ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
         ASSERT_NE(view_model.mesh_snapshot(), nullptr);
         EXPECT_TRUE(first_snapshot.expired());
     }
@@ -1057,7 +1291,8 @@ TEST(ProjectViewModelTest, ClosingLastTabFlipsPlaceholderVisibility) {
     QTemporaryDir fixture;
     ASSERT_TRUE(fixture.isValid());
     ProjectViewModel view_model;
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
 
     EXPECT_TRUE(view_model.placeholder_visible());
     view_model.closeDocument(QStringLiteral("welcome"));
@@ -1087,14 +1322,16 @@ TEST(ProjectViewModelTest, FailedLoadRetainsTabAndCloseReleasesActivationState) 
     source.close();
 
     ProjectViewModel view_model;
-    ASSERT_TRUE(view_model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        view_model, view_model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(view_model.importStl(sourcePath, QStringLiteral("solid-3d"),
                                      QStringLiteral("millimeters"), false));
-    ASSERT_TRUE(view_model.saveProject());
+    ASSERT_TRUE(wait_for_active_mesh(view_model, view_model.activeDocumentId()));
+    ASSERT_TRUE(finish_project_operation(view_model, view_model.saveProject()));
     const auto assetPath = view_model.importedAssetPath();
 
     ProjectViewModel reopened;
-    ASSERT_TRUE(reopened.openProject(view_model.currentPath()));
+    ASSERT_TRUE(finish_project_operation(reopened, reopened.openProject(view_model.currentPath())));
 
     // 资产损坏 → 加载失败：页签保留 Failed 态并携带原因，视口保持 Welcome。
     ASSERT_TRUE(QFile::rename(assetPath, assetPath + QStringLiteral(".bak")));
@@ -1139,9 +1376,11 @@ TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
               0);
     source.close();
     ProjectViewModel model;
-    ASSERT_TRUE(model.createProject(QStringLiteral("Demo"), fixture.path()));
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("Demo"), fixture.path())));
     ASSERT_TRUE(model.importStl(sourcePath, QStringLiteral("dual-domain"),
                                 QStringLiteral("millimeters"), false));
+    ASSERT_TRUE(wait_for_active_mesh(model, model.activeDocumentId()));
     const auto initial = model.planSettings();
     auto candidate = initial.value(QStringLiteral("fillSettings")).toMap();
     candidate.insert(QStringLiteral("meltTemperature"), 235.0);
@@ -1154,20 +1393,21 @@ TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
     EXPECT_FALSE(model.setFillSettings(
         model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
         initial.value(QStringLiteral("importId")).toString(), candidate));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_VERIFY(!finished.isEmpty());
     ASSERT_EQ(finished.count(), 1);
     EXPECT_TRUE(finished.at(0).at(0).toBool());
     EXPECT_FALSE(model.fillSettingsConfirmationPending());
     EXPECT_TRUE(model.planSettings().value(QStringLiteral("fillSettingsConfirmed")).toBool());
     EXPECT_EQ(model.planSettings().value(QStringLiteral("fillSettings")).toMap(), candidate);
     ProjectViewModel reopened;
-    ASSERT_TRUE(reopened.openProjectUrl(QUrl::fromLocalFile(model.currentPath())));
+    ASSERT_TRUE(finish_project_operation(
+        reopened, reopened.openProjectUrl(QUrl::fromLocalFile(model.currentPath()))));
     expect_same_plan_settings(reopened.planSettings(), model.planSettings());
     candidate.insert(QStringLiteral("flowRate"), -1.0);
     ASSERT_TRUE(model.setFillSettings(
         model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
         initial.value(QStringLiteral("importId")).toString(), candidate));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_COMPARE(finished.count(), 2);
     EXPECT_FALSE(finished.at(1).at(0).toBool());
     EXPECT_FALSE(model.fillSettingsConfirmationPending());
     EXPECT_EQ(model.errorCode(), QStringLiteral("project.manifest_invalid"));
@@ -1180,7 +1420,7 @@ TEST(ProjectViewModelTest, FillSettingsConfirmAsynchronouslyAndReopenFromRust) {
     ASSERT_TRUE(model.setFillSettings(
         model.currentPath(), model.planSettings().value(QStringLiteral("revision")).toULongLong(),
         initial.value(QStringLiteral("importId")).toString(), candidate));
-    ASSERT_TRUE(finished.wait(5000));
+    QTRY_COMPARE(finished.count(), 3);
     ASSERT_EQ(finished.count(), 3);
     EXPECT_TRUE(finished.at(2).at(0).toBool());
     EXPECT_FALSE(model.fillSettingsConfirmationPending());

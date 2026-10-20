@@ -7,10 +7,6 @@ use panta_core::project::{
     DEFAULT_MESH_TYPE, ImportRecord, ProjectCommand, ProjectService, StlImportPreview,
 };
 
-const EXPANDED_MESH_WARNING_BYTES: u128 = 2 * 1024 * 1024 * 1024;
-const BYTES_PER_EXPANDED_TRIANGLE: u128 = 72;
-const SIDECAR_HEADER_ESTIMATE_BYTES: u128 = 64;
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportOptions {
     mesh_type: String,
@@ -35,7 +31,7 @@ pub fn import(
     let preview = service
         .inspect_stl(&source_path)
         .map_err(|error| error.to_string())?;
-    if expanded_mesh_estimate_bytes(preview.triangle_count) > EXPANDED_MESH_WARNING_BYTES {
+    if preview.large_mesh_warning {
         eprintln!(
             "Warning: expanded mesh data is estimated to exceed 2 GiB. Import will continue, but it may require substantial memory and disk space."
         );
@@ -74,16 +70,9 @@ pub(super) fn parse_import_options(arguments: &[OsString]) -> Result<ImportOptio
     Ok(options)
 }
 
-fn expanded_mesh_estimate_bytes(triangle_count: u64) -> u128 {
-    u128::from(triangle_count) * BYTES_PER_EXPANDED_TRIANGLE + SIDECAR_HEADER_ESTIMATE_BYTES
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        BYTES_PER_EXPANDED_TRIANGLE, DEFAULT_MESH_TYPE, EXPANDED_MESH_WARNING_BYTES, ImportOptions,
-        expanded_mesh_estimate_bytes, parse_import_options,
-    };
+    use super::{DEFAULT_MESH_TYPE, ImportOptions, parse_import_options};
     use std::ffi::OsString;
 
     #[test]
@@ -113,15 +102,5 @@ mod tests {
         );
         assert!(parse_import_options(&[OsString::from("--unknown"), OsString::from("x")]).is_err());
         assert!(parse_import_options(&[OsString::from("--units")]).is_err());
-    }
-
-    #[test]
-    fn expanded_mesh_estimate_matches_the_sidecar_ir_size_and_warning_boundary() {
-        assert_eq!(
-            expanded_mesh_estimate_bytes(1),
-            BYTES_PER_EXPANDED_TRIANGLE + 64
-        );
-        assert!(expanded_mesh_estimate_bytes(29_826_161) > EXPANDED_MESH_WARNING_BYTES);
-        assert!(expanded_mesh_estimate_bytes(29_826_160) < EXPANDED_MESH_WARNING_BYTES);
     }
 }
