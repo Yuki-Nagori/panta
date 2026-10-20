@@ -1,6 +1,8 @@
 /// ProjectViewModel 回归：工程命令、错误映射及任务 080 的视口文档生命周期。
 
+#include "mesh_frame_tracker.hpp"
 #include "panta/visualization/mesh_source.hpp"
+#include "panta/visualization/render_scene.hpp"
 #include "project_operation_helpers.hpp"
 #include "project_view_model.hpp"
 #include <QCoreApplication>
@@ -255,6 +257,61 @@ TEST(ProjectViewModelTest, DisplayPreparationCoalescesSelectionAndRejectsTheOldD
     model.releaseFirst();
     ASSERT_TRUE(wait_for_active_mesh(model, QStringLiteral("import-2")));
     EXPECT_EQ(model.mesh_snapshot()->vertices[1], (std::array<double, 3>{2.0, 0.0, 0.0}));
+}
+
+TEST(ProjectViewModelTest, GpuSamplingRejectsEmptyFramesAndWaitsForTheTargetScene) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto path = fixture.filePath(QStringLiteral("part.stl"));
+    QFile source(path);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+    HeldBackgroundViewModel model;
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("GpuSampling"), fixture.path())));
+    for (int index = 1; index <= 2; ++index) {
+        ASSERT_TRUE(model.importStl(path, QStringLiteral("solid-3d"), QStringLiteral("millimeters"),
+                                    false));
+        ASSERT_TRUE(wait_for_active_mesh(model, QStringLiteral("import-%1").arg(index)));
+    }
+
+    panta::test::MeshFrameTracker frames;
+    panta::visualization::SceneRevision revision = 0;
+    QObject::connect(&model, &ProjectViewModel::meshChanged, &model, [&] {
+        const auto mesh = model.mesh_snapshot();
+        frames.record_scene(++revision, mesh);
+        // 模拟离屏渲染：清空场景立即完成，目标模型帧由下方显式交付。
+        if (!mesh)
+            frames.record_frame(revision);
+    });
+    model.holdWork = true;
+    for (const auto& id : {QStringLiteral("import-1"), QStringLiteral("import-2")}) {
+        const auto before = frames.frame_count();
+        model.activateDocument(id);
+        ASSERT_EQ(model.held.size(), 1U);
+        ASSERT_GT(frames.frame_count(), before); // 旧的“帧数增长”判定已被空帧满足。
+        const auto emptyRevision = revision;
+        EXPECT_TRUE(frames.scene_complete());
+        EXPECT_FALSE(frames.ready(model.mesh_snapshot()));
+
+        model.releaseFirst();
+        ASSERT_TRUE(wait_for_active_mesh(model, id));
+        EXPECT_GT(revision, emptyRevision);
+        EXPECT_FALSE(frames.scene_complete());
+        EXPECT_FALSE(frames.ready(model.mesh_snapshot()));
+        // DTO 已就绪仍不够；先收到上一场景帧也不能结束目标等待。
+        frames.record_frame(emptyRevision);
+        EXPECT_FALSE(frames.ready(model.mesh_snapshot()));
+        frames.record_frame(revision);
+        EXPECT_TRUE(frames.ready(model.mesh_snapshot()));
+        EXPECT_FALSE(frames.ready(std::make_shared<panta::visualization::SurfaceMeshSnapshot>()));
+    }
+    std::weak_ptr<const panta::visualization::SurfaceMeshSnapshot> prior = model.mesh_snapshot();
+    model.activateDocument(QStringLiteral("welcome"));
+    EXPECT_TRUE(prior.expired());
+    EXPECT_FALSE(frames.ready(nullptr));
+    EXPECT_TRUE(frames.scene_complete());
 }
 
 TEST(ProjectViewModelTest, DestroyingDisplayPreparationOwnerDoesNotAccessDeletedQtObjects) {

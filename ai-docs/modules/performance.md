@@ -6,6 +6,8 @@
 
 源码集中在 `tests/performance/{cpu,gpu,support}`；性能专用文件名不重复 CPU/GPU 分类。共享功能测试辅助代码放 `tests/support`，QML 夹具仍为 `tests/fixtures/qml`。全部 native 性能目标独立登记在 `native/performance/CMakeLists.txt`，从默认构建与 CTest 排除，格式 / clang-tidy / include-cleaner / Cppcheck 仍覆盖这些源码。
 
+工程 Mesh 视口基准先等待目标文档 DTO 就绪，再核对该 Mesh 对应的场景修订已报告帧。真实窗口使用 `VtkViewport::frameSubmitted` 确认 VTK 提交，离屏在 `WaitForCompletion` 后确认同一修订的队列完成；切换时的空帧和迟到旧帧均不能完成目标采样。帧计时包含后台显示准备及场景更新，不能解释为纯 GPU 内核耗时；确定性顺序回归纳入 Bridge 行为测试，实际 GPU 测量仍按需单独运行。
+
 ```sh
 cargo performance                       # 辅助代码 → CPU → GPU；一步失败即停止
 cargo performance support               # 仅辅助代码与 CLI 正确性测试
