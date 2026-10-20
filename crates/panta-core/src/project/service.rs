@@ -30,6 +30,7 @@ pub struct ProjectService {
     pub(super) activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
     // 候选提交期间锁住工程元数据；Mesh 驻留和只读显示操作仍可继续。
     pub(super) pending_metadata: Option<storage::PendingMetadataWrite>,
+    pub(super) pending_variable: Option<super::variable_document::PendingVariableDocument>,
     pub(super) pending_preview: Option<preview::PendingPreview>,
     pub(super) preview_request: u64,
     pub(super) pending_import: Option<super::import::PendingImport>,
@@ -48,6 +49,15 @@ impl ProjectService {
 
     // 后台候选已冻结；消费结果前，任何工程写入都会与候选清单竞争。
     pub(super) fn ensure_project_writable(&self) -> Result<(), ProjectError> {
+        if self
+            .pending_variable
+            .as_ref()
+            .is_some_and(|pending| pending.write)
+        {
+            return Err(ProjectError::CommandInvalid(
+                "variable document save pending".to_owned(),
+            ));
+        }
         if self.pending_metadata.is_some() {
             return Err(ProjectError::CommandInvalid(
                 "metadata confirmation pending".to_owned(),
@@ -219,6 +229,13 @@ impl ProjectService {
         scope: &crate::runtime::RuntimeTaskScope,
         values: BTreeMap<String, crate::runtime::RuntimeValue>,
     ) -> Result<crate::runtime::VariableSnapshot, crate::runtime::RuntimeCommitError> {
+        if self
+            .pending_variable
+            .as_ref()
+            .is_some_and(|pending| pending.write)
+        {
+            return Err(crate::runtime::RuntimeCommitError::Busy);
+        }
         let context = self
             .runtime_context
             .as_mut()
@@ -268,22 +285,6 @@ impl ProjectService {
         source: &str,
     ) -> Result<(String, crate::runtime::VariableSnapshot), VariableDocumentError> {
         let scope = self.variable_scope(expected_generation, expected_revision)?;
-        let values = variable_runtime_values(&scope, source)?;
-        let normalized =
-            panta_dsl_core::format_source(source).map_err(VariableDocumentError::Diagnostics)?;
-        if normalized.len() > panta_dsl_core::MAX_SOURCE_BYTES {
-            return Err(VariableDocumentError::SourceTooLarge {
-                size: normalized.len(),
-                limit: panta_dsl_core::MAX_SOURCE_BYTES,
-            });
-        }
-        scope
-            .variables()
-            .revision()
-            .checked_add(1)
-            .ok_or(VariableDocumentError::Commit(
-                crate::runtime::RuntimeCommitError::RevisionExhausted,
-            ))?;
         let project_path = self
             .current
             .as_ref()
@@ -292,21 +293,29 @@ impl ProjectService {
             ))?
             .path
             .clone();
-        let path = super::variable_document::path(&project_path)
-            .map_err(VariableDocumentError::Project)?;
-        super::variable_document::write_atomically(&path, normalized.as_bytes())
+        let prepared = super::variable_document::prepare_save(&scope, &project_path, source)?;
+        super::variable_document::write_atomically(&prepared.path, prepared.source.as_bytes())
             .map_err(VariableDocumentError::Project)?;
         let snapshot = self
-            .commit_runtime_variables(&scope, values)
+            .commit_runtime_variables(&scope, prepared.values)
             .map_err(VariableDocumentError::Commit)?;
-        Ok((normalized, snapshot))
+        Ok((prepared.source, snapshot))
     }
 
-    fn variable_scope(
+    pub(super) fn variable_scope(
         &self,
         expected_generation: u64,
         expected_revision: u64,
     ) -> Result<crate::runtime::RuntimeTaskScope, VariableDocumentError> {
+        if self
+            .pending_variable
+            .as_ref()
+            .is_some_and(|pending| pending.write)
+        {
+            return Err(VariableDocumentError::Project(
+                ProjectError::CommandInvalid("variable document save pending".to_owned()),
+            ));
+        }
         let scope = self
             .runtime_context
             .as_ref()
@@ -335,6 +344,7 @@ impl ProjectService {
             previous.close();
         }
         self.runtime_context = context;
+        self.pending_variable = None;
     }
 
     /// 将当前模型以同目录临时文件写入后替换 `.panta` 主文件。
@@ -774,7 +784,7 @@ impl std::fmt::Display for VariableDocumentError {
 
 impl std::error::Error for VariableDocumentError {}
 
-fn variable_runtime_values(
+pub(super) fn variable_runtime_values(
     scope: &crate::runtime::RuntimeTaskScope,
     source: &str,
 ) -> Result<BTreeMap<String, crate::runtime::RuntimeValue>, VariableDocumentError> {

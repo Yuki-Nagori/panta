@@ -11,18 +11,41 @@
 #include <QSignalSpy>
 #include <QString>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QUrl>
 #include <QVariantMap>
 #include <QtCore/qcontainerfwd.h>
+#include <QtCore/qtestsupport_core.h>
 #include <QtTest/qtest.h>
 #include <array>
+#include <functional>
 #include <gtest/gtest.h>
 #include <memory>
+#include <system_error>
+#include <thread>
+#include <utility>
+#ifdef Q_OS_UNIX
+#include <sys/stat.h>
+#endif
 #include <qtestcase.h>
 
 using panta::bridge::ProjectViewModel;
 
 namespace {
+
+class VariableWaiterFailureViewModel : public ProjectViewModel {
+  public:
+    bool failNextStart = false;
+
+  protected:
+    void startVariableWaiter(std::function<void()> work) override {
+        if (std::exchange(failNextStart, false)) {
+            throw std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again),
+                                    "injected variable waiter startup failure");
+        }
+        ProjectViewModel::startVariableWaiter(std::move(work));
+    }
+};
 
 void expect_same_plan_settings(QVariantMap actual, QVariantMap expected) {
     // 创建路径与 QUrl 重开路径在 Windows 可使用不同分隔符；比较同一文件身份。
@@ -101,10 +124,14 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
 
     ProjectViewModel model;
     ASSERT_TRUE(model.createProject(QStringLiteral("Variables"), fixture.path()));
+    QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
     const QString source = QStringLiteral(
         "version: 1\nkind: variables\n\nvalues:\n  count: int = 12\n  doubled: int = count * 2\n");
-    ASSERT_TRUE(model.saveVariableDocument(source, model.variableGeneration(), 0))
+    ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0))
         << model.errorCode().toStdString() << ": " << model.errorDetail().toStdString();
+    EXPECT_EQ(model.variableRevision(), 0U);
+    ASSERT_TRUE(finished.wait(5000));
+    ASSERT_TRUE(finished.takeFirst().at(1).toBool());
     EXPECT_EQ(model.variableRevision(), 1U);
     EXPECT_EQ(model.variableSource(), source);
     ASSERT_EQ(model.variableValues().size(), 2);
@@ -121,7 +148,7 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
 
     const QString staleSource =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 99\n");
-    EXPECT_FALSE(model.saveVariableDocument(staleSource, model.variableGeneration(), 0));
+    EXPECT_FALSE(model.beginSaveVariableDocument(staleSource, model.variableGeneration(), 0));
     EXPECT_EQ(model.errorCode(), QStringLiteral("variables.stale_revision"));
     EXPECT_EQ(model.variableRevision(), 1U);
     EXPECT_EQ(model.variableValues().at(0).toMap().value(QStringLiteral("value")).toString(),
@@ -132,7 +159,9 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
 
     const QString invalidSource =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = unknown-name\n");
-    EXPECT_FALSE(model.saveVariableDocument(invalidSource, model.variableGeneration(), 1));
+    ASSERT_TRUE(model.beginSaveVariableDocument(invalidSource, model.variableGeneration(), 1));
+    ASSERT_TRUE(finished.wait(5000));
+    EXPECT_FALSE(finished.takeFirst().at(1).toBool());
     ASSERT_EQ(model.variableDiagnostics().size(), 1);
     const auto diagnostic = model.variableDiagnostics().constFirst().toMap();
     EXPECT_EQ(diagnostic.value(QStringLiteral("code")).toString(),
@@ -144,7 +173,9 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
 
     const QString invalidResource = QStringLiteral(
         "version: 1\nkind: variables\n\nvalues:\n  mesh: resource = project:/../outside.stl\n");
-    EXPECT_FALSE(model.saveVariableDocument(invalidResource, model.variableGeneration(), 1));
+    ASSERT_TRUE(model.beginSaveVariableDocument(invalidResource, model.variableGeneration(), 1));
+    ASSERT_TRUE(finished.wait(5000));
+    EXPECT_FALSE(finished.takeFirst().at(1).toBool());
     ASSERT_EQ(model.variableDiagnostics().size(), 1);
     const auto resourceDiagnostic = model.variableDiagnostics().constFirst().toMap();
     EXPECT_EQ(resourceDiagnostic.value(QStringLiteral("code")).toString(),
@@ -157,8 +188,11 @@ TEST(ProjectViewModelTest, VariableDocumentsPreserveDiagnosticsAndRejectStaleUpd
 
     ProjectViewModel reopened;
     ASSERT_TRUE(reopened.openProject(model.currentPath()));
-    ASSERT_TRUE(reopened.loadVariableDocument(reopened.variableGeneration(), 0))
+    QSignalSpy loaded(&reopened, &ProjectViewModel::variableDocumentFinished);
+    ASSERT_TRUE(reopened.beginLoadVariableDocument(reopened.variableGeneration(), 0))
         << reopened.errorCode().toStdString() << ": " << reopened.errorDetail().toStdString();
+    ASSERT_TRUE(loaded.wait(5000));
+    EXPECT_TRUE(loaded.takeFirst().at(1).toBool());
     EXPECT_EQ(reopened.variableRevision(), 1U);
     EXPECT_EQ(reopened.variableValues().size(), 2);
     EXPECT_EQ(reopened.variableSource(), source);
@@ -176,13 +210,145 @@ TEST(ProjectViewModelTest, OldVariableRequestCannotWriteIntoAnotherProject) {
 
     const QString source =
         QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
-    EXPECT_FALSE(model.saveVariableDocument(source, oldGeneration, 0));
+    EXPECT_FALSE(model.beginSaveVariableDocument(source, oldGeneration, 0));
     EXPECT_EQ(model.errorCode(), QStringLiteral("variables.stale_generation"));
     EXPECT_EQ(model.variableRevision(), 0U);
     EXPECT_TRUE(model.variableValues().isEmpty());
     EXPECT_FALSE(QFileInfo(QDir(QFileInfo(model.currentPath()).absolutePath())
                                .filePath(QStringLiteral("variables.pa")))
                      .exists());
+}
+
+TEST(ProjectViewModelTest, VariableWaiterStartupFailureDoesNotSubmitOrFreezeProject) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    VariableWaiterFailureViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
+    const QString source =
+        QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
+    ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
+    ASSERT_TRUE(finished.wait(5000));
+    ASSERT_TRUE(finished.takeFirst().at(1).toBool());
+    QFile variableFile(QDir(QFileInfo(model.currentPath()).absolutePath())
+                           .filePath(QStringLiteral("variables.pa")));
+    ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
+    const auto original = variableFile.readAll();
+    variableFile.close();
+
+    model.failNextStart = true;
+    EXPECT_FALSE(model.beginSaveVariableDocument(
+        QStringLiteral("version: 1\nkind: variables\nvalues:\n  count: int = 99\n"),
+        model.variableGeneration(), 1));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.io"));
+    EXPECT_EQ(model.variableRevision(), 1U);
+    EXPECT_EQ(model.variableSource(), source);
+    ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
+    EXPECT_EQ(variableFile.readAll(), original);
+    variableFile.close();
+    model.failNextStart = true;
+    EXPECT_FALSE(model.beginLoadVariableDocument(model.variableGeneration(), 1));
+    EXPECT_EQ(model.errorCode(), QStringLiteral("project.io"));
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(finished.isEmpty());
+
+    // 两类启动失败均未准入 Rust 任务；工程可切换，后续请求仍能正常完成。
+    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
+    ASSERT_TRUE(finished.wait(5000));
+    EXPECT_TRUE(finished.takeFirst().at(1).toBool());
+    EXPECT_EQ(model.variableRevision(), 1U);
+    ASSERT_TRUE(variableFile.open(QIODevice::ReadOnly));
+    EXPECT_EQ(variableFile.readAll(), original);
+}
+
+TEST(ProjectViewModelTest, VariableSaveRejectsConflictingSwitchUntilQueuedCompletion) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
+    const QString source =
+        QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
+    ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
+    // 即使 worker 已完成，GUI 尚未消费回执，冻结的候选仍不能被工程切换或另一次保存覆盖。
+    EXPECT_EQ(model.variableRevision(), 0U);
+    EXPECT_FALSE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    EXPECT_EQ(model.currentName(), QStringLiteral("First"));
+    EXPECT_FALSE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
+    ASSERT_TRUE(finished.wait(5000));
+    EXPECT_TRUE(finished.takeFirst().at(1).toBool());
+    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+}
+
+TEST(ProjectViewModelTest, VariableReadCompletionFromOldProjectDoesNotReplaceNewProjection) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("First"), fixture.path()));
+    QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
+    const QString source =
+        QStringLiteral("version: 1\nkind: variables\n\nvalues:\n  count: int = 7\n");
+    ASSERT_TRUE(model.beginSaveVariableDocument(source, model.variableGeneration(), 0));
+    ASSERT_TRUE(finished.wait(5000));
+    finished.clear();
+    const auto oldGeneration = model.variableGeneration();
+    ASSERT_TRUE(model.beginLoadVariableDocument(oldGeneration, 1));
+    ASSERT_TRUE(model.createProject(QStringLiteral("Second"), fixture.path()));
+    const auto nextGeneration = model.variableGeneration();
+    ASSERT_TRUE(finished.wait(5000));
+    const auto completion = finished.takeFirst();
+    EXPECT_EQ(completion.at(0).toULongLong(), oldGeneration);
+    EXPECT_FALSE(completion.at(1).toBool());
+    EXPECT_EQ(model.variableGeneration(), nextGeneration);
+    EXPECT_EQ(model.variableRevision(), 0U);
+    EXPECT_TRUE(model.variableSource().isEmpty());
+    EXPECT_TRUE(model.variableValues().isEmpty());
+    EXPECT_TRUE(model.errorCode().isEmpty());
+}
+
+#ifdef Q_OS_UNIX
+TEST(ProjectViewModelTest, VariableReadKeepsGuiResponsiveWhileFilesystemIsBlocked) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    ProjectViewModel model;
+    ASSERT_TRUE(model.createProject(QStringLiteral("BlockedRead"), fixture.path()));
+    const auto variablePath = QDir(QFileInfo(model.currentPath()).absolutePath())
+                                  .filePath(QStringLiteral("variables.pa"));
+    const auto nativePath = QFile::encodeName(variablePath);
+    ASSERT_EQ(::mkfifo(nativePath.constData(), 0600), 0);
+    QSignalSpy finished(&model, &ProjectViewModel::variableDocumentFinished);
+    // FIFO 的 open/read 直到 GUI 发出下一事件才获准完成，捕捉把 I/O 移回 GUI 的回归。
+    ASSERT_TRUE(model.beginLoadVariableDocument(model.variableGeneration(), 0));
+    EXPECT_EQ(model.variableRevision(), 0U);
+    bool guiEventDelivered = false;
+    std::jthread writer;
+    QTimer::singleShot(0, &model, [&] {
+        guiEventDelivered = true;
+        writer = std::jthread([variablePath] {
+            QFile stream(variablePath);
+            if (stream.open(QIODevice::WriteOnly)) {
+                stream.write("version: 1\nkind: variables\nvalues:\n  count: int = 7\n");
+            }
+        });
+    });
+    ASSERT_TRUE(finished.wait(5000));
+    EXPECT_TRUE(guiEventDelivered);
+    EXPECT_TRUE(finished.takeFirst().at(1).toBool());
+    EXPECT_EQ(model.variableRevision(), 1U);
+}
+#endif
+
+TEST(ProjectViewModelTest, DestroyingVariableRequestOwnerDoesNotWaitForQtCompletion) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    auto model = std::make_unique<ProjectViewModel>();
+    ASSERT_TRUE(model->createProject(QStringLiteral("Dropped"), fixture.path()));
+    ASSERT_TRUE(model->beginLoadVariableDocument(model->variableGeneration(), 0));
+    model.reset();
+    // worker 不拥有 Qt 对象；销毁后排队的完成通知由连接的 context 自动撤销。
+    QTest::qWait(20);
+    QCoreApplication::processEvents();
 }
 
 TEST(ProjectViewModelTest, MapsRustErrorsWithoutCreatingInvalidTargets) {

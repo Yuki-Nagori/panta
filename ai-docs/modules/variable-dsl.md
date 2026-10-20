@@ -2,13 +2,13 @@
 
 [模块导航](README.md) · [实施任务 025](../task/025-variable-dsl.md) · [路径与运行时](paths-and-runtime.md)
 
-实现状态：`panta-dsl-core` 提供变量表达式求值和规范格式化；`panta-core::ProjectService` 固定读写工程包根的 `variables.pa`，校验资源根授权并提交运行时快照；CXX 和 `ProjectViewModel` 暴露带类型的值、源码、工程会话 generation、变量 revision 与结构化诊断。任务 025 负责这些能力的验收和收尾。
+实现状态：`panta-dsl-core` 提供变量表达式求值和规范格式化；`panta-core::ProjectService` 固定读写工程包根的 `variables.pa`，校验资源根授权并提交运行时快照；CXX 和 `ProjectViewModel` 暴露带类型的值、源码、工程会话 generation、变量 revision 与结构化诊断。GUI 使用后台读写接口，变量编辑页面尚未接入；任务 025 记录服务与边界验收。
 
 ## 用途与最小范围
 
 DSL 用于可审阅地声明软件内的变量、参数及逻辑资源引用。先做声明式文本与受限表达式，不引入通用脚本执行；运行时消费校验后的变量快照，路径解析调用 023 的服务。它不替代 QML、不直接调用 OCCT/Netgen/VTK，也不改变外部求解器协议。
 
-Panta DSL 的源码统一使用 `.pa` 后缀（Panta Artifact）；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。`.pa` 面向人读写，Artifact 引擎按 `kind` 聚合为字典、Theme 或变量快照。国际化 `.pa` 由 Rust 编译器转换为构建树中的临时 TS XML，再交给 QtTools 生成 QM，源码目录不需要出现 `.ts`。语法借鉴 YAML 的层级和冒号，但不承诺通用 YAML 兼容；以下为待实现的变量域语法示意，完整关键字和 API 仍由 025 冻结：
+Panta DSL 的源码统一使用 `.pa` 后缀（Panta Artifact）；`.pt` 不采用，以免与 Portuguese/locale 语义混淆。`.pa` 面向人读写，Artifact 引擎按 `kind` 聚合为字典、Theme 或变量快照。国际化 `.pa` 由 Rust 编译器转换为构建树中的临时 TS XML，再交给 QtTools 生成 QM，源码目录不需要出现 `.ts`。语法借鉴 YAML 的层级和冒号，但不承诺通用 YAML 兼容；以下为变量域语法示例，范围由 025 冻结：
 
 ```text
 version: 1
@@ -54,6 +54,8 @@ Rust 端作为唯一解析和求值实现：UTF-8 源文本 → 带源位置的 
 ## 存储与状态归属
 
 DSL 文本保存用户声明；求值快照是可重建派生产物。工程变量固定存于工程包根的 `variables.pa`，其路径由 Rust 工程服务决定，C++/QML 不传任意目标路径。V1 提供读写往返，序列化采用明确规范形式并允许丢失排版/注释，但不得丢失声明类型、表达式与语义；不宣称提供保留原格式的编辑器。输入和规范化输出都必须处于解析器 1 MiB 上限内。内存解析成功不代表保存完成，写入使用同目录唯一临时文件、文件同步和原子替换，失败保留上一份有效文件。加载或保存同时校验调用方捕获的工程会话 generation 与变量 revision，工程切换或旧 revision 都会拒绝过期请求。
+
+GUI 的 `beginLoadVariableDocument` / `beginSaveVariableDocument` 只返回准入结果；Rust 在有界后台执行器读取、解析或原子写入，再由服务线程校验作用域并发布快照。拥有式 CXX request/completion 不借用 ViewModel 或服务；Qt 先建立可报告启动失败的等待线程，再准入 Rust 请求；通过 `QPromise` / `QFutureWatcher` 队列通知完成，不轮询。等待线程启动失败时不提交 Rust 请求、不留下 pending 或写盘副作用。读取期间允许切换工程，旧 generation/revision 的完成不会覆盖当前状态；保存准入后拒绝冲突写入或切换，直到消费终态。服务销毁取消尚未取得写入许可的任务，已开始的原子写入按进程后台写入收尾协议完成；GUI 销毁不等待磁盘。
 
 `RuntimeContext` 和 `RuntimeTaskScope` 仍不开放任意写文件能力。固定变量文档的读写属于 `ProjectService` 工程存储职责，并复用工程根约束；运行时上下文只负责值快照、generation/revision 与资源引用授权。
 

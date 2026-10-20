@@ -12,6 +12,7 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 #include <cstdint>
+#include <functional>
 #include <panta/visualization/mesh_source.hpp>
 #include <rust/cxx.h>
 
@@ -151,11 +152,12 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     /// 保存当前 Rust 工程模型；无当前工程时返回可恢复错误。
     Q_INVOKABLE bool saveProject();
 
-    /// 从工程固定的 variables.pa 加载并提交已校验快照；预期修订过期时拒绝覆盖。
-    Q_INVOKABLE bool loadVariableDocument(quint64 expectedGeneration, quint64 expectedRevision);
-    /// 保存并规范化变量源码；诊断失败时保留当前值与旧文件。
-    Q_INVOKABLE bool saveVariableDocument(const QString& source, quint64 expectedGeneration,
-                                          quint64 expectedRevision);
+    /// 发起 Rust 后台加载；返回准入结果，完成由 variableDocumentFinished 通知。
+    Q_INVOKABLE bool beginLoadVariableDocument(quint64 expectedGeneration,
+                                               quint64 expectedRevision);
+    /// 发起后台规范化和原子保存；失败保留当前值与旧文件，GUI 不等待磁盘。
+    Q_INVOKABLE bool beginSaveVariableDocument(const QString& source, quint64 expectedGeneration,
+                                               quint64 expectedRevision);
 
     /// 示例模型命令：修改显示名称并将工程标记为 dirty。
     Q_INVOKABLE bool renameProject(const QString& name);
@@ -225,6 +227,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void projectOpened(const QString& path);
     void projectSaved(const QString& path);
     void variableDocumentChanged();
+    /// 捕获的工程代次对应请求完成；旧工程结果不改变当前投影。
+    void variableDocumentFinished(quint64 generation, bool succeeded);
     void importsChanged();
     void planSettingsChanged();
     void materialConfirmationPendingChanged();
@@ -242,6 +246,10 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void documentsChanged();
     void activeDocumentChanged();
 
+  protected:
+    /// 启动只等待独占 Rust 请求的线程；启动失败抛 system_error，调用方尚未准入领域任务。
+    virtual void startVariableWaiter(std::function<void()> work);
+
   private:
     bool fail(const panta::ffi::ProjectDiagnostic& diagnostic);
     bool fail(const QString& code, const QString& category = QStringLiteral("validation"),
@@ -250,6 +258,8 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     bool applySnapshot(const panta::ffi::ProjectSnapshot& snapshot);
     bool applyVariableDocument(const panta::ffi::VariableDocumentResult& result);
     void resetVariableDocument();
+    bool beginVariableDocument(const std::string& source, bool save, quint64 expectedGeneration,
+                               quint64 expectedRevision);
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     bool publish_import(const panta::ffi::ProjectImport& imported);

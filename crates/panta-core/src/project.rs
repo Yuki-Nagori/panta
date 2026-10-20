@@ -20,6 +20,7 @@ pub use panta_import::{
     StlImportPreview, default_display_name,
 };
 pub use service::{ProjectService, VariableDocumentError};
+pub use variable_document::{VariableDocumentCompletion, VariableDocumentRequest};
 pub use workspace::{
     ActivationRequest as WorkspaceActivationRequest, ActivationResultKind, CloseDocumentResult,
     DocumentDiagnostic, DocumentKind, DocumentState, DocumentWorkspace, WorkspaceDocument,
