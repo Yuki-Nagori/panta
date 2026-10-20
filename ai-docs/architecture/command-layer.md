@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-Rust 应用服务位于 `panta-core`，例如 `ProjectService` 编排工程状态和网格激活。GUI 通过 `panta-ffi`/CXX 将请求转到 Rust，再由 C++ ViewModel 提供 Qt 属性、信号及异步调度。工程打开由 Qt 无关的 `ProjectCommand::Open` 表达，GUI FFI 与 CLI 都经 `ProjectService::execute` 调用同一校验和读取路径。
+Rust 应用服务位于 `panta-core`，例如 `ProjectService` 编排工程状态和网格激活。GUI 通过 `panta-ffi`/CXX 将请求转到 Rust，再由 C++ ViewModel 提供 Qt 属性、信号及异步调度。CLI 的工程检查使用 Qt 无关的 `ProjectCommand::Open` 与 `ProjectService::execute`；GUI 打开工程走 `begin_project_operation(ProjectOperation::Open)` 异步入口，再由同一服务执行读取与校验。两端共享领域实现，但不共用同步调度入口。
 
-`panta-dslc` 是 `.pa` parser/formatter 的命令行工具；`panta-launcher` 负责启动 native app 与打包。`panta-cli` 提供窄应用操作：`project inspect <path>` 读取工程摘要和已导入资产来源，`project create <parent> <name>` 创建工程，`stl inspect <path>` 只读预检 STL，`stl import <project> <path>` 将 STL 导入现有工程；它不负责启动 GUI。工程 inspect 与 GUI 打开操作共用 `ProjectCommand::Open`；create 与 GUI 共用 `ProjectService::create` 及名称、路径和覆盖保护规则；STL 检查与 GUI 导入预检共用 `ProjectService::inspect_stl` 和 Rust 解析诊断；CLI 导入调用同步 `ProjectService::import_stl`，与 GUI 后台入口共用 Rust 导入提交实现、选项校验和 sidecar 事务。构建脚本与 CLI 共用 `panta-dsl-core` 函数不等同于应用命令复用。
+`panta-dslc` 是 `.pa` parser/formatter 的命令行工具；`panta-launcher` 负责启动 native app 与打包。`panta-cli` 提供窄应用操作：`project inspect <path>` 读取工程摘要和已导入资产来源，`project create <parent> <name>` 创建工程，`stl inspect <path>` 只读预检 STL，`stl import <project> <path>` 将 STL 导入现有工程；它不负责启动 GUI。工程检查与 GUI 打开共用清单读取和 schema 校验；create 与 GUI 共用 `ProjectService::create` 及名称、路径和覆盖保护规则；STL 检查与 GUI 导入预检共用 `ProjectService::inspect_stl` 和 Rust 解析诊断；CLI 导入调用同步 `ProjectService::import_stl`，与 GUI 后台入口共用 Rust 导入提交实现、选项校验和 sidecar 事务。构建脚本与 CLI 共用 `panta-dsl-core` 函数不等同于应用命令复用。
 
 ## 目标职责
 
@@ -24,6 +24,6 @@ CLI 参数 → Rust CLI adapter ─────┘
 
 ## 命令选择
 
-打开工程命令由 GUI 用于加载活动工程状态，CLI 则使用隔离的 `ProjectService` 实例检查 `.panta` 文件并显示名称、路径、修订号及已保存的导入记录摘要。打开命令会复用文件存在性、扩展名、清单解析和 schema 校验，不复制业务规则。工程创建也复用 `ProjectService::create`，由 CLI 解析父目录和名称后调用，不复制目录创建、名称验证及目标冲突规则。STL 导入先通过 `inspect_stl` 取得预览和面数估算，超 2 GiB 时在提交前给出非阻断提醒，再由同步 `import_stl` 复核源字节并复用缓存的已解析 Mesh 提交；GUI 使用后台 begin/finish 入口。两条路径共享 `panta-core` 的导入事务实现。导入只把 Mesh sidecar 和来源快照写入工程，来源 STL 之后可以删除。参数/格式错误返回非零退出码，领域错误保留稳定的 `ProjectError` code 供诊断。
+CLI 工程检查使用隔离的 `ProjectService` 实例读取 `.panta` 文件并输出工程摘要；GUI 打开则进入带请求身份和后台执行的活动工程流程。两条路径复用清单读取与 schema 校验。工程创建共用 `ProjectService::create` 的名称、路径和冲突规则。STL 导入先运行 `inspect_stl`；超过 2 GiB 时仅显示非阻断提醒，再由同步 CLI `import_stl` 复核源字节并复用已解析 Mesh 提交，GUI 使用后台 begin/finish 入口。两端共享 Rust 导入事务实现。导入只将 Mesh sidecar 与来源快照写入工程；之后可删除或移动来源 STL。参数错误返回非零退出码，领域错误保留稳定 `ProjectError` code。
 
 开发时可运行 `cargo run -p panta-cli -- project inspect <工程文件.panta>` 检查工程及资产、`cargo run -p panta-cli -- project create <父目录> <工程名>` 创建工程、`cargo run -p panta-cli -- stl inspect <文件.stl>` 查看只读预检摘要，或 `cargo run -p panta-cli -- stl import <工程文件.panta> <文件.stl> [--mesh-type <id>] [--units <unit>]` 导入 STL。默认网格类型来自 Rust 领域常量，单位为毫米；STL 预检不推断单位，也不评估网格质量。新增跨 GUI/CLI 的用户操作时，先定义 Qt 无关输入/输出和错误，再由 FFI 与 CLI 各自做薄适配。

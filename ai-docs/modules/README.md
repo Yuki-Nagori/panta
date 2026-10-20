@@ -6,7 +6,7 @@
 
 本目录保存跨任务的重要模块设计：职责、数据流、生命周期、方案取舍与演进门槛。架构文档维护全局分层；规范维护通用约束；实施进展与验证证据仍以 task 为准，不在这里复制状态表。
 
-本目录同时记录已实现基础和后续规划。跨平台路径层（023）、静态 QML 模块注册（026）、原子 / 组合组件（029）及 `.pa` parser / formatter（034/035）已落地；Rust FSM 已接入只读 STL 视口资源激活。运行时、变量 DSL、主题 DSL、UI 重载及增量更新等后续能力仍按对应任务推进，具体边界见各模块说明与实现。
+本目录同时记录已实现基础和后续规划。路径服务（023）、工程运行时与变量 DSL（024/025）、静态 QML 模块注册（026）、原子 / 组合组件（029）、`.pa` parser / formatter（034/035）及 Rust FSM 的只读 STL 视口激活（073/080）已落地。主题 DSL（030，ready）、QML 重载（027）、设置界面与持久化（087/115/125）及增量更新（037）尚未实现；状态以任务记录为准。
 
 | 方向 | 设计说明 | 实施任务 |
 |---|---|---|
@@ -17,16 +17,12 @@
 | 变量声明、表达式与快照 | [变量 DSL](variable-dsl.md) | [025](../task/025-variable-dsl.md) |
 | 静态库、QML 注册与状态重载 | [模块与热重载](qml-modules-and-reload.md) | [026](../task/026-static-qml-modules.md)、[027](../task/027-qml-state-reload.md) |
 | 高 DPI 缩放与多显示屏 | [显示缩放与多屏](display-scaling-and-multi-monitor.md) | [033](../task/033-display-scaling-and-multi-monitor.md) |
-| 跨语言格式、测试、审计与 100% 覆盖率 | [质量工具链](quality-tooling.md) | [032](../task/032-cross-language-quality-gates.md) |
+| 跨语言格式、测试、审计与质量门禁 | [质量工具链](quality-tooling.md) | [032](../task/032-cross-language-quality-gates.md) |
 | `.pa` 解析、聚合与 TS/QM 工具链 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [034](../task/034-rust-panta-artifact-parser.md) |
 | `.pa` 格式化与校验 | [DSL 解析与 Artifact 引擎](dsl-engine-and-toolchain.md) | [035](../task/035-pa-formatter-and-validator.md) |
 | 编译期 FSM 声明、Rust 状态机与异步事务 | [FSM 与状态机](fsm.md) | [072 评估](../task/072-flow-state-machine-planning.md)、[073 实施](../task/073-fsm-dsl-and-import-state-machine.md) |
-| Mesh 资产 revision、旁置存储与按需加载（规划） | [工程存储](../architecture/application-and-storage.md)、[网格架构](../architecture/mesh.md) | [088](../task/088-mesh-asset-sidecar-storage.md) |
+| Mesh 资产 revision、旁置存储与按需加载 | [工程存储](../architecture/application-and-storage.md)、[网格架构](../architecture/mesh.md) | [088](../task/088-mesh-asset-sidecar-storage.md) |
 | Qt 交互流程、导入窗口与状态恢复（规划） | [Qt 交互状态机](qt-interaction-state-machines.md) | [074](../task/074-qt-interaction-state-machine.md) |
 | 打包后软件内增量更新、签名、回滚 | [软件内增量更新](incremental-updates.md) | [037](../task/037-incremental-update-foundation.md) |
 | VTK/OCCT/Netgen 预编译 SDK 与受信制品 | [Native 依赖供给](native-dependency-supply.md) | [031](../task/031-prebuilt-native-dependencies.md)、[038](../task/038-native-sdk-artifact-production.md) |
 | 性能基线、剖析与回归对比（开发侧，非 CI 门禁） | [性能测试与剖析](performance.md) | [048](../task/048-performance-testing.md) |
-
-022 已完成英文源文案、语言字典和运行时切换；后续 087/125 实现语言设置界面与偏好持久化，并由 115 提供菜单入口。023 与 026 也已完成；024 跟踪工程运行时，025 建立在运行时之上，027 验证 UI 重载。这些任务不成为现有 M0 视口主线的额外前置条件。
-
-组件库 029 已按 050 复刻件落地原子/组合组件与 Shell 框架拼装；后续由 025 + 029 → 030 推进主题 DSL 接入，不依赖 027 引擎热重载。

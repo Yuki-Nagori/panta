@@ -8,7 +8,7 @@
 |---|---|---|
 | Rust 领域与 C++ 重库边界 | [适配边界与 crate 规划](native-domain-boundaries.md) | 本仓库；当前审计与目标 |
 | 目录与模块归属 | [目录规划](repository-layout.md) | 本仓库 |
-| Rust 应用命令层 | [GUI / CLI 共享命令设计](command-layer.md) | 当前服务边界与后续实施 |
+| Rust 应用命令层 | [GUI / CLI 共享命令设计](command-layer.md) | 当前 GUI / CLI 边界与后续扩展 |
 | Cargo/CMake、运行与部署 | [构建与开发](build-and-development.md) | 本仓库 |
 | QML、ViewModel 与交互 | [界面与桥接](ui-and-bridge.md) | 本仓库 |
 | STEP、拓扑与 OCCT | [几何模型](geometry.md) | 本仓库 |
@@ -22,30 +22,9 @@
 | 共享 schema 与协议 | [[External / 非本仓库] Mold Protocol](external-mold-protocol.md) | 候选外部仓库 |
 | 交付阶段与验收 | [里程碑与验证](milestones-and-validation.md) | 本仓库 |
 
-## 文档状态与命名
+## 当前实现与目标边界
 
-本组文档依据用户提供的架构讨论附件整理。附件将桌面平台称为 MoldCAE / `moldcae`；本仓库名称是 `panta`，因此以下以 panta 指代该桌面平台。MoldCAE 是原方案名称，不代表已存在的本地目录或可执行文件。
-
-当前仓库已有 Rust workspace、Cargo 调度的 native 构建与 Qt Quick/C++ ViewModel
-桌面骨架（任务 001–005）。`panta-foundation` 已承载进程级崩溃设施，
-`panta-ffi` 负责 CXX 边界；VTK 视口的旧 Qt OpenGL/QQuickVTKItem 模块、适配器和
-创建级测试曾落地，但由于 macOS 26 窗口化渲染路径崩溃，任务 007 已切换到
-VTK WebGPU + 平台 hardware window 路线（Linux Wayland、macOS Cocoa、Windows Win32）。
-`sdk-vtk-9.7.0-webgpu` 已由受信 CI 发布并登记，原生 surface 宿主也已接入 native 工程；`App.qml` 已实际创建 `CaeViewport`。macOS Cocoa/Metal 与 Windows 已有真实窗口证据；Linux Wayland、跨显示器 DPR 及 007 列明的剩余场景尚未收口，007 当前为 deferred。工程新建/打开/保存、STL 预检与导入已由 063 实现，088 已交付 schema 4 工程清单与 Mesh sidecar 旁置存储、按需激活；121–124 的窄 CLI 与 GUI 共用 Rust 应用命令。024 的工程运行时上下文、不可变快照与协作取消也已接入 `ProjectService`。STEP 导入到工程、实际 Create Mesh、Study 与真实求解器流程仍未交付。本组文档
-描述目标架构与已验证的边界，不把规划能力写成已实现；具体依赖版本、协议
-编码和持久化格式仍须在实施时验证并确定。文档中的字段名和 API 名用于说明
-语义，不是已发布接口。
-
-## 第一阶段目标
-
-先实现 Geometry / Preprocessor + CAE UI + Visualization Platform：STEP → Geometry → Mesh → Visualization → Study Setup → Save Project。第一阶段不依赖真实 CFD 引擎完成；使用带明确标识的合成标量场验证结果显示。
-
-V1 应覆盖工程新建、打开、保存，STEP 导入，面/边/实体选择，Netgen 网格生成，
-表面与体网格显示，属性编辑，相机、裁剪、色标和求解器占位入口。当前 VTK
-视口已完成 WebGPU/platform-surface 适配边界、STL 网格显示与输入协调，macOS 和 Windows 已有窗口与生命周期记录；
-Linux Wayland 真实窗口、跨显示器 DPR 及剩余窗口场景仍待完成，见[任务 007](../task/007-vtk-quick-viewport.md)，不能据此宣称完整 V1 视口已交付。
-V1 不实现 AI、自研 GPU 计算后端或物理求解内核。VTK/Qt 正常使用图形硬件
-不属于排除范围中的 GPU 计算开发。
+仓库已有 Qt/QML 桌面应用、Rust 工程服务、STL 导入与 Mesh sidecar、`.pa` 工具链、GUI/CLI 命令以及 VTK WebGPU 视口。STEP 的 native shape 仓库和 Netgen 复用尚未形成持久化几何资产或完整网格生成流程；Study 求解闭环与外部引擎也未实现。平台验收和具体功能状态以[任务索引](../task-index.md)及责任任务为准；本组文档说明模块边界和目标，不维护重复的验收记录。产品阶段目标见[里程碑](milestones-and-validation.md)。
 
 ## 分层和依赖方向
 

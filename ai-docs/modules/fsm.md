@@ -12,7 +12,7 @@
 
 - [`panta-dsl-core`](../../crates/panta-dsl-core/src/grammar.pest) 与 `panta-dslc` 共用冒号语法、AST、诊断与格式化；kind 为 `language`、`variables`、`theme`，`fsm` 由 `panta-dsl-core::fsm` 独立 schema 入口承接，CLI `check` / `format` 按头部 kind 行分发。
 - [`panta-import`](../../crates/panta-import/src/lib.rs) 已负责来源快照、STL 预览和导入准备；[`panta-core::project`](../../crates/panta-core/src/project/import.rs) 写资产与清单、维护修订，成功后替换当前网格。
-- [`ProjectExecution`](../../crates/panta-core/src/execution.rs) 为工程操作提供私有有界执行能力；具体生命周期、取消与提交结果由各领域服务和状态机拥有。当前没有通用任务管理器或任务面板。
+- [`ProjectExecution`](../../crates/panta-core/src/execution.rs) 为工程操作提供私有有界执行能力；具体生命周期、取消与提交结果由各领域服务和状态机拥有。
 
 因此，067 已完成的 STL 导入路径不追加 FSM 改造；首个 FSM 消费者改为任务 080 中按需读取已提交 STL 资产并重建视口网格的异步激活流程。它只读工程，不承担提交；未来 STEP 等写入型导入事务另行登记消费者并明确后端、提交和取消边界。
 
@@ -36,7 +36,7 @@
 | 内容 | 唯一拥有者 | 边界 |
 |---|---|---|
 | 状态 / 事件种类、初态、终态、允许的边、guard 名称 | 领域 crate 随代码提交的 `fsm/*.pa` | 不可在运行期编辑或热加载；不承载事件数据 |
-| FSM grammar、schema、AST、诊断、formatter、Rust 元数据生成 | `panta-dsl-core`（扩展规划） | 不依赖 `panta-import` / `panta-core`、Qt 或重库，不生成业务动作 |
+| FSM grammar、schema、AST、诊断、formatter、Rust 元数据生成 | `panta-dsl-core::fsm`（已实现） | 不依赖 `panta-import` / `panta-core`、Qt 或重库，不生成业务动作 |
 | 来源固定、格式分发、解析完成与取消 | `panta-import` / 数据领域 crate 的准备或读取服务 | 产出拥有明确所有权的准备结果；首个 073 消费者只读取已提交 STL 资产 |
 | 工程身份、资产定位与只读激活请求相关性 | `panta-core::project` | 校验 session / generation 与 ImportRecord ID；只读激活不改 revision 或 dirty |
 | 修订校验、资产发布与提交终态 | `panta-core::project` 的未来写入型导入事务 | 调用准备服务并协调工程存储；重试建立新事务 |
@@ -45,7 +45,7 @@
 
 编译依赖维持 `panta-core → panta-import → panta-mesh / 未来 panta-geom`。各 FSM 消费者只在构建期依赖公共 DSL 内核；运行期不加载 FSM 源码。首个只读激活 flow 由 `panta-core` 持有请求身份和工程 session 上下文，解析复用 `panta-mesh`；未来的导入准备 flow 可留在 `panta-import`，跨工程提交的写入事务由 core 编排。不以一个公共 FSM 对象跨 crate 持有所有上下文。
 
-073 的只读资产激活由 `ActivationCoordinator` 持有请求身份、generation、取消和结果状态；`ProjectExecution` 仅调度工作，不替领域服务裁决结果。当前没有通用任务管理器或任务面板。写入型导入仍须由 core 事务协调者唯一裁决提交、取消及最终结果；若未来多个业务形成共享任务 / 作业需求，再据实际契约增加相应 API。
+073 的只读资产激活由 `ActivationCoordinator` 持有请求身份、generation、取消和结果状态；`ProjectExecution` 仅调度工作，不替领域服务裁决结果。写入型导入仍须由 core 事务协调者唯一裁决提交、取消及最终结果；若未来多个业务形成共享任务 / 作业需求，再据实际契约增加相应 API。
 
 ## FSM V1 语法草案
 
@@ -99,7 +99,7 @@ V1 的静态约束：
 - 不支持层级 / 并行状态、历史状态、通配边、自动转移、定时表达式、action / entry / exit 字段。超时是 Rust 调度器投递的显式事件；事件 payload 与错误详情也是 Rust 类型。
 - parser 保留现有输入资源上限，并为状态数、边数和生成体积设置可测试上限。formatter 保持语义、声明顺序和注释；CLI check、format 与 build script 共用同一 schema。
 
-V1 扩展已由 073 实现：schema、定位诊断、正反夹具与 grammar 扩展随 `panta-dsl-core::fsm` 落地（`tests/flow.rs`），CLI 分发与既有 kind 回归由 `panta-dslc` 测试覆盖。
+V1 扩展已由 073 实现：schema、定位诊断、正反夹具与 grammar 扩展随 `panta-dsl-core::fsm` 落地，parser 回归位于 `crates/panta-dsl-core/tests/fsm.rs`，CLI 分发回归位于 `crates/panta-dslc/src/main.rs` 的模块测试。
 
 ## 构建与生成契约
 

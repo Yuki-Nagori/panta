@@ -5,13 +5,13 @@
 - 依赖：[107](107-rust-service-boundaries-and-revisions.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-10-08 / 2026-10-09
+- 创建 / 更新：2026-10-08 / 2026-10-20
 
 ## 目标与范围
 
 分离 panta-build 的工具资产登记、安装 / 校验、编译器 / 平台环境；沿现有 coverage / performance 模块组织质量入口的 build / lint / sanitizer。保持 Cargo / CMake 职责、固定版本与供给锁。沿用现行测试布局：私有单元测试保留在源码内联 cfg(test) 模块，公共 API 黑盒测试在 tests/rust 注册；107 的 FFI 测试归属问题已由 112 修正，本任务不重复迁移。
 
-本任务对应 [106 架构评审](106-rust-architecture-review.md) 的后续建议；确认导入后台化仍由 063 实施。保持 UI 与正常工程 schema，不将新基础接口描述为已经实现。
+本任务对应 [106 架构评审](106-rust-architecture-review.md) 的历史后续建议。登记时，异步导入仍由 063 实施，现已完成；本任务只整理构建与质量工具模块。保持 UI 与正常工程 schema，不将新基础接口描述为已经实现。
 
 ## 必读
 

@@ -5,11 +5,11 @@
 - 依赖：[031](031-prebuilt-native-dependencies.md)、[020](020-toolchain-provisioning.md)
 - 优先级：P0
 - 负责人：待分配
-- 创建 / 更新：2026-09-17 / 2026-10-02
+- 创建 / 更新：2026-09-17 / 2026-10-20
 
 ## 目标与背景
 
-VTK、OpenCASCADE、Netgen 在目标平台没有统一、完整且可直接消费的官方 C++ SDK。为了坚持预编译优先，由受信 CI 按固定源码 commit 和工具链生产可复用 SDK，开发者和普通 CI 只下载校验后的归档，不在本地构建第三方源码。VTK WebGPU 制品（Release `sdk-vtk-9.7.0-webgpu`）与 OCCT/Netgen 制品（Release `sdk-occt-netgen-8.0.1-6.2.2604`）已生产并登记进 031 manifest；剩余为 SBOM/provenance 发布闭环与 007/009/010 的真实链接/运行冒烟覆盖。
+VTK、OpenCASCADE、Netgen 在目标平台没有统一、完整且可直接消费的官方 C++ SDK。为了坚持预编译优先，由受信 CI 按固定源码 commit 和工具链生产可复用 SDK，开发者和普通 CI 只下载校验后的归档，不在本地构建第三方源码。VTK WebGPU 制品（Release `sdk-vtk-9.7.0-webgpu`）与 OCCT/Netgen 制品（Release `sdk-occt-netgen-8.0.1-6.2.2604`）已生产并登记进 031 manifest；009/010 的 adapter 冒烟已完成，当前尚待 Linux glibc 基线、桌面运行时分发及 SBOM/provenance。
 
 ## 必读
 
@@ -74,7 +74,7 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 ### 待执行与未覆盖
 
 - 复核 OCCT/Netgen 当前 manifest 与生产发布链，记录 Linux glibc 最低有效基线。
-- 完成 SDK 消费侧 SBOM/provenance，以及 007/009/010 的真实链接、运行时分发与引擎集成验收。
+- 完成 SDK 消费侧 SBOM/provenance、Linux glibc 基线，以及桌面运行时分发与 VTK 真实窗口验收。009/010 的 adapter 冒烟已完成，不列为未完成项。
 
 
 ## 风险与回退
@@ -87,11 +87,11 @@ CI workflow、构建描述、制品 manifest/校验脚本、许可证汇总、03
 - 2026-09-18：OCCT 8.0.1 与 Netgen 6.2.2604 必须同工具链配对，故合并为一个三平台 workflow 和一个 Release；保留 STEP/DataExchange，关闭无关 GUI、Freetype/Xlib、Python/MPI 等依赖。
 - 2026-09-19–20：007 路线转为 VTK WebGPU hardware window。生产依赖固定为 VTK 9.7 所要求的 Dawn 源码版本与 RTTI 配置、C++20；Linux 只构建 Wayland 后端，并把消费所需 CMake Find 模块随 SDK 安装。
 - 2026-09-21（任务 049）：Release 重产在单一 tag 内全量替换资产；Netgen 关闭 `USE_NATIVE_ARCH`，避免制品依赖构建机 ISA。
-- 2026-10-14：维护者要求所有 macOS 依赖最低支持版本统一为 13.0；VTK/Dawn、OCCT、Netgen 已按该部署目标重产并替换三平台 Release 资产（runs 38509650210、38509650514），sidecar 与 API digest 一致，摘要已登记到 031。任务仍为 deferred，原因是 SBOM/provenance、Linux glibc 基线及真实链接/运行验收仍未完成。
+- 2026-10-14：维护者要求所有 macOS 依赖最低支持版本统一为 13.0；VTK/Dawn、OCCT、Netgen 已按该部署目标重产并替换三平台 Release 资产（runs 38509650210、38509650514），sidecar 与 API digest 一致，摘要已登记到 031。任务仍为 deferred，原因是 SBOM/provenance、Linux glibc 基线及产品运行时分发/VTK 窗口验收仍未完成；009/010 adapter 冒烟已完成。
 - 后续变更需同步 manifest 的 URL/SHA256、SDK metadata、许可证、自检结果与 task 031；当前待办见上方“待执行与未覆盖”。
 
 ## 完成摘要
 
 未完成。VTK WebGPU hardware-window 三平台 production/selfcheck/package/release 已完成，031 manifest 已切换并记录真实 SHA256、ABI、targets 与窗口系统；OCCT/Netgen 合并 workflow 已有三平台 Release。
 
-2026-10-02：维护者要求本任务暂时延后。状态改为 deferred，不排入当前交付。恢复时继续 OCCT/Netgen manifest 复核、SBOM/provenance、007/009/010 的真实链接与运行冒烟，以及 Linux glibc 有效基线。已发布制品和 manifest 保持有效，不把延后写成这些收尾已完成。
+2026-10-02：维护者要求本任务暂时延后。状态改为 deferred，不排入当前交付。恢复时继续 OCCT/Netgen manifest 复核、SBOM/provenance、桌面运行时分发与 VTK 窗口验收，以及 Linux glibc 有效基线。009/010 adapter 冒烟已完成；已发布制品和 manifest 保持有效。

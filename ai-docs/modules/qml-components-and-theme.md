@@ -12,7 +12,7 @@
 
 029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。
 
-主窗口标题栏融合由 [051 无边框外观与一体化窗口标题栏](../task/051-integrated-window-titlebar.md) 推进：macOS 查询 AppKit 原生标题栏按钮矩形并避让；Windows 按 Qt 6.11.2 标题栏按钮布局，通过系统 DPI 指标运行时计算避让；Linux 保留窗口管理器标题栏和系统按钮提示，以零宽标题隐藏文字。三个平台都隐藏系统栏中的应用图标和标题，Windows/Linux 保留应用内 P 品牌块。Linux/Wayland 与 Windows 的真实窗口验收仍未完成。`WindowChromeMetrics` 属于 Shell 平台适配，只提供原生窗口几何，不承载业务行为。该方案不依赖不存在的 `QWindow::setTitleBar(QWidget*)`。
+主窗口标题栏融合见 [051 无边框外观与一体化窗口标题栏](../task/051-integrated-window-titlebar.md)：macOS 查询 AppKit 原生按钮矩形并避让；Windows 按 Qt 6.11.2 窗口布局，通过系统 DPI 指标运行时计算避让；Linux 保留窗口管理器标题栏和系统按钮提示，以零宽标题隐藏文字。三个平台都隐藏系统栏中的应用图标和标题，Windows/Linux 保留应用内 P 品牌块。三平台外观已确认；原生交互、Wayland 和跨 DPI 行为尚未验收，任务暂为 deferred。`WindowChromeMetrics` 只提供原生窗口几何，不承载业务行为。
 
 ## 页面设计工作流：HTML 先行复刻
 
@@ -95,7 +95,7 @@ Theme 集中管理 spacing、padding、radius、borderWidth、iconSize、fontSiz
 
 UI 尺寸统一采用 Qt Quick 逻辑像素语义，不自行乘设备像素比；图标栅格资源分辨率与控件布局尺寸区分。高 DPI、字体变化、英文/中文长文本和小窗口下仍需验证布局。业务数值、网格单位及几何尺寸不属于 Theme。
 
-## 组件与弹窗整理（099 实施中）
+## 组件与弹窗整理（099 已实施）
 
 [099](../task/099-qml-components-and-dialog-consolidation.md) 已将公共选择与按钮样式迁入 Atoms，弹窗复用公共窗口和内容外壳；构建、质量检查及视觉验收的真实状态见任务记录。SidebarPanel 装配 Panels/Sidebar 下的 ProjectTasksPage、ToolsPage 和 SharedViewsPage；工程任务页隐藏滚动条，保留滚动。
 

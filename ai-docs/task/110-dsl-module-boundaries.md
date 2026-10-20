@@ -5,13 +5,13 @@
 - 依赖：[107](107-rust-service-boundaries-and-revisions.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-10-08 / 2026-10-09
+- 创建 / 更新：2026-10-08 / 2026-10-20
 
 ## 目标与范围
 
 在 panta-dsl-core 内分离 AST / 诊断、Pest 解析、语义校验、格式化和 TS 输出。保持共享 grammar、FSM 模块、公共 API、CLI 与构建脚本输出；不创建第二套 parser 或无消费者的新 crate。
 
-本任务对应 [106 架构评审](106-rust-architecture-review.md) 的后续建议；确认导入后台化仍由 063 实施。保持 UI 与正常工程 schema，不将新基础接口描述为已经实现。
+本任务对应 [106 架构评审](106-rust-architecture-review.md) 的历史后续建议。登记时，异步导入仍由 063 实施，现已完成；本任务只整理 DSL 模块边界。保持 UI 与正常工程 schema，不将新基础接口描述为已经实现。
 
 ## 必读
 

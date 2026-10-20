@@ -5,13 +5,13 @@
 - 依赖：[003](003-cmake-native-skeleton.md)（已完成）、[008](008-tasks-errors-logging.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-09-20
+- 创建 / 更新：2026-09-16 / 2026-10-20
 
 ## 目标与背景
 
 证明固定 OCCT 依赖可被 native adapter 使用，并形成最小可验证 STEP 输入边界。
 
-本任务尚未实施；拟改路径不代表文件已存在，执行前核对依赖任务的实际产物。
+已完成 OCCT SDK 消费与 native STEP adapter 冒烟；不代表 STEP 已成为可持久化的工程几何资产，后续闭环见[几何架构](../architecture/geometry.md)。
 
 ## 必读
 

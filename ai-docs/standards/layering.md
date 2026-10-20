@@ -42,7 +42,7 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 
 Rust/CMake/QML 的当前允许边据实际清单核对；新增边须先更新分层归属和相应任务，lint 尚未更新时不得用“当前能构建”替代架构评审。跨语言链接须登记在边界表中，不能以新增反向依赖消除构建问题。
 
-Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；CMake 表针对自有 target 的直接链接边，QML module dependency 单独标出，第三方 imported target 按 adapter 边界归类。新增仓库内边需先判断职责归属；允许表或 lint 尚未更新时不得用“当前能构建”替代架构评审。任务 119 实现自动边检查，任务 120 独立实现测试影响范围选择。
+Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；CMake 表针对自有 target 的直接链接边，QML module dependency 单独标出，第三方 imported target 按 adapter 边界归类。新增仓库内边需先判断职责归属；允许表或 lint 尚未更新时不得用“当前能构建”替代架构评审。任务 119 已实现自动边检查，任务 120 已实现测试影响范围选择。
 
 ### 应用命令层
 
@@ -58,7 +58,7 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 - 小数据使用值语义；大对象可使用自有 opaque 所有者。接口必须说明创建、释放、跨调用有效期、借用、可否共享 / 修改、线程以及失效后的行为。只保存整数句柄时必须拒绝释放后复用导致的陈旧引用；进程句柄不能持久化为工程身份。
 - 可恢复 C++ 错误在适配边界统一成结构化错误或受控 CXX Result；非标准库异常也须显式覆盖。panic 不作可恢复错误，CXX Result 不承诺捕获 Rust panic。具体约束见 [CXX](cxx.md) 与 [FFI](ffi.md)。
 - 领域 crate 不依赖 Qt、VTK、CXX 或 `panta-ffi`；业务通过注入的后端接口使用 native 能力。禁止 `panta-core → panta-ffi → panta-core`，也禁止新增领域 crate 与 core 双向依赖；规划依赖图见架构文档。
-- 当前 `panta-core` 内的 project/path/task 保持安全 Rust，不依赖 Qt、VTK 或 FFI，按真实职责演进。进程设施归 `panta-foundation`，不能因“属于 Rust”就放进领域 core；`panta-ffi` 可调用两者，反向依赖禁止。
+- 当前 `panta-core` 内的 project/path/runtime/FSM 与存储实现保持安全 Rust，不依赖 Qt、VTK 或 FFI，按真实职责演进。进程设施归 `panta-foundation`，不能因“属于 Rust”就放进领域 core；`panta-ffi` 可调用两者，反向依赖禁止。当前操作调度边界见[应用与存储架构](../architecture/application-and-storage.md)。
 
 ## Rust 导入职责（067）
 
@@ -88,7 +88,7 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 - locale 支持集、校验和当前选择由 Rust 服务拥有；Qt adapter 管理 `QTranslator`，Bridge `Settings` 将 Rust locale 选择与 Qt resource 加载、QML 重翻译协调起来。Rust 不接触 Qt 类型、QML/Qt 事件循环或 QM resource URL；QML 不维护第二份 locale 列表。
 - surface 坐标、窗口尺寸、设备像素以及 Wayland/Win32/Cocoa 对象归 C++ 平台适配层，不搬入主题 token 或 Rust 逐帧路径。
 - Qt Quick 与 VTK hardware window 生命周期紧密耦合的原生 surface 代码归 `native/visualization`，不得为了平台 API 归类而让通用 Qt adapter 反向依赖 VTK。
-- 用户设置由 Rust 定义 schema、默认值和业务校验；C++/Qt adapter 调用 QSettings，QML 与领域 core 不依赖 QSettings。
+- 用户设置的 schema、默认值、持久化与界面尚在任务 087/115/125 规划；实施时由 Rust 定义业务设置，Qt adapter 负责平台持久化，QML 与领域 core 不直接依赖 `QSettings`。
 - 手写 unsafe 仅在登记的边界模块（当前 `panta-foundation::crash`），逐块说明安全前提；CXX 的 unsafe 声明与生成胶水按 FFI 规则审查，不扩散到业务调用方。
 - External MoldSolver 只经进程协议接入，不链接其 ABI。
 
