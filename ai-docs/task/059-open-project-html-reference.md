@@ -11,7 +11,7 @@
 
 本任务补齐打开工程后的 HTML 参考状态：任务面板显示工程树入口，顶部工具栏从启动区切换为项目工作区工具；已有 QML 的滑块页签、磁贴尺寸、工具按钮悬停/焦点和输出工具条细节也需要回写到两份 HTML 设计档案，避免 HTML 与已落地 QML 视觉分叉。
 
-本任务只更新 `ai-docs/qml-html/` 文档资产，完成 HTML 更新后暂停，交由维护者手工验收，不继续修改 QML 或执行构建。
+本任务只更新 `prototypes/shell/` 文档资产，完成 HTML 更新后暂停，交由维护者手工验收，不继续修改 QML 或执行构建。
 
 ## 必读
 
@@ -24,11 +24,11 @@
 
 ## 范围与非目标
 
-范围：更新 `homepage/homepage.html` 的已落地 QML 视觉细节；以首页为底稿更新 `open-project/open-project.html`，增加打开工程后的工程任务项和项目工具 Ribbon；按参考截图修正首页启动 Ribbon 与两种状态的纯白 Ribbon 底色、分组线和底部组名栏；补充 `qml-html/README.md` 与本任务记录。
+范围：更新 `homepage/homepage.html` 的已落地 QML 视觉细节；以首页为底稿更新 `open-project/open-project.html`，增加打开工程后的工程任务项和项目工具 Ribbon；按参考截图修正首页启动 Ribbon 与两种状态的纯白 Ribbon 底色、分组线和底部组名栏；补充 `prototypes/shell/README.md` 与本任务记录。
 
 非目标：不修改 QML、C++、Rust、构建配置或业务行为；不实现 HTML 的真实工程命令。HTML 完成静态检查后停止，视觉效果由维护者手工验收；工具允许时补充浏览器预览。
 
-本轮整理以 homepage 为基准，按维护者最新要求将公共部分提取到上一级 `qml-html/`：`shell.css` 统一样式与 token，`shell.js` 提供公共壳层、SVG 图标和页签交互。两页保留标题、菜单、Ribbon 工具和任务列表模板，通过相对路径引用公共文件，不请求网络资源或增加构建步骤。保留 96px Ribbon、白色工具分组和右侧灰色渐变，统一英文文案并修正长工具文案、关闭按钮预留空间和等宽滑块页签。
+本轮整理以 homepage 为基准，按维护者最新要求将公共部分提取到上一级 `prototypes/shell/`：`shell.css` 统一样式与 token，`shell.js` 提供公共壳层、SVG 图标和页签交互。两页保留标题、菜单、Ribbon 工具和任务列表模板，通过相对路径引用公共文件，不请求网络资源或增加构建步骤。保留 96px Ribbon、白色工具分组和右侧灰色渐变，统一英文文案并修正长工具文案、关闭按钮预留空间和等宽滑块页签。
 
 工程任务项 `Project '01'` 左侧由文件夹改为参考截图风格的折角文件图标，保留绿色工程标记。
 
@@ -42,10 +42,10 @@
 
 ## 预计改动
 
-- `ai-docs/qml-html/homepage/homepage.html`：按首页截图重做启动 Ribbon，并同步 QML 滑块页签和工具细节。
-- `ai-docs/qml-html/open-project/open-project.html`：新增打开工程后的任务树和项目工具栏，统一 Ribbon 纯白分组底色。
-- `ai-docs/qml-html/shell.css`、`ai-docs/qml-html/shell.js`：两页公共样式、壳层、图标与最小页签交互（本轮新增）。
-- `ai-docs/qml-html/README.md`：登记首页与打开工程两个参考状态。
+- `prototypes/shell/homepage/homepage.html`：按首页截图重做启动 Ribbon，并同步 QML 滑块页签和工具细节。
+- `prototypes/shell/open-project/open-project.html`：新增打开工程后的任务树和项目工具栏，统一 Ribbon 纯白分组底色。
+- `prototypes/shell/shell.css`、`prototypes/shell/shell.js`：两页公共样式、壳层、图标与最小页签交互（本轮新增）。
+- `prototypes/shell/README.md`：登记首页与打开工程两个参考状态。
 - `ai-docs/task-index.md`、本文件：登记任务和暂停验收状态。
 
 ## 清理与兼容例外
@@ -66,7 +66,7 @@
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-22 | 静态核对 `homepage.html`、`open-project.html`、QML 052/055 记录 | 两个状态的结构和已确认视觉 token 对齐 | 已更新；根据本轮截图反馈重做 Ribbon，待维护者手工验收 |
-| 2026-09-22 | `node --check ai-docs/qml-html/shell.js`、`git diff --check` | 语法和补丁空白检查通过 | 通过 |
+| 2026-09-22 | `node --check prototypes/shell/shell.js`、`git diff --check` | 语法和补丁空白检查通过 | 通过 |
 | 2026-09-22 | Node 内联静态检查：组装两页模板、标签与属性、资源路径、SVG 引用、CSS 选择器 / token、英文文案 | 两页共用资源有效，无悬空引用或重复定义 | 通过；首页 7 个 Ribbon 工具，工程页 18 个，公共 50 个 SVG symbol 均有消费者；工程项引用文件图标 |
 | 2026-09-22 | Node VM 夹具执行公共脚本：壳层插入、标题 / 插槽、点击、方向键 / Home / End、Tab 放行 | 模板插入及两组页签选中态逻辑一致 | 通过；这是脚本逻辑检查，不是浏览器渲染验证 |
 | 2026-09-22 | 浏览器打开本地 HTML | 预览两页布局 | 工具安全策略拦截本地文件 URL，未渲染；不绕过限制，待维护者手工验收 |
@@ -86,7 +86,7 @@ HTML 是独立设计资产，不影响构建。若手工验收发现布局偏差
 - 2026-09-22：首页文案统一为英文；homepage 与 open-project 的 Ribbon 基础 CSS 对齐，并按比例再次缩小首页工具区。
 - 2026-09-22：按最新验收反馈，打开工程页补回地球/下拉入口，Ribbon 结构和 CSS 直接复用首页版本，只替换工具内容。
 - 2026-09-22：开始两页整体简化；统一公共样式、英文壳层和 SVG 复用，浏览器核对公共尺寸及长文案布局后交付验收。
-- 2026-09-22：维护者要求公共部分提取到上一级 qml-html，采用 shell.css / shell.js；页面仅保留状态模板，替代此前复制内联资源的方式。
+- 2026-09-22：维护者要求公共部分提取到上一级原型公共目录，采用 shell.css / shell.js；页面仅保留状态模板，替代此前复制内联资源的方式。
 - 2026-09-22：维护者要求将工程任务项左侧文件夹改为类似参考图的文件图标；与公共资源提取一并完成。
 - 2026-09-22：已提取 shell.css / shell.js，两页只保留状态模板；保留首页 New Project 文案，工程项采用带绿色标记的折角文件图标。静态及脚本逻辑检查通过，因浏览器本地 URL 限制未完成渲染验证，停止并等待手工验收。
 - 2026-09-22：维护者验收通过，提交 HTML 参考件与公共资源；后续 QML 实施另行登记任务。

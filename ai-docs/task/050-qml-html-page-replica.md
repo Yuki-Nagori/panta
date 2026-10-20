@@ -21,7 +21,7 @@ QML 页面开发缺乏高保真的视觉参照：直接写 QML 需要同时解�
 与状态栏。品牌、菜单与文案全部使用 panta，不出现任何第三方品牌信息；该框架与
 panta 桌面工程 UI 同构，是后续 QML 主窗口任务的直接设计底稿。
 
-完成后的可观察行为：`ai-docs/qml-html/homepage/homepage.html` 在浏览器中渲染出
+完成后的可观察行为：`prototypes/shell/homepage/homepage.html` 在浏览器中渲染出
 与参照截图结构、布局、配色一致的桌面框架静态页面，内嵌网页区留空；QML 文档
 登记该工作流。
 
@@ -32,8 +32,8 @@ panta 桌面工程 UI 同构，是后续 QML 主窗口任务的直接设计底�
 
 ## 范围与非目标
 
-范围：`ai-docs/qml-html/homepage/homepage.html` 自包含复刻件（内联 CSS，零外部
-资源）；`ai-docs/qml-html/README.md` 目录约定与工作流；`qml-components-and-theme.md`
+范围：`prototypes/shell/homepage/homepage.html` 自包含复刻件（内联 CSS，零外部
+资源）；`prototypes/shell/README.md` 目录约定与工作流；`qml-components-and-theme.md`
 登记流程。
 
 非目标：QML 实现（后续页面任务承接）；内嵌网页视图的真实内容（按要求留空）；
@@ -47,7 +47,7 @@ panta 桌面工程 UI 同构，是后续 QML 主窗口任务的直接设计底�
 
 ## 实施步骤
 
-1. 登记 `ai-docs/qml-html/` 目录约定（README：用途、布局、"不进构建"边界）。
+1. 登记 `prototypes/shell/` 目录约定（README：用途、布局、"不进构建"边界）。
 2. 编写 `homepage.html`：标题工具条/菜单栏/ribbon/左面板/内嵌网页占位/状态栏，
    设计值（间距、字号、配色）以 CSS 自定义属性集中声明，便于后续映射 Theme token。
 3. `qml-components-and-theme.md` 增补"HTML 先行复刻"工作流小节并链接 README。
@@ -55,8 +55,8 @@ panta 桌面工程 UI 同构，是后续 QML 主窗口任务的直接设计底�
 
 ## 预计改动
 
-- `ai-docs/qml-html/homepage/homepage.html`（已存在空占位，本任务填充）。
-- `ai-docs/qml-html/README.md`（待创建）。
+- `prototypes/shell/homepage/homepage.html`（已存在空占位，本任务填充）。
+- `prototypes/shell/README.md`（待创建）。
 - `ai-docs/modules/qml-components-and-theme.md`（现存，增补小节）。
 
 ## 清理与兼容例外
@@ -106,7 +106,7 @@ panta 桌面主窗口 GUI 框架的 HTML 复刻件已交付并经内置浏览器
 控制）、菜单栏四项、ribbon 启动区三入口、左侧任务面板（任务/工具/共享视图页签、
 打开/新建工程）与输出面板、中央内嵌网页视图（按要求留空）、状态栏，逐项与参照
 截图对应；品牌与文案全部为 panta，零外部资源，设计值集中于 `:root` 自定义属性。
-工作流（HTML 先行复刻 → 对照迁移 QML）已登记于 `../qml-html/README.md` 与
+工作流（HTML 先行复刻 → 对照迁移 QML）已登记于 `../../prototypes/shell/README.md` 与
 [qml-components-and-theme](../modules/qml-components-and-theme.md)。
 
 限制：图标为内联 SVG 占位、图像占位以 CSS 渐变表达，替换真实资源时映射为对应

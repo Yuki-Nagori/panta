@@ -4,10 +4,9 @@
 
 ## 当前与目标
 
-当前存在根目录文档、许可证、忽略配置、`ai-docs/`、Cargo workspace、
-`panta-foundation` 进程基础设施、`panta-core` 领域模型、`panta-ffi` CXX
-边界，以及任务 034 正在实施的 `.pa` DSL parser/CLI（`crates/panta-dsl-core`、
-`crates/panta-dslc`）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt
+当前存在根目录文档、许可证、忽略配置、`ai-docs/`、`prototypes/shell/`、Cargo workspace、
+`panta-foundation` 进程基础设施、`panta-core` 工程服务、`panta-ffi` CXX
+边界，以及已实现的 `.pa` DSL parser/CLI（034/035）与工程/STL CLI（121–124）。任务 003/004 落地 native 构建骨架，任务 005 落地 Qt
 桌面骨架；任务 007 的 VTK WebGPU 原生视口已接入默认窗口，065 补齐导航。
 真实窗口的跨平台覆盖仍见各任务。下图标为规划的部分不应据此
 创建无用途的占位模块。
@@ -27,10 +26,12 @@ panta/
 ├── crates/
 │   ├── launcher/              # 统一运行入口与 native 构建调度
 │   ├── panta-foundation/      # 进程级设施；当前为崩溃信号与日志（047）
-│   ├── panta-core/            # Rust 领域模型：任务、路径等（008/023）
+│   ├── panta-build/           # 托管工具、安装与编译数据库支持
+│   ├── panta-core/            # 工程、运行时、任务、Mesh 驻留与持久化
 │   ├── panta-ffi/             # CXX DTO/句柄/错误边界与 staticlib（006/047）
-│   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034 实施中）
-│   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035 实施中）
+│   ├── panta-dsl-core/         # .pa parser、Artifact 聚合、诊断与 TS 生成（034）
+│   ├── panta-dslc/             # 单文件 .pa 校验/格式化/TS 输出 CLI（034/035）
+│   ├── panta-cli/             # 工程创建/检查与 STL 检查/导入 CLI
 │   ├── panta-geom/            # 规划：几何身份、修订与后端契约
 │   ├── panta-import/          # 当前：格式识别、来源快照与 STL 导入准备
 │   ├── panta-mesh/            # 当前：STL 网格数据、Mesh IR 与领域校验
@@ -46,19 +47,22 @@ panta/
 │   ├── CMakePresets.json      # 单配置 Ninja presets：debug / release（任务 003 已落地）
 │   ├── cmake/                 # 安装包配置模板与 Qt 供给脚本（qt-provision.cmake，005 已落地）
 │   ├── foundation/            # 基础契约与构建链验证 target（003 已落地）
+│   ├── qt-adapter/            # Qt 平台服务与系统目录/偏好适配
+│   ├── i18n/                  # QM 资源构建与 QTranslator 适配
 │   ├── bridge/                # ViewModel（ShellViewModel + GTest 信号测试，005 已落地）
 │   ├── app/                   # Qt 桌面入口 panta（005 已落地 Qt 实现）
 │   ├── geometry/{include,src/occt}/       # 当前：自有摘要契约与 OCCT adapter
 │   ├── mesh/{include,src/netgen}/         # 当前：native 网格 DTO、CXX 校验适配与 Netgen adapter
 │   └── visualization/{include,src/vtk}/   # 当前：显示契约与 VTK 后端（含 navigation/）
 ├── qml/
-│   ├── App.qml                # 主窗口（005 已落地；URI Panta.Shell，NO_PLUGIN 资源模块）
+│   ├── App.qml                # 主窗口；静态 Panta.Shell 模块含平台单例插件
 │   ├── Components/
-│   ├── Panels/                # PlaceholderPanel 占位（005 已落地）
+│   ├── Panels/                # Ribbon、工程工具树与 dock 面板
 │   ├── Viewport/
 │   └── Themes/                # Theme 单例（005 已落地）
-├── python/                    # 后续 Python API，包名待定
-├── schemas/                   # 本地工程 schema、外部契约版本引用
+├── prototypes/shell/          # HTML/SVG 原型；shell.js 也是 QML 回归资源输入
+├── python/                    # 规划：后续 Python API，包名待定
+├── schemas/                   # 规划：本地工程 schema、外部契约版本引用
 ├── resources/                 # 图标、.pa 源文件与样例；TS/QM 只进构建树
 └── tests/                     # Cargo 编排及测试；详见 tests/README.md
     ├── rust/、cpp/、qml/       # 按语言 / 模块组织功能回归
@@ -98,4 +102,4 @@ panta/
 
 按职责放置文件，避免按语言把所有业务堆进一个桥接层。访问私有实现的单元测试贴近源码；公开 API 的 Rust 黑盒测试放根 `tests/rust/` 并由所属 crate 注册，native/QML 测试和回归夹具按[测试规范](../standards/testing.md)归档。测试资产应小且能合法分发，大型 CAD/结果数据通过受控的外部资产机制管理。
 
-工程名与 Rust package 名已统一：工程为 `panta`，Rust package 用 `panta-` 前缀，当前 launcher 的 bin 名为 `panta-launcher`（任务 001）。Python package 名与最终桌面可执行文件名在相应脚手架任务（014 / 005）搭建时确定；不直接沿用附件中的 `moldcae-desktop` 等示意名称。
+工程名与 Rust package 名已统一：工程为 `panta`，Rust package 用 `panta-` 前缀，当前 launcher 的 bin 名为 `panta-launcher`（任务 001）。桌面可执行文件已统一命名 `panta`；Python package 名由后续 API 任务确定；不直接沿用附件中的 `moldcae-desktop` 等示意名称。

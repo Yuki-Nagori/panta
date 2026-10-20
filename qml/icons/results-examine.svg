@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
-  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-results-examine；内部绘制，保留原始几何与颜色。 -->
+  <!-- 来源：prototypes/shell/shell.js 的 #i-results-examine；内部绘制，保留原始几何与颜色。 -->
   <defs>
   <linearGradient id="legend-5" x1="0" y1="0" x2="0" y2="1">
   <stop stop-color="#c8322b"/>

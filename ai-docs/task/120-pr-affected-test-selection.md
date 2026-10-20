@@ -5,7 +5,7 @@
 - 依赖：[118 实际依赖图与应用命令层设计](118-layering-lint-and-command-boundaries.md)、[100 tests 整体整理与性能入口统一](100-tests-consolidation.md)
 - 优先级：P0
 - 负责人：维护者
-- 创建 / 更新：2026-10-16 / 2026-10-16
+- 创建 / 更新：2026-10-16 / 2026-10-20
 
 ## 目标与背景
 
@@ -22,6 +22,8 @@
 - [验证与评审](../standards/validation-and-review.md)
 
 ## 范围与非目标
+
+本轮评审修复（2026-10-20）：将 Shell HTML / SVG 原型从文档树迁至根 `prototypes/shell/`，同步资源构建输入、来源及文档链接，并让测试与质量影响范围识别该生产输入；核对架构入口的已实现能力与窗口验收边界。任务原有 `done` 状态表示 2026-10-16 的交付历史，本轮修复的适用验证和独立评审另记，完成前不视为本轮验收通过。
 
 - 定义并实现 PR 测试层级：L1 为变更 crate/target 的快速局部验证；L2 运行依赖闭包中受影响的 Rust 反向依赖、native CTest 与 QML 行为测试；公共接口、构建图和无法分类的变更进入对应语言的完整测试矩阵。层级必须给出实际执行命令与选中结果，避免“分层”只成为标签。
 - Rust 影响闭包不得止于 Cargo：沿 CXX/FFI staticlib 消费边继续扩展到 native targets、相关 CTest 和 QML module/行为测试。例如 `panta-mesh` 改动需考虑其 Rust 调用方以及 native mesh/CXX 消费者。
@@ -78,3 +80,11 @@
 ## 完成摘要
 
 实现、严格评审、本地验收和 PR 三平台 CI 已通过；文档同步已完成。PR #41 按维护者指示不等待最新文档提交触发的 CI，直接合并。
+
+## 本轮评审修复验证（2026-10-20）
+
+- 已完成（macOS，仓库根目录）：`git diff HEAD --check` 通过；全文 `rg` 检查无旧目录引用（保留任务 050 文件名）；23 份 Markdown 的 213 个本地链接均有效；迁移的 6 份 HTML/CSS/JS 与 `HEAD` 原文件字节一致，HTML 相对资源均存在。未运行完整门禁或真实窗口。
+- 迁移独立提交评审：`gpt-6.1-sol` medium 只读核对文件字节、142 个 SVG 来源注释、Markdown/HTML 相对链接、QtTest 资源 URL 与 Cargo 重建追踪，未发现阻断问题。新原型路径已实测触发全量保守回退，不依赖后续精细分类；构建与资源行为测试在本轮后续修复完成后统一验证。
+- 新原型路径实跑 `cargo test-plan --ci` 选择 `bridge/qml`，不再当文档跳过，也不需全量回退；未知 `ai-docs/` 非 Markdown 输入仍完整回退。选择器 16 项回归通过；runner 共 30 项通过，另 3 项性能入口专属检查保持忽略。
+- `cargo test-scope all` 通过本轮选中的全部 Rust package 与 CTest 86/86，包含迁移后的 `Qml.ThemeComponentParameters` 资源加载和比对。适用质量阶段按 119 的本轮记录完成；`gpt-6.1-sol` medium 独立只读评审最终完整分支，未发现未解决问题。
+- [PR #69 CI](https://github.com/Yuki-Nagori/panta/actions/runs/39386991774) 对实现提交 `971c33a` 的 15 个 job 全部成功。本轮公共工具输入触发完整范围；三平台 Rust 测试及 native/QML CTest 通过（macOS 86/86、Linux 85/85、Windows 83/83，差异来自平台条件测试），包含迁移后的原型资源行为验证。

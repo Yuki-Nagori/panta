@@ -31,6 +31,7 @@ const RERUN_PATHS: &[&str] = &[
     "../panta-mesh",
     "../panta-foundation",
     "../../qml",
+    "../../prototypes/shell",
     "../../resources/i18n",
 ];
 
@@ -237,7 +238,11 @@ fn orchestrate() -> Result<PathBuf, String> {
     let owned = provision::database::owned(commands.clone(), &root);
     provision::database::write(&quality_dir.join("compile_commands.json"), &owned)?;
     // 未使用函数分析需要看到 moc/CXX 生成的调用边；生成代码本身不作为告警对象。
-    let mut cppcheck = owned;
+    // Cppcheck 不解析 Objective-C++；这些平台单元由 macOS LLVM 检查覆盖。
+    let mut cppcheck: Vec<_> = owned
+        .into_iter()
+        .filter(|entry| entry.source().extension().is_none_or(|ext| ext != "mm"))
+        .collect();
     cppcheck.extend(commands.into_iter().filter(|entry| {
         entry
             .file

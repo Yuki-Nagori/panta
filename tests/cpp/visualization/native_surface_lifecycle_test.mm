@@ -36,8 +36,23 @@ class NativeSurfaceLifecycleTest final : public QObject {
         hardware->Destroy();
         hardware.reset();
         const bool no_interactor = [view getInteractor] == nullptr;
-        [view mouseEntered:nil];
-        [view mouseExited:nil];
+        for (const auto type : {NSEventTypeMouseEntered, NSEventTypeMouseExited}) {
+            NSEvent* event = [NSEvent enterExitEventWithType:type
+                                                    location:NSZeroPoint
+                                               modifierFlags:0
+                                                   timestamp:0
+                                                windowNumber:0
+                                                     context:nil
+                                                 eventNumber:0
+                                              trackingNumber:0
+                                                    userData:nullptr];
+            QVERIFY(event != nil);
+            if (type == NSEventTypeMouseEntered) {
+                [view mouseEntered:event];
+            } else {
+                [view mouseExited:event];
+            }
+        }
         [view release];
         QVERIFY(detached);
         QVERIFY(no_interactor);

@@ -2,15 +2,14 @@
 /// CAMetalLayer；本文件只把该视图重新挂入 Qt Quick 的原生宿主视图。
 #include "vtk_native_surface.hpp"
 
+#import <Cocoa/Cocoa.h>
+#include <QPointF>
 #include <QQuickItem>
 #include <QQuickWindow>
-#include <QPointF>
 #include <QtGlobal>
-#include <vtkCocoaHardwareWindow.h>
 #include <vtkCocoaHardwareView.h>
+#include <vtkCocoaHardwareWindow.h>
 #include <vtkHardwareWindow.h>
-
-#import <Cocoa/Cocoa.h>
 
 namespace panta::visualization {
 namespace {
@@ -19,7 +18,8 @@ NSView* qt_native_view(QQuickWindow* window) {
     if (window == nullptr) {
         return nullptr;
     }
-    return reinterpret_cast<NSView*>(window->winId());
+    // Cocoa 的 WId 编码 NSView*；这里只恢复 Qt 的句柄，不计算数值地址。
+    return reinterpret_cast<NSView*>(window->winId()); // NOLINT(performance-no-int-to-ptr)
 }
 
 } // namespace
@@ -33,7 +33,8 @@ bool attach_native_surface(QQuickWindow* window, QQuickItem*, vtkHardwareWindow*
     auto* cocoa = vtkCocoaHardwareWindow::SafeDownCast(hardware);
     NSView* host = qt_native_view(window);
     NSView* view = cocoa != nullptr ? cocoa->GetViewId() : nullptr;
-    if (cocoa == nullptr || host == nullptr || view == nullptr || cocoa->GetMetalLayer() == nullptr) {
+    if (cocoa == nullptr || host == nullptr || view == nullptr ||
+        cocoa->GetMetalLayer() == nullptr) {
         return false;
     }
 
@@ -69,10 +70,9 @@ void sync_native_surface(QQuickWindow*, QQuickItem* item, vtkHardwareWindow* har
     // Qt 的 content view 是 flipped 坐标系（原点左上），子视图 frame 直接
     // 使用 QML scene 坐标；仅非 flipped 宿主需要换算底部原点。
     const NSRect host_bounds = [host bounds];
-    const CGFloat y = [host isFlipped]
-                          ? static_cast<CGFloat>(scene_position.y())
-                          : host_bounds.size.height - static_cast<CGFloat>(scene_position.y()) -
-                                height;
+    const CGFloat y = [host isFlipped] ? static_cast<CGFloat>(scene_position.y())
+                                       : host_bounds.size.height -
+                                             static_cast<CGFloat>(scene_position.y()) - height;
     [view setFrame:NSMakeRect(static_cast<CGFloat>(scene_position.x()), y, width, height)];
 }
 

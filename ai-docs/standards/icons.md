@@ -1,6 +1,6 @@
 # panta 图标设计规范
 
-更新日期：2026-09-30。适用于 `qml/icons/`、Shell 图标使用点与 `ai-docs/qml-html/shell.js` 视觉原型。项目确定以 HTML 原型中经维护者确认的 SVG symbol 集合作为正式图标视觉基准；QML 使用的图标迁移到对应 symbol 的独立 SVG 资源，不再另画一套图形。迁移和组件适配由[081 QML 视觉语言与图标体系统一](../task/081-qml-visual-language-and-iconography.md)跟踪。
+更新日期：2026-09-30。适用于 `qml/icons/`、Shell 图标使用点与 `prototypes/shell/shell.js` 视觉原型。项目确定以 HTML 原型中经维护者确认的 SVG symbol 集合作为正式图标视觉基准；QML 使用的图标迁移到对应 symbol 的独立 SVG 资源，不再另画一套图形。迁移和组件适配由[081 QML 视觉语言与图标体系统一](../task/081-qml-visual-language-and-iconography.md)跟踪。
 
 ## 视觉语言
 

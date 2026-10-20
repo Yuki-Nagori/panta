@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      width="16" height="16" viewBox="0 0 16 16" fill="none">
-  <!-- 来源：ai-docs/qml-html/shell.js 的 #i-layers；内部绘制，原始几何与颜色保留。 -->
+  <!-- 来源：prototypes/shell/shell.js 的 #i-layers；内部绘制，原始几何与颜色保留。 -->
   <path d="m1.5 4 6.5-3 6.5 3-6.5 3zM1.5 7l6.5 3 6.5-3M1.5 10l6.5 3 6.5-3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
 </svg>

@@ -66,6 +66,7 @@ impl VariableSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeCommitError {
     NoContext,
+    Busy,
     Closed,
     StaleContext,
     EmptyVariableName,
@@ -77,6 +78,7 @@ pub enum RuntimeCommitError {
 impl std::fmt::Display for RuntimeCommitError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Busy => write!(formatter, "runtime variable write pending"),
             Self::NoContext => write!(formatter, "no active runtime context"),
             Self::Closed => write!(formatter, "runtime context is closed"),
             Self::StaleContext => write!(formatter, "runtime task scope is stale"),

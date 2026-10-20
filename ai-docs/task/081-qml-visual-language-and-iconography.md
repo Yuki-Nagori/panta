@@ -27,7 +27,7 @@
 - 审计 `qml/Themes/Theme.qml`、现有 QML 组件、Ribbon、工程/任务/Layers Dock、对话框、视口与 080 页签；建立可追溯的色彩、字号、图标比例、圆角、间距、层级、边框与交互状态规范。
 - 以 `shell.js` 的全部内联 SVG symbol 作为唯一图标造型基准，将现有 QML 图标全集替换为对应 symbol 的独立多色 SVG 资源；为 HTML 树与任务区中尚未进入 QML 清单的工程文件夹、STL、任务操作和状态符号补全 QML 映射。形成应用内资源清单，记录内部绘制/第三方来源、许可证、修改情况和对应功能；无法确认来源的资源不得直接作为可发布资产沿用。
 - 适配 QML 图标加载组件，避免彩色 SVG 经过当前单色 `panta-icons` 渲染路径而丢失颜色；颜色表达语义，不依赖色相作为唯一状态信息。
-- 更新 `ai-docs/qml-html/` 中适用参考页面，先稳定视觉底稿，再将规则映射至 Theme token 和 QML 组件；保留 HTML 与 QML 一致的 token 与图标语义。
+- 更新 `prototypes/shell/` 中适用参考页面，先稳定视觉底稿，再将规则映射至 Theme token 和 QML 组件；保留 HTML 与 QML 一致的 token 与图标语义。
 - 统一常态、悬停、按下、选中、禁用、焦点、关闭和空白视口等可见状态；覆盖英文/中文长度、键盘焦点与高 DPI 布局。
 - `TasksPanel` 默认打开 Tasks 页签：空工程时显示 Open Project / New Project；工程打开后由工程树和 Plan tasks 内容替代这两个入口。Tools 与 Shared Views 各自显示带 Information 标题的信息框：Tools 提供三段英文工具使用说明，Shared Views 引导用户从 Home 页的 Shared 面板访问共享视图。工程入口继续复用已有 ViewModel 信号。
 - Plan tasks 标题图标使用 `plan-tasks` 正式 symbol ID，保持 `shell.js`、QML SVG、QML/HTML 调用与性能场景清单一致。
@@ -62,7 +62,7 @@
 ## 预计改动
 
 - `qml/Themes/Theme.qml`、`qml/Components/`、`qml/Panels/`、`qml/Panels/Ribbon/` 与 `qml/icons/*.svg`。
-- `ai-docs/qml-html/shell.css`、`shell.js` 和实际受影响的页面；`ai-docs/qml-html/README.md`。
+- `prototypes/shell/shell.css`、`shell.js` 和实际受影响的页面；`prototypes/shell/README.md`。
 - `ai-docs/standards/icons.md`、`ai-docs/modules/qml-components-and-theme.md` 与本任务依赖页面；图标来源/功能清单维护在 `ai-docs/standards/icons.md`。
 - 现有组件测试、截图/可访问性检查，以及 `tests/qml/project_docks_cpu_benchmark.cpp`、`tests/qml/project_docks_gpu_benchmark.cpp` 中适用的场景。
 - 053/080 的设计依赖与实现决策；不改 Rust / native 业务接口。

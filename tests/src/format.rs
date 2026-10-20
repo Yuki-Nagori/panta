@@ -76,8 +76,11 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
     if !pa_files.is_empty() {
         run_pa_formatter(check, &pa_files)?;
     }
-    let cpp_files = files_with_extensions(&changed_files, &["cpp", "cc", "cxx", "h", "hpp"])
-        .into_iter()
+    let cpp_files = changed_files
+        .iter()
+        .filter(|path| {
+            panta_build::database::is_source(path) || panta_build::database::is_header(path)
+        })
         .filter(|path| {
             [
                 "native",
@@ -91,6 +94,7 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|directory| path.starts_with(root.join(directory)))
         })
+        .cloned()
         .collect::<Vec<_>>();
     if !cpp_files.is_empty() {
         format_cpp_files(check, &cpp_files)?;
@@ -360,9 +364,8 @@ fn cpp_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
         let path = entry.path();
         if entry.file_type()?.is_dir() {
             files.extend(cpp_sources(&path)?);
-        } else if path.extension().is_some_and(|extension| {
-            matches!(extension.to_str(), Some("cpp" | "cc" | "cxx" | "h" | "hpp"))
-        }) {
+        } else if panta_build::database::is_source(&path) || panta_build::database::is_header(&path)
+        {
             files.push(path);
         }
     }

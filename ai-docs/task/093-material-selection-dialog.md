@@ -57,7 +57,7 @@ Rust 提供只读材料摘要与确认命令；确认按导入记录保存稳定
 
 ## 验证计划与结果
 
-- HTML：`node --check ai-docs/qml-html/shell.js` 通过；本机浏览器预览默认材料和详情布局，用户确认效果。
+- HTML：`node --check prototypes/shell/shell.js` 通过；本机浏览器预览默认材料和详情布局，用户确认效果。
 - 真实窗口（2026-10-02，macOS）：原生二进制经临时 app wrapper 启动，两个导入记录的临时工程通过 Material Data 打开弹窗；详情完整展示参数与单位，目录操作禁用。Cancel / Esc 后仍为 Material Data。以 `.panta.tmp` 同名目录制造写盘失败，弹窗保留并显示错误，原清单字节不变；移除障碍后 OK 成功，任务行显示 PP — 25% mineral filler 与完成勾。清单修订 8 → 9，仅 `import-2` 保存材料 ID；再次 OK 不改变清单字节。退出应用并重开同一工程，材料状态保持。截图与 AX 证据位于忽略目录 `artifacts/task-093/`；验收后移除 wrapper。此前窗口连接中断的缺口已补齐。
 - 质量检查：`cargo format --check`、`cargo build --locked`、`cargo lint` 和 diff 空白检查通过；提交前按最终修改复查。
 - 静态评审：Rust 独占候选及元数据写入保护防止旧候选覆盖新修订；结果只消费一次，失败解除保护并保留旧状态。Qt 仅在提交期间轮询，配置通知按值变化发出，渲染 getter 继续读取本地 C++ 快照。

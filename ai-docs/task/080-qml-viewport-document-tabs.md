@@ -68,7 +68,7 @@
 ## 预计改动
 
 - `qml/Panels/ViewportPane.qml`：替换旧底部类别页签并承接新面板布局；必要时新增文档标签组合组件及 Theme token。
-- `ai-docs/qml-html/imported-project/imported-project.html`、`ai-docs/qml-html/shell.js`、`ai-docs/qml-html/shell.css`、`ai-docs/qml-html/README.md`：维护交互参考和明确演示边界。
+- `prototypes/shell/imported-project/imported-project.html`、`prototypes/shell/shell.js`、`prototypes/shell/shell.css`、`prototypes/shell/README.md`：维护交互参考和明确演示边界。
 - `crates/panta-core` / `crates/panta-import` / `crates/panta-ffi`：按 073 设计加入基于已保存 ImportRecord 的异步只读资产激活；具体子模块和 DTO 以接口评审为准。
 - `native/bridge/src/project_view_model.*` 与视口数据适配：提供稳定导入记录、session 失效和显示快照，不把 VTK 类型或网格数组暴露到 QML。
 - `tests/` 与 QML 手动性能基准 harness：覆盖加载、切换、关闭、失败、迟到结果、内存释放和真实视口更新；记录真实窗口与 CPU / GPU 性能结果。

@@ -89,6 +89,22 @@ pub fn write(path: &Path, commands: &[CompileCommand]) -> Result<(), String> {
     std::fs::write(path, bytes).map_err(|e| format!("写入 {}：{e}", path.display()))
 }
 
+/// 自有 C++ 与 Objective-C++ 翻译单元；头文件随实际消费者检查。
+pub fn is_source(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|extension| extension.to_str()),
+        Some("cpp" | "cc" | "cxx" | "mm")
+    )
+}
+
+/// 同时供格式检查与增量静态分析识别公共头输入，包括已删除的路径。
+pub fn is_header(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|extension| extension.to_str()),
+        Some("h" | "hh" | "hpp" | "hxx")
+    )
+}
+
 /// 排除构建目录、第三方与头文件；头文件随包含它的真实翻译单元检查。
 pub fn owned(commands: Vec<CompileCommand>, root: &Path) -> Vec<CompileCommand> {
     let directories = [
@@ -102,9 +118,7 @@ pub fn owned(commands: Vec<CompileCommand>, root: &Path) -> Vec<CompileCommand> 
         .into_iter()
         .filter(|entry| {
             let source = entry.source();
-            source
-                .extension()
-                .is_some_and(|ext| matches!(ext.to_str(), Some("cpp" | "cc" | "cxx")))
+            is_source(&source)
                 && directories
                     .iter()
                     .any(|dir| source.starts_with(root.join(dir)))
@@ -156,6 +170,7 @@ mod tests {
     fn keeps_handwritten_cxx_and_tests_without_generated_code_or_headers() {
         let entries = [
             "native/app/main.cpp",
+            "native/app/window_chrome_metrics_mac.mm",
             "tests/cpp/ffi/test.cc",
             "tests/qml/main.cpp",
             "tests/performance/gpu/viewport_benchmark.cpp",
@@ -167,7 +182,7 @@ mod tests {
         .map(entry)
         .to_vec();
         let selected = owned(entries, Path::new("/repo"));
-        assert_eq!(selected.len(), 5);
+        assert_eq!(selected.len(), 6);
         assert!(
             selected
                 .iter()

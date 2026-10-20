@@ -17,13 +17,13 @@
 ## 页面设计工作流：HTML 先行复刻
 
 新页面的视觉开发采用 HTML 先行复刻工作流（维护者 2026-09-21 确立）：先在
-`../qml-html/<page>/` 用 HTML 状态模板复刻目标页面——品牌与文案统一 panta，
+`../../prototypes/shell/<page>/` 用 HTML 状态模板复刻目标页面——品牌与文案统一 panta，
 公共壳层与样式由上一级 shell.js / shell.css 提供，设计值集中在 `:root`，
 照片/渲染图以渐变占位——浏览器对照确认后，再由
 页面任务迁移为 QML：盒模型层级映射 anchors/Layout，`:root` 设计值映射 Theme
 token，占位图映射 Image 元素。这样把视觉迭代与 QML 实现解耦，效率最高。复刻件
-是文档参考资产，不进 QML 构建图；约定与边界见
-[`../qml-html/README.md`](../qml-html/README.md)，首个样例为
+是视觉原型；其中 `shell.js` 的 SVG symbol 已作为图标一致性测试的构建输入，变更须触发相关测试与质量检查。约定与边界见
+[`../../prototypes/shell/README.md`](../../prototypes/shell/README.md)，首个样例为
 panta 桌面主窗口框架（任务 050 复刻、029 迁移）。
 
 ## 组件分层与输入输出

@@ -42,30 +42,73 @@ pub(super) fn project_service_save(
     service.service.save().map(project_snapshot)
 }
 
-pub(super) fn project_service_load_variable_document(
-    service: &mut ProjectService,
-    expected_generation: u64,
-    expected_revision: u64,
-) -> bridge::VariableDocumentResult {
-    variable_document_result(
-        service
-            .service
-            .load_variable_document(expected_generation, expected_revision),
-        service.service.variable_document_generation(),
-    )
+/// 独占后台 receiver；C++ 只能移交给等待线程，不能借用 ProjectService。
+pub struct VariableDocumentRequest {
+    request: Result<
+        panta_core::project::VariableDocumentRequest,
+        panta_core::project::VariableDocumentError,
+    >,
+    generation: u64,
 }
 
-pub(super) fn project_service_save_variable_document(
+/// 后台等待结束后移交服务线程消费的拥有式结果。
+pub struct VariableDocumentCompletion {
+    completion: Result<
+        panta_core::project::VariableDocumentCompletion,
+        panta_core::project::VariableDocumentError,
+    >,
+    generation: u64,
+}
+
+pub(super) fn project_service_begin_variable_document(
     service: &mut ProjectService,
     expected_generation: u64,
     expected_revision: u64,
     source: String,
+    save: bool,
+) -> Box<VariableDocumentRequest> {
+    Box::new(VariableDocumentRequest {
+        request: service.service.begin_variable_document(
+            expected_generation,
+            expected_revision,
+            save.then_some(source),
+        ),
+        generation: expected_generation,
+    })
+}
+
+pub(super) fn variable_document_request_accepted(request: &VariableDocumentRequest) -> bool {
+    request.request.is_ok()
+}
+
+#[expect(
+    clippy::boxed_local,
+    reason = "CXX opaque 请求必须以 Box 移交并消费唯一所有权"
+)]
+pub(super) fn variable_document_wait(
+    request: Box<VariableDocumentRequest>,
+) -> Box<VariableDocumentCompletion> {
+    Box::new(VariableDocumentCompletion {
+        completion: request
+            .request
+            .map(panta_core::project::VariableDocumentRequest::wait),
+        generation: request.generation,
+    })
+}
+
+#[expect(
+    clippy::boxed_local,
+    reason = "CXX opaque 完成结果必须以 Box 移回 Rust 消费"
+)]
+pub(super) fn project_service_finish_variable_document(
+    service: &mut ProjectService,
+    completion: Box<VariableDocumentCompletion>,
 ) -> bridge::VariableDocumentResult {
     variable_document_result(
-        service
-            .service
-            .save_variable_document(expected_generation, expected_revision, &source),
-        service.service.variable_document_generation(),
+        completion
+            .completion
+            .and_then(|completion| service.service.finish_variable_document(completion)),
+        completion.generation,
     )
 }
 
@@ -947,6 +990,71 @@ mod tests {
     };
     use std::fs;
     use std::path::PathBuf;
+
+    #[test]
+    fn variable_requests_transfer_owned_results_and_preserve_structured_errors()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use super::{
+            project_service_begin_variable_document, project_service_finish_variable_document,
+            project_service_variable_document_generation, variable_document_request_accepted,
+            variable_document_wait,
+        };
+        let fixture = crate::temp_directory::Fixture::new()?;
+        let mut service = project_service_new();
+        project_service_create(
+            &mut service,
+            fixture.root.display().to_string(),
+            "Variables".to_owned(),
+        )?;
+        let generation = project_service_variable_document_generation(&service);
+        let source = "version: 1\nkind: variables\n\nvalues:\n  count: int = 12\n";
+        let request = project_service_begin_variable_document(
+            &mut service,
+            generation,
+            0,
+            source.to_owned(),
+            true,
+        );
+        assert!(variable_document_request_accepted(&request));
+        // receiver 和结果拥有所有权；等待不借用应用服务。
+        let completion = std::thread::spawn(move || variable_document_wait(request))
+            .join()
+            .map_err(|_| "variable wait thread panicked")?;
+        let result = project_service_finish_variable_document(&mut service, completion);
+        assert!(result.error.code.is_empty());
+        assert_eq!(result.generation, generation);
+        assert_eq!(result.revision, 1);
+        assert_eq!(result.values[0].value, "12");
+        let previous = fs::read(fixture.root.join("Variables/variables.pa"))?;
+        let request = project_service_begin_variable_document(
+            &mut service,
+            generation,
+            0,
+            source.to_owned(),
+            true,
+        );
+        assert!(!variable_document_request_accepted(&request));
+        let stale =
+            project_service_finish_variable_document(&mut service, variable_document_wait(request));
+        assert_eq!(stale.error.code, "variables.stale_revision");
+        let request = project_service_begin_variable_document(
+            &mut service,
+            generation,
+            1,
+            "version: 1\nkind: variables\nvalues:\n  count: int = unknown-name\n".to_owned(),
+            true,
+        );
+        assert!(variable_document_request_accepted(&request));
+        let invalid =
+            project_service_finish_variable_document(&mut service, variable_document_wait(request));
+        assert_eq!(invalid.diagnostics[0].code, "variables.unknown_reference");
+        assert_eq!(invalid.diagnostics[0].line, 4);
+        assert_eq!(
+            fs::read(fixture.root.join("Variables/variables.pa"))?,
+            previous
+        );
+        Ok(())
+    }
 
     #[test]
     fn plan_settings_exposes_core_constraints_and_draft_validation_errors() {

@@ -6,24 +6,33 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QFuture>
+#include <QFutureWatcher>
 #include <QLatin1Char>
 #include <QMetaType>
 #include <QObject>
+#include <QPromise>
 #include <QString>
 #include <QUrl>
 #include <QVariantMap>
 #include <QtCore/qcontainerfwd.h>
+#include <QtCore/qnamespace.h>
 #include <QtCore/qtmetamacros.h>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <future>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <panta/qt_adapter/standard_paths.hpp>
 #include <qlogging.h>
 #include <rust/cxx.h>
 #include <string>
+#include <system_error>
+#include <thread>
 #include <utility>
 
 namespace panta::bridge {
@@ -676,26 +685,84 @@ bool ProjectViewModel::saveProject() {
     return true;
 }
 
-bool ProjectViewModel::loadVariableDocument(quint64 expectedGeneration, quint64 expectedRevision) {
+bool ProjectViewModel::beginLoadVariableDocument(quint64 expectedGeneration,
+                                                 quint64 expectedRevision) {
     clearError();
-    const auto result = panta::ffi::project_service_load_variable_document(
-        *m_service, static_cast<std::uint64_t>(expectedGeneration),
-        static_cast<std::uint64_t>(expectedRevision));
-    return applyVariableDocument(result);
+    return beginVariableDocument({}, false, expectedGeneration, expectedRevision);
 }
 
-bool ProjectViewModel::saveVariableDocument(const QString& source, quint64 expectedGeneration,
-                                            quint64 expectedRevision) {
+bool ProjectViewModel::beginSaveVariableDocument(const QString& source, quint64 expectedGeneration,
+                                                 quint64 expectedRevision) {
     clearError();
     std::string boundarySource;
     QString conversionError;
     if (!toBoundaryText(source, &boundarySource, &conversionError)) {
         return fail(conversionError);
     }
-    const auto result = panta::ffi::project_service_save_variable_document(
+    return beginVariableDocument(boundarySource, true, expectedGeneration, expectedRevision);
+}
+
+void ProjectViewModel::startVariableWaiter(std::function<void()> work) {
+    std::thread(std::move(work)).detach();
+}
+
+bool ProjectViewModel::beginVariableDocument(const std::string& source, bool save,
+                                             quint64 expectedGeneration, quint64 expectedRevision) {
+    using Request = rust::Box<panta::ffi::VariableDocumentRequest>;
+    using Completion = rust::Box<panta::ffi::VariableDocumentCompletion>;
+    using Result = std::shared_ptr<Completion>;
+    using Watcher = QFutureWatcher<Result>;
+    const auto input = std::make_shared<std::promise<std::optional<Request>>>();
+    const auto ready = std::make_shared<std::future<std::optional<Request>>>(input->get_future());
+    const auto result = std::make_shared<QPromise<Result>>();
+    auto watcher = std::make_unique<Watcher>();
+    result->start();
+    watcher->setFuture(result->future());
+    connect(watcher.get(), &Watcher::finished, watcher.get(), &QObject::deleteLater);
+    connect(
+        watcher.get(), &Watcher::finished, this,
+        [this, future = result->future(), expectedGeneration] {
+            // Rust 准入被拒绝时等待线程只有退出回执，没有变量结果。
+            if (future.resultCount() == 0) {
+                return;
+            }
+            const auto completion = future.result();
+            const auto document = panta::ffi::project_service_finish_variable_document(
+                *m_service, std::move(*completion));
+            const bool succeeded =
+                expectedGeneration == m_variableGeneration && applyVariableDocument(document);
+            emit variableDocumentFinished(expectedGeneration, succeeded);
+        },
+        Qt::QueuedConnection);
+    try {
+        // 先确保等待线程存在，再准入可能写盘的 Rust 请求。gate 不持有 QObject/服务。
+        // std::thread 构造失败会抛异常；Qt 的 QThread::start 则可能仅 warning 且永不发 finished。
+        startVariableWaiter([ready, result] {
+            auto request = ready->get();
+            if (request) {
+                result->addResult(std::make_shared<Completion>(
+                    panta::ffi::variable_document_wait(std::move(*request))));
+            }
+            result->finish();
+        });
+    } catch (const std::system_error& error) {
+        return fail(QStringLiteral("project.io"), QStringLiteral("io"),
+                    QString::fromUtf8(error.what()));
+    }
+    // watcher 归 ViewModel，销毁会撤销回调；后台只持有 future 状态，GUI 不 join。
+    watcher.release()->setParent(this);
+    auto request = panta::ffi::project_service_begin_variable_document(
         *m_service, static_cast<std::uint64_t>(expectedGeneration),
-        static_cast<std::uint64_t>(expectedRevision), boundarySource);
-    return applyVariableDocument(result);
+        static_cast<std::uint64_t>(expectedRevision), source, save);
+    if (!panta::ffi::variable_document_request_accepted(*request)) {
+        input->set_value(std::nullopt);
+        // 拒绝的请求没有后台 receiver，wait 在此只取回结构化准入错误。
+        const auto document = panta::ffi::project_service_finish_variable_document(
+            *m_service, panta::ffi::variable_document_wait(std::move(request)));
+        return applyVariableDocument(document);
+    }
+    input->set_value(std::move(request));
+    return true;
 }
 
 bool ProjectViewModel::renameProject(const QString& name) {

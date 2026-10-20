@@ -28,7 +28,7 @@ Rust 管理分析序列目录及各导入零件的已确认选择，通过 CXX �
 |---|---|
 | `cargo test --locked --workspace` | 通过，CTest 66/66；Rust 覆盖每记录保存、重开、无效命令、同值确认和写盘失败，Bridge 覆盖多零件 / Welcome 投影，QML 覆盖键盘确认、取消和重新打开 |
 | `cargo format --check`、`cargo lint`、`cargo build --locked` | 全部通过；lint 需要本机锁服务的 TCP 监听权限 |
-| `node --check ai-docs/qml-html/shell.js`、`git diff HEAD --check` | 通过 |
+| `node --check prototypes/shell/shell.js`、`git diff HEAD --check` | 通过 |
 | CPU / GPU 基准目标构建 | 通过；目录由真实 ProjectViewModel 注入，不复制测试目录 |
 | `QT_QPA_PLATFORM=offscreen QT_QUICK_CONTROLS_STYLE=Basic target/native/debug/qml/panta_qml_cpu_benchmark measures_analysis_sequence_construct` | 通过，31 次采样；空白 / 面板 / 完整弹窗 p50/p95 为 12.9/15.5、164.4/300.4、523.0/779.9 µs。仅构造与布局，无可见窗口；不据此比较版本性能或推断 GPU 表现 |
 | 真实窗口 / GPU | 同 091：临时 app wrapper 两次连接超时，GPU 启动无可用 screen；未取得真实窗口及帧呈现证据，保持 in-progress |

@@ -49,35 +49,35 @@ use path::{
     path_service_resolve_existing, path_service_resolve_write_target, path_service_set_root,
 };
 mod project;
-pub use project::ProjectService;
 #[cfg(test)]
 use project::activation_outcome_to_bridge;
 #[cfg(test)]
 use project::project_service_inspect_stl;
+pub use project::{ProjectService, VariableDocumentCompletion, VariableDocumentRequest};
 use project::{
     analysis_sequence_catalog, default_material, default_mesh_type, format_project_dimensions,
     mesh_type_catalog, project_error_message_key, project_service_activate_mesh_document,
     project_service_begin_asset_activation, project_service_begin_fill_settings_confirmation,
     project_service_begin_gate_location_settings_confirmation,
     project_service_begin_material_confirmation,
-    project_service_begin_stl_import as begin_stl_import, project_service_cancel_asset_activation,
+    project_service_begin_stl_import as begin_stl_import, project_service_begin_variable_document,
+    project_service_cancel_asset_activation,
     project_service_cancel_stl_import as cancel_stl_import, project_service_create,
     project_service_current, project_service_deactivate_mesh_document,
     project_service_drain_asset_activations, project_service_drain_workspace_activations,
     project_service_execute, project_service_finish_fill_settings_confirmation,
     project_service_finish_gate_location_settings_confirmation,
     project_service_finish_material_confirmation, project_service_finish_stl_import,
-    project_service_import_stl, project_service_imports, project_service_load_variable_document,
+    project_service_finish_variable_document, project_service_import_stl, project_service_imports,
     project_service_mesh_snapshot_for_import, project_service_new, project_service_open,
     project_service_plan_settings, project_service_release_mesh_document,
-    project_service_resident_mesh_ids, project_service_save,
-    project_service_save_variable_document, project_service_set_analysis_sequence,
+    project_service_resident_mesh_ids, project_service_save, project_service_set_analysis_sequence,
     project_service_variable_document_generation, project_service_workspace_activate,
     project_service_workspace_close, project_service_workspace_move,
     project_service_workspace_open_import, project_service_workspace_publish_import,
     project_service_workspace_reset, project_service_workspace_snapshot, stl_import_preview,
     validate_fill_settings_draft, validate_gate_location_settings_draft,
-    validate_holding_profile_draft,
+    validate_holding_profile_draft, variable_document_request_accepted, variable_document_wait,
 };
 mod mesh;
 use mesh::{mesh_coordinates, mesh_validate_tet};
@@ -569,16 +569,25 @@ pub mod bridge {
         #[rust_name = "project_service_save_response"]
         fn project_service_save(service: &mut ProjectService) -> ProjectSnapshotResult;
         fn project_service_variable_document_generation(service: &ProjectService) -> u64;
-        fn project_service_load_variable_document(
-            service: &mut ProjectService,
-            expected_generation: u64,
-            expected_revision: u64,
-        ) -> VariableDocumentResult;
-        fn project_service_save_variable_document(
+        type VariableDocumentRequest;
+        type VariableDocumentCompletion;
+        /// 发起有界后台读写；save=false 忽略 source。请求独占所有权，可移交等待线程。
+        fn project_service_begin_variable_document(
             service: &mut ProjectService,
             expected_generation: u64,
             expected_revision: u64,
             source: String,
+            save: bool,
+        ) -> Box<VariableDocumentRequest>;
+        fn variable_document_request_accepted(request: &VariableDocumentRequest) -> bool;
+        /// 仅在独立等待线程调用；拒绝准入的请求立即返回，不借用服务。
+        fn variable_document_wait(
+            request: Box<VariableDocumentRequest>,
+        ) -> Box<VariableDocumentCompletion>;
+        /// 仅在服务拥有线程消费完成结果并映射 DTO。
+        fn project_service_finish_variable_document(
+            service: &mut ProjectService,
+            completion: Box<VariableDocumentCompletion>,
         ) -> VariableDocumentResult;
         #[rust_name = "project_service_execute_response"]
         fn project_service_execute(

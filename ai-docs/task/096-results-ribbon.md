@@ -37,7 +37,7 @@ Results 页签显示维护者截图中的结果工具分组，沿用现有 Ribbo
 
 - 2026-09-30：HTML 与 QML 已同步 11 个分组、Home / Results 导航、39 个 SVG 和双语翻译。首帧 / 尾帧图标对称、播放按钮居中，时间与比例值预留空间；紧凑工具复用 Theme 尺寸。
 - 2026-09-30：整体评审修正比例尺的解码尺寸及禁用透明度，整理页签选择逻辑；导航只更新展示状态，无业务调用或循环信号链。
-- 2026-09-30：`cargo build --locked`、`cargo lint qmllint --check`、`cargo lint cmake --check`、`cargo format --check`、`node --check ai-docs/qml-html/shell.js`、`git diff HEAD --check` 通过；未运行功能测试。
+- 2026-09-30：`cargo build --locked`、`cargo lint qmllint --check`、`cargo lint cmake --check`、`cargo format --check`、`node --check prototypes/shell/shell.js`、`git diff HEAD --check` 通过；未运行功能测试。
 - 2026-09-30：维护者通过截图反馈并确认当前布局。Computer Use 绑定临时 PantaPreview.app 返回 `timeoutReached`，未取得自动化真实窗口证据；临时 wrapper 已清理，窗口验收待补。
 
 ## 清理与兼容例外
