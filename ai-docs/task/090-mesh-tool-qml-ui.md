@@ -9,7 +9,7 @@
 
 ## 目标与背景
 
-从 Plan tasks 的 `Create Mesh...` 进入 Tools 页签，以网格工具替换该页签原有的 Information 内容。以 [HTML 参考](../qml-html/mesh-tool/mesh-tool.html) 为控件和分区底稿，颜色、字号、间距及控件样式沿用现有 QML Theme。工程树和 Plan tasks 都属于 Tasks 页签，切到 Tools 后一起隐藏。
+从 Plan tasks 的 `Create Mesh...` 进入 Tools 页签，以网格工具替换该页签原有的 Information 内容。以 [HTML 参考](../../prototypes/shell/mesh-tool/mesh-tool.html) 为控件和分区底稿，颜色、字号、间距及控件样式沿用现有 QML Theme。工程树和 Plan tasks 都属于 Tasks 页签，切到 Tools 后一起隐藏。
 
 ## 必读
 
@@ -40,7 +40,7 @@
 
 ## 预计改动
 
-`ai-docs/qml-html/` 参考件、`qml/Panels/TasksPanel.qml`、新增 QML 视图及其 CMake 登记、`resources/i18n/panta-{en,cn}.pa`、QML 行为测试和手动 CPU / GPU 基准场景、本任务和索引。无 Rust / C++ 接口、工程格式或网格数据变更。
+`prototypes/shell/` 参考件、`qml/Panels/TasksPanel.qml`、新增 QML 视图及其 CMake 登记、`resources/i18n/panta-{en,cn}.pa`、QML 行为测试和手动 CPU / GPU 基准场景、本任务和索引。无 Rust / C++ 接口、工程格式或网格数据变更。
 
 ## 清理与兼容例外
 
@@ -57,7 +57,7 @@ Tools 默认 Information 保留；进入 Mesh Tool 后在同一页签内替换�
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-09-30 | HTML 源码、`node --check ai-docs/qml-html/shell.js`、用户截图反馈 | Tasks / Tools 切换和样式结构正确 | 脚本检查通过；按用户截图反馈调整了操作选择框、F2 与 General 左对齐。浏览器自动化禁止打开本地 `file:` 页面，最终 HTML 未做自动截图验收 |
+| 2026-09-30 | HTML 源码、`node --check prototypes/shell/shell.js`、用户截图反馈 | Tasks / Tools 切换和样式结构正确 | 脚本检查通过；按用户截图反馈调整了操作选择框、F2 与 General 左对齐。浏览器自动化禁止打开本地 `file:` 页面，最终 HTML 未做自动截图验收 |
 | 2026-09-30 | `cargo format --check`、`cargo lint qmllint --check`、`cargo lint` | 格式与质量入口通过 | 均通过；`cargo lint` 需在允许本机锁服务 TCP 监听的受控环境执行 |
 | 2026-09-30 | `cargo build --locked`、`cargo test --locked --workspace` | 构建和聚合回归通过 | 均通过；CTest 66/66。新增 QML 测试覆盖 Tools 默认 Information、Create Mesh 进入工具、再次点 Tools 返回 Information，以及窄 Dock 滚动 |
 | 2026-09-30 | Qt 6.11.2 / macOS arm64，Basic 样式；`panta_qml_cpu_benchmark measures_mesh_tool_construct` | 记录空白与 Mesh Tool 构造开销 | offscreen、31 次采样：空白 p50/p95 14.5/19.1 µs，Mesh Tool 1002.3/1273.0 µs；不代表 GPU 帧耗时 |

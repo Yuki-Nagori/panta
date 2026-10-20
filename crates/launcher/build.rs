@@ -31,6 +31,7 @@ const RERUN_PATHS: &[&str] = &[
     "../panta-mesh",
     "../panta-foundation",
     "../../qml",
+    "../../prototypes/shell",
     "../../resources/i18n",
 ];
 

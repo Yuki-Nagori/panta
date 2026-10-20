@@ -45,7 +45,7 @@ HTML 确认后迁移 QML，包含温度、填充控制、速度 / 压力切换�
 
 工作目录为仓库根；环境为 macOS，Rust 1.98.1 与仓库锁定 Qt SDK。
 
-- 2026-09-30：`node --check ai-docs/qml-html/shell.js` 与差异空白检查通过；Yuki 确认 HTML，并提供两层 QML 实际窗口截图作为初始视觉证据。
+- 2026-09-30：`node --check prototypes/shell/shell.js` 与差异空白检查通过；Yuki 确认 HTML，并提供两层 QML 实际窗口截图作为初始视觉证据。
 - 2026-09-30：`cargo format --check`、`cargo build --locked`、`cargo lint` 通过，覆盖 Rust Clippy、native 构建、qmllint 和 C++ 静态检查。最终评审修正确认类型枚举的底层类型后，重新通过完整回归与静态检查。
 - 2026-09-30：`cargo test --locked --workspace` 通过，含 67 项 CTest。Rust 覆盖持久化往返、导入记录隔离、过期目标、非法数值、写盘失败和材料 / 工艺互斥；C++ 覆盖异步确认与投影；QML 覆盖三行草稿、等宽输入、父子取消、冻结目标、按钮尺寸和 Enter 取消行为。
 - 2026-09-30：最终真实窗口验收未完成。临时 macOS app wrapper 经 CUA 绑定多次超时，应用清单显示未运行，无法取得最终窗口证据；已清理临时 wrapper 和测试工程。保留 Yuki 的初始视觉证据，不将自动化 QML 测试视为真实窗口验收。

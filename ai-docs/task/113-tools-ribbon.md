@@ -9,11 +9,11 @@
 
 ## 目标与背景
 
-按维护者提供的 Tools 页签截图，在已打开工程时提供 Tools Ribbon。依照既有页面工作流，先更新 `ai-docs/qml-html/imported-project/imported-project.html` 与公共 SVG symbol，再按该原型迁移到 QML。原有 Shell、工程树、视口和其他 Ribbon 状态保持不变。
+按维护者提供的 Tools 页签截图，在已打开工程时提供 Tools Ribbon。依照既有页面工作流，先更新 `prototypes/shell/imported-project/imported-project.html` 与公共 SVG symbol，再按该原型迁移到 QML。原有 Shell、工程树、视口和其他 Ribbon 状态保持不变。
 
 ## 必读
 
-- [HTML 参考工作流](../qml-html/README.md)
+- [HTML 参考工作流](../../prototypes/shell/README.md)
 - [Ribbon 拆分](062-ribbon-tab-components.md)、[Results 工具栏](096-results-ribbon.md)
 - [图标规范](../standards/icons.md)、[QML 规范](../standards/qml.md)
 - [注释规范](../standards/comments.md)、[仓库文件规范](../standards/repository-hygiene.md)
@@ -47,7 +47,7 @@
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-10-12 | HTML / QML 实施与验证 | HTML 先行、Tools 六组可切换、业务未接入项禁用 | 已完成 HTML 模板、SVG symbol、QML Ribbon、双语翻译和导航回归；`cargo build --locked`、`cargo test --locked --workspace`（73 项 CTest 全通过）、`cargo format --check`、`cargo clippy --workspace --all-targets --locked -- -D warnings`、`node --check ai-docs/qml-html/shell.js`、`git diff --cached --check` 通过。`cargo lint` 启动器因沙箱禁止绑定 TCP listener 失败，直接运行其 Rust Clippy 检查通过。内置浏览器策略拒绝 `file:` 本地页面，未取得 HTML 截图。独立 review 发现宏槽位排列和往返导航覆盖不足，已修正；修正后聚合测试再次全通过。 |
+| 2026-10-12 | HTML / QML 实施与验证 | HTML 先行、Tools 六组可切换、业务未接入项禁用 | 已完成 HTML 模板、SVG symbol、QML Ribbon、双语翻译和导航回归；`cargo build --locked`、`cargo test --locked --workspace`（73 项 CTest 全通过）、`cargo format --check`、`cargo clippy --workspace --all-targets --locked -- -D warnings`、`node --check prototypes/shell/shell.js`、`git diff --cached --check` 通过。`cargo lint` 启动器因沙箱禁止绑定 TCP listener 失败，直接运行其 Rust Clippy 检查通过。内置浏览器策略拒绝 `file:` 本地页面，未取得 HTML 截图。独立 review 发现宏槽位排列和往返导航覆盖不足，已修正；修正后聚合测试再次全通过。 |
 | 2026-10-12 | Tools 宏槽布局微调 | 编号 Grid 在工具行可用高度内垂直居中 | Grid 增加垂直中心锚点；`cargo format --check`、`git diff --check`、`cargo test --locked --workspace` 通过（73 项 CTest 全通过）。独立 review 确认纵向锚定到 RibbonGroup 工具行不会影响 Row 的横向排布。 |
 | 2026-10-12 | issue #8 文档复核 | 图标清单和任务完成摘要无重复或遗漏 | 删除图标规范中重复的 Results 行，并将任务索引摘要补齐 113、114；文档检查与 `git diff --check` 通过。 |
 

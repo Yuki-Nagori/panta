@@ -31,7 +31,7 @@
 |---|---|---|
 | 2026-09-30 | `cargo format --check`、`cargo lint qmllint --check`、`cargo lint`、`cargo build --locked` | 通过；lint 的本机锁服务需允许 TCP 监听 |
 | 2026-09-30 | `cargo test --locked --workspace` | 通过，CTest 66/66；QML 回归覆盖任务行入口、方向键选择、Enter 确认、取消及再次打开恢复已确认值 |
-| 2026-09-30 | `node --check ai-docs/qml-html/shell.js`、源码检查、用户 HTML 截图反馈 | 脚本检查通过；分析序列按钮改为整行宽度，悬停背景避开左侧状态列。最终 HTML 未做自动截图验收 |
+| 2026-09-30 | `node --check prototypes/shell/shell.js`、源码检查、用户 HTML 截图反馈 | 脚本检查通过；分析序列按钮改为整行宽度，悬停背景避开左侧状态列。最终 HTML 未做自动截图验收 |
 | 2026-09-30 | Qt 6.11.2 / macOS arm64 / Basic / offscreen，CPU `measures_analysis_sequence_construct` | 十个选项，31 次采样；空白 / 面板 / 完整弹窗 p50/p95 分别为 20.1/38.7、606.7/893.7、2117.4/2926.3 µs；包含构造与布局，不代表 GPU 性能 |
 | 2026-09-30 | GPU `measures_analysis_sequence_frame_presentation` | 场景登记并构建，启动报 `Cannot create window: no screens available`，未取得帧呈现数据 |
 | 2026-09-30 | 构建后使用临时 PantaPreview.app 连接真实应用 | 两次连接均报 `timeoutReached`；临时 wrapper 已删除，真实窗口验收待补 |

@@ -39,7 +39,7 @@ HTML 使用 Default machine 和 Advanced gate locator 展示选择字段；温�
 工作目录为仓库根目录。HTML 阶段检查脚本语法、差异空白并通过浏览器查看设计；QML 与持久化阶段使用适用的 Cargo 聚合入口，真实窗口验收单独记录。
 
 - 2026-09-30：登记任务，开始 HTML 设计；尚未实现 QML 和领域持久化。
-- 2026-09-30：HTML 字段及按序列路由已实现，`node --check ai-docs/qml-html/shell.js` 与 `git diff --check` 通过。浏览器安全策略拒绝访问本地 `file:` 页面，未取得渲染验收证据，后续已由 Yuki 确认 HTML 设计；未运行功能测试。
+- 2026-09-30：HTML 字段及按序列路由已实现，`node --check prototypes/shell/shell.js` 与 `git diff --check` 通过。浏览器安全策略拒绝访问本地 `file:` 页面，未取得渲染验收证据，后续已由 Yuki 确认 HTML 设计；未运行功能测试。
 
 - 2026-09-30：`cargo build --locked`、`cargo format --check`、`cargo lint`、脚本语法与差异空白检查通过。评审核对按序列路由、配置隔离、整数 DTO 转换、后台互斥和失败保留旧状态；未新增或运行行为测试，未完成真实窗口验收。
 

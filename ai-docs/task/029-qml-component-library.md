@@ -10,7 +10,7 @@
 ## 目标与背景
 
 基于当前界面建立原子/组合组件，以明确输入属性和输出信号拼装面板；所有可配置视觉尺寸统一收敛到现存 Theme.qml。本轮以 050 复刻件
-`ai-docs/qml-html/homepage/homepage.html` 为设计底稿完成组件提取与 Shell 框架拼装。
+`prototypes/shell/homepage/homepage.html` 为设计底稿完成组件提取与 Shell 框架拼装。
 
 ## 必读
 

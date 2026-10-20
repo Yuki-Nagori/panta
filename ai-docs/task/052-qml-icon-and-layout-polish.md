@@ -9,7 +9,7 @@
 
 ## 目标与范围
 
-对照 `ai-docs/qml-html/homepage/homepage.html` 修正顶部工具分组、搜索和输出工具条，并重新设计 SVG。新增适用于 Qt Quick 的 Mono/Art 图标规范与完整清单；操作图标统一网格、描边与运行期着色，保留现有业务状态。标题栏融合仍由 051 承接，本任务不接入新业务或主题 DSL。
+对照 `prototypes/shell/homepage/homepage.html` 修正顶部工具分组、搜索和输出工具条，并重新设计 SVG。新增适用于 Qt Quick 的 Mono/Art 图标规范与完整清单；操作图标统一网格、描边与运行期着色，保留现有业务状态。标题栏融合仍由 051 承接，本任务不接入新业务或主题 DSL。
 
 ## 必读
 

@@ -60,7 +60,7 @@
 
 - 2026-09-30：登记并完成 HTML 演示，维护者确认布局与互斥选择；随后按要求完成 QML 展示壳子、Logs 显隐接线及主题参数分类。HTML Preview 与正式空态分开。
 - 2026-10-01：新增四项 QML 组件回归，覆盖空态、分类切换、方案隔离、关闭保留历史、Logs 可见性勾选、跨分组互斥与键盘选择、运行切换后恢复选择。测试使用 C++ `QVariantList` 输入；修复该序列不支持 `flatMap` 导致目录初始化失败的问题，改为显式遍历。
-- 2026-10-01：macOS 仓库根目录执行 `cargo test --locked --workspace` 通过，包含 67 项 native / QML CTest；组件测试不作为真实 GPU 窗口验收。`cargo build --locked`、`cargo format --check`、`cargo lint --check`（全部八项）、`node --check ai-docs/qml-html/shell.js` 与 `git diff HEAD --check` 均通过。
+- 2026-10-01：macOS 仓库根目录执行 `cargo test --locked --workspace` 通过，包含 67 项 native / QML CTest；组件测试不作为真实 GPU 窗口验收。`cargo build --locked`、`cargo format --check`、`cargo lint --check`（全部八项）、`node --check prototypes/shell/shell.js` 与 `git diff HEAD --check` 均通过。
 - 2026-10-01：Yuki 人工窗口验收通过：日志区位于视口与文档页签之间，右上角可关闭；Logs 单击切换显隐，关闭同步清除勾选。此项为用户证据，不计作自动化 GPU 验收。
 
 ## 清理与兼容例外

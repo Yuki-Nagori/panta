@@ -1,6 +1,6 @@
 # QML 页面 HTML 先行复刻
 
-QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每个状态一个子目录，
+QML 页面设计的视觉原型目录（任务 050 确立工作流，任务 120 迁移至根 `prototypes/shell/`）。每个状态一个子目录，
 入口为 `<page>/<page>.html`；公共资源放在本目录，以 homepage 为视觉基准。
 
 ## 文件组织
@@ -9,7 +9,7 @@ QML 页面设计的视觉参考件目录（任务 050 确立工作流）。每�
 - [shell.js](shell.js)：公共壳层、SVG 图标、通用页签状态和视口文档页签交互。
 - [homepage/homepage.html](homepage/homepage.html)：启动 / 学习首页。
 - [open-project/open-project.html](open-project/open-project.html)：工程任务项与项目工具 Ribbon。
-- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入后的工程树与视口状态，Create Mesh 可进入 Mesh Tool；Fill 行打开 Analysis Sequence 选择弹窗；Material Data 行打开材料选择弹窗（内置 PP / 25% 矿物填充摘要）；Process Settings 根据分析序列打开 Fill 工艺设置及保压曲线编辑（[任务 094](../task/094-fill-process-settings.md)），或 Gate Location 浇口定位设置（[任务 095](../task/095-gate-location-process-settings.md)）；Mesh 行展示示例导入类型 Dual Domain，并保留进入工具的点击行为；Home / Results / Tools / View 在原工程页切换工具栏，保留工程树、任务与视口状态；Results 内容见 [任务 096](../task/096-results-ribbon.md)，Tools 内容见 [任务 113](../task/113-tools-ribbon.md)，View 内容见 [任务 114](../task/114-view-ribbon.md)。
+- [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入后的工程树与视口状态，Create Mesh 可进入 Mesh Tool；Fill 行打开 Analysis Sequence 选择弹窗；Material Data 行打开材料选择弹窗（内置 PP / 25% 矿物填充摘要）；Process Settings 根据分析序列打开 Fill 工艺设置及保压曲线编辑（[任务 094](../../ai-docs/task/094-fill-process-settings.md)），或 Gate Location 浇口定位设置（[任务 095](../../ai-docs/task/095-gate-location-process-settings.md)）；Mesh 行展示示例导入类型 Dual Domain，并保留进入工具的点击行为；Home / Results / Tools / View 在原工程页切换工具栏，保留工程树、任务与视口状态；Results 内容见 [任务 096](../../ai-docs/task/096-results-ribbon.md)，Tools 内容见 [任务 113](../../ai-docs/task/113-tools-ribbon.md)，View 内容见 [任务 114](../../ai-docs/task/114-view-ribbon.md)。
 - [mesh-tool/mesh-tool.html](mesh-tool/mesh-tool.html)：Mesh Tool 操作与 General 网格参数布局。
 
 HTML 只保留标题、菜单、Ribbon、任务、视口和对话框状态模板，脚本将模板嵌入公共壳层。
@@ -41,17 +41,17 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
 
 ## 边界
 
-- 复刻件是文档参考资产，不进 QML 构建图，不参与任何质量门禁。
+- HTML / CSS 是视觉与交互原型，不作为运行时页面。`shell.js` 的 SVG symbol 同时是正式图标来源，由 `qml/CMakeLists.txt` 打包给 `Qml.ThemeComponentParameters` 测试，对照 QML 图标资源；因此本目录是测试与质量影响范围的生产输入，不能按纯文档跳过。
 - 复刻件是布局/配色参考，不追求像素级逐帧校对；视口文档页签演示打开、去重、选择和关闭，
   但不执行工程命令、不解析资产或切换真实业务视图，也不实现移动端布局。
 - 复刻对象里的内嵌网页视图等内容区可按需求留空（如桌面主窗口的 WebEngineView
   区域），迁移时映射为对应 QML 元素。
 
 首页早期版本已于任务 029 按设计值迁移为 QML（`qml/App.qml` 与面板组件，见
-[组件库与主题 DSL](../modules/qml-components-and-theme.md)）。本轮两状态整理见
-[任务 059](../task/059-open-project-html-reference.md)，HTML 已经维护者手工验收，
-作为 [QML 同步任务 060](../task/060-qml-project-workspace-reference.md) 的底稿。
-布局与状态由 QML 实现。`shell.js` 中的 SVG symbol 是正式图标造型来源，QML 按相同 ID 从 `qml/icons/` 加载独立资源；彩色图标保留源色，单色 utility glyph 由 `panta-icons` provider 按 Theme 着色。资源和来源登记见[`../standards/icons.md`](../standards/icons.md)。
+[组件库与主题 DSL](../../ai-docs/modules/qml-components-and-theme.md)）。本轮两状态整理见
+[任务 059](../../ai-docs/task/059-open-project-html-reference.md)，HTML 已经维护者手工验收，
+作为 [QML 同步任务 060](../../ai-docs/task/060-qml-project-workspace-reference.md) 的底稿。
+布局与状态由 QML 实现。`shell.js` 中的 SVG symbol 是正式图标造型来源，QML 按相同 ID 从 `qml/icons/` 加载独立资源；彩色图标保留源色，单色 utility glyph 由 `panta-icons` provider 按 Theme 着色。资源和来源登记见[`../../ai-docs/standards/icons.md`](../../ai-docs/standards/icons.md)。
 
 ## 日志演示（任务 097）
 

@@ -136,9 +136,9 @@ if(BUILD_TESTING)
     PREFIX
     "/panta-test"
     BASE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../ai-docs/qml-html"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../prototypes/shell"
     FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/../ai-docs/qml-html/shell.js")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../prototypes/shell/shell.js")
   panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
   if(PANTA_ENABLE_BRIDGE_MODULE)
     target_link_libraries(panta_qml_theme_component_test PRIVATE panta::bridge)
