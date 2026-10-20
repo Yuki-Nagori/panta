@@ -876,12 +876,18 @@ mod tests {
             assert!(plan.native_labels.contains("qml"), "{input}");
             assert!(plan.packages_l2.contains("panta-launcher"), "{input}");
         }
-        let support = make_plan(
-            &["tests/support/qt/project_operation_helpers.hpp".into()],
-            &root,
-        )?;
-        assert!(support.full && support.full_quality && support.qml);
-        assert!(support.native_labels.contains("bridge"));
+        for input in [
+            "tests/support/qt/project_operation_helpers.hpp",
+            "tests/support/qt/mesh_frame_tracker.hpp",
+        ] {
+            let support = make_plan(&[input.into()], &root)?;
+            assert!(
+                support.full && support.full_quality && support.qml,
+                "{input}"
+            );
+            assert!(support.native_labels.contains("bridge"), "{input}");
+            assert!(support.native_labels.contains("visualization"), "{input}");
+        }
         Ok(())
     }
 

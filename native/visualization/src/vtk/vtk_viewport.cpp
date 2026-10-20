@@ -658,10 +658,12 @@ void VtkViewport::sync_native_surface() {
     impl_->renderer->SetBackground(impl_->pending.background.redF(),
                                    impl_->pending.background.greenF(),
                                    impl_->pending.background.blueF());
+    const auto submitted_revision = impl_->pending.revision;
     impl_->render_window->Render();
     qCDebug(viewport_log) << "frame submitted" << pixel_size;
     impl_->applied_pixel_size = pixel_size;
     impl_->scene_dirty = false;
+    emit frameSubmitted(submitted_revision);
 }
 
 void VtkViewport::destroy_render_window() {

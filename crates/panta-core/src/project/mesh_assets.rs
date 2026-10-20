@@ -69,7 +69,7 @@ fn publish_mesh_bytes(path: &Path, bytes: &[u8]) -> Result<(), ProjectError> {
 fn create_temporary(target: &Path) -> Result<(PathBuf, File), ProjectError> {
     for _ in 0..32 {
         let id = NEXT_TEMPORARY
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| ProjectError::Io("mesh staging identifiers exhausted".to_owned()))?;
         let name = target
             .file_name()

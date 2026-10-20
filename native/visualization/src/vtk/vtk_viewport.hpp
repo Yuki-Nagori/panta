@@ -30,6 +30,8 @@ class VtkViewport final : public QQuickItem, public ViewportBackend {
   signals:
     /// 原生 surface 与最小 VTK 场景已建立。
     void sceneInitialized();
+    /// 已向 VTK 提交该场景修订的帧；不表示 GPU 队列已完成。
+    void frameSubmitted(quint64 sceneRevision);
 
   protected:
     void geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) override;

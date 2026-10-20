@@ -205,7 +205,7 @@ impl TaskManager {
             let task_id = self
                 .inner
                 .next_id
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
                 .map_err(|_| SubmitError::IdentifiersExhausted)?;
             state.tasks.insert(
                 task_id,

@@ -192,6 +192,7 @@ class ViewportModuleLoadTest final : public QObject {
         QQuickItem parent(first.contentItem());
         panta::visualization::VtkViewport viewport(&parent);
         viewport.setSize(QSizeF(400, 300));
+        QSignalSpy submitted(&viewport, &panta::visualization::VtkViewport::frameSubmitted);
         QSignalSpy initialized(&viewport, &panta::visualization::VtkViewport::sceneInitialized);
         // 先消费尚未显示时的刷新，验证构造时已有窗口归属仍能监听后续 show。
         QCoreApplication::processEvents();
@@ -207,6 +208,7 @@ class ViewportModuleLoadTest final : public QObject {
                  QSize(qRound(viewport.width() * dpr), qRound(viewport.height() * dpr)));
         QTest::qWait(100);
         capture.reset();
+        submitted.clear();
         panta::visualization::RenderScene scene;
         for (int i = 0; i < 100; ++i) {
             scene.revision = i + 1;
@@ -216,6 +218,8 @@ class ViewportModuleLoadTest final : public QObject {
         }
         QTest::qWait(100);
         QCOMPARE(capture.count(), 1);
+        QCOMPARE(submitted.count(), 1);
+        QCOMPARE(submitted.at(0).at(0).toULongLong(), qulonglong{100});
 
         auto snapshot = std::make_shared<panta::visualization::SurfaceMeshSnapshot>();
         snapshot->vertices = {{{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}}};

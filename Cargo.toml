@@ -21,10 +21,9 @@ default-members = ["crates/launcher"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-# 承诺支持的最低工具链：跟随首选 CXX release（1.0.202）的 MSRV；
-# 日常验证使用 rust-toolchain.toml 固定的 stable 1.98.1。
-# resolver 3 的 MSRV 感知依赖解析以该值为准，依赖要求更高时上调并记录原因。
-rust-version = "1.88"
+# 支持下限由当前使用的标准库 / 依赖 API 决定（Atomic::try_update 要求 1.95）。
+# 日常工具链由 rust-toolchain.toml 锁定；resolver 3 按此下限解析依赖。
+rust-version = "1.95"
 license = "Apache-2.0"
 repository = "https://github.com/Yuki-Nagori/panta"
 

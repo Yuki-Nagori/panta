@@ -97,7 +97,7 @@ fn create_temporary(target: &Path) -> Result<(PathBuf, File), ProjectError> {
         .ok_or_else(|| ProjectError::Io("invalid variable document filename".to_owned()))?;
     for _ in 0..TEMPORARY_ATTEMPTS {
         let id = NEXT_TEMPORARY
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| ProjectError::Io("variable staging identifiers exhausted".to_owned()))?;
         let path = parent.join(format!(".{name}-{}-{id}.tmp", std::process::id()));
         match OpenOptions::new().write(true).create_new(true).open(&path) {

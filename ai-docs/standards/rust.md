@@ -1,6 +1,6 @@
 # Rust 编码与工具链
 
-查阅日期：2026-09-17。状态：workspace Clippy 已启用 warning-as-error；FFI、native 依赖接入仍按对应 task 验证。
+更新日期：2026-10-20。状态：workspace Clippy 已启用 warning-as-error；FFI、native 依赖接入仍按对应 task 验证。
 
 适用于 `crates/`、launcher 和 Rust 构建辅助代码。stable 表示工具链渠道；可复现构建仍需固定实际版本。
 
@@ -12,8 +12,8 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 
 ## 项目规则
 
-- 采用 edition 2024；工具链由 `rust-toolchain.toml` 固定在 stable 1.98.1（任务 001，2026-09-16 验证）。workspace `rust-version = "1.88"` 是承诺下限，跟随首选 CXX release（当时 1.0.202）的 MSRV，而非 edition 的最低要求 1.85；依赖或 CXX 要求更高时上调并记录原因。升级编译器与依赖分别评估，不能以浮动 stable 代替验证记录。
-- crate 名使用 `panta-` 前缀，模块/函数 `snake_case`、类型 `PascalCase`。默认使用 rustfmt；workspace 内 Clippy 以 `cargo clippy --locked --workspace --all-targets -- -D warnings` 运行，warning 直接失败。第三方源码不纳入本项目 lint。
+- 采用 edition 2024。固定编译器和组件见根 [rust-toolchain.toml](../../rust-toolchain.toml)，MSRV 见 [Cargo.toml](../../Cargo.toml) 的 `workspace.package.rust-version`；当前下限由 `Atomic::try_update` 的稳定版本决定，升级证据见任务 [001](../task/001-cargo-config.md)。编译器与依赖分别评估，不以浮动 stable 代替验证。
+- crate 名使用 `panta-` 前缀，模块/函数 `snake_case`、类型 `PascalCase`。格式与 Clippy 入口见下文，warning 直接失败。第三方源码不纳入本项目 lint。
 - 领域库用结构化 `Result`，在应用边界补充上下文；不在正常输入、文件读写和协议处理路径使用 `unwrap`/`expect` 代替错误处理。
 - ID 使用 newtype；持久化 DTO 和内存领域对象分离。文件路径采用 `Path`/`PathBuf`，不假定操作系统路径一定能无损转成 UTF-8 字符串。
 - `unsafe` 集中在边界模块，每处注明安全前提、所有者和线程条件。workspace 默认 `unsafe_code = "deny"`；当前登记的 allow 仅包括 CXX 桥接生成胶水和 `panta-foundation::crash` 专用模块，均不得向业务代码外扩。新增手写 unsafe 需专用模块并逐块写 `// SAFETY:`。不得为了通过类型检查无依据实现 `Send`/`Sync`。
@@ -23,12 +23,12 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 
 ## 导入与领域 crate（067）
 
-项目约定：按数据和生命周期分 crate。`panta-import` 负责格式识别、来源快照、预览、导入选项、解析分发与格式错误；`panta-mesh` 负责 STL 表面网格和体 Mesh IR 的解析 / 校验；`panta-core` 负责工程资产写入、清单、修订和提交。规划的 `panta-geom` 负责 STEP / IGES 的几何领域身份，底层解析必须委托 OCCT C++ adapter。实际状态和下一步见 [职责审计](../architecture/native-domain-boundaries.md) 与 [067](../task/067-rust-mesh-domain-migration.md)。
+按数据和生命周期分 crate；导入、Mesh、几何、core 与 native adapter 的具体职责及实际状态见[职责审计](../architecture/native-domain-boundaries.md)。
 
 拆 crate 时依次检查：是否需要重库、格式 / 规则是否频繁变化、消费者是否只占少数模块、逻辑与状态是否足够大。依赖重库的能力必须经独立 C++ adapter，不得放入 `panta-core`；但独立 Rust crate 本身也不直接链接重库。格式变化快、消费者少或生命周期独立时倾向独立 crate。`panta-core` 过渡期只拥有应用服务与工程存储；ID、单位和错误先留在各自的领域 crate，第二个真实消费者需要相同语义时再考虑低层契约 crate。不得为潜在复用提前创建 `panta-common` 或空领域 crate。此判断是项目模块边界准则，不是 Rust 语言的硬规则。
 
-依赖只从应用服务流向导入与领域库；领域 crate 不依赖 `panta-core` / `panta-ffi`。跨格式统一的是来源快照、单位策略、修订与失败保留旧资产的导入事务，不把 B-rep、STL 表面网格和 Netgen 体网格强制塞进一个通用解析结构。STL 解码器位于 `panta-mesh`；STEP / IGES 的领域结果由未来的 `panta-geom` 拥有，native shape 由 C++ adapter 持有并释放，Rust 仅传稳定 ID 和修订号。导入器持有待提交快照，预览后来源变化必须重新确认；工程事务只在提交成功后发布新修订和显示资产。业务模块不可调用 `unsafe` 绕开 native adapter。
+依赖从应用服务流向导入与领域库；领域 crate 不依赖 core / FFI。跨格式统一导入事务、来源、单位和修订语义，不强迫 B-rep、表面 Mesh 与体网格共用解析结构。工程提交成功后才发布资产；预览后来源变化须重新确认，业务代码不得用 `unsafe` 绕开 native adapter。
 
 ## 验证
 
-`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 是 Rust-only 质量入口；跨语言项目验证使用根 `cargo format`、`cargo lint` 和 `cargo test`。领域测试覆盖输入修订、取消、错误转换，随首个业务 crate 建立。涉及 FFI 时同时运行 native 侧测试。`cargo ub-check` 以固定 nightly 解释执行纯 Rust crate 测试，作为 UB/数据竞争的补充动态检测；CXX FFI 与进程类 crate 不在其语义内，边界见[质量工具链](../modules/quality-tooling.md)与任务 032。
+`cargo fmt --all -- --check` 与 `cargo clippy --locked --workspace --all-targets -- -D warnings` 是 Rust-only 质量入口；跨语言项目验证使用根 `cargo format`、`cargo lint` 和 `cargo test`。领域测试覆盖输入修订、取消与错误转换。涉及 FFI 时同时运行 native 侧测试。`cargo ub-check` 以固定 nightly 解释执行纯 Rust crate 测试，作为 UB/数据竞争的补充动态检测；CXX FFI 与进程类 crate 不在其语义内，边界见[质量工具链](../modules/quality-tooling.md)与任务 032。
