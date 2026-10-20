@@ -8,6 +8,7 @@ DialogWindow {
     property var sequences: []
     property var planSettings: ({})
     property string errorText: ""
+    property bool saving: false
     // 打开时冻结命令目标；后台或程序化工程切换不能把确认写入另一个方案。
     property var openedSettings: ({})
     signal selectionRequested(string projectPath, double revision, string importId, string sequenceId)
@@ -17,8 +18,14 @@ DialogWindow {
     minimumWidth: Theme.analysisSequenceDialogMinimumWidth
     minimumHeight: Theme.analysisSequenceDialogMinimumHeight
     title: qsTranslate("AnalysisSequenceDialog", "Select Analysis Sequence")
+    onClosing: event => {
+        if (saving)
+            event.accepted = false;
+    }
 
     function open() {
+        if (saving)
+            return;
         openedSettings = planSettings;
         sequencePanel.selectedIndex = sequences.findIndex(entry => entry.id === openedSettings.sequenceId);
         if (sequencePanel.selectedIndex < 0 || !openedSettings.importId)
@@ -30,13 +37,13 @@ DialogWindow {
     }
 
     function acceptSelection() {
-        if (sequencePanel.selectedId.length > 0 && openedSettings.importId)
+        if (visible && !saving && sequencePanel.selectedId.length > 0 && openedSettings.importId)
             selectionRequested(openedSettings.projectPath, openedSettings.revision, openedSettings.importId, sequencePanel.selectedId);
     }
 
     DialogFrame {
         window: dialog
-        closeEnabled: true
+        closeEnabled: !dialog.saving
 
         ThemedLabel {
             Layout.fillWidth: true
@@ -57,6 +64,7 @@ DialogWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 sequences: dialog.sequences
+                enabled: !dialog.saving
             }
             ColumnLayout {
                 Layout.fillHeight: true
@@ -65,7 +73,7 @@ DialogWindow {
                     objectName: "analysisSequenceAccept"
 
                     text: qsTranslate("DialogAction", "OK")
-                    enabled: sequencePanel.selectedId.length > 0
+                    enabled: !dialog.saving && sequencePanel.selectedId.length > 0
                     primaryAction: true
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
@@ -73,6 +81,7 @@ DialogWindow {
                 }
                 ThemedButton {
                     objectName: "analysisSequenceCancel"
+                    enabled: !dialog.saving
 
                     text: qsTranslate("DialogAction", "Cancel")
                     contentColor: Theme.colorText
@@ -93,10 +102,12 @@ DialogWindow {
         }
     }
     Shortcut {
+        enabled: dialog.visible && !dialog.saving
         sequence: "Esc"
         onActivated: dialog.close()
     }
     Shortcut {
+        enabled: dialog.visible && !dialog.saving
         sequence: "Return"
         onActivated: dialog.acceptSelection()
     }

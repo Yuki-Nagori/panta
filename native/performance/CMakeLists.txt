@@ -7,6 +7,7 @@ set(_vtk_private "${CMAKE_CURRENT_SOURCE_DIR}/../visualization/src/vtk")
 function(panta_performance_target name source)
   add_executable(${name} EXCLUDE_FROM_ALL "${_performance_sources}/${source}")
   panta_native_defaults(${name})
+  target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../tests/support/qt")
   add_dependencies(panta_benchmark_moc ${name}_autogen)
 endfunction()
 

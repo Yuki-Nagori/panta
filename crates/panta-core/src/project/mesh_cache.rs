@@ -1,13 +1,14 @@
 //! 工程运行期 Mesh 驻留预算及活动资产的 LRU 策略。
 use panta_mesh::SurfaceMesh;
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 const DEFAULT_MESH_CACHE_BUDGET_BYTES: usize = 128 * 1024 * 1024;
 
 /// 以三角数组容量计量的工程运行期缓存；活动文档 pin 由 ViewModel 的选择意图驱动。
 #[derive(Debug)]
 pub(super) struct SurfaceMeshCache {
-    meshes: HashMap<String, SurfaceMesh>,
+    meshes: HashMap<String, Arc<SurfaceMesh>>,
     recency: VecDeque<String>,
     active_id: Option<String>,
     budget_bytes: usize,
@@ -35,7 +36,7 @@ impl SurfaceMeshCache {
 
     pub(super) fn insert_active(&mut self, id: String, mesh: SurfaceMesh) {
         self.remove(&id);
-        self.meshes.insert(id.clone(), mesh);
+        self.meshes.insert(id.clone(), Arc::new(mesh));
         self.active_id = Some(id.clone());
         self.touch(&id);
         self.trim();
@@ -71,7 +72,11 @@ impl SurfaceMeshCache {
     }
 
     pub(super) fn get(&self, id: &str) -> Option<&SurfaceMesh> {
-        self.meshes.get(id)
+        self.meshes.get(id).map(Arc::as_ref)
+    }
+
+    pub(super) fn snapshot(&self, id: &str) -> Option<Arc<SurfaceMesh>> {
+        self.meshes.get(id).map(Arc::clone)
     }
 
     pub(super) fn resident_ids(&self) -> Vec<String> {

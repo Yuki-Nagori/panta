@@ -3,14 +3,12 @@ use super::model::{MeshAssetRef, next_revision, validate_name};
 use super::storage::write_manifest;
 use super::{
     ActivationAttempt, ActivationResultKind, DocumentDiagnostic, DocumentWorkspace,
-    IMPORT_RECORD_VERSION, ImportRecord, Outcome, PROJECT_FILE_EXTENSION, PROJECT_SCHEMA_VERSION,
-    ProjectCommand, ProjectError, ProjectManifest, ProjectSnapshot, ProjectState, StlImportSession,
-    SurfaceMeshCache, WorkspaceActivationRequest, WorkspaceSnapshot, activation_error_message_key,
-    analysis_sequence, gate_location, material, preview, process_settings, storage,
+    IMPORT_RECORD_VERSION, ImportRecord, ProjectCommand, ProjectError, ProjectSnapshot,
+    ProjectState, StlImportSession, SurfaceMeshCache, WorkspaceActivationRequest,
+    WorkspaceSnapshot, activation_error_message_key, preview, storage,
 };
 use panta_mesh::SurfaceMesh;
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -29,6 +27,7 @@ pub struct ProjectService {
     pub(super) activation_attempts: HashMap<String, u64>,
     pub(super) activation: Arc<crate::fsm::open_saved_stl::ActivationCoordinator>,
     // 候选提交期间锁住工程元数据；Mesh 驻留和只读显示操作仍可继续。
+    pub(super) pending_project: Option<super::command_job::PendingProjectOperation>,
     pub(super) pending_metadata: Option<storage::PendingMetadataWrite>,
     pub(super) pending_variable: Option<super::variable_document::PendingVariableDocument>,
     pub(super) pending_preview: Option<preview::PendingPreview>,
@@ -49,6 +48,11 @@ impl ProjectService {
 
     // 后台候选已冻结；消费结果前，任何工程写入都会与候选清单竞争。
     pub(super) fn ensure_project_writable(&self) -> Result<(), ProjectError> {
+        if self.pending_project.is_some() {
+            return Err(ProjectError::CommandInvalid(
+                "project operation pending".to_owned(),
+            ));
+        }
         if self
             .pending_variable
             .as_ref()
@@ -78,142 +82,34 @@ impl ProjectService {
         service
     }
 
-    /// 创建 `location/name/name.panta` 目录包和初始清单；目标已存在时拒绝覆盖。
+    /// 同步工程入口供 CLI 使用；GUI 通过后台工程操作执行同一准备流程。
     pub fn create(&mut self, location: &Path, name: &str) -> Result<ProjectSnapshot, ProjectError> {
         self.ensure_project_writable()?;
-        validate_name(name)?;
-        if location.as_os_str().is_empty() {
-            return Err(ProjectError::LocationEmpty);
-        }
-        if !location.is_absolute() {
-            return Err(ProjectError::LocationNotAbsolute(
-                location.display().to_string(),
-            ));
-        }
-        if !location.exists() {
-            fs::create_dir_all(location).map_err(|error| {
-                ProjectError::LocationCreateFailed(format!("{}: {error}", location.display()))
-            })?;
-        }
-        if !location.is_dir() {
-            return Err(ProjectError::LocationCreateFailed(
-                location.display().to_string(),
-            ));
-        }
-
-        let project_root = location.join(name);
-        if project_root.exists() {
-            return Err(ProjectError::AlreadyExists(
-                project_root.display().to_string(),
-            ));
-        }
-        fs::create_dir(&project_root)
-            .map_err(|error| ProjectError::Io(format!("{}: {error}", project_root.display())))?;
-
-        let project_path = project_root.join(format!("{name}.{PROJECT_FILE_EXTENSION}"));
-
-        let mut state = ProjectState {
-            path: project_path,
-            name: name.to_owned(),
-            revision: 0,
-            persisted_revision: None,
-            dirty: false,
-            imports: Vec::new(),
-            mesh_assets: BTreeMap::new(),
-            analysis_sequences: BTreeMap::new(),
-            materials: BTreeMap::new(),
-            fill_settings: BTreeMap::new(),
-            gate_location_settings: BTreeMap::new(),
-        };
-        if let Err(error) = write_manifest(&mut state) {
-            if let Some(project_root) = state.path.parent() {
-                let _ = fs::remove_dir_all(project_root);
-            }
-            return Err(error);
-        }
-        self.current = Some(state);
-        self.clear_stl_preview();
-        self.latest_mesh_id = None;
-        self.mesh_cache.clear();
-        self.activation_attempts.clear();
-        let generation = self.activation.advance_generation();
-        self.replace_runtime_context(Some(
-            crate::runtime::RuntimeContext::for_project(generation, &project_root)
-                .map_err(|error| ProjectError::Io(error.to_string()))?,
-        ));
-        self.reset_document_workspace("Welcome");
-        self.snapshot()
+        let prepared = super::command_job::prepare_create(location, name)?;
+        self.publish_project_replacement(prepared)
     }
 
-    /// 打开既有 `.panta` 主文件并读取清单；不改变 cwd，也不接受其他扩展名。
-    ///
-    /// 打开清单但不解析导入资产：已保存 Mesh sidecar 由
-    /// [`Self::begin_asset_activation`] 异步按需重建（080 文档页签），
-    /// 避免保留同步与异步两条重复加载路径。
+    /// 打开清单，不加载 Mesh sidecar；GUI 使用后台工程操作。
     pub fn open(&mut self, path: &Path) -> Result<ProjectSnapshot, ProjectError> {
         self.ensure_project_writable()?;
-        if !path.is_absolute() || !path.is_file() {
-            return Err(ProjectError::FileMissing(path.display().to_string()));
-        }
-        let is_panta_file = path
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .is_some_and(|extension| extension.eq_ignore_ascii_case(PROJECT_FILE_EXTENSION));
-        if !is_panta_file {
-            return Err(ProjectError::InvalidFile(path.display().to_string()));
-        }
-        let bytes = fs::read(path)
-            .map_err(|error| ProjectError::Io(format!("{}: {error}", path.display())))?;
-        // 先只读取版本号，确保旧 schema 不会因其记录形状与当前模型不同而
-        // 被误报为当前清单损坏。
-        #[derive(serde::Deserialize)]
-        struct SchemaEnvelope {
-            schema: u32,
-        }
+        let prepared = super::command_job::prepare_open(path)?;
+        self.publish_project_replacement(prepared)
+    }
 
-        let envelope: SchemaEnvelope = serde_json::from_slice(&bytes).map_err(|error| {
-            ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
-        })?;
-        if envelope.schema != PROJECT_SCHEMA_VERSION {
-            return Err(ProjectError::UnsupportedSchema(envelope.schema));
-        }
-        let manifest: ProjectManifest = serde_json::from_slice(&bytes).map_err(|error| {
-            ProjectError::ManifestInvalid(format!("{}: {error}", path.display()))
-        })?;
-        validate_schema_four_mesh_assets(&manifest.imports, &manifest.mesh_assets)?;
-        validate_name(&manifest.name)?;
-        analysis_sequence::validate_sequences(&manifest)?;
-        material::validate_materials(&manifest)?;
-        process_settings::validate_settings(&manifest.imports, &manifest.fill_settings)?;
-        gate_location::validate_settings(&manifest.imports, &manifest.gate_location_settings)?;
-        let project_root = path
-            .parent()
-            .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-        for asset in manifest.mesh_assets.values() {
-            resolve_asset_path(project_root, &asset.relative_path)?;
-        }
-        self.current = Some(ProjectState {
-            path: path.to_path_buf(),
-            name: manifest.name,
-            revision: manifest.revision,
-            persisted_revision: Some(manifest.revision),
-            dirty: false,
-            imports: manifest.imports,
-            mesh_assets: manifest.mesh_assets,
-            analysis_sequences: manifest.analysis_sequences,
-            materials: manifest.materials,
-            fill_settings: manifest.fill_settings,
-            gate_location_settings: manifest.gate_location_settings,
-        });
+    pub(super) fn publish_project_replacement(
+        &mut self,
+        prepared: super::command_job::PreparedReplacement,
+    ) -> Result<ProjectSnapshot, ProjectError> {
+        self.current = Some(prepared.state);
+        self.clear_stl_preview();
         self.latest_mesh_id = None;
         self.mesh_cache.clear();
         self.activation_attempts.clear();
-        self.clear_stl_preview();
         let generation = self.activation.advance_generation();
-        self.replace_runtime_context(Some(
-            crate::runtime::RuntimeContext::for_project(generation, project_root)
-                .map_err(|error| ProjectError::Io(error.to_string()))?,
-        ));
+        self.replace_runtime_context(Some(crate::runtime::RuntimeContext::new(
+            generation,
+            prepared.paths,
+        )));
         self.reset_document_workspace("Welcome");
         self.snapshot()
     }
@@ -229,6 +125,9 @@ impl ProjectService {
         scope: &crate::runtime::RuntimeTaskScope,
         values: BTreeMap<String, crate::runtime::RuntimeValue>,
     ) -> Result<crate::runtime::VariableSnapshot, crate::runtime::RuntimeCommitError> {
+        if self.pending_project.is_some() {
+            return Err(crate::runtime::RuntimeCommitError::Busy);
+        }
         if self
             .pending_variable
             .as_ref()
@@ -307,6 +206,11 @@ impl ProjectService {
         expected_generation: u64,
         expected_revision: u64,
     ) -> Result<crate::runtime::RuntimeTaskScope, VariableDocumentError> {
+        if self.pending_project.is_some() {
+            return Err(VariableDocumentError::Commit(
+                crate::runtime::RuntimeCommitError::Busy,
+            ));
+        }
         if self
             .pending_variable
             .as_ref()
@@ -391,6 +295,7 @@ impl ProjectService {
     /// 按 `ImportRecord.id` 发起只读资产激活（073 首个 FSM 消费者）。
     ///
     /// 记录不存在或无工程时同步失败；同会话同记录的在飞 attempt 去重复用。
+    /// 路径包含关系、符号链接和文件读取由 worker 校验，失败经终态返回。
     /// 结果经 [`Self::drain_asset_activations`] 拉取；加载不修改
     /// revision / dirty，也不写任何存储。
     pub fn begin_asset_activation(
@@ -422,7 +327,8 @@ impl ProjectService {
                 "mesh asset index entry is unsupported".to_owned(),
             ));
         }
-        let asset_path = resolve_asset_path(root, &asset_ref.relative_path)?;
+        let project_root = root.to_owned();
+        let relative_path = asset_ref.relative_path.clone();
         let expected_digest = asset_ref.digest.clone();
         let import_id = record.id.clone();
         let attempt = self
@@ -430,7 +336,8 @@ impl ProjectService {
             .begin(
                 &import_id,
                 crate::fsm::open_saved_stl::ActivationRequest {
-                    asset_path,
+                    project_root,
+                    relative_path,
                     expected_digest,
                 },
                 Arc::clone(&self.execution.reads),
@@ -440,7 +347,8 @@ impl ProjectService {
         Ok(attempt)
     }
 
-    /// 相对路径投影只供 C++ 视图适配层定位已提交 sidecar，不构成资产身份。
+    /// 仅投影已提交 sidecar 的相对路径，不访问文件系统或构成资产身份。
+    /// 包目录包含关系与符号链接校验由激活 worker 在实际读取前执行。
     pub fn mesh_asset_path_for_import(&self, import_id: &str) -> Result<String, ProjectError> {
         let state = self.current.as_ref().ok_or(ProjectError::NoProject)?;
         let record = state
@@ -454,11 +362,6 @@ impl ProjectService {
             .ok_or_else(|| {
                 ProjectError::ManifestInvalid("mesh asset index entry is missing".to_owned())
             })?;
-        let root = state
-            .path
-            .parent()
-            .ok_or_else(|| ProjectError::Io("project has no package directory".to_owned()))?;
-        resolve_asset_path(root, &asset.relative_path)?;
         Ok(asset.relative_path.clone())
     }
 
@@ -467,9 +370,13 @@ impl ProjectService {
         self.activation.cancel(attempt)
     }
 
-    /// 拉取当前会话已完成的激活结果；旧代次结果已在 Rust 侧释放。
-    pub fn drain_asset_activations(&mut self) -> Vec<Outcome> {
-        self.activation.drain()
+    /// 消费终态并完成过期校验、缓存发布和工作区更新；消费者只读取最终结果。
+    pub fn drain_asset_activations(&mut self) -> Vec<super::CompletedActivation> {
+        self.activation
+            .drain()
+            .into_iter()
+            .map(|outcome| self.complete_asset_activation(outcome))
+            .collect()
     }
 
     /// 抛弃已关闭页签的 attempt，避免其迟到成功结果进入 Mesh 缓存。
@@ -855,7 +762,7 @@ fn source_position(source: &str, offset: usize) -> (usize, usize) {
     (line, column)
 }
 
-fn validate_schema_four_mesh_assets(
+pub(super) fn validate_schema_four_mesh_assets(
     imports: &[ImportRecord],
     mesh_assets: &std::collections::BTreeMap<String, MeshAssetRef>,
 ) -> Result<(), ProjectError> {
@@ -902,7 +809,7 @@ fn is_sha256_digest(value: &str) -> bool {
 
 /// 校验清单内的工程相对资产引用并解析为绝对路径；拒绝绝对路径与
 /// `..` 等非普通分量，防止清单注入越出工程包目录。
-pub(super) fn resolve_asset_path(root: &Path, relative: &str) -> Result<PathBuf, ProjectError> {
+pub(crate) fn resolve_asset_path(root: &Path, relative: &str) -> Result<PathBuf, ProjectError> {
     let mut paths = crate::path::PathService::new();
     paths
         .set_root(crate::path::RootCategory::Project, root)

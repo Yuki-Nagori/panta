@@ -861,6 +861,31 @@ mod tests {
     }
 
     #[test]
+    fn project_boundary_modules_and_shared_qt_support_select_their_consumers()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for input in [
+            "crates/panta-core/src/project/command_job.rs",
+            "crates/panta-core/src/project/activation_result.rs",
+            "crates/panta-ffi/src/project_operation.rs",
+            "crates/panta-ffi/src/display.rs",
+        ] {
+            let plan = make_plan(&[input.into()], &root)?;
+            assert!(plan.rust && plan.native, "{input}");
+            assert!(plan.native_labels.contains("bridge"), "{input}");
+            assert!(plan.native_labels.contains("qml"), "{input}");
+            assert!(plan.packages_l2.contains("panta-launcher"), "{input}");
+        }
+        let support = make_plan(
+            &["tests/support/qt/project_operation_helpers.hpp".into()],
+            &root,
+        )?;
+        assert!(support.full && support.full_quality && support.qml);
+        assert!(support.native_labels.contains("bridge"));
+        Ok(())
+    }
+
+    #[test]
     fn native_analysis_follows_build_and_generated_header_inputs() {
         for input in [
             "qml/CMakeLists.txt",

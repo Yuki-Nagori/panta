@@ -486,6 +486,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(project->currentPath().isEmpty());
 
         QVERIFY(project->createProject(QStringLiteral("Navigation"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         verify_ribbon_tab(window, "home", 18);
         activate_menu(window, "tools", keyboard);
         verify_ribbon_tab(window, "tools", 11);
@@ -554,8 +556,12 @@ class ShellModuleLoadTest final : public QObject {
         activate_menu(window, "start-learn", keyboard);
         activate_menu(window, "community", keyboard);
         verify_ribbon_tab(window, "start-learn", 7);
-        QVERIFY(!project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
-        QVERIFY(!project->createProject(QStringLiteral("Navigation"), fixture.path()));
+        QVERIFY(project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(!project->errorCode().isEmpty());
+        QVERIFY(project->createProject(QStringLiteral("Navigation"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QCOMPARE(project->errorCode(), QStringLiteral("project.already_exists"));
         verify_ribbon_tab(window, "start-learn", 7);
         QCOMPARE(project->currentPath(), path);
         QCOMPARE(project->currentName(), name);
@@ -563,6 +569,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(project->renameProject(QStringLiteral("Renamed on start page")));
         verify_ribbon_tab(window, "start-learn", 7);
         QVERIFY(project->saveProject());
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         verify_ribbon_tab(window, "start-learn", 7);
 
         const QString captureDir = qEnvironmentVariable("PANTA_PROJECT_CAPTURE_DIR");
@@ -594,10 +602,82 @@ class ShellModuleLoadTest final : public QObject {
 
         // 同一路径重开也应选中 Home，不能只依赖 currentPath 的值变化。
         QVERIFY(project->openProject(path));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         verify_ribbon_tab(window, "home", 18);
         activate_menu(window, "start-learn", keyboard);
         QVERIFY(project->createProject(QStringLiteral("Second"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         verify_ribbon_tab(window, "home", 18);
+    }
+
+    void analysis_sequence_submission_keeps_window_until_completion() {
+        QTemporaryDir fixture;
+        QVERIFY(fixture.isValid());
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        engine.loadFromModule(QStringLiteral("Panta.Shell"), QStringLiteral("App"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
+        QVERIFY(window);
+        auto* project =
+            window->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
+        auto* dialog = window->findChild<QQuickWindow*>(QStringLiteral("analysisSequenceDialog"));
+        QVERIFY(project && dialog);
+        QVERIFY(project->createProject(QStringLiteral("Sequence"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
+        const QString sourcePath = fixture.filePath(QStringLiteral("part.stl"));
+        QFile source(sourcePath);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        const QByteArray stl("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n");
+        QCOMPARE(source.write(stl), stl.size());
+        source.close();
+        QVERIFY(project->importStl(sourcePath, QStringLiteral("dual-domain"),
+                                   QStringLiteral("millimeters"), false));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QVERIFY(dialog->isVisible());
+        auto* panel = dialog->findChild<QObject*>(QStringLiteral("analysisSequencePanel"));
+        auto* accept = dialog->findChild<QObject*>(QStringLiteral("analysisSequenceAccept"));
+        auto* cancel = dialog->findChild<QObject*>(QStringLiteral("analysisSequenceCancel"));
+        QVERIFY(panel && accept && cancel);
+        panel->setProperty("selectedIndex", 1);
+        const auto initial = project->planSettings();
+        QSignalSpy requested(dialog, SIGNAL(selectionRequested(QString, double, QString, QString)));
+        QSignalSpy finished(project, &panta::bridge::ProjectViewModel::projectOperationFinished);
+        QVERIFY(requested.isValid() && finished.isValid());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        QVERIFY(project->projectOperationPending());
+        QVERIFY(dialog->property("saving").toBool());
+        QVERIFY(dialog->isVisible());
+        QVERIFY(!accept->property("enabled").toBool());
+        QVERIFY(!cancel->property("enabled").toBool());
+        QVERIFY(!dialog->close());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        QCOMPARE(requested.count(), 1);
+        QCOMPARE(project->planSettings(), initial);
+        QTRY_COMPARE(finished.count(), 1);
+        QCOMPARE(finished.constFirst().at(0).toString(), QStringLiteral("analysis-sequence"));
+        QVERIFY(finished.constFirst().at(1).toBool());
+        QTRY_VERIFY(!dialog->isVisible());
+        QCOMPARE(project->planSettings().value(QStringLiteral("sequenceId")).toString(),
+                 QStringLiteral("fill-pack"));
+
+        // 弹窗捕获的修订过期后保留候选，不能把旧目标提交为当前方案。
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        panel->setProperty("selectedIndex", 0);
+        QVERIFY(project->renameProject(QStringLiteral("New revision")));
+        const auto revised = project->planSettings();
+        QVERIFY(QMetaObject::invokeMethod(dialog, "acceptSelection"));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(!project->errorCode().isEmpty());
+        QVERIFY(dialog->isVisible());
+        QVERIFY(!dialog->property("saving").toBool());
+        QCOMPARE(panel->property("selectedIndex").toInt(), 0);
+        QCOMPARE(project->planSettings(), revised);
+        QVERIFY(dialog->close());
+        QVERIFY(window->close());
     }
 
     void material_submission_keeps_windows_until_completion() {
@@ -614,6 +694,8 @@ class ShellModuleLoadTest final : public QObject {
         auto* dialog = window->findChild<QQuickWindow*>(QStringLiteral("materialSelectionDialog"));
         QVERIFY(project && dialog);
         QVERIFY(project->createProject(QStringLiteral("Material"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         const QString sourcePath = fixture.filePath(QStringLiteral("part.stl"));
         QFile source(sourcePath);
         QVERIFY(source.open(QIODevice::WriteOnly));
@@ -664,6 +746,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(fixture.isValid());
         panta::bridge::ProjectViewModel stored;
         QVERIFY(stored.createProject(storedName, fixture.path()));
+        QTRY_VERIFY(!stored.projectOperationPending());
+        QVERIFY(stored.errorCode().isEmpty());
         const QUrl selectedUrl = QUrl::fromLocalFile(stored.currentPath());
         // Qt 解码本地 URL 后使用 /；Windows 新建工程快照可含原生反斜杠。
         const QString selectedPath = selectedUrl.toLocalFile();
@@ -692,6 +776,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(filters.constFirst().endsWith(QStringLiteral("(*.panta)")));
 
         QVERIFY(project->createProject(QStringLiteral("Current"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         QVERIFY(project->renameProject(QStringLiteral("Unsaved current")));
         const QString previousPath = project->currentPath();
         const QVariantMap previousSettings = project->planSettings();
@@ -726,6 +812,7 @@ class ShellModuleLoadTest final : public QObject {
             if (disappears)
                 QVERIFY(QFile::remove(path));
             QVERIFY(QMetaObject::invokeMethod(dialog, "accepted"));
+            QTRY_VERIFY(!project->projectOperationPending());
             QCOMPARE(opened.count(), 0);
             QVERIFY(!project->errorCode().isEmpty());
             QCOMPARE(project->currentPath(), previousPath);
@@ -738,7 +825,8 @@ class ShellModuleLoadTest final : public QObject {
 
         QVERIFY(dialog->setProperty("selectedFile", selectedUrl));
         QVERIFY(QMetaObject::invokeMethod(dialog, "accepted"));
-        QCOMPARE(opened.count(), 1);
+        QTRY_VERIFY(!project->projectOperationPending());
+        QTRY_COMPARE(opened.count(), 1);
         QCOMPARE(opened.constFirst().constFirst().toString(), selectedPath);
         QCOMPARE(project->currentPath(), selectedPath);
         QCOMPARE(project->currentName(), storedName);
@@ -778,9 +866,15 @@ class ShellModuleLoadTest final : public QObject {
         if (openExisting) {
             panta::bridge::ProjectViewModel savedProject;
             QVERIFY(savedProject.createProject(QStringLiteral("Stored"), fixture.path()));
+            QTRY_VERIFY(!savedProject.projectOperationPending());
+            QVERIFY(savedProject.errorCode().isEmpty());
             QVERIFY(project->openProjectUrl(QUrl::fromLocalFile(savedProject.currentPath())));
+            QTRY_VERIFY(!project->projectOperationPending());
+            QVERIFY(project->errorCode().isEmpty());
         } else {
             QVERIFY(project->createProject(QStringLiteral("Created"), fixture.path()));
+            QTRY_VERIFY(!project->projectOperationPending());
+            QVERIFY(project->errorCode().isEmpty());
         }
         QTRY_COMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("home"));
         QTRY_VERIFY(projectItem->isVisible());
@@ -792,7 +886,9 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(home && home->property("highlighted").toBool());
 
         // 失败不能把当前工程视图退回首页，名称变更则必须更新可见任务项和标题。
-        QVERIFY(!project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
+        QVERIFY(project->openProject(fixture.filePath(QStringLiteral("missing.panta"))));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(!project->errorCode().isEmpty());
         QCOMPARE(ribbon->property("activeRibbonTab").toString(), QStringLiteral("home"));
         const QString renamed = QStringLiteral("Renamed project with a longer name");
         QVERIFY(project->renameProject(renamed));
@@ -914,6 +1010,8 @@ class ShellModuleLoadTest final : public QObject {
             root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
         QVERIFY(dialog && model);
         QVERIFY(model->createProject(QStringLiteral("Reopen"), fixture.path()));
+        QTRY_VERIFY(!model->projectOperationPending());
+        QVERIFY(model->errorCode().isEmpty());
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
         dialog->setProperty("sourcePath", path);
         QVERIFY(model->inspectStl(path));
@@ -962,6 +1060,8 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(!tabRow->isVisible());
 
         QVERIFY(project->createProject(QStringLiteral("Imported"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         const QString importedProjectPath = project->currentPath();
         const QString firstStlPath = fixture.filePath(QStringLiteral("first.stl"));
         QFile firstStl(firstStlPath);
@@ -994,8 +1094,12 @@ class ShellModuleLoadTest final : public QObject {
         QVERIFY(tabRow->isVisible());
         QVERIFY(sidebarPanel->isVisible());
         QVERIFY(project->saveProject());
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
 
         QVERIFY(project->createProject(QStringLiteral("Empty"), fixture.path()));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         QTRY_VERIFY(!tabRow->isVisible());
         QTRY_VERIFY(layersPanel->isVisible());
         QTRY_VERIFY(toolbar->isVisible());
@@ -1003,6 +1107,8 @@ class ShellModuleLoadTest final : public QObject {
         QTRY_VERIFY(sidebarPanel->isVisible());
 
         QVERIFY(project->openProject(importedProjectPath));
+        QTRY_VERIFY(!project->projectOperationPending());
+        QVERIFY(project->errorCode().isEmpty());
         QTRY_VERIFY(tabRow->isVisible());
         QTRY_COMPARE(visual_items(sidebarPanel, QStringLiteral("importedPartEntry")).size(), 2);
         QVERIFY(sidebarPanel->isVisible());

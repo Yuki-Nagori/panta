@@ -690,142 +690,41 @@ fn drain_asset_activations(
         .service
         .drain_asset_activations()
         .into_iter()
-        .map(|outcome| {
-            let bridge_outcome = activation_outcome_to_bridge_with_payload(
-                &mut service.service,
-                outcome,
-                include_coordinates,
-            );
-            let result = match bridge_outcome.kind {
-                bridge::ActivationOutcomeKind::Succeeded => {
-                    panta_core::project::ActivationResultKind::Succeeded
-                }
-                bridge::ActivationOutcomeKind::Failed => {
-                    panta_core::project::ActivationResultKind::Failed
-                }
-                bridge::ActivationOutcomeKind::Cancelled => {
-                    panta_core::project::ActivationResultKind::Cancelled
-                }
-                bridge::ActivationOutcomeKind::Expired => {
-                    panta_core::project::ActivationResultKind::Expired
-                }
-                _ => panta_core::project::ActivationResultKind::Expired,
-            };
-            service.service.resolve_workspace_activation(
-                &bridge_outcome.import_id,
-                bridge_outcome.attempt,
-                result,
-                panta_core::project::DocumentDiagnostic {
-                    code: bridge_outcome.error.code.clone(),
-                    category: bridge_outcome.error.category.clone(),
-                    detail: bridge_outcome.error.detail.clone(),
-                },
-            );
-            bridge_outcome
-        })
+        .map(|outcome| activation_outcome_to_bridge(outcome, include_coordinates))
         .collect()
 }
 
-#[cfg(test)]
-pub(super) fn activation_outcome_to_bridge(
-    service: &mut panta_core::project::ProjectService,
-    outcome: panta_core::project::Outcome,
-) -> bridge::ActivationOutcome {
-    activation_outcome_to_bridge_with_payload(service, outcome, true)
-}
-
-fn activation_outcome_to_bridge_with_payload(
-    service: &mut panta_core::project::ProjectService,
-    outcome: panta_core::project::Outcome,
+fn activation_outcome_to_bridge(
+    outcome: panta_core::project::CompletedActivation,
     include_coordinates: bool,
 ) -> bridge::ActivationOutcome {
-    let (kind, error, coordinates) = match outcome.kind {
-        panta_core::project::OutcomeKind::Succeeded
-            if !service.is_current_activation_attempt(&outcome.import_id, outcome.attempt) =>
-        {
-            // 旧 attempt 的成功结果既不进缓存，也不跨 FFI 携带大网格。
-            (
-                bridge::ActivationOutcomeKind::Expired,
-                bridge::ProjectDiagnostic::default(),
-                Vec::new(),
-            )
-        }
-        panta_core::project::OutcomeKind::Succeeded => match outcome.mesh {
-            Some(mesh) if !include_coordinates => {
-                if service.cache_activation_result(&outcome.import_id, outcome.attempt, mesh) {
-                    (
-                        bridge::ActivationOutcomeKind::Succeeded,
-                        bridge::ProjectDiagnostic::default(),
-                        Vec::new(),
-                    )
-                } else {
-                    (
-                        bridge::ActivationOutcomeKind::Expired,
-                        bridge::ProjectDiagnostic::default(),
-                        Vec::new(),
-                    )
-                }
-            }
-            Some(mesh) => match mesh_coordinates(&mesh) {
-                Ok(coordinates) => {
-                    if service.cache_activation_result(&outcome.import_id, outcome.attempt, mesh) {
-                        (
-                            bridge::ActivationOutcomeKind::Succeeded,
-                            bridge::ProjectDiagnostic::default(),
-                            coordinates,
-                        )
-                    } else {
-                        (
-                            bridge::ActivationOutcomeKind::Expired,
-                            bridge::ProjectDiagnostic::default(),
-                            Vec::new(),
-                        )
-                    }
-                }
-                Err(detail) => {
-                    service.finish_asset_activation(&outcome.import_id, outcome.attempt);
-                    (
-                        bridge::ActivationOutcomeKind::Failed,
-                        project_response::diagnostic(
-                            "project.mesh_allocation_failed",
-                            "resource",
-                            detail,
-                        ),
-                        Vec::new(),
-                    )
-                }
-            },
-            None => {
-                service.finish_asset_activation(&outcome.import_id, outcome.attempt);
-                (
-                    bridge::ActivationOutcomeKind::Failed,
-                    project_response::diagnostic(
-                        "project.mesh_missing",
-                        "state",
-                        outcome.import_id.clone(),
-                    ),
-                    Vec::new(),
-                )
-            }
-        },
-        kind => {
-            service.finish_asset_activation(&outcome.import_id, outcome.attempt);
-            let error = bridge::ProjectDiagnostic {
-                code: outcome.code,
-                category: outcome.category.to_owned(),
-                detail: outcome.detail,
-            };
-            (activation_kind(kind), error, Vec::new())
-        }
-    };
-    bridge::ActivationOutcome {
+    let mut result = bridge::ActivationOutcome {
         attempt: outcome.attempt,
         generation: outcome.generation,
         import_id: outcome.import_id,
-        kind,
-        error,
-        coordinates,
+        kind: activation_kind(outcome.kind),
+        error: bridge::ProjectDiagnostic {
+            code: outcome.code,
+            category: outcome.category.to_owned(),
+            detail: outcome.detail,
+        },
+        coordinates: Vec::new(),
+    };
+    if include_coordinates && let Some(mesh) = outcome.mesh {
+        match mesh_coordinates(&mesh) {
+            Ok(coordinates) => result.coordinates = coordinates,
+            Err(detail) => {
+                // 显示格式分配失败只影响此适配结果，不撤销 core 已完成的资产激活。
+                result.kind = bridge::ActivationOutcomeKind::Failed;
+                result.error = project_response::diagnostic(
+                    "project.mesh_allocation_failed",
+                    "resource",
+                    detail,
+                );
+            }
+        }
     }
+    result
 }
 
 fn activation_kind(kind: panta_core::project::OutcomeKind) -> bridge::ActivationOutcomeKind {
@@ -837,7 +736,9 @@ fn activation_kind(kind: panta_core::project::OutcomeKind) -> bridge::Activation
     }
 }
 
-fn project_snapshot(snapshot: panta_core::project::ProjectSnapshot) -> bridge::ProjectSnapshot {
+pub(super) fn project_snapshot(
+    snapshot: panta_core::project::ProjectSnapshot,
+) -> bridge::ProjectSnapshot {
     bridge::ProjectSnapshot {
         path: snapshot.path.display().to_string(),
         name: snapshot.name,
@@ -875,6 +776,8 @@ pub(super) fn stl_import_preview(
     bridge::StlImportPreview {
         source_name: preview.source_name,
         triangle_count: preview.triangle_count,
+        expanded_mesh_bytes: preview.expanded_mesh_bytes,
+        large_mesh_warning: preview.large_mesh_warning,
         size_x: preview.dimensions[0],
         size_y: preview.dimensions[1],
         size_z: preview.dimensions[2],
@@ -981,11 +884,12 @@ pub(super) fn project_service_finish_fill_settings_confirmation(
 
 #[cfg(test)]
 mod tests {
+    use super::activation_outcome_to_bridge;
     use crate::{
-        activation_outcome_to_bridge, bridge, project_service_create, project_service_current,
-        project_service_execute, project_service_mesh_snapshot_for_import, project_service_new,
-        project_service_open, project_service_plan_settings, project_service_resident_mesh_ids,
-        project_service_save, validate_fill_settings_draft, validate_gate_location_settings_draft,
+        bridge, project_service_create, project_service_current, project_service_execute,
+        project_service_mesh_snapshot_for_import, project_service_new, project_service_open,
+        project_service_plan_settings, project_service_resident_mesh_ids, project_service_save,
+        validate_fill_settings_draft, validate_gate_location_settings_draft,
         validate_holding_profile_draft,
     };
     use std::fs;
@@ -1661,8 +1565,7 @@ endsolid
 
     #[test]
     fn failed_activation_transfers_structured_diagnostics_without_mesh_payload() {
-        let mut service = project_service_new();
-        let outcome = panta_core::project::Outcome {
+        let outcome = panta_core::project::CompletedActivation {
             attempt: 7,
             generation: 3,
             import_id: "import-2".into(),
@@ -1672,7 +1575,7 @@ endsolid
             detail: "C:\\资产: read denied".into(),
             mesh: None,
         };
-        let result = activation_outcome_to_bridge(&mut service.service, outcome);
+        let result = activation_outcome_to_bridge(outcome, true);
         assert!(result.kind == bridge::ActivationOutcomeKind::Failed);
         assert_eq!(result.attempt, 7);
         assert_eq!(result.generation, 3);
@@ -1681,30 +1584,5 @@ endsolid
         assert_eq!(result.error.category, "io");
         assert_eq!(result.error.detail, "C:\\资产: read denied");
         assert!(result.coordinates.is_empty());
-    }
-
-    #[test]
-    fn activation_without_a_current_attempt_does_not_cross_the_bridge() {
-        let mut service = project_service_new();
-        let outcome = |attempt, x| panta_core::project::Outcome {
-            attempt,
-            generation: 0,
-            import_id: "import-1".to_owned(),
-            kind: panta_core::project::OutcomeKind::Succeeded,
-            code: String::new(),
-            category: "",
-            detail: String::new(),
-            mesh: Some(panta_mesh::SurfaceMesh {
-                triangles: vec![[[x, 0.0, 0.0], [x + 1.0, 0.0, 0.0], [x, 1.0, 0.0]]],
-            }),
-        };
-
-        let first = activation_outcome_to_bridge(&mut service.service, outcome(1, 1.0));
-        let second = activation_outcome_to_bridge(&mut service.service, outcome(2, 10.0));
-
-        assert!(first.kind == bridge::ActivationOutcomeKind::Expired);
-        assert!(first.coordinates.is_empty());
-        assert!(second.kind == bridge::ActivationOutcomeKind::Expired);
-        assert!(second.coordinates.is_empty());
     }
 }

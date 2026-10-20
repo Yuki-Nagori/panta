@@ -5,11 +5,13 @@
 - 依赖：[067 Rust 网格领域迁移](067-rust-mesh-domain-migration.md)、[080 QML 视口文档页签](080-qml-viewport-document-tabs.md)、[107 Rust 工程服务边界](107-rust-service-boundaries-and-revisions.md)
 - 优先级：P1
 - 负责人：维护者
-- 创建 / 更新：2026-10-16 / 2026-10-16
+- 创建 / 更新：2026-10-16 / 2026-10-20
 
 ## 目标与背景
 
-对应 [GitHub issue #35](https://github.com/Yuki-Nagori/panta/issues/35)。`ProjectViewModel` 当前管理文档页签列表、活动文档、加载结果合并、关闭后的回退选择、网格驻留投影及错误文案映射。这些决策仅能通过 Qt 测试，且不便由其他 Rust 调用方复用。本任务将文档工作区状态与决策移入 `panta-core`，保持现有 QML 行为和 Rust 网格激活服务边界。
+对应 [GitHub issue #35](https://github.com/Yuki-Nagori/panta/issues/35)。迁移前，`ProjectViewModel` 管理文档页签列表、活动文档、加载结果合并、关闭后的回退选择、网格驻留投影及错误文案映射。这些决策仅能通过 Qt 测试，且不便由其他 Rust 调用方复用。本任务已将文档工作区状态与决策移入 `panta-core` 的 `project::DocumentWorkspace`，保持现有 QML 行为和 Rust 网格激活服务边界。
+
+2026-10-20 后续收尾见 [127](127-rust-qt-boundary-followup.md)：激活结果的过期裁决、缓存提交、attempt 收尾与工作区更新应集中为 core 的完整用例，不由 FFI 拼接。ViewModel 继续仅投影工作区与持有活动显示 DTO；大网格后台显示准备按最新选择及 generation/revision 拒绝迟到结果。127 的实施和验证独立跟踪，下文不作为该轮通过证据。
 
 ## 必读
 

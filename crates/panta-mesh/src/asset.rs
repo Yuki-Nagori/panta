@@ -9,9 +9,19 @@ use zstd::stream::{Decoder, Encoder};
 const MAGIC: &[u8; 8] = b"PNTMESH\0";
 pub const MESH_ASSET_FORMAT_VERSION: u32 = 2;
 const HEADER_SIZE: usize = 56;
+const SURFACE_COUNT_BYTES: usize = size_of::<u64>();
+const SURFACE_TRIANGLE_BYTES: usize = 3 * 3 * size_of::<f64>();
 const SURFACE_KIND: u8 = 1;
 const TET_KIND: u8 = 2;
 const ZSTD_CODEC: u8 = 1;
+
+/// 未压缩表面 Mesh 资产的布局字节数，包含文件头与面数，不估算进程总内存。
+/// 超出 `u64` 时饱和，供资源提醒使用；不据此分配或限制网格规模。
+pub fn surface_mesh_expanded_bytes(triangle_count: u64) -> u64 {
+    triangle_count
+        .saturating_mul(SURFACE_TRIANGLE_BYTES as u64)
+        .saturating_add((HEADER_SIZE + SURFACE_COUNT_BYTES) as u64)
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MeshAsset {
@@ -198,7 +208,7 @@ fn encode_surface_asset(mesh: &SurfaceMesh) -> Result<(Vec<u8>, String), MeshAss
             .write_all(&count.to_le_bytes())
             .map_err(map_codec_error)?;
         for triangle in &mesh.triangles {
-            let mut encoded_triangle = [0; 72];
+            let mut encoded_triangle = [0; SURFACE_TRIANGLE_BYTES];
             for (index, coordinate) in triangle.iter().flatten().enumerate() {
                 let offset = index * 8;
                 encoded_triangle[offset..offset + 8].copy_from_slice(&coordinate.to_le_bytes());
@@ -217,8 +227,8 @@ fn decode_surface_compressed(payload: &[u8]) -> Result<SurfaceMesh, MeshAssetErr
         usize::try_from(read_u64(&mut decoder)?).map_err(|_| MeshAssetError::InvalidLength)?;
     if count == 0
         || count
-            .checked_mul(72)
-            .and_then(|size| size.checked_add(8))
+            .checked_mul(SURFACE_TRIANGLE_BYTES)
+            .and_then(|size| size.checked_add(SURFACE_COUNT_BYTES))
             .is_none()
     {
         return Err(MeshAssetError::InvalidLength);
@@ -228,7 +238,7 @@ fn decode_surface_compressed(payload: &[u8]) -> Result<SurfaceMesh, MeshAssetErr
         .try_reserve_exact(count)
         .map_err(|_| MeshAssetError::AllocationFailed)?;
     for _ in 0..count {
-        let mut encoded_triangle = [0; 72];
+        let mut encoded_triangle = [0; SURFACE_TRIANGLE_BYTES];
         read_exact(&mut decoder, &mut encoded_triangle)?;
         let mut triangle = [[0.0; 3]; 3];
         for (index, coordinate) in triangle.iter_mut().flatten().enumerate() {
@@ -466,11 +476,28 @@ fn ensure_decompressed_eof<R: Read>(reader: &mut R) -> Result<(), MeshAssetError
 mod tests {
     use super::{
         HEADER_SIZE, MeshAsset, MeshAssetError, decode_mesh_asset, encode_mesh_asset,
-        mesh_asset_encoded_len,
+        mesh_asset_encoded_len, surface_mesh_expanded_bytes,
     };
     use crate::{SurfaceMesh, SurfaceTriangle, TetMesh, Tetrahedron};
     use sha2::{Digest, Sha256};
     use std::io::Read;
+
+    #[test]
+    fn expanded_surface_size_matches_the_encoded_layout() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mesh = MeshAsset::Surface(SurfaceMesh {
+            triangles: vec![[[1.0, 2.0, 3.0]; 3]; 2],
+        });
+        let (bytes, _) = encode_mesh_asset(&mesh)?;
+        let raw_payload = zstd::stream::decode_all(&bytes[HEADER_SIZE..])?;
+        assert_eq!(
+            surface_mesh_expanded_bytes(2),
+            (HEADER_SIZE + raw_payload.len()) as u64
+        );
+        assert_eq!(surface_mesh_expanded_bytes(0), 64);
+        assert_eq!(surface_mesh_expanded_bytes(u64::MAX), u64::MAX);
+        Ok(())
+    }
 
     fn sidecar_with_repacked_payload(
         original: &[u8],

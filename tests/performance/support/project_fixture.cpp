@@ -1,4 +1,5 @@
 // 通过正式工程服务生成性能套件专用的 STL 工程；输入和产物只写入调用方的新目录。
+#include "project_operation_helpers.hpp"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -13,6 +14,8 @@
 #include <iostream>
 #include <project_view_model.hpp>
 #include <stdexcept>
+
+using panta::test::finish_project_operation;
 
 namespace {
 void write_u32(std::ofstream& stream, std::uint32_t value) {
@@ -54,7 +57,8 @@ int main(int argc, char* argv[]) try {
         throw std::runtime_error("Cannot create fixture directory");
     }
     panta::bridge::ProjectViewModel project;
-    if (!project.createProject(QStringLiteral("Benchmark"), directory.absolutePath())) {
+    if (!finish_project_operation(project, project.createProject(QStringLiteral("Benchmark"),
+                                                                 directory.absolutePath()))) {
         throw std::runtime_error(project.error().toStdString());
     }
     for (std::uint32_t triangles : {10'000U, 20'000U}) {
@@ -76,7 +80,7 @@ int main(int argc, char* argv[]) try {
             throw std::runtime_error(project.error().toStdString());
         }
     }
-    if (!project.saveProject()) {
+    if (!finish_project_operation(project, project.saveProject())) {
         throw std::runtime_error(project.error().toStdString());
     }
     std::cout << "fixture=" << project.currentPath().toStdString()

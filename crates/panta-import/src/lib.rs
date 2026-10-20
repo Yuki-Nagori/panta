@@ -1,7 +1,7 @@
 //! 格式识别和来源快照；格式专属算法由对应领域后端执行。
 //! STEP / IGES 的几何读取由后续 OCCT adapter 接入。
 
-use panta_mesh::{StlError, SurfaceMesh, SurfaceSummary, parse_stl};
+use panta_mesh::{StlError, SurfaceMesh, SurfaceSummary, parse_stl, surface_mesh_expanded_bytes};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt::{Display, Formatter};
@@ -74,6 +74,24 @@ pub struct StlImportPreview {
     pub source_name: String,
     pub triangle_count: u64,
     pub dimensions: [f64; 3],
+    /// 未压缩 Mesh 资产的估算字节数；不包含来源缓冲、显示 DTO 或 GPU 内存。
+    pub expanded_mesh_bytes: u64,
+    /// 仅提醒资源成本；不限制导入，也不依赖来源文件的压缩率或字节数。
+    pub large_mesh_warning: bool,
+}
+
+impl StlImportPreview {
+    fn from_summary(source_name: String, summary: SurfaceSummary) -> Self {
+        const LARGE_MESH_WARNING_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+        let expanded_mesh_bytes = surface_mesh_expanded_bytes(summary.triangle_count);
+        Self {
+            source_name,
+            triangle_count: summary.triangle_count,
+            dimensions: summary.dimensions,
+            expanded_mesh_bytes,
+            large_mesh_warning: expanded_mesh_bytes > LARGE_MESH_WARNING_BYTES,
+        }
+    }
 }
 
 /// 可用网格类型的稳定 ID 和英文源文案；Qt 仅负责翻译和展示。
@@ -390,11 +408,7 @@ impl StlImportSession {
             mesh,
             modified_unix_ms: input.modified_unix_ms,
         });
-        Ok(StlImportPreview {
-            source_name,
-            triangle_count: summary.triangle_count,
-            dimensions: summary.dimensions,
-        })
+        Ok(StlImportPreview::from_summary(source_name, summary))
     }
 
     pub fn prepare(&mut self, path: &Path) -> Result<PreparedStl, ImportError> {
@@ -527,6 +541,30 @@ mod tests {
     }
 
     #[test]
+    fn preview_reports_expanded_asset_cost_without_rejecting_large_counts() {
+        let preview = |triangle_count| {
+            StlImportPreview::from_summary(
+                "model.stl".to_owned(),
+                SurfaceSummary {
+                    triangle_count,
+                    dimensions: [1.0; 3],
+                },
+            )
+        };
+        assert_eq!(preview(1).expanded_mesh_bytes, 136);
+        let below = preview(29_826_160);
+        assert_eq!(below.expanded_mesh_bytes, 2_147_483_584);
+        assert!(!below.large_mesh_warning);
+        let above = preview(29_826_161);
+        assert_eq!(above.expanded_mesh_bytes, 2_147_483_656);
+        assert!(above.large_mesh_warning);
+        let overflowing = preview(u64::MAX);
+        assert_eq!(overflowing.expanded_mesh_bytes, u64::MAX);
+        assert!(overflowing.large_mesh_warning);
+        assert_eq!(overflowing.triangle_count, u64::MAX);
+    }
+
+    #[test]
     fn preview_cancellation_before_read_and_after_parse_does_not_publish_a_snapshot()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = Fixture::new()?;
@@ -580,6 +618,8 @@ mod tests {
         assert_eq!(preview.source_name, "part.stl");
         assert_eq!(preview.triangle_count, 1);
         assert_eq!(preview.dimensions, [1.0, 2.0, 0.0]);
+        assert_eq!(preview.expanded_mesh_bytes, 136);
+        assert!(!preview.large_mesh_warning);
 
         let prepared = session.prepare(&source)?;
         assert_eq!(prepared.summary().dimensions, preview.dimensions);

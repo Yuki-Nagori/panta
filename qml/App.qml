@@ -63,6 +63,10 @@ ApplicationWindow {
             if (succeeded)
                 materialDialog.close();
         }
+        onProjectOperationFinished: (operation, succeeded) => {
+            if (operation === "analysis-sequence" && succeeded)
+                analysisSequenceDialog.close();
+        }
     }
 
     Connections {
@@ -91,9 +95,9 @@ ApplicationWindow {
         sequences: projectModel.analysisSequences
         planSettings: projectModel.planSettings
         errorText: projectModel.error
+        saving: projectModel.projectOperationPending
         onSelectionRequested: (path, revision, importId, sequenceId) => {
-            if (projectModel.setAnalysisSequence(path, revision, importId, sequenceId))
-                analysisSequenceDialog.close();
+            projectModel.setAnalysisSequence(path, revision, importId, sequenceId);
         }
     }
 

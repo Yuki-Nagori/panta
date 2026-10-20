@@ -5,13 +5,15 @@
 - 依赖：[023](023-cross-platform-paths.md)（已落地路径宿主）、[029](029-qml-component-library.md)（已落地原子组件）、[055](055-qml-review-and-cleanup.md)（已完成 QML 整理）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-22 / 2026-09-22
+- 创建 / 更新：2026-09-22 / 2026-10-20
 
 ## 目标与背景
 
 将左侧 `New Project` 入口从视觉占位推进为可用的现代化 QML 对话框。对话框提供项目名、保存目录、目录选择和说明，默认保存根目录为系统 `Documents/panta`，确认后生成 `Documents/panta/<name>/<name>.panta` 工程目录包，目录内可继续放置其他工程文件，底部只保留 `OK` 与 `Cancel`。新建项目命令必须经显式 ViewModel 信号进入 native 服务，QML 不直接访问文件系统。
 
 同时把打开文件、创建项目、保存和工程模型命令的最小 Rust application service 一起落地，形成可复用的后端范例：QML 只表达用户意图，C++ ViewModel 负责 Qt/QML 适配、路径转换和错误呈现，工程模型、清单读写与命令校验归 Rust 服务。
+
+2026-10-20 后续收尾由 [127](127-rust-qt-boundary-followup.md) 跟踪：GUI 创建、打开、保存通过独占 request 的 begin / 后台 wait / 服务线程 finish 执行 I/O，准入不等于成功；完成通知后才更新窗口或关闭成功对话框，失败保留旧工程和用户输入，不新增轮询器。下文保留 057 初次实施与验收记录；127 的实现及验证另行记录。
 
 ## 必读
 

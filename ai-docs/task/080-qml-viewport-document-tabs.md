@@ -5,13 +5,15 @@
 - 依赖：[007](007-vtk-quick-viewport.md)、[063](063-stl-import-and-mesh-workspace.md)、[068](068-qml-project-and-layers-docks.md)、[073](073-fsm-dsl-and-import-state-machine.md)、[086](086-qt-platform-adapter.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-17
+- 创建 / 更新：2026-09-24 / 2026-10-20
 
 ## 目标与背景
 
 将 `ViewportPane.qml` 底部目前用于 `Model / Mesh / Results` 分类切换的 `PanelTabBar` 替换为浏览器式文档页签。每次进入已打开的工程工作区时默认创建并选中 `Welcome`，显示现有 VTK `panta` 立体字样；成功导入 STL 后自动打开对应页签。用户点击工程树中的 STL 时，已打开的导入记录直接切到现有页签；尚未打开的记录先建立 Loading 页签，再从 `.panta` 工程资产异步读取并解析，成功后激活并显示网格。活动页签 ID 是视口显示内容的唯一选择状态：ViewModel 同步向 QML 投影选中项并向单个 CaeViewport 提供对应场景；QML 不并行维护另一份可分歧的选择值。每个页签（含 Welcome）均有关闭按钮；关闭只是结束当前 UI 会话中的打开视图，不删除工程记录、不改工程 dirty 状态。关闭最后一个页签后视口留空，用户可再从工程树打开 STL。配套整理左侧工程树与 Part / Plan tasks 检查器的行高、图标尺寸、选择底色、标题分隔线、缩进和文字对齐，让用户清楚看见所选 STL 与当前任务检查器的对应关系；不改变原工程树和检查器的数据/命令语义。
 
 当前持久资产格式与首次加载的数据源由后续任务 [088](088-mesh-asset-sidecar-storage.md) 更新为工程内 Mesh sidecar；080 定义的页签身份、激活、重排、错误展示及运行期快照生命周期不变。
+
+工作区权威已由 [117](117-rust-project-document-workspace.md) 迁入 Rust `DocumentWorkspace`，包括打开页签、活动选择、加载状态和关闭回退；ViewModel 只投影快照。[127](127-rust-qt-boundary-followup.md) 已完成 core 的激活终态编排及大网格后台显示准备：捕获 `Arc<SurfaceMesh>`，后台展开并构造 C++ 显示 DTO，最多一个在途准备，按最新选择及 generation/revision 拒绝迟到结果。Qt / VTK / GPU 对象生命周期保持在原线程，具体实施和验证状态见 127。
 
 首次打开旧导入记录是本功能的异步领域操作：Rust 要按稳定导入 ID 解析工程资产并重建网格，操作可能受文件大小影响；工程切换、关闭待加载页签或快速连续选择还会产生取消和迟到结果。因此它作为 [073](073-fsm-dsl-and-import-state-machine.md) 的首个 FSM 消费者。纯粹激活已就绪页签、改变选中态和关闭非活动页签仍是同步 UI 操作，不经 FSM。
 
@@ -125,9 +127,11 @@
 | CPU 构造 / 切换 / 关闭 | macOS 26.3.1 arm64、Qt 6.11.2、debug；1 次预热、31 次采样。1 页签构造 150/224 µs；8 页签构造 932/1204、切换 323/598、关闭 894/1267；24 页签构造 2790/4998、切换 442/2079、关闭 2932/5721。 | QML 构造、模型更新和事件处理，不含 GPU。 |
 | GPU 帧间隔 | macOS 26.3.1 arm64、Qt 6.11.2、Metal、debug；1000×700，30 帧预热、每场景 3×60 帧。空场景 16.65/18.93 ms；静态 1/8/24 页签 16.70/25.60、16.69/25.27、16.70/24.90；切换 8/24 为 16.73/24.35、16.75/25.38；关闭/重开 8/24 为 16.71/24.59、16.67/18.96。 | 包含 vsync / compositor；只呈现 DocumentTabBar，不包含 VTK 网格场景或 GPU 内核耗时。 |
 
-### STL 激活与显示 DTO 基线
+### STL 激活与显示 DTO 历史基线
 
-真实工程测量使用用户提供的 `test_1.panta` 及其三个已保存资产：`Frame.stl`（47,946 面，约 2.3 MiB）、`Large_Earth_Elemental.stl`（608,218 面，约 29 MiB）和 `mug.stl`（8,834 面，约 431 KiB）。CPU 基准负责 ViewModel 工程激活/重载延迟、Rust Mesh 驻留估值和活动显示 DTO 容量；驻留估值用该资产的 DTO payload 代替 Rust `Vec` 实际容量，不表示 C++ 按页签保留 DTO。独立 GPU 基准在真实窗口测量单个 VTK 视口的帧提交及进程 RSS。两个手动目标和 CPU / GPU 源码分别集中于 `native/performance/CMakeLists.txt` 与 `tests/cpp/performance/`，不加入默认构建或 CTest。目标为 `panta_bridge_project_stl_activation_cpu_benchmark` 与 `panta_project_stl_viewport_gpu_benchmark`，通过 `cmake --build target/native/release --target panta_bridge_project_stl_activation_cpu_benchmark panta_project_stl_viewport_gpu_benchmark --parallel 4` 构建；CPU 目标接受工程路径和重载次数，GPU 目标接受工程路径及可选采样数，并要求可见原生图形窗口。CPU 重载重复运行时操作系统文件缓存为热状态；GPU 切换复用已加载 Mesh。进程 RSS 不代表专用 GPU 显存。
+下列数字记录 2026-09-29 的同步显示 DTO 路径，含缓存命中后在 GUI 线程物化 DTO 的成本；保留作为 127 异步迁移前的比较依据，不代表本轮实现的延迟或内存结果。
+
+真实工程测量使用用户提供的 `test_1.panta` 及其三个已保存资产：`Frame.stl`（47,946 面，约 2.3 MiB）、`Large_Earth_Elemental.stl`（608,218 面，约 29 MiB）和 `mug.stl`（8,834 面，约 431 KiB）。CPU 基准负责 ViewModel 工程激活/重载延迟、Rust Mesh 驻留估值和活动显示 DTO 容量；驻留估值用该资产的 DTO payload 代替 Rust `Vec` 实际容量，不表示 C++ 按页签保留 DTO。独立 GPU 基准在真实窗口测量单个 VTK 视口的帧提交及进程 RSS。两个手动目标集中于 `native/performance/CMakeLists.txt`，CPU / GPU 源码现位于 `tests/performance/cpu/` 与 `tests/performance/gpu/`，不加入默认构建或 CTest。目标为 `panta_bridge_project_stl_activation_cpu_benchmark` 与 `panta_project_stl_viewport_gpu_benchmark`，通过 `cmake --build target/native/release --target panta_bridge_project_stl_activation_cpu_benchmark panta_project_stl_viewport_gpu_benchmark --parallel 4` 构建；CPU 目标接受工程路径和重载次数，GPU 目标接受工程路径及可选采样数，并要求可见原生图形窗口。CPU 重载重复运行时操作系统文件缓存为热状态；GPU 切换复用已加载 Mesh。进程 RSS 不代表专用 GPU 显存。
 
 | 输入 | 解析 / 展开中位数 | 数据量与边界 |
 |---|---|---|

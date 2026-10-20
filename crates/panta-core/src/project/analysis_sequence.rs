@@ -81,31 +81,57 @@ impl ProjectService {
         import_id: &str,
         sequence_id: &str,
     ) -> Result<ProjectSnapshot, ProjectError> {
-        let state = self.checked_plan_target(expected_path, expected_revision, import_id)?;
-        if definition(sequence_id).is_none() {
-            return Err(ProjectError::CommandInvalid(
-                "unknown analysis sequence".to_owned(),
-            ));
-        }
-        let current = state
-            .analysis_sequences
-            .get(import_id)
-            .map_or(DEFAULT_SEQUENCE_ID, String::as_str);
-        if current == sequence_id {
-            return self.snapshot();
-        }
-        let mut candidate = state.clone();
-        if sequence_id == DEFAULT_SEQUENCE_ID {
-            candidate.analysis_sequences.remove(import_id);
-        } else {
-            candidate
-                .analysis_sequences
-                .insert(import_id.to_owned(), sequence_id.to_owned());
-        }
-        candidate.revision = next_revision(candidate.revision)?;
-        candidate.dirty = false;
-        write_manifest(&mut candidate)?;
+        self.ensure_project_writable()?;
+        let state = self.current.as_ref().ok_or(ProjectError::NoProject)?;
+        let candidate = prepare_sequence(
+            state,
+            expected_path,
+            expected_revision,
+            import_id,
+            sequence_id,
+        )?;
         self.current = Some(candidate);
         self.snapshot()
     }
+}
+
+pub(super) fn prepare_sequence(
+    state: &super::ProjectState,
+    expected_path: &Path,
+    expected_revision: u64,
+    import_id: &str,
+    sequence_id: &str,
+) -> Result<super::ProjectState, ProjectError> {
+    if state.path != expected_path || state.revision != expected_revision {
+        return Err(ProjectError::CommandInvalid(
+            "plan settings changed".to_owned(),
+        ));
+    }
+    if !state.imports.iter().any(|record| record.id == import_id) {
+        return Err(ProjectError::ImportRecordMissing(import_id.to_owned()));
+    }
+    if definition(sequence_id).is_none() {
+        return Err(ProjectError::CommandInvalid(
+            "unknown analysis sequence".to_owned(),
+        ));
+    }
+    let current = state
+        .analysis_sequences
+        .get(import_id)
+        .map_or(DEFAULT_SEQUENCE_ID, String::as_str);
+    if current == sequence_id {
+        return Ok(state.clone());
+    }
+    let mut candidate = state.clone();
+    if sequence_id == DEFAULT_SEQUENCE_ID {
+        candidate.analysis_sequences.remove(import_id);
+    } else {
+        candidate
+            .analysis_sequences
+            .insert(import_id.to_owned(), sequence_id.to_owned());
+    }
+    candidate.revision = next_revision(candidate.revision)?;
+    candidate.dirty = false;
+    write_manifest(&mut candidate)?;
+    Ok(candidate)
 }

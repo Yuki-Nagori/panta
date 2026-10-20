@@ -29,7 +29,8 @@ pub struct ActivationAttempt {
 
 /// 一次激活请求的工作数据；提交后归 worker 线程所有。
 pub(crate) struct ActivationRequest {
-    pub asset_path: PathBuf,
+    pub project_root: PathBuf,
+    pub relative_path: String,
     pub expected_digest: String,
 }
 
@@ -438,7 +439,22 @@ fn run_attempt(
         coordinator.complete(attempt, Event::CancelAcknowledged);
         return;
     }
-    let bytes = match read_mesh_bytes(&request.asset_path, cancelled) {
+    let asset_path =
+        match crate::project::resolve_asset_path(&request.project_root, &request.relative_path) {
+            Ok(path) => path,
+            Err(error) => {
+                coordinator.complete(
+                    attempt,
+                    Event::Fail {
+                        code: error.code(),
+                        category: error.category(),
+                        detail: error.detail(),
+                    },
+                );
+                return;
+            }
+        };
+    let bytes = match read_mesh_bytes(&asset_path, cancelled) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => {
             coordinator.complete(attempt, Event::CancelAcknowledged);
@@ -476,7 +492,7 @@ fn run_attempt(
                 Event::Fail {
                     code: "project.asset_parse_failed",
                     category: "format",
-                    detail: request.asset_path.display().to_string(),
+                    detail: asset_path.display().to_string(),
                 },
             );
         }
@@ -486,7 +502,7 @@ fn run_attempt(
                 Event::Fail {
                     code: "project.asset_unsupported_format",
                     category: "format",
-                    detail: request.asset_path.display().to_string(),
+                    detail: asset_path.display().to_string(),
                 },
             );
         }
@@ -876,13 +892,74 @@ mod tests {
             .begin_with(
                 "import-1",
                 ActivationRequest {
-                    asset_path: PathBuf::from("unused.stl"),
+                    project_root: PathBuf::from("unused-project"),
+                    relative_path: "unused.pmesh".to_owned(),
                     expected_digest: "sha256:test".to_owned(),
                 },
                 accept_activation_request,
             )
             .unwrap_or_else(|error| panic!("activation admission failed: {error}"));
         (coordinator, attempt)
+    }
+
+    fn run_path_request(root: PathBuf, relative_path: &str) -> Outcome {
+        let (coordinator, attempt) = coordinator_with_request();
+        run_attempt(
+            Arc::clone(&coordinator),
+            attempt.attempt,
+            ActivationRequest {
+                project_root: root,
+                relative_path: relative_path.to_owned(),
+                expected_digest: "sha256:test".to_owned(),
+            },
+            Arc::new(AtomicBool::new(false)),
+        );
+        let mut outcomes = coordinator.drain();
+        assert_eq!(outcomes.len(), 1);
+        outcomes.remove(0)
+    }
+
+    #[test]
+    fn worker_validates_relative_asset_paths_and_preserves_missing_diagnostics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = crate::project::temp_directory::Fixture::new()?;
+        let missing = run_path_request(fixture.root.clone(), "missing.pmesh");
+        assert_eq!(missing.kind, OutcomeKind::Failed);
+        assert_eq!(missing.code, "project.asset_missing");
+        assert_eq!(missing.category, "missing");
+        assert!(missing.mesh.is_none());
+
+        for path in ["../outside.pmesh", "/outside.pmesh"] {
+            let invalid = run_path_request(fixture.root.clone(), path);
+            assert_eq!(invalid.kind, OutcomeKind::Failed);
+            assert_eq!(invalid.code, "project.manifest_invalid");
+            assert_eq!(invalid.category, "format");
+            assert!(invalid.mesh.is_none());
+        }
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn worker_rejects_leaf_and_parent_symlinks_that_escape_the_project()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = crate::project::temp_directory::Fixture::new()?;
+        let project_root = fixture.root.join("project");
+        let external_root = fixture.root.join("external");
+        std::fs::create_dir(&project_root)?;
+        std::fs::create_dir(&external_root)?;
+        let external_asset = external_root.join("asset.pmesh");
+        std::fs::write(&external_asset, b"must not be read")?;
+        std::os::unix::fs::symlink(&external_asset, project_root.join("leaf.pmesh"))?;
+        std::os::unix::fs::symlink(&external_root, project_root.join("directory"))?;
+        for path in ["leaf.pmesh", "directory/asset.pmesh"] {
+            let invalid = run_path_request(project_root.clone(), path);
+            assert_eq!(invalid.kind, OutcomeKind::Failed);
+            assert_eq!(invalid.code, "project.manifest_invalid");
+            assert_eq!(invalid.category, "format");
+            assert!(invalid.mesh.is_none());
+        }
+        Ok(())
     }
 
     #[test]
@@ -993,7 +1070,8 @@ mod tests {
     fn duplicate_begin_reuses_in_flight_attempt() {
         let coordinator = Arc::new(ActivationCoordinator::default());
         let request = || ActivationRequest {
-            asset_path: PathBuf::from("unused.stl"),
+            project_root: PathBuf::from("unused-project"),
+            relative_path: "unused.pmesh".to_owned(),
             expected_digest: "sha256:test".to_owned(),
         };
         let first = coordinator
@@ -1018,7 +1096,8 @@ mod tests {
             .begin_with(
                 "import-1",
                 ActivationRequest {
-                    asset_path: PathBuf::from("unused.stl"),
+                    project_root: PathBuf::from("unused-project"),
+                    relative_path: "unused.pmesh".to_owned(),
                     expected_digest: "sha256:test".to_owned(),
                 },
                 |_coordinator, _attempt, _request, _cancel| {
@@ -1074,7 +1153,8 @@ mod tests {
     fn activation_backlog_and_identifiers_are_bounded_and_reclaimed() {
         let coordinator = Arc::new(ActivationCoordinator::default());
         let request = || ActivationRequest {
-            asset_path: PathBuf::from("unused.stl"),
+            project_root: PathBuf::from("unused-project"),
+            relative_path: "unused.pmesh".to_owned(),
             expected_digest: "sha256:test".into(),
         };
         for id in 0..OUTCOME_CAPACITY {
@@ -1120,7 +1200,8 @@ mod tests {
             .begin_with(
                 "queued",
                 ActivationRequest {
-                    asset_path: PathBuf::from("unused.stl"),
+                    project_root: PathBuf::from("unused-project"),
+                    relative_path: "unused.pmesh".to_owned(),
                     expected_digest: "sha256:test".into(),
                 },
                 move |_, _, _, token| {

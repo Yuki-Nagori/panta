@@ -49,7 +49,8 @@ class SettingsTest final : public QObject {
                                QUrl());
         std::unique_ptr<QObject> errorObject(errorComponent.create());
         QVERIFY2(errorObject != nullptr, qPrintable(errorComponent.errorString()));
-        QVERIFY(!projectModel.createProject(QStringLiteral("../invalid"), QDir::tempPath()));
+        QVERIFY(projectModel.createProject(QStringLiteral("../invalid"), QDir::tempPath()));
+        QTRY_VERIFY(!projectModel.projectOperationPending());
         QCOMPARE(errorObject->property("errorText").toString(),
                  QStringLiteral("Enter a valid project name."));
 

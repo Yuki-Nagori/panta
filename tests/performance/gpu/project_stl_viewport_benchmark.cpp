@@ -4,6 +4,7 @@
 #include "../support/offscreen_vtk_renderer.hpp"
 #include "panta/visualization/mesh_source.hpp"
 #include "panta/visualization/render_scene.hpp"
+#include "project_operation_helpers.hpp"
 #include "project_view_model.hpp"
 #include <QEventLoop>
 #include <QGuiApplication>
@@ -48,6 +49,8 @@
 #endif
 
 #include <vtk_viewport.hpp>
+
+using panta::test::finish_project_operation;
 
 namespace {
 
@@ -356,7 +359,7 @@ int main(int argc, char* argv[]) try {
     print_memory("viewport_baseline", {resident_bytes(), peak_rss_bytes()}, 0);
     diagnostic_pause.at("viewport_baseline");
 
-    if (!view_model.openProject(arguments[1])) {
+    if (!finish_project_operation(view_model, view_model.openProject(arguments[1]))) {
         return fail("openProject failed: " + view_model.error().toStdString());
     }
     const auto ids = view_model.importedPartIds();

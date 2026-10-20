@@ -5,11 +5,13 @@
 - 依赖：[121 GUI 与 CLI 共享 Rust 命令入口](121-rust-gui-cli-command-layer.md)、[063 STL 导入与工程工作区](063-stl-import-and-mesh-workspace.md)、[067 Rust 统一 STL 解析与 Mesh IR 领域校验](067-rust-mesh-domain-migration.md)、[073 FSM DSL 与导入状态机](073-fsm-dsl-and-import-state-machine.md)、[088 Mesh 资产旁置存储与按需加载](088-mesh-asset-sidecar-storage.md)、[123 Rust CLI 检查 STL](123-rust-cli-stl-inspection.md)
 - 优先级：P2
 - 负责人：维护者
-- 创建 / 更新：2026-10-16 / 2026-10-17
+- 创建 / 更新：2026-10-16 / 2026-10-20
 
 ## 目标与背景
 
 提供脚本化的 STL 工程导入能力，复用 GUI 的导入选项、单位处理、来源记录、资产修订及事务失败回滚。CLI 不直接拼写工程文件或绕过工程服务。
+
+2026-10-20：[127](127-rust-qt-boundary-followup.md) 收敛导入资源提醒策略。`panta-mesh` 提供与实际编码布局一致且溢出饱和的展开字节估算，`panta-import::StlImportPreview` 统一返回 `expanded_mesh_bytes` 与 `large_mesh_warning`；CLI 删除独立公式和阈值，仅展示 Rust 预览结果。严格超过 2 GiB 仅提醒且允许继续，不设上限；该轮实施与验证以 127 为准，下文保留 124 当时的验收记录。
 
 ## 必读
 

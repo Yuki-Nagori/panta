@@ -134,6 +134,8 @@ mod tests {
             StlImportPreview {
                 source_name: "current.stl".into(),
                 triangle_count: 1,
+                expanded_mesh_bytes: 136,
+                large_mesh_warning: false,
                 dimensions: [1.0, 1.0, 0.0],
             },
         )))?;
