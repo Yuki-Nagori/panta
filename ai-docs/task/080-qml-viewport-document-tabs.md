@@ -13,7 +13,7 @@
 
 当前持久资产格式与首次加载的数据源由后续任务 [088](088-mesh-asset-sidecar-storage.md) 更新为工程内 Mesh sidecar；080 定义的页签身份、激活、重排、错误展示及运行期快照生命周期不变。
 
-工作区权威已由 [117](117-rust-project-document-workspace.md) 迁入 Rust `DocumentWorkspace`，包括打开页签、活动选择、加载状态和关闭回退；ViewModel 只投影快照。[127](127-rust-qt-boundary-followup.md) 正在收尾 core 的激活终态编排及大网格后台显示准备：捕获 `Arc<SurfaceMesh>`，后台展开并构造 C++ 显示 DTO，最多一个在途准备，按最新选择及 generation/revision 拒绝迟到结果。Qt / VTK / GPU 对象生命周期保持在原线程，具体实施和验证状态见 127。
+工作区权威已由 [117](117-rust-project-document-workspace.md) 迁入 Rust `DocumentWorkspace`，包括打开页签、活动选择、加载状态和关闭回退；ViewModel 只投影快照。[127](127-rust-qt-boundary-followup.md) 已完成 core 的激活终态编排及大网格后台显示准备：捕获 `Arc<SurfaceMesh>`，后台展开并构造 C++ 显示 DTO，最多一个在途准备，按最新选择及 generation/revision 拒绝迟到结果。Qt / VTK / GPU 对象生命周期保持在原线程，具体实施和验证状态见 127。
 
 首次打开旧导入记录是本功能的异步领域操作：Rust 要按稳定导入 ID 解析工程资产并重建网格，操作可能受文件大小影响；工程切换、关闭待加载页签或快速连续选择还会产生取消和迟到结果。因此它作为 [073](073-fsm-dsl-and-import-state-machine.md) 的首个 FSM 消费者。纯粹激活已就绪页签、改变选中态和关闭非活动页签仍是同步 UI 操作，不经 FSM。
 

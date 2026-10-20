@@ -13,7 +13,7 @@
 
 当前实现把导入后的 `SurfaceMesh` sidecar 作为工程内唯一权威资产，不保留原始 STL 副本。工程保留导入时选中的原始路径、文件名、格式、SHA-256、mtime 和 size 作为追溯诊断快照；来源文件不存在或路径失效不影响重开工程或加载 Mesh。打开页签只按工程内资产 ID/revision 加载 sidecar。当前开发阶段不迁移 schema 1–3；打开旧 schema 时明确拒绝且不修改工程文件，后续若出现实际迁移需求再单独设计。
 
-后续边界收尾见 [127](127-rust-qt-boundary-followup.md)：激活终态由 core 统一校验、提交缓存并更新工作区，FFI 只转换结果；显示准备捕获 `Arc<SurfaceMesh>` 后在后台展开和构造拥有式 C++ DTO，按最新选择及 generation/revision 拒绝迟到结果。展开字节估算复用 `panta-mesh` 实际布局，由 Rust 预览统一返回非阻断的 2 GiB 提醒，GUI / CLI 只展示。该轮实施与验证尚在 127 跟踪，不改变 sidecar 格式或来源快照契约。
+后续边界收尾见 [127](127-rust-qt-boundary-followup.md)：激活终态由 core 统一校验、提交缓存并更新工作区，FFI 只转换结果；显示准备捕获 `Arc<SurfaceMesh>` 后在后台展开和构造拥有式 C++ DTO，按最新选择及 generation/revision 拒绝迟到结果。展开字节估算复用 `panta-mesh` 实际布局，由 Rust 预览统一返回非阻断的 2 GiB 提醒，GUI / CLI 只展示。该轮实施与验收结果见 127，不改变 sidecar 格式或来源快照契约。
 
 当前 Rust `SurfaceMesh` 每个面存三个 `[f64; 3]` 顶点，展开数据为 72 字节 / 面；binary STL 约 50 字节 / 面。Mesh IR 不改变顶点语义，sidecar 在文件层用 Zstandard 压缩 payload，解码按 Mesh 计数流式构造领域对象，不额外分配完整未压缩副本。压缩率依赖实际几何数据，需同时测量文件字节和编解码耗时。
 
