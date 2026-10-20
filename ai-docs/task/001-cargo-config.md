@@ -1,6 +1,6 @@
 # 001 — Cargo workspace 与 Rust 工具链
 
-- 状态：in-progress
+- 状态：done
 - 阶段：M0
 - 依赖：无
 - 优先级：P0
@@ -18,7 +18,7 @@
 - [x] 原始 workspace 成员、默认 launcher、锁文件和 lint 规则落地；骨架 build / test / fmt / Clippy 及干净检出重建通过。
 - [x] Rust 1.99.0 与 rustfmt / Clippy 安装确认；CI 从根工具链文件取 channel，缓存键包含其摘要。
 - [x] Rust 1.99 格式、Clippy、workspace 构建与聚合测试通过；Rust 1.95 core all-targets 编译检查通过。
-- [ ] 本批三平台 PR CI 通过，状态与索引同步。
+- [x] 本批三平台 PR CI 通过，状态与索引同步。
 
 ## 验证记录
 
@@ -29,6 +29,8 @@
 | 2026-10-20，Rust 1.99 | `cargo format --check`、`cargo lint clippy --check`、`cargo build --locked --workspace`、`cargo test-scope all` 均退出 0，Rust package 回归与 native/QML CTest 93/93 通过。初轮 Clippy 报 4 处弃用，迁移后通过；独立 `gpt-6.1-sol` medium 只读评审核对 API / 内存序 / 溢出语义及工具链配置，无可操作发现。 |
 | 2026-10-20，MSRV | `cargo +1.95.0 check --locked -p panta-core --all-targets` 退出 0，仅涵盖 core 及其依赖 / 测试 target。首次因工具链安装不完整失败，rustup 修复后通过；未宣称全 workspace 的 MSRV 实测。 |
 
+实现提交 `e819de0` 的 [CI 39425918094](https://github.com/Yuki-Nagori/panta/actions/runs/39425918094) 15/15 成功，涵盖三平台构建测试及全部触发的质量检查；[PR #71](https://github.com/Yuki-Nagori/panta/pull/71) 文档收尾不改变已验证实现。
+
 ## 决策与清理
 
 - 首次选版同时考虑 edition 与 CXX 的最低版本；本批 `try_update` 的 1.95.0 稳定属性已从本机标准库源码核对，4 处迁移保持原子内存序及溢出拒绝语义；`workspace.package.rust-version` 表示 MSRV，不等同于日常锁定编译器。
@@ -38,4 +40,4 @@
 
 ## 完成摘要
 
-原始骨架已验收。当前工具链升级本地验证通过，CI 通过后恢复 done；本任务不重复后续 native / GUI 功能任务的实施记录。
+原始骨架已验收。本批 Rust 1.99 / MSRV 1.95 升级的本地及三平台 CI 验收通过；本任务不重复后续 native / GUI 功能任务的实施记录。

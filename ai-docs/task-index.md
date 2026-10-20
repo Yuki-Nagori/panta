@@ -48,7 +48,7 @@ ai-docs/
 
 | 编号 | 任务 | 阶段 | 依赖 | 状态 |
 |---|---|---|---|---|
-| 001 | [Cargo workspace 与 Rust 工具链](task/001-cargo-config.md) | M0 | — | in-progress |
+| 001 | [Cargo workspace 与 Rust 工具链](task/001-cargo-config.md) | M0 | — | done |
 | 002 | [平台、工具链与 native 依赖基线](task/002-dependency-baseline.md) | M0 | 001 | done |
 | 003 | [CMake/Ninja 原生构建骨架](task/003-cmake-native-skeleton.md) | M0 | 002 | done |
 | 004 | [Cargo 调度 CMake 与运行入口](task/004-cargo-native-orchestration.md) | M0 | 001, 003 | done |
@@ -138,7 +138,7 @@ ai-docs/
 | 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | done |
 | 125 | [设置服务与 Qt 持久化适配](task/125-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
 | 126 | [OCCT Shape 仓库与 Netgen 复用](task/126-native-shape-repository-and-netgen-reuse.md) | CAE 领域模块迁移 | 009, 010, 066, 067, 119 | done |
-| 127 | [Rust 与 Qt 职责边界收尾](task/127-rust-qt-boundary-followup.md) | Rust 架构整理 | 057, 080, 088, 092, 107, 117, 124 | in-progress |
+| 127 | [Rust 与 Qt 职责边界收尾](task/127-rust-qt-boundary-followup.md) | Rust 架构整理 | 057, 080, 088, 092, 107, 117, 124 | done |
 
 ## 验证与质量扩展队列
 
