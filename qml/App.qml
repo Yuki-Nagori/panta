@@ -4,11 +4,14 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import Panta.Bridge
+import Panta.Shell as Shell
 
 ApplicationWindow {
     id: shellWindow
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
+    width: Theme.windowMinimumWidth
+    height: Theme.windowMinimumHeight
     // Linux XCB 会把空标题替换为应用名；零宽字符让窗口管理器保留原生标题栏按钮，
     // 同时不显示文字。应用显示名在 Linux 入口中显式留空，避免 QPA 追加名称。
     title: Qt.platform.os === "linux" ? "\u200B" : ""
@@ -19,20 +22,53 @@ ApplicationWindow {
     leftPadding: 0
     rightPadding: 0
     visible: true
-    visibility: Window.Maximized
+    property int lastWindowedWidth: Settings.windowWidth
+    property int lastWindowedHeight: Settings.windowHeight
+    property bool lastRestorableMaximized: Settings.windowMaximized
     color: Theme.colorPanel
     onClosing: event => {
         if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
             event.accepted = false;
+        else
+            Settings.saveWindowState(Qt.size(lastWindowedWidth, lastWindowedHeight), lastRestorableMaximized);
+    }
+    onVisibilityChanged: {
+        if (visibility === Window.Maximized)
+            lastRestorableMaximized = true;
+        else if (visibility === Window.Windowed)
+            lastRestorableMaximized = false;
+    }
+    onWidthChanged: {
+        if (visibility === Window.Windowed)
+            lastWindowedWidth = width;
+    }
+    onHeightChanged: {
+        if (visibility === Window.Windowed)
+            lastWindowedHeight = height;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property real nativeControlsLeftInset: WindowChromeMetrics.leadingSystemControlsInset
     readonly property bool layersDockShown: layersPanel.dockOpen
-    readonly property string statusMessage: projectModel.error
+    readonly property string statusMessage: projectModel.error.length > 0 ? projectModel.error : Settings.settingsError.length > 0 ? qsTranslate("App", "Some application preferences could not be applied. (%1)").arg(Settings.settingsError.split(":")[0]) : ""
     // 展示状态独立于工程快照，浏览开始页不卸载工程或视口。
     property string activeRibbonTab: "start-learn"
 
-    Component.onCompleted: WindowChromeMetrics.observeWindow(shellWindow)
+    Component.onCompleted: {
+        // 只在启动时读取一次；后续偏好快照变更不能通过 QML binding 改写用户正在调整的窗口。
+        shellWindow.width = Settings.windowWidth;
+        shellWindow.height = Settings.windowHeight;
+        shellWindow.visibility = Settings.windowMaximized ? Window.Maximized : Window.Windowed;
+        WindowChromeMetrics.observeWindow(shellWindow);
+        Shell.ThemeViewModel.selectTheme(Settings.themeId);
+    }
+
+    Connections {
+        target: Shell.ThemeViewModel
+        function onActiveThemeChanged() {
+            if (!Settings.setThemeId(Shell.ThemeViewModel.activeTheme))
+                Shell.ThemeViewModel.selectTheme(Settings.themeId);
+        }
+    }
 
     function selectRibbonTab(tab) {
         // 工程工具仅在打开工程后可达，开始页始终可达。
@@ -44,8 +80,14 @@ ApplicationWindow {
         id: projectModel
         objectName: "projectModel"
         // 仅成功创建 / 打开时导航；改名、保存和失败不打断当前页签。
-        onProjectCreated: shellWindow.selectRibbonTab("home")
-        onProjectOpened: shellWindow.selectRibbonTab("home")
+        onProjectCreated: path => {
+            Settings.recordRecentProject(path);
+            shellWindow.selectRibbonTab("home");
+        }
+        onProjectOpened: path => {
+            Settings.recordRecentProject(path);
+            shellWindow.selectRibbonTab("home");
+        }
         onProjectImported: layersPanel.dockOpen = true
         onGateLocationSettingsConfirmationFinished: succeeded => {
             if (succeeded)

@@ -1,6 +1,6 @@
 # 注释与接口文档规范
 
-更新 / 查阅日期：2026-09-16。适用于所有自有代码；下面区分工具机制与项目规则，文档生成工具尚未配置。
+更新 / 查阅日期：2026-10-21。适用于所有自有代码；下面区分工具机制与项目规则，文档生成工具尚未配置。
 
 ## 官方依据
 
@@ -27,6 +27,9 @@ Python docstring 是对象定义中的首个字符串语句；PEP 257 区分摘�
 `#include` 列表由 `.clang-format` 与 `.clang-tidy` 的包含规则统一生成与维护（任务 010）：
 - 排序采用 Regroup 分类块——主头/契约头（优先级 0）独立成块置顶，其余（优先级 1）
   单块字母序；不手工维护块内顺序，也不添加规则外的分组空行。
+- include-cleaner 的 provider 诊断用于定位直接依赖，不代表自动修复后无需验证：区分
+  声明函数所需的头文件与调用成员函数/实例化对象所需的完整类型头；两者都直接使用时
+  保留两者，并重新编译受影响 target。不要为单文件误报扩大 `IgnoreHeaders` 或加 NOLINT。
 - 提供"编译前提副作用"的第三方契约头（如 netgen 的 mystdlib.h 提供
   `using namespace std`）必须登记进 `.clang-tidy` 的
   `misc-include-cleaner.IgnoreHeaders`，禁止用 NOLINT 或 clang-format off

@@ -1,22 +1,27 @@
 #include "settings.hpp"
 
 #include "panta_ffi.h"
-#include "rust/cxx.h"
 #include <QByteArray>
+#include <QDebug>
 #include <QLatin1Char>
+#include <QObject>
 #include <QQmlEngine>
+#include <QSettings>
+#include <QSize>
 #include <QString>
-#include <QStringList>
+#include <QtCore/qlogging.h>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
-#include <optional>
 #include <panta/qt_adapter/system_motion_preference.hpp>
 #include <panta/qt_adapter/translation_catalog.hpp>
+#include <panta/qt_adapter/user_settings_store.hpp>
 #include <qcontainerfwd.h>
-#include <qobject.h>
 #include <qqml.h>
 #include <qtmetamacros.h>
+#include <rust/cxx.h>
 #include <string>
+#include <utility>
 
 namespace panta::bridge {
 
@@ -37,127 +42,168 @@ bool activateTranslation(panta::qt_adapter::TranslationCatalog& translation, con
     return translation.install(catalogResourcePath(locale), error);
 }
 
+QString fromRustString(const rust::String& value) {
+    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+}
+
+bool toRustString(const QString& value, std::string* result, QString* error) {
+    const QByteArray encoded = value.toUtf8();
+    if (QString::fromUtf8(encoded) != value) {
+        *error = QStringLiteral("settings.invalid_utf8");
+        return false;
+    }
+    *result = std::string(encoded.constData(), static_cast<std::size_t>(encoded.size()));
+    return true;
+}
+
 } // namespace
 
-/// 只转换 QString/CXX 字符串并调用 Rust locale 服务；不持有 Qt 翻译目录。
-class LanguageServiceClient final {
-  public:
-    LanguageServiceClient() : m_service(panta::ffi::language_service_new()) {}
+Settings::Settings(QObject* parent) : Settings(QString{}, parent) {}
 
-    [[nodiscard]] QString language() const {
-        return QString::fromUtf8(panta::ffi::language_service_current(*m_service));
-    }
-
-    [[nodiscard]] QStringList availableLanguages() const {
-        QStringList locales;
-        const auto supported = panta::ffi::language_service_supported_locales();
-        locales.reserve(static_cast<qsizetype>(supported.size()));
-        for (const auto& locale : supported) {
-            locales.push_back(QString::fromUtf8(locale));
-        }
-        return locales;
-    }
-
-    [[nodiscard]] std::optional<QString> validate(const QString& candidate, QString* error) const {
-        std::string utf8;
-        if (!toUtf8(candidate, &utf8, error)) {
-            return std::nullopt;
-        }
-        try {
-            return QString::fromUtf8(panta::ffi::language_service_validate(*m_service, utf8));
-        } catch (const rust::Error& failure) {
-            *error = QString::fromUtf8(failure.what());
-            return std::nullopt;
-        }
-    }
-
-    [[nodiscard]] bool commit(const QString& candidate, QString* error) {
-        std::string utf8;
-        if (!toUtf8(candidate, &utf8, error)) {
-            return false;
-        }
-        try {
-            const auto committed =
-                QString::fromUtf8(panta::ffi::language_service_commit(*m_service, utf8));
-            if (committed == candidate) {
-                return true;
-            }
-            *error = QStringLiteral("language.commit_mismatch");
-            return false;
-        } catch (const rust::Error& failure) {
-            *error = QString::fromUtf8(failure.what());
-            return false;
-        }
-    }
-
-  private:
-    [[nodiscard]] static bool toUtf8(const QString& value, std::string* utf8, QString* error) {
-        const QByteArray encoded = value.toUtf8();
-        if (QString::fromUtf8(encoded) != value) {
-            *error = QStringLiteral("language.invalid_locale_encoding");
-            return false;
-        }
-        *utf8 = std::string(encoded.constData(), static_cast<std::size_t>(encoded.size()));
-        return true;
-    }
-
-    rust::Box<panta::ffi::LanguageService> m_service;
-};
-
-Settings::Settings(QObject* parent)
+Settings::Settings(QString settingsFileName, QObject* parent)
     : QObject(parent), m_preference(std::make_unique<panta::qt_adapter::SystemMotionPreference>()),
       m_translation(std::make_unique<panta::qt_adapter::TranslationCatalog>()),
-      m_languageService(std::make_unique<LanguageServiceClient>()) {
+      m_store(settingsFileName.isEmpty() ? std::make_unique<panta::qt_adapter::UserSettingsStore>()
+                                         : std::make_unique<panta::qt_adapter::UserSettingsStore>(
+                                               std::move(settingsFileName), QSettings::IniFormat)),
+      m_service(panta::ffi::settings_service_new()) {
     connect(m_preference.get(), &panta::qt_adapter::SystemMotionPreference::reducedMotionChanged,
             this, &Settings::reducedMotionChanged);
+    static_cast<void>(loadStoredSettings());
 }
 
 Settings::~Settings() = default;
 
 bool Settings::reducedMotion() const { return m_preference->reducedMotion(); }
 
-QString Settings::language() const { return m_languageService->language(); }
+QString Settings::language() const {
+    return fromRustString(panta::ffi::settings_service_current(*m_service).language);
+}
 
-QStringList Settings::availableLanguages() const { return m_languageService->availableLanguages(); }
+QStringList Settings::availableLanguages() const {
+    QStringList locales;
+    const auto supported = panta::ffi::settings_service_supported_languages();
+    locales.reserve(static_cast<qsizetype>(supported.size()));
+    for (const auto& locale : supported) {
+        locales.push_back(fromRustString(locale));
+    }
+    return locales;
+}
 
-QString Settings::languageError() const { return m_languageError; }
+QString Settings::settingsError() const { return m_settingsError; }
+
+QString Settings::themeId() const {
+    return fromRustString(panta::ffi::settings_service_current(*m_service).theme_id);
+}
+
+int Settings::windowWidth() const {
+    return static_cast<int>(panta::ffi::settings_service_current(*m_service).window_width);
+}
+
+int Settings::windowHeight() const {
+    return static_cast<int>(panta::ffi::settings_service_current(*m_service).window_height);
+}
+
+bool Settings::windowMaximized() const {
+    return panta::ffi::settings_service_current(*m_service).window_maximized;
+}
+
+QStringList Settings::recentProjectPaths() const {
+    QStringList paths;
+    const auto snapshot = panta::ffi::settings_service_current(*m_service);
+    paths.reserve(static_cast<qsizetype>(snapshot.recent_project_paths.size()));
+    for (const auto& path : snapshot.recent_project_paths) {
+        paths.push_back(fromRustString(path));
+    }
+    return paths;
+}
 
 bool Settings::setLanguage(const QString& locale) {
+    auto candidate = currentSnapshot();
+    std::string encoded;
     QString error;
-    const auto candidate = m_languageService->validate(locale, &error);
-    if (!candidate.has_value()) {
-        setLanguageError(error);
+    if (!toRustString(locale, &encoded, &error)) {
+        setSettingsError(error);
         return false;
     }
-    const QString previous = language();
-    if (*candidate == previous) {
-        setLanguageError({});
-        return true;
-    }
+    candidate.language = rust::String(encoded);
 
-    if (!activateTranslation(*m_translation, *candidate, &error)) {
-        setLanguageError(error);
+    panta::ffi::UserSettingsSnapshot validated;
+    try {
+        validated = panta::ffi::settings_service_validate(*m_service, candidate);
+    } catch (const rust::Error& failure) {
+        setSettingsError(QString::fromUtf8(failure.what()));
         return false;
     }
-
-    if (!m_languageService->commit(*candidate, &error)) {
-        QString stateRollbackError;
-        if (!m_languageService->commit(previous, &stateRollbackError)) {
-            error = QStringLiteral("language.state_rollback_failed: %1").arg(stateRollbackError);
-        }
-        QString translationRollbackError;
-        if (!activateTranslation(*m_translation, previous, &translationRollbackError)) {
-            error = QStringLiteral("language.rollback_failed: %1").arg(translationRollbackError);
+    const QString nextLocale = fromRustString(validated.language);
+    const QString previousLocale = language();
+    if (nextLocale == previousLocale) {
+        return m_settingsError.isEmpty();
+    }
+    if (!activateTranslation(*m_translation, nextLocale, &error)) {
+        setSettingsError(error);
+        return false;
+    }
+    if (!commitCandidate(validated)) {
+        QString rollbackError;
+        if (!activateTranslation(*m_translation, previousLocale, &rollbackError)) {
+            setSettingsError(
+                QStringLiteral("settings.translation_rollback_failed: %1").arg(rollbackError));
         }
         retranslate();
-        setLanguageError(error);
         return false;
     }
-
-    setLanguageError({});
     emit languageChanged();
     retranslate();
     return true;
+}
+
+bool Settings::setThemeId(const QString& id) {
+    auto candidate = currentSnapshot();
+    std::string encoded;
+    QString error;
+    if (!toRustString(id, &encoded, &error)) {
+        setSettingsError(error);
+        return false;
+    }
+    candidate.theme_id = rust::String(encoded);
+    return commitCandidate(candidate);
+}
+
+bool Settings::saveWindowState(const QSize& size, bool maximized) {
+    auto candidate = currentSnapshot();
+    candidate.window_width = size.width() < 0 ? 0U : static_cast<std::uint32_t>(size.width());
+    candidate.window_height = size.height() < 0 ? 0U : static_cast<std::uint32_t>(size.height());
+    candidate.window_maximized = maximized;
+    return commitCandidate(candidate);
+}
+
+bool Settings::recordRecentProject(const QString& path) {
+    std::string encoded;
+    QString error;
+    if (!toRustString(path, &encoded, &error)) {
+        setSettingsError(error);
+        return false;
+    }
+    try {
+        const auto candidate = panta::ffi::settings_service_candidate_recent_project(
+            *m_service, rust::String(encoded));
+        return commitCandidate(candidate);
+    } catch (const rust::Error& failure) {
+        setSettingsError(QString::fromUtf8(failure.what()));
+        return false;
+    }
+}
+
+void Settings::setSettingsError(const QString& error) {
+    if (m_settingsError == error) {
+        return;
+    }
+    m_settingsError = error;
+    if (!error.isEmpty()) {
+        qWarning().noquote() << "Application settings:" << error;
+    }
+    emit settingsErrorChanged();
 }
 
 void Settings::retranslate() {
@@ -166,12 +212,121 @@ void Settings::retranslate() {
     }
 }
 
-void Settings::setLanguageError(const QString& error) {
-    if (m_languageError == error) {
-        return;
+panta::ffi::UserSettingsSnapshot Settings::currentSnapshot() const {
+    return panta::ffi::settings_service_current(*m_service);
+}
+
+bool Settings::commitCandidate(const panta::ffi::UserSettingsSnapshot& candidate) {
+    panta::ffi::UserSettingsSnapshot validated;
+    try {
+        validated = panta::ffi::settings_service_validate(*m_service, candidate);
+    } catch (const rust::Error& failure) {
+        setSettingsError(QString::fromUtf8(failure.what()));
+        return false;
     }
-    m_languageError = error;
-    emit languageErrorChanged();
+    if (!m_persistenceAvailable) {
+        if (m_settingsError.isEmpty()) {
+            setSettingsError(QStringLiteral("settings.persistence_disabled"));
+        }
+        return false;
+    }
+    if (validated == currentSnapshot()) {
+        return m_settingsError.isEmpty();
+    }
+
+    QString error;
+    if (!m_store->save(toRecord(validated), &error)) {
+        setSettingsError(error);
+        return false;
+    }
+    try {
+        panta::ffi::settings_service_commit(*m_service, validated);
+    } catch (const rust::Error& failure) {
+        setSettingsError(QString::fromUtf8(failure.what()));
+        return false;
+    }
+
+    setSettingsError({});
+    emit preferencesChanged();
+    return true;
+}
+
+bool Settings::loadStoredSettings() {
+    panta::qt_adapter::UserSettingsRecord record;
+    bool found = false;
+    QString error;
+    if (!m_store->load(&record, &found, &error)) {
+        m_persistenceAvailable = false;
+        setSettingsError(error);
+        return false;
+    }
+    if (!found) {
+        return true;
+    }
+
+    try {
+        panta::ffi::UserSettingsSnapshot stored;
+        if (!fromRecord(record, &stored, &error)) {
+            m_persistenceAvailable = false;
+            setSettingsError(error);
+            return false;
+        }
+        const auto candidate = panta::ffi::settings_service_validate(*m_service, stored);
+        const QString storedLocale = fromRustString(candidate.language);
+        if (!activateTranslation(*m_translation, storedLocale, &error)) {
+            m_persistenceAvailable = false;
+            setSettingsError(error);
+            return false;
+        }
+        panta::ffi::settings_service_commit(*m_service, candidate);
+    } catch (const rust::Error& failure) {
+        m_persistenceAvailable = false;
+        setSettingsError(QString::fromUtf8(failure.what()));
+        return false;
+    }
+    return true;
+}
+
+panta::qt_adapter::UserSettingsRecord
+Settings::toRecord(const panta::ffi::UserSettingsSnapshot& snapshot) {
+    panta::qt_adapter::UserSettingsRecord record;
+    record.schemaVersion = snapshot.schema_version;
+    record.themeId = fromRustString(snapshot.theme_id);
+    record.language = fromRustString(snapshot.language);
+    record.windowWidth = snapshot.window_width;
+    record.windowHeight = snapshot.window_height;
+    record.windowMaximized = snapshot.window_maximized;
+    for (const auto& path : snapshot.recent_project_paths) {
+        record.recentProjectPaths.push_back(fromRustString(path));
+    }
+    return record;
+}
+
+bool Settings::fromRecord(const panta::qt_adapter::UserSettingsRecord& record,
+                          panta::ffi::UserSettingsSnapshot* snapshot, QString* error) {
+    if (snapshot == nullptr || error == nullptr) {
+        return false;
+    }
+    std::string themeId;
+    std::string language;
+    if (!toRustString(record.themeId, &themeId, error) ||
+        !toRustString(record.language, &language, error)) {
+        return false;
+    }
+    snapshot->schema_version = record.schemaVersion;
+    snapshot->theme_id = rust::String(themeId);
+    snapshot->language = rust::String(language);
+    snapshot->window_width = record.windowWidth;
+    snapshot->window_height = record.windowHeight;
+    snapshot->window_maximized = record.windowMaximized;
+    for (const auto& path : record.recentProjectPaths) {
+        std::string encoded;
+        if (!toRustString(path, &encoded, error)) {
+            return false;
+        }
+        snapshot->recent_project_paths.push_back(rust::String(encoded));
+    }
+    return true;
 }
 
 } // namespace panta::bridge

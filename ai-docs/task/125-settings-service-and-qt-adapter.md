@@ -1,6 +1,6 @@
 # 125 — 设置服务与 Qt 持久化适配
 
-- 状态：planned
+- 状态：implemented
 - 阶段：应用平台扩展
 - 依赖：[006](006-rust-cpp-boundary.md)、[023](023-cross-platform-paths.md)、[030](030-theme-dsl.md)
 - 优先级：P1
@@ -34,9 +34,10 @@ Rust core、每帧视口状态持久化、无依据的旧版本自动迁移。
 ## 前置条件与待决策
 
 - 030 需要冻结主题 ID、`.pa` 基线/覆盖合并和 ThemeViewModel 输入快照。
-- 需要决定设置 key 的命名空间、版本升级策略及 QSettings 的 NativeFormat/IniFormat
-  选择；未验证前不把平台文件路径写入公共契约。
-- 需要定义哪些设置属于用户偏好，哪些属于工程模型或临时会话状态。
+- 已冻结 schema v1：QSettings NativeFormat，`preferences/snapshot` 保存整个 JSON 快照为单一值；测试通过注入 IniFormat 文件。单值写入避免多字段在 Windows 注册表后端形成非事务更新。
+- 持久化主题 ID、语言、窗口逻辑宽高与最大化状态、最近 10 个工程路径。窗口不保存屏幕坐标，工程内容与视口会话状态不进入用户偏好。
+- 默认值为 `light`、`en`、1280×720、最大化、空最近列表；窗口尺寸范围为 1280..16384 × 720..16384；当前主题 ID 必须是内置 `light` 或 `dark`。
+- 不支持未知 schema 版本或损坏/多余字段：回退内存默认值，显示稳定诊断，并禁用本次运行中的持久化，避免覆盖原文件。无旧格式迁移。
 
 ## 实施步骤
 
@@ -46,7 +47,7 @@ Rust core、每帧视口状态持久化、无依据的旧版本自动迁移。
 3. 复用 030 提供的 `qml/Themes/*.pa` 资源与 `ThemeViewModel`；本任务只将选中的
    主题 ID 持久化到 QSettings，并在启动时恢复选择，不重复加载或实现主题解析。
    读取损坏或缺失的主题 ID 时回退到默认主题并报告诊断。
-4. 覆盖三平台启动恢复、写入失败保留上一份有效值、版本拒绝和 QML 绑定更新。
+4. 覆盖启动恢复、写入失败保留上一份有效值、版本拒绝和 QML 绑定更新；平台存储行为由 QSettings NativeFormat 负责，整份快照只写入单个值。
 
 ## 预计改动
 
@@ -62,17 +63,19 @@ Rust core、每帧视口状态持久化、无依据的旧版本自动迁移。
 
 ## 验收标准
 
-- [ ] `panta-core`/Rust 设置逻辑无 Qt 依赖，QSettings 只存在 C++ adapter。
-- [ ] 主题 ID、窗口状态和最近路径可跨三端保存/恢复；工程数据不混入用户偏好。
-- [ ] 未知版本、非法值、读写失败均有稳定诊断，并保留上一份有效状态。
-- [ ] QML 只经 ViewModel 读写，主题切换不重建 QML engine，不产生工程 dirty。
-- [ ] 代码、测试、文档、task 和索引一致；无未登记兼容分支。
+- [x] `panta-core`/Rust 设置逻辑无 Qt 依赖，QSettings 只存在 C++ adapter。
+- [x] 设置快照含主题 ID、语言、窗口状态和最近路径；工程数据不混入用户偏好。
+- [x] 未知版本、非法值、读写失败均有稳定诊断，并保留上一份有效状态。
+- [x] QML 通过设置服务恢复/提交偏好；语言切换保留现有 engine 并触发翻译更新。
+- [x] 代码、测试、文档、task 和索引一致；无未登记兼容分支。
+- [ ] Windows/Linux 原生窗口恢复仍待对应桌面实机验收；NativeFormat 存储由三平台 CI 的隔离跨进程测试覆盖。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| — | 待实施 | 三平台设置读写与失败矩阵 | 未执行 |
+| 2026-10-21 | macOS 本机；`cargo verify-changed`、`cargo format --changed`、NativeFormat CTest | 设置代码、适用质量检查和 NativeFormat 跨进程往返通过 | format、lint、Rust 测试及其余 90 个 CTest 通过；NativeFormat CTest 在受限沙箱中无法写用户偏好目录，获准沙箱外重跑后 1/1 通过。真实窗口恢复仍待实机验收 |
+| 2026-10-21 | PR #82（提交 `a11ef43`）CI：macOS、Ubuntu、Windows | 三平台构建、适用 lint，以及隔离 NativeFormat 跨进程往返通过 | 所有 CI 检查通过；三平台 NativeFormat 用例通过。CI 不覆盖真实窗口恢复 |
 
 ## 风险与回退
 
@@ -85,8 +88,15 @@ QSettings 的平台路径、格式和同步时机可能不同；adapter 只暴�
 - 2026-09-20：确认 QSettings 属于 Qt 平台存取层，Rust 负责 schema/校验/业务设置，
   不把 Qt 依赖倒灌到 `panta-core`；主题定义与主题选择分别由 `.pa` 和设置服务管理。
 - 2026-10-17：因任务索引中编号 048 已用于性能测试体系，本任务改用新编号 125。应用菜单入口由 115 提供；具体设置页面由消费任务提供，语言设置 UI（087）通过该入口访问设置服务。
+- 2026-10-21：确定首版使用 QSettings NativeFormat，并仅保存用户偏好快照；设置 schema 为 v1，不实现迁移。窗口只恢复逻辑尺寸与最大化状态；屏幕位置由后续多屏任务处理。无效或未知设置不覆盖原存储。
 - 2026-10-17：独立只读评审确认 125 → 115 → 087 依赖无环、任务职责和文档链接一致；保留 125 对 planned 030、115 对 deferred 051 的既有前置条件。
+- 2026-10-21：单值 JSON 快照避免 Windows 注册表后端多 key 更新的非事务状态；跨进程测试覆盖空、单项和多项最近工程路径。include-cleaner 规则补充声明头/完整类型头的区分及自动修复后的编译验证，不新增全局忽略项。
+- 2026-10-21：首轮独立只读 final review 未发现阻塞问题；当时尚未覆盖 Windows/Linux NativeFormat，故增加下方隔离原生存储测试。真实窗口恢复和断电持久性仍不由该测试覆盖。
+- 2026-10-21：PR #82 原有 CI 检查通过；按任务状态规则转为 `implemented`。新增隔离 NativeFormat 跨进程用例后，三平台 CI 需重新验证；真实窗口恢复仍待 Windows/Linux 实机验收，不阻塞依赖任务。
+- 2026-10-21：增加隔离组织/应用标识的 `NativeFormat` 跨进程往返用例；各平台 CI 分别走系统原生 QSettings 后端（Windows 注册表、macOS 原生偏好设置、Linux NativeFormat），真实窗口恢复仍需实机验收。
+- 2026-10-21：本机完整受影响验证中，NativeFormat 用例受沙箱对 `~/Library/Preferences` 的写入限制；在授权沙箱外环境运行对应 CTest 后通过，隔离设置域由测试清理器回收。
+- 2026-10-21：独立只读评审未发现新增 NativeFormat 测试问题；PR #82 的 macOS、Ubuntu、Windows 构建、受影响测试及适用 lint 全部通过，NativeFormat 跨进程用例在三平台 CI 验收通过。
 
 ## 完成摘要
 
-未完成。
+设置服务、持久化适配及三平台 NativeFormat 存储验证已完成。真实窗口恢复仍待 Windows/Linux 桌面实机验收，不阻塞依赖任务。
