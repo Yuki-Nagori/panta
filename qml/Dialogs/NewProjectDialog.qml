@@ -10,6 +10,7 @@ DialogWindow {
 
     required property ProjectViewModel projectModel
     property bool submitting: false
+    escapeEnabled: !submitting
     signal projectCreated(string path)
 
     width: Theme.newProjectDialogWidth
@@ -32,9 +33,7 @@ DialogWindow {
         if (projectModel.projectOperationPending)
             return;
         resetFields();
-        centerOnOwner();
-        visible = true;
-        requestActivate();
+        present();
         projectNameField.forceActiveFocus();
     }
 
@@ -222,11 +221,5 @@ DialogWindow {
                 dialog.projectModel.clearError();
             }
         }
-    }
-
-    Shortcut {
-        enabled: dialog.visible && !dialog.submitting
-        sequence: "Esc"
-        onActivated: dialog.close()
     }
 }

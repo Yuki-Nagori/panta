@@ -267,6 +267,10 @@ cancel:
   src: Cancel
   tr: Cancel
 
+settings:
+  src: Settings
+  tr: Settings
+
 [ImportTask]
 mesh-type:
   src: Mesh (%1)
@@ -316,6 +320,10 @@ filter:
   tr: Panta project files (*.panta)
 
 [TopChromePanel]
+application-menu:
+  src: Application menu
+  tr: Application menu
+
 sign-in:
   src: Sign in
   tr: Sign in
@@ -1751,3 +1759,178 @@ entry-45:
 model-display:
   src: Model Display
   tr: Model Display
+
+[ApplicationMenu]
+panta:
+  src: panta
+  tr: panta
+
+file:
+  src: File
+  tr: File
+
+edit:
+  src: Edit
+  tr: Edit
+
+window:
+  src: Window
+  tr: Window
+
+about-panta:
+  src: About panta
+  tr: About panta
+
+settings:
+  src: Settings…
+  tr: Settings…
+
+quit-panta:
+  src: Quit panta
+  tr: Quit panta
+
+new-project:
+  src: New Project…
+  tr: New Project…
+
+open-project:
+  src: Open Project…
+  tr: Open Project…
+
+save:
+  src: Save
+  tr: Save
+
+close:
+  src: Close
+  tr: Close
+
+minimize:
+  src: Minimize
+  tr: Minimize
+
+zoom:
+  src: Zoom
+  tr: Zoom
+
+undo:
+  src: Undo
+  tr: Undo
+
+redo:
+  src: Redo
+  tr: Redo
+
+cut:
+  src: Cut
+  tr: Cut
+
+copy:
+  src: Copy
+  tr: Copy
+
+paste:
+  src: Paste
+  tr: Paste
+
+select-all:
+  src: Select All
+  tr: Select All
+
+[ApplicationBackstage]
+close-application-menu:
+  src: Close application menu
+  tr: Close application menu
+
+save:
+  src: Save
+  tr: Save
+
+close:
+  src: Close
+  tr: Close
+
+new:
+  src: New
+  tr: New
+
+open:
+  src: Open
+  tr: Open
+
+export:
+  src: Export
+  tr: Export
+
+publish:
+  src: Publish
+  tr: Publish
+
+print:
+  src: Print
+  tr: Print
+
+project:
+  src: Project
+  tr: Project
+
+study-properties:
+  src: Study Properties
+  tr: Study Properties
+
+search-recent-projects:
+  src: Search recent projects
+  tr: Search recent projects
+
+recent-projects:
+  src: Recent Projects
+  tr: Recent Projects
+
+sort-by:
+  src: Sort by
+  tr: Sort by
+
+last-opened:
+  src: Last opened
+  tr: Last opened
+
+name:
+  src: Name
+  tr: Name
+
+projects-empty:
+  src: Projects you open will appear here.
+  tr: Projects you open will appear here.
+
+exit-panta:
+  src: Exit panta
+  tr: Exit panta
+
+[SettingsDialog]
+settings:
+  src: Settings
+  tr: Settings
+
+general:
+  src: General
+  tr: General
+
+appearance:
+  src: Appearance
+  tr: Appearance
+
+language:
+  src: Language
+  tr: Language
+
+preferences:
+  src: Preferences
+  tr: Preferences
+
+preferences-description:
+  src: Common application preferences are managed here.
+  tr: Common application preferences are managed here.
+
+registered-pages-description:
+  src: Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.
+  tr: Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.

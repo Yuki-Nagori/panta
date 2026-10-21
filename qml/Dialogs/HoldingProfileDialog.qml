@@ -51,9 +51,7 @@ DialogWindow {
             });
         editRevision++;
         plotVisible = false;
-        centerOnOwner();
-        show();
-        requestActivate();
+        present();
         table.forceActiveFocus();
     }
     function acceptProfile() {
@@ -343,10 +341,5 @@ DialogWindow {
                 }
             }
         }
-    }
-    Shortcut {
-        sequence: "Esc"
-        enabled: dialog.visible
-        onActivated: dialog.close()
     }
 }

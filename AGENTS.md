@@ -18,6 +18,7 @@
 ## 任务与代码约束
 
 - 实施前创建或更新 `ai-docs/task/NNN-name.md` 并登记 `ai-docs/task-index.md`。任务元数据使用无序列表，每个任务保持一个文件。CI 修复等小范围工作更新所属任务的范围与验证记录，不另建任务。验收后记录实际验证结果并同步任务状态和索引。
+- 新增或明显调整可见 QML 页面、工具栏、菜单、弹窗或交互布局时，先在 `prototypes/shell/` 创建或更新 HTML 原型，检查渲染与主要交互，并请用户确认后再迁移 QML。纯逻辑修改或不影响可见行为的修复可跳过，任务记录说明原因；原型与迁移范围登记在同一 task，目录约定见 [原型工作流](prototypes/shell/README.md)。
 - 代码注释遵循[注释规范](ai-docs/standards/comments.md)，新增文件遵循[仓库文件规范](ai-docs/standards/repository-hygiene.md)，验证要求见[验证与评审](ai-docs/standards/validation-and-review.md)。
 - 不保留死代码或废弃实现；替换时同步清理，默认不写前向或后向兼容代码。确需例外时用 `COMPAT(...)` 标记并登记清理任务，见[代码生命周期](ai-docs/standards/code-lifecycle.md)。
 - 每次提交需让功能、测试、配置、文档和任务记录保持一致，并遵循[提交规范](ai-docs/standards/commits.md)。不把已知损坏状态留给后续提交修复。

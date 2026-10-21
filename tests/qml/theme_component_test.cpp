@@ -386,6 +386,11 @@ class ThemeAtomTest final : public QObject {
                         tool_button_forwards_icon_mode = true;
                     } else if (expression == QStringLiteral("projectEntry.iconName")) {
                         QCOMPARE(mode, QStringLiteral("true"));
+                    } else if (expression == QStringLiteral("command.iconName")) {
+                        QCOMPARE(mode, QStringLiteral("command.preserveIconColors"));
+                    } else if (expression == QStringLiteral("pageDelegate.modelData.iconName")) {
+                        QCOMPARE(mode, QStringLiteral(
+                                           "pageDelegate.modelData.preserveSourceColors ?? false"));
                     } else {
                         QFAIL(qPrintable(
                             path + QStringLiteral(": unrecognized dynamic ThemedIcon name: ") +

@@ -1,4 +1,6 @@
 // Shell 页面装配；页面持有 ViewModel 和对话框，面板只发语义命令信号。
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
@@ -25,6 +27,7 @@ ApplicationWindow {
     property int lastWindowedWidth: Settings.windowWidth
     property int lastWindowedHeight: Settings.windowHeight
     property bool lastRestorableMaximized: Settings.windowMaximized
+    property alias settingsRouter: settingsPageRouter
     color: Theme.colorPanel
     onClosing: event => {
         if (projectModel.materialConfirmationPending || projectModel.fillSettingsConfirmationPending || projectModel.gateLocationSettingsConfirmationPending)
@@ -45,6 +48,26 @@ ApplicationWindow {
     onHeightChanged: function (height) {
         if (shellWindow.visibility === Window.Windowed)
             lastWindowedHeight = height;
+    }
+
+    menuBar: Qt.platform.os === "osx" ? platformMenuBar : null
+
+    PlatformMenuBar {
+        id: platformMenuBar
+        objectName: "platformApplicationMenuBar"
+        visible: Qt.platform.os === "osx"
+        hostWindow: shellWindow
+        projectCommandsEnabled: true
+        onSettingsRequested: settingsPageRouter.openPage("general")
+        onQuitRequested: shellWindow.close()
+        onNewProjectRequested: newProjectDialog.open()
+        onOpenProjectRequested: openProjectFileDialog.open()
+    }
+
+    SettingsPageRouter {
+        id: settingsPageRouter
+        objectName: "settingsPageRouter"
+        ownerWindow: shellWindow
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property real nativeControlsLeftInset: WindowChromeMetrics.leadingSystemControlsInset
@@ -197,7 +220,13 @@ ApplicationWindow {
             nativeControlsLeftInset: shellWindow.nativeControlsLeftInset
             nativeControlsRightInset: WindowChromeMetrics.trailingSystemControlsInset
             hostWindow: shellWindow
+            recentProjects: Settings.recentProjectPaths
             onMenuRequested: key => shellWindow.selectRibbonTab(key)
+            onNewProjectRequested: newProjectDialog.open()
+            onOpenProjectRequested: openProjectFileDialog.open()
+            onRecentProjectRequested: path => projectModel.openProject(path)
+            onSettingsRequested: settingsPageRouter.openPage("general")
+            onExitRequested: shellWindow.close()
         }
 
         RibbonPanel {

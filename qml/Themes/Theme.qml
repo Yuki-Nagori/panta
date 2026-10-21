@@ -80,6 +80,10 @@ QtObject {
     readonly property int statusbarHeight: ThemeViewModel.tokens.statusbarHeight
     readonly property int titlebarMinimumContentWidth: ThemeViewModel.tokens.titlebarMinimumContentWidth
     readonly property int logoWidth: ThemeViewModel.tokens.logoWidth
+    readonly property int applicationMenuWidth: ThemeViewModel.tokens.applicationMenuWidth
+    readonly property int applicationMenuHeight: ThemeViewModel.tokens.applicationMenuHeight
+    readonly property int applicationMenuSidebarWidth: ThemeViewModel.tokens.applicationMenuSidebarWidth
+    readonly property int applicationMenuCommandHeight: ThemeViewModel.tokens.applicationMenuCommandHeight
 
     // Ribbon 布局（尺寸为逻辑像素，行数为计数）
     readonly property int ribbonHeight: ThemeViewModel.tokens.ribbonHeight
@@ -137,6 +141,9 @@ QtObject {
     // 弹窗与表单控件（逻辑像素）
     readonly property int dialogActionWidth: ThemeViewModel.tokens.dialogActionWidth
     readonly property int dialogActionSpacing: ThemeViewModel.tokens.dialogActionSpacing
+    readonly property int settingsDialogWidth: ThemeViewModel.tokens.settingsDialogWidth
+    readonly property int settingsDialogHeight: ThemeViewModel.tokens.settingsDialogHeight
+    readonly property int settingsDialogSidebarWidth: ThemeViewModel.tokens.settingsDialogSidebarWidth
     readonly property int formControlHeight: ThemeViewModel.tokens.formControlHeight
     readonly property int profilePlotHeight: ThemeViewModel.tokens.profilePlotHeight
     readonly property int profileStepColumnWidth: ThemeViewModel.tokens.profileStepColumnWidth

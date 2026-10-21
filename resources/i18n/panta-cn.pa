@@ -267,6 +267,10 @@ cancel:
   src: Cancel
   tr: 取消
 
+settings:
+  src: Settings
+  tr: 设置
+
 [ImportTask]
 mesh-type:
   src: Mesh (%1)
@@ -316,6 +320,10 @@ filter:
   tr: Panta 工程文件 (*.panta)
 
 [TopChromePanel]
+application-menu:
+  src: Application menu
+  tr: 应用菜单
+
 sign-in:
   src: Sign in
   tr: 登录
@@ -1751,3 +1759,178 @@ entry-45:
 model-display:
   src: Model Display
   tr: 模型显示
+
+[ApplicationMenu]
+panta:
+  src: panta
+  tr: panta
+
+file:
+  src: File
+  tr: 文件
+
+edit:
+  src: Edit
+  tr: 编辑
+
+window:
+  src: Window
+  tr: 窗口
+
+about-panta:
+  src: About panta
+  tr: 关于 panta
+
+settings:
+  src: Settings…
+  tr: 设置…
+
+quit-panta:
+  src: Quit panta
+  tr: 退出 panta
+
+new-project:
+  src: New Project…
+  tr: 新建项目…
+
+open-project:
+  src: Open Project…
+  tr: 打开项目…
+
+save:
+  src: Save
+  tr: 保存
+
+close:
+  src: Close
+  tr: 关闭
+
+minimize:
+  src: Minimize
+  tr: 最小化
+
+zoom:
+  src: Zoom
+  tr: 缩放
+
+undo:
+  src: Undo
+  tr: 撤销
+
+redo:
+  src: Redo
+  tr: 重做
+
+cut:
+  src: Cut
+  tr: 剪切
+
+copy:
+  src: Copy
+  tr: 复制
+
+paste:
+  src: Paste
+  tr: 粘贴
+
+select-all:
+  src: Select All
+  tr: 全选
+
+[ApplicationBackstage]
+close-application-menu:
+  src: Close application menu
+  tr: 关闭应用菜单
+
+save:
+  src: Save
+  tr: 保存
+
+close:
+  src: Close
+  tr: 关闭
+
+new:
+  src: New
+  tr: 新建
+
+open:
+  src: Open
+  tr: 打开
+
+export:
+  src: Export
+  tr: 导出
+
+publish:
+  src: Publish
+  tr: 发布
+
+print:
+  src: Print
+  tr: 打印
+
+project:
+  src: Project
+  tr: 项目
+
+study-properties:
+  src: Study Properties
+  tr: 分析属性
+
+search-recent-projects:
+  src: Search recent projects
+  tr: 搜索最近项目
+
+recent-projects:
+  src: Recent Projects
+  tr: 最近项目
+
+sort-by:
+  src: Sort by
+  tr: 排序方式
+
+last-opened:
+  src: Last opened
+  tr: 最近打开
+
+name:
+  src: Name
+  tr: 名称
+
+projects-empty:
+  src: Projects you open will appear here.
+  tr: 打开的项目将显示在这里。
+
+exit-panta:
+  src: Exit panta
+  tr: 退出 panta
+
+[SettingsDialog]
+settings:
+  src: Settings
+  tr: 设置
+
+general:
+  src: General
+  tr: 常规
+
+appearance:
+  src: Appearance
+  tr: 外观
+
+language:
+  src: Language
+  tr: 语言
+
+preferences:
+  src: Preferences
+  tr: 偏好设置
+
+preferences-description:
+  src: Common application preferences are managed here.
+  tr: 在此管理应用程序的通用偏好设置。
+
+registered-pages-description:
+  src: Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.
+  tr: Windows、Linux 和 macOS 共用此弹窗，设置页面可注册到这里。

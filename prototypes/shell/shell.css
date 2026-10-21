@@ -732,6 +732,32 @@ button.inspector-row:hover { background: linear-gradient(to right, transparent c
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; }
 .dialog-actions button { min-width: 82px; height: 30px; padding: 0 12px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); }
 .dialog-actions .dialog-primary { background: var(--color-dialog-primary); border-color: var(--color-dialog-primary-border); }
+
+/* 可独立嵌入的对话框页面及共享 Settings 内容布局。 */
+.dialog-frame-host:not([hidden]) { position: fixed; z-index: 80; inset: 0; display: block; }
+.dialog-frame-host[hidden] { display: none !important; }
+.dialog-frame { display: block; width: 100%; height: 100%; border: 0; background: transparent; }
+body.settings-dialog-document { display: block; overflow: hidden; background: transparent; }
+body.settings-dialog-document .top-chrome,
+body.settings-dialog-document .workspace,
+body.settings-dialog-document .statusbar { display: none !important; }
+.settings-dialog { display: flex; flex-direction: column; width: min(760px, 100%); height: min(540px, calc(100vh - 48px)); min-height: min(400px, calc(100vh - 48px)); }
+.settings-dialog-body { flex: 1; min-height: 0; }
+.settings-dialog-content { display: grid; grid-template-columns: 180px minmax(0, 1fr); flex: 1; min-height: 0; overflow: auto; }
+.settings-categories { display: flex; flex-direction: column; gap: 4px; padding: 16px 10px; border-right: 1px solid var(--color-panel-line); background: #f6f6f6; }
+.settings-categories button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 7px 10px; border-radius: var(--radius); color: var(--color-text); text-align: left; }
+.settings-categories button:hover,
+.settings-categories button.is-current { background: var(--color-selected); }
+.settings-category-icon { width: 16px; height: 16px; color: #5a6f7f; }
+.settings-dialog-page { padding: 18px 22px; }
+.settings-dialog-page h3 { margin: 0 0 16px; font-size: 17px; font-weight: 500; }
+.settings-dialog-description { margin: 0 0 20px; color: var(--color-muted); line-height: 1.5; }
+.settings-preview-card { display: flex; flex-direction: column; gap: 7px; padding: 14px 16px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: #fff; }
+.settings-preview-title { font-weight: 600; }
+.settings-preview-copy { color: var(--color-muted); line-height: 1.5; }
+.settings-dialog-actions { flex: none; }
+.settings-dialog-actions { padding-top: 14px; border-top: 1px solid var(--color-panel-line); }
+
 .import-body { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 22px; min-height: 320px; }
 .import-main { display: flex; flex-direction: column; gap: 14px; }
 .import-form-grid { grid-template-columns: 100px minmax(180px, 250px); }

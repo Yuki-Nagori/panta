@@ -11,6 +11,7 @@ QML 页面设计的视觉原型目录（任务 050 确立工作流，任务 120 
 - [open-project/open-project.html](open-project/open-project.html)：工程任务项与项目工具 Ribbon。
 - [imported-project/imported-project.html](imported-project/imported-project.html)：STL 导入后的工程树与视口状态，Create Mesh 可进入 Mesh Tool；Fill 行打开 Analysis Sequence 选择弹窗；Material Data 行打开材料选择弹窗（内置 PP / 25% 矿物填充摘要）；Process Settings 根据分析序列打开 Fill 工艺设置及保压曲线编辑（[任务 094](../../ai-docs/task/094-fill-process-settings.md)），或 Gate Location 浇口定位设置（[任务 095](../../ai-docs/task/095-gate-location-process-settings.md)）；Mesh 行展示示例导入类型 Dual Domain，并保留进入工具的点击行为；Home / Results / Tools / View 在原工程页切换工具栏，保留工程树、任务与视口状态；Results 内容见 [任务 096](../../ai-docs/task/096-results-ribbon.md)，Tools 内容见 [任务 113](../../ai-docs/task/113-tools-ribbon.md)，View 内容见 [任务 114](../../ai-docs/task/114-view-ribbon.md)。
 - [mesh-tool/mesh-tool.html](mesh-tool/mesh-tool.html)：Mesh Tool 操作与 General 网格参数布局。
+- [application-menu/application-menu.html](application-menu/application-menu.html)：任务 115 的 Windows/Linux P 后台面板（约 440 × 560 CSS px，面板从应用窗口顶部展开并包含完整 P 品牌块，覆盖标题栏和菜单行；Close 排在菜单项中，布局参考 Autodesk 文件页，右下角 Settings）、macOS 无 P 的系统菜单栏（panta 与 File 由应用定义，Edit/Window 等使用系统项）。菜单图标复用 `shell.js` 的 SVG symbol；共享弹窗见独立的 [settings-dialog.html](application-menu/settings-dialog.html)，由通用弹窗框架打开，使用一致的 SVG 图标和 `shell.css` 对话框样式，底部提供 Cancel / OK。
 
 HTML 只保留标题、菜单、Ribbon、任务、视口和对话框状态模板，脚本将模板嵌入公共壳层。
 这些入口通过相对路径引用公共文件，无网络资源和构建步骤；浏览器需启用
@@ -34,8 +35,9 @@ JavaScript。可直接打开 HTML；复制参考件时应保留整个目录结�
    配色、圆角）集中在 `shell.css` 的 `:root`；图标集中在 `shell.js` 的 SVG
    symbol 中，以 use 引用。无网络字体、图片或脚本，照片 / 渲染图以 CSS 渐变
    占位并注明语义。
-3. 浏览器渲染截图，与参照截图对照区块结构、布局与配色。
-4. 后续 QML 页面任务以复刻件为底稿迁移：盒模型层级 → anchors/Layout，
+3. 浏览器渲染目标尺寸并检查主要交互，与参照截图对照区块结构、布局与配色。
+4. 向维护者展示原型并取得确认；确认前不开始对应的 QML 页面实现。
+5. 后续 QML 页面任务以确认过的原型为底稿迁移：盒模型层级 → anchors/Layout，
    `:root` 设计值 → Theme token，占位图 → Image 元素；迁移完成后复刻件保留
    为设计档案。
 

@@ -13,6 +13,7 @@ DialogWindow {
     property var openedSettings: ({})
     property bool saving: false
     property string errorText: ""
+    escapeEnabled: !saving && !profileDialog.visible
     signal settingsRequested(string projectPath, double revision, string importId, var settings)
     readonly property var constraints: planSettings.processConstraints ?? ({})
     readonly property var draftValidation: validationModel ? validationModel.validateFillSettingsDraft({
@@ -55,9 +56,7 @@ DialogWindow {
                     duration: point.duration,
                     pressure: point.pressure
                 }));
-        centerOnOwner();
-        show();
-        requestActivate();
+        present();
         moldTemperature.forceActiveFocus();
     }
 
@@ -94,7 +93,7 @@ DialogWindow {
     }
     DialogFrame {
         window: dialog
-        closeEnabled: true
+        closeEnabled: !dialog.saving
 
         ThemedLabel {
             Layout.fillWidth: true
@@ -339,10 +338,5 @@ DialogWindow {
                 enabled: false
             }
         }
-    }
-    Shortcut {
-        sequence: "Esc"
-        enabled: dialog.visible && !dialog.saving && !profileDialog.visible
-        onActivated: dialog.close()
     }
 }

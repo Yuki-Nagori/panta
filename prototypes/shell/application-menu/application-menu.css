@@ -1,0 +1,254 @@
+/* 任务 115：Windows/Linux 后台菜单与 macOS 系统菜单栏原型。 */
+:root { --prototype-controls-height: 34px; }
+body { position: relative; }
+.prototype-controls {
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--color-panel-line);
+  background: #f6f6f6;
+  font-size: var(--font-small);
+}
+.prototype-controls button {
+  padding: 4px 9px;
+  border: 1px solid var(--color-panel-line);
+  background: var(--color-panel);
+}
+.prototype-controls button[aria-pressed="true"] { background: var(--color-selected); }
+
+.mac-system-menubar:not([hidden]) {
+  position: relative;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  background: #f4f4f4;
+  border-bottom: 1px solid #d5d5d5;
+  box-shadow: 0 1px 3px #00000018;
+  color: #222;
+  font-size: 13px;
+}
+.system-menubar-item { padding: 0 10px; }
+.mac-menubar-trigger {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.mac-menubar-trigger[aria-expanded="true"],
+.mac-menubar-trigger:hover { background: #dedede; }
+.mac-app-menu-trigger {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.mac-app-menu-trigger[aria-expanded="true"],
+.mac-app-menu-trigger:hover { background: #dedede; }
+.mac-application-menu, .mac-file-menu {
+  position: absolute;
+  z-index: 50;
+  top: 27px;
+  left: 8px;
+  width: 220px;
+  padding: 5px;
+  border: 1px solid #b9b9b9;
+  border-radius: 6px;
+  background: #f7f7f7;
+  box-shadow: 0 6px 18px #0003;
+}
+.mac-file-menu { left: 78px; }
+
+body[data-platform="macos"] .top-chrome { display: none; }
+body[data-platform="macos"] .mac-system-menubar { display: flex; }
+body[data-platform="desktop"] .mac-system-menubar { display: none; }
+.brand-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  background: transparent;
+}
+button.brand-menu-trigger:enabled:hover,
+button.brand-menu-trigger:focus-visible,
+button.brand-menu-trigger[aria-expanded="true"] { background: #a92320; }
+
+.application-menu { color: var(--color-text); }
+.application-menu button[role="menuitem"] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 3px;
+  text-align: left;
+  white-space: nowrap;
+}
+.application-menu button[role="menuitem"]:hover,
+.application-menu button[role="menuitem"]:focus-visible { background: var(--color-hover); }
+.application-menu hr { height: 1px; margin: 5px 4px; border: 0; background: #d6d6d6; }
+.desktop-application-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(var(--prototype-controls-height) + var(--titlebar-height));
+  left: 0;
+  width: min(920px, 100vw);
+  height: min(650px, calc(100vh - var(--titlebar-height)));
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #c7c7c7;
+  background: #f5f5f5;
+  box-shadow: 0 8px 24px #0004;
+}
+.backstage:not([hidden]) {
+  position: absolute;
+  z-index: 40;
+  top: var(--prototype-controls-height);
+  left: 0;
+  width: min(440px, calc(100vw - 16px));
+  height: min(560px, calc(100vh - var(--titlebar-height) - 24px));
+}
+.desktop-application-menu[hidden], .mac-application-menu[hidden] { display: none !important; }
+
+.backstage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+}
+.backstage-brand {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: var(--logo-width);
+  height: calc(var(--titlebar-height) + var(--menubar-height));
+  background: #a92320;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+}
+button.backstage-brand:enabled:hover,
+button.backstage-brand:focus-visible { background: #a92320; }
+.backstage-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: calc(var(--titlebar-height) + var(--menubar-height) + 8px) 7px 8px;
+  border-right: 1px solid #d1d1d1;
+  background: #e9e9e9;
+}
+.backstage-command {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 12px;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 3px 6px;
+  border-radius: 2px;
+  text-align: left;
+  font-size: 13px;
+}
+.backstage-command:hover,
+.backstage-command:focus-visible,
+.backstage-command.is-current { background: #d9e9f7; }
+.backstage-command:disabled { opacity: 1; color: #999; }
+.backstage-icon { width: 18px; height: 18px; justify-self: center; }
+.command-chevron { width: 11px; height: 11px; color: #6a6a6a; }
+.backstage-command:disabled .command-chevron { color: #aaa; }
+.backstage-separator { height: 1px; margin: 5px 4px; background: #c8c8c8; }
+.backstage-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 18px;
+  background: #f5f5f5;
+}
+.backstage-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+.recent-projects-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; }
+.recent-projects-heading > .icon { width: 17px; height: 17px; color: #5a6f7f; }
+.recent-projects-heading h1 { margin: 0; font-size: 17px; font-weight: 500; }
+.backstage-search { position: relative; display: flex; align-items: center; width: min(200px, 100%); }
+.backstage-search input {
+  width: min(200px, 100%);
+  height: 28px;
+  padding: 0 28px 0 8px;
+  border: 1px solid #b9b9b9;
+  background: white;
+}
+.backstage-search > .icon { position: absolute; right: 8px; width: 16px; height: 16px; color: var(--color-icon); }
+.recent-projects-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ccc;
+  font-size: 12px;
+}
+.recent-projects-sort { display: flex; align-items: center; gap: 6px; }
+.recent-projects-sort select { height: 27px; padding: 0 7px; border: 1px solid #aaa; background: #fff; }
+.recent-projects-view { display: grid; place-items: center; width: 28px; height: 27px; border: 1px solid #aaa; background: #fff; }
+.recent-projects-view .icon { width: 16px; height: 16px; }
+.recent-projects-empty {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: #777;
+  font-size: 13px;
+  text-align: center;
+}
+.backstage-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+.backstage-footer button {
+  min-width: 78px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #aaa;
+  background: #f7f7f7;
+  text-align: center;
+}
+.backstage-footer button:hover { background: #e9e9e9; }
+.backstage-page h2 { font-size: 21px; font-weight: 400; }
+.backstage-page p { max-width: 520px; color: #555; line-height: 1.5; }
+.backstage[hidden] { display: none !important; }
+
+
+@media (max-width: 620px) {
+  .backstage { grid-template-columns: 140px minmax(0, 1fr); }
+  .backstage-content { padding: 14px 12px; }
+  .backstage-header { align-items: stretch; }
+  .backstage-search { width: 100%; }
+}
+
+body[data-platform="macos"] .backstage:not([hidden]) {
+  top: calc(var(--prototype-controls-height) + 28px);
+}
+body[data-platform="macos"] .backstage-brand { display: none; }
+body[data-platform="macos"] .backstage-navigation {
+  padding-top: 12px;
+}

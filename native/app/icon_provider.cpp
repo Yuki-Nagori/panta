@@ -73,7 +73,7 @@ const QSet<QString>& monochrome_icon_names() {
         QStringLiteral("copy"),    QStringLiteral("image"),    QStringLiteral("export"),
         QStringLiteral("delete"),  QStringLiteral("layers"),   QStringLiteral("caret"),
         QStringLiteral("globe"),   QStringLiteral("split"),    QStringLiteral("search"),
-        QStringLiteral("right"),
+        QStringLiteral("right"),   QStringLiteral("history"),
     };
     return names;
 }
