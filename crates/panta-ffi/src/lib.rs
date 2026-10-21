@@ -35,6 +35,11 @@ use language::{
     language_service_commit, language_service_current, language_service_new,
     language_service_supported_locales, language_service_validate,
 };
+mod theme;
+pub use theme::ThemeService;
+use theme::{
+    theme_service_current, theme_service_new, theme_service_select, theme_service_theme_ids,
+};
 mod path;
 pub use path::PathService;
 use path::{
@@ -133,6 +138,20 @@ pub mod bridge {
         pub name: String,
         pub revision: u64,
         pub dirty: bool,
+    }
+
+    /// 已验证主题的 QML 属性值；类型标签由 Rust schema 决定，Qt 仅转换 QVariant。
+    #[derive(Clone, PartialEq)]
+    pub struct ThemeToken {
+        pub qml_name: String,
+        pub value_type: String,
+        pub value: String,
+    }
+
+    #[derive(Clone, PartialEq)]
+    pub struct ThemeSnapshot {
+        pub id: String,
+        pub tokens: Vec<ThemeToken>,
     }
 
     /// 已导入网格的持久化元数据。尺寸拆成标量，避免 CXX shared struct
@@ -498,6 +517,19 @@ pub mod bridge {
             service: &mut LanguageService,
             candidate: String,
         ) -> Result<String>;
+
+        /// 主题基线、主题定义与 token 校验由 Rust 服务拥有；此服务不读写设置。
+        type ThemeService;
+
+        fn theme_service_new(
+            gui_source: String,
+            theme_ids: Vec<String>,
+            theme_sources: Vec<String>,
+            default_theme_id: String,
+        ) -> Result<Box<ThemeService>>;
+        fn theme_service_theme_ids(service: &ThemeService) -> Vec<String>;
+        fn theme_service_current(service: &ThemeService) -> ThemeSnapshot;
+        fn theme_service_select(service: &mut ThemeService, id: String) -> Result<ThemeSnapshot>;
 
         fn process(request: &FfiRequest) -> Result<FfiResponse>;
         fn panic_probe();

@@ -276,18 +276,26 @@ DialogWindow {
                     requestPaint()
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
+                Connections {
+                    target: ThemeViewModel
+                    function onTokensChanged() {
+                        plot.requestPaint();
+                    }
+                }
                 onPaint: {
                     const ctx = getContext("2d");
                     ctx.clearRect(0, 0, width, height);
                     const inset = Theme.spacingLarge;
                     const total = dialog.points.reduce((sum, point) => sum + point.duration, 0);
-                    ctx.strokeStyle = Theme.colorPanelLine;
-                    ctx.lineWidth = Theme.borderWidth;
-                    ctx.beginPath();
-                    ctx.moveTo(inset, inset);
-                    ctx.lineTo(inset, height - inset);
-                    ctx.lineTo(width - inset, height - inset);
-                    ctx.stroke();
+                    if (Theme.borderWidth > 0) {
+                        ctx.strokeStyle = Theme.colorPanelLine;
+                        ctx.lineWidth = Theme.borderWidth;
+                        ctx.beginPath();
+                        ctx.moveTo(inset, inset);
+                        ctx.lineTo(inset, height - inset);
+                        ctx.lineTo(width - inset, height - inset);
+                        ctx.stroke();
+                    }
                     ctx.strokeStyle = Theme.colorFocus;
                     ctx.lineWidth = Theme.focusBorderWidth;
                     ctx.beginPath();

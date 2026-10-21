@@ -59,21 +59,30 @@ impl EvaluatedVariables {
 /// 解析并求值一个 `kind: variables` 文档。
 pub fn evaluate_variables(source: &str) -> Result<EvaluatedVariables, Diagnostics> {
     let document = parse(source)?;
-    evaluate_document(&document, source)
+    evaluate_for_kind(&document, source, Kind::Variables)
 }
 
-/// 对已解析变量文档求值；`source` 必须是生成该 AST 的原始文本，用于诊断定位。
-pub fn evaluate_document(
+/// 解析并求值一个 `kind: theme` 文档。
+pub fn evaluate_theme(source: &str) -> Result<EvaluatedVariables, Diagnostics> {
+    let document = parse(source)?;
+    evaluate_for_kind(&document, source, Kind::Theme)
+}
+
+fn evaluate_for_kind(
     document: &Document,
     source: &str,
+    expected_kind: Kind,
 ) -> Result<EvaluatedVariables, Diagnostics> {
-    if document.kind != Kind::Variables {
-        return Err(Diagnostics::one(
-            "variables.wrong_document_kind",
-            "expected a variables document",
-            0,
-            source,
-        ));
+    if document.kind != expected_kind {
+        let (code, description) = match expected_kind {
+            Kind::Variables => (
+                "variables.wrong_document_kind",
+                "expected a variables document",
+            ),
+            Kind::Theme => ("theme.wrong_document_kind", "expected a theme document"),
+            Kind::Language => ("values.wrong_document_kind", "expected a values document"),
+        };
+        return Err(Diagnostics::one(code, description, 0, source));
     }
 
     let mut diagnostics = Vec::new();

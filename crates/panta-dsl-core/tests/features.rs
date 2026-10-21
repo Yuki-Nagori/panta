@@ -45,6 +45,14 @@ fn variables_requires_values() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn theme_allows_empty_overlay_to_inherit_defaults() -> Result<(), Box<dyn Error>> {
+    let document = parse("version: 1\nkind: theme\n")?;
+    assert_eq!(document.kind, Kind::Theme);
+    assert!(document.values.is_empty());
+    Ok(())
+}
+
+#[test]
 fn theme_rejects_language_fields_and_values_reject_messages() -> Result<(), Box<dyn Error>> {
     assert!(matches!(
         parse("version: 1\nkind: theme\n\n[App]\ntitle:\n  src: Hi\n  tr: Hi\n"),

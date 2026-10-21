@@ -1,4 +1,4 @@
-# 原子组件库、Theme 与主题 DSL（029 已落地组件层；DSL 为 030 规划）
+# 原子组件库、Theme 与主题 DSL（029、030 已落地）
 
 [模块导航](README.md) · [QML 规范](../standards/qml.md) · [029 组件库](../task/029-qml-component-library.md) · [030 主题切换](../task/030-theme-dsl.md) · [081 视觉与图标统一](../task/081-qml-visual-language-and-iconography.md)
 
@@ -8,7 +8,7 @@
 
 `FillProcessSettingsDialog` 与 `HoldingProfileDialog` 复用主题输入、按钮和标题栏；父弹窗持有候选参数，子弹窗确认才替换候选曲线。曲线表格默认至少三行，空白行不提交；绘图使用 Qt Quick Canvas，仅在编辑、显露和尺寸变化时重绘。Rust 提供已保存的 `PlanSettings.fillSettings`，确认命令经 ViewModel 后台写盘，成功后刷新任务行；QML 不保存第二份已确认配置。窗口尺寸在 Theme 的窗口约束分类中，确认与取消按钮统一使用 ThemedButton 的 92 × 24 默认尺寸。实现与验收见 [094](../task/094-fill-process-settings.md)。
 
-`qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认布局/配色源于 050 复刻件 homepage.html 的 `:root`（029 迁入），图标与交互尺寸由 052 按用户反馈细化；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，运行期默认值迁 `.pa` 与切换由 030 的 C++ ThemeViewModel 发布，Theme 属性名即稳定契约。
+`qml/Themes/Theme.qml` 是颜色、间距、字号和结构尺寸的唯一 QML 门面，默认布局/配色源于 050 复刻件 homepage.html 的 `:root`（029 迁入），图标与交互尺寸由 052 按用户反馈细化；沿用大写 `Theme.qml`，符合仓库 QML 类型命名约定。属性保持 readonly，并绑定到 C++ `ThemeViewModel` 的完整快照，不在 QML 重复存储默认值。Rust `panta-core::theme` 校验 `.pa` 基线和主题覆盖；`panta-ffi` 仅转换快照。主题切换是同步的内存操作，无工程依赖；跨重启保存主题 ID 由 125 的设置服务负责。
 
 029 已把 Shell 拼装为复刻件同构桌面框架（顶部 chrome、ribbon、任务/输出面板、VTK 视口、状态栏）；后续页面按同一套 token 与组件拼装，不新增第二套视觉常量。
 
@@ -107,41 +107,36 @@ UI 尺寸统一采用 Qt Quick 逻辑像素语义，不自行乘设备像素比�
 
 ## Theme 与 DSL 的单向数据流
 
-029 阶段：保留 Theme.qml 中的内置默认 token，先完成参数化组件，无需等待 DSL。
-
-030 阶段：把可配置默认值迁入内置主题 DSL；Theme.qml 保留稳定的属性名和到 C++ ThemeViewModel 的只读绑定，作为唯一 QML 访问入口。颜色、尺寸默认值不再同时维护于 QML 与 DSL。主题 schema 管键名、类型、范围和映射，不复制一套默认值。
+030 已实现主题数据流：视觉 token 默认值集中在 `qml/Themes/gui-default.pa`，`Theme.qml` 只保留稳定属性名和到 C++ `ThemeViewModel` 的只读绑定。Rust 主题 schema 管键名、QML 属性映射、类型和范围，不在 QML 或 C++ 复制默认值；真实窗口与高 DPI 验收仍记录在 task 030。
 
 `.pa` 按职责分层，而不是按控件拆散：
 
-- `gui.pa`（`kind: variables`）保存不随主题改变的 GUI 设计 token，例如窗口最小尺寸、布局间距、控件高度和字号的基线。
-- `light.pa`、`dark.pa` 等（`kind: theme`）只保存可覆盖的主题 token，例如颜色、圆角、阴影开关，必要时覆盖允许主题化的字号或间距。
+- `gui-default.pa`（`kind: variables`）保存完整默认快照，包括窗口约束、布局尺寸、字号和默认颜色。
+- `light.pa`、`dark.pa` 等（`kind: theme`）保存需要覆盖的 token；颜色、尺寸、字号等均可按 schema 声明类型和值域，未写出的键继承默认快照。当前 dark 覆盖颜色、字号和控件高度，light 使用默认值。
 - 合并顺序固定为 `gui` 基线 → 选中的主题覆盖 → schema 校验 → 完整快照；覆盖文件不直接被 QML 读取，也不把未声明的键静默注入 Theme。
 
 这样“换主题”是选择另一份 `.pa` 覆盖，不是复制一份 QML。平台 surface 的运行时位置、实际 item 宽高和 DPR 仍由 C++ 原生适配器计算，不能写成 `.pa` 固定坐标；VTK 相机/几何默认值也不属于 GUI Theme，除非未来明确纳入独立的渲染配置域。
 
-规划流向：内置默认主题 DSL + 用户选择的主题覆盖 → 共用 DSL 解析器 → 主题 schema 校验与完整快照 → C++ ThemeViewModel → Theme.qml → 组件输入属性 → 拼装界面。QML 不解析 DSL、不访问文件、不直接连接 Rust；沿用服务经 C++ ViewModel 暴露的边界。
+运行流向：内置默认快照与主题覆盖 → 共用 DSL 解析器 → Rust 主题 schema 校验与完整快照 → C++ `ThemeViewModel` → `Theme.qml` → 组件输入属性 → 拼装界面。QML 不解析 DSL、不访问文件、不直接连接 Rust。
 
-示意主题文本（`.pa` 文法沿用 025；键映射尚未实现）：
+主题覆盖文件使用 025 的 `.pa` 文法；例如：
 
 ```text
 version: 1
 kind: theme
 
 values:
-  spacing-small: real = 8
-  control-height: real = 32
-  font-body: real = 14
-  color-background: string = #1e1f22
+  color-background: string = "#1e1f22"
 ```
 
-映射示意：`spacing-small` → `Theme.spacingSmall`，`control-height` → `Theme.controlHeight`。键名映射由单一 schema 明确定义，不按字符串猜测属性。颜色首期用 string 加主题专用校验，不要求 025 引入 color 类型；数值在 DSL 层仍无量纲，主题 schema 将特定键解释为逻辑像素，与 CAE 物理单位无关。业务 key 统一使用短横线，生成到 C++/QML 属性时才按 schema 映射为 camelCase。
+新增可主题化的 QML 视觉参数时，同步添加 Rust `theme_schema.rs` 的 DSL 键、QML 属性名、类型和值域，在 `gui-default.pa` 提供完整默认值，并在 `Theme.qml` 暴露只读绑定；覆盖与快照测试也要验证映射。仅属业务状态或组件内部实现的参数不进入 Theme。
 
-应用主题作用域独立于工程变量，复用解析器和不可变快照机制，但不要求打开工程，不随工程关闭销毁，切换也不把工程标记为 dirty。主题覆盖缺省键继承内置默认值；未知键、错误类型、非法颜色、非有限或越界尺寸拒绝整个覆盖。内置默认主题本身必须键齐全且通过构建/测试校验。
+主题覆盖可包含任意 schema token；未声明的尺寸、字号和颜色继承基线。键名映射由单一 Rust schema 明确定义，例如 `spacing-small` 映射到 `Theme.spacingSmall`，不按字符串猜测属性。颜色使用 string 并校验十六进制颜色或 `transparent`；DSL 数值仍无量纲，主题 schema 将尺寸解释为逻辑像素，与 CAE 物理单位无关。业务 key 使用短横线，快照属性使用 schema 声明的 camelCase 名称。
+
+应用主题作用域独立于工程变量，复用解析器和不可变快照机制，不要求打开工程，不随工程关闭销毁，切换也不把工程标记为 dirty。基线必须包含 schema 中全部 token；主题覆盖可省略键并继承基线，也可覆盖 schema 中允许的颜色、尺寸、字号等 token。未知键、错误类型、非法颜色、非有限或越界数值拒绝整个候选。内置默认基线和所有主题都在构造服务时一次性验证；切换仅选取已校验快照，不做文件 I/O 或后台轮询。
 
 ## 切换、编辑与持久化
 
-候选主题先离线解析、合并和校验，再在 GUI 线程发布完整快照，统一触发属性刷新；不得在校验过程中逐字段污染当前主题。快速连续选择以请求 generation 拒绝迟到结果，切换失败保留旧主题与偏好并呈现可翻译诊断。成功后才保存主题 ID/配置位置，保存失败单独报告，不能声称重启偏好已更新。
+主题服务初始化时先解析、合并并校验所有内置快照，之后 GUI 线程切换只发布完整快照；失败时保留当前值并报告稳定诊断。此任务默认启动为 light。选择不写磁盘、不保存偏好，也没有异步请求或 generation；125 负责持久化主题 ID 和启动恢复。正常切换通过属性绑定更新，无需销毁 QML 引擎，也不依赖 027 热重载。
 
-首次启动使用内置默认主题；重启遇到用户主题缺失或损坏时回退内置主题并提示，不覆盖损坏的用户文件。正常切换通过属性绑定更新，无需销毁 QML 引擎，也不依赖 027 热重载。
-
-若以后提供主题编辑器，UI 修改经显式服务命令校验后写入主题 DSL，并重新发布快照；不得观察 Theme 属性再自动反写 DSL，避免绑定回环。本期 030 只交付读取、选择与应用，不含主题编辑器、动画切换或任意 QML 注入。
+若以后提供主题编辑器，UI 修改经显式服务命令校验后写入主题 DSL，并重新发布快照；不得观察 Theme 属性再自动反写 DSL，避免绑定回环。030 只交付内置主题读取、运行期选择与应用，不含主题编辑器、持久化、动画切换或任意 QML 注入。
