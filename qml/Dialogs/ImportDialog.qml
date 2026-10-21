@@ -9,6 +9,7 @@ DialogWindow {
     objectName: "importDialog"
 
     required property ProjectViewModel projectModel
+    escapeEnabled: projectModel.importInteraction.canEdit
 
     width: Theme.importDialogWidth
     height: Theme.importDialogHeight

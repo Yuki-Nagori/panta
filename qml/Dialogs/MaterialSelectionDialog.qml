@@ -10,6 +10,7 @@ DialogWindow {
     property var openedSettings: ({})
     property string errorText: ""
     property bool saving: false
+    escapeEnabled: !saving
     readonly property bool canConfirm: !saving && !!material.id && !!openedSettings.importId
     signal selectionRequested(string projectPath, double revision, string importId, string materialId)
     width: Theme.materialDialogWidth
@@ -27,9 +28,7 @@ DialogWindow {
             return;
         openedSettings = planSettings;
         materialPanel.reset();
-        centerOnOwner();
-        show();
-        requestActivate();
+        present();
     }
 
     function acceptSelection() {
@@ -87,11 +86,6 @@ DialogWindow {
                 enabled: false
             }
         }
-    }
-    Shortcut {
-        enabled: dialog.visible && !dialog.saving
-        sequence: "Esc"
-        onActivated: dialog.close()
     }
     Shortcut {
         enabled: dialog.visible && dialog.canConfirm

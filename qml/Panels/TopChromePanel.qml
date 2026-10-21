@@ -14,9 +14,16 @@ Rectangle {
     property real nativeControlsLeftInset: 0
     property real nativeControlsRightInset: 0
     property Window hostWindow
+    property var recentProjects: []
+    property bool projectCommandsEnabled: true
 
     // 面板仅报告稳定菜单 key，由宿主决定哪些入口可导航。
     signal menuRequested(string key)
+    signal newProjectRequested
+    signal openProjectRequested
+    signal recentProjectRequested(string path)
+    signal settingsRequested
+    signal exitRequested
 
     implicitWidth: Theme.chromeImplicitWidth
     implicitHeight: Theme.titlebarHeight + Theme.menubarHeight + Theme.borderWidth
@@ -34,12 +41,34 @@ Rectangle {
             Layout.preferredWidth: Theme.logoWidth
             color: Theme.colorBrand
 
-            ThemedLabel {
-                anchors.centerIn: parent
+            ToolButton {
+                id: applicationMenuButton
+                objectName: "applicationMenuButton"
+                anchors.fill: parent
+                Accessible.name: qsTranslate("TopChromePanel", "Application menu")
+                display: AbstractButton.TextOnly
                 text: "P"
-                textSize: Theme.fontTitle
-                textColor: Theme.colorPanel
+                font.pixelSize: Theme.fontTitle
                 font.bold: true
+                palette.buttonText: Theme.colorPanel
+                hoverEnabled: true
+                background: Rectangle {
+                    color: applicationBackstage.visible || applicationMenuButton.down || applicationMenuButton.hovered ? Qt.darker(Theme.colorBrand, 1.2) : Theme.colorBrand
+                    border.width: applicationMenuButton.visualFocus ? Theme.focusBorderWidth : 0
+                    border.color: Theme.colorFocus
+                }
+                onClicked: applicationBackstage.visible ? applicationBackstage.close() : applicationBackstage.openAt(applicationMenuButton)
+            }
+
+            ApplicationBackstage {
+                id: applicationBackstage
+                recentProjects: chrome.recentProjects
+                projectCommandsEnabled: chrome.projectCommandsEnabled
+                onNewProjectRequested: chrome.newProjectRequested()
+                onOpenProjectRequested: chrome.openProjectRequested()
+                onRecentProjectRequested: path => chrome.recentProjectRequested(path)
+                onSettingsRequested: chrome.settingsRequested()
+                onExitRequested: chrome.exitRequested()
             }
         }
 

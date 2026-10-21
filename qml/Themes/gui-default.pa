@@ -63,6 +63,10 @@ values:
   statusbar-height: int = 26
   titlebar-minimum-content-width: int = 1100
   logo-width: int = 46
+  application-menu-width: int = 440
+  application-menu-height: int = 560
+  application-menu-sidebar-width: int = 150
+  application-menu-command-height: int = 36
   ribbon-height: int = 96
   ribbon-tool-minimum-width: int = 56
   ribbon-tool-height: int = 68
@@ -112,6 +116,9 @@ values:
   document-tab-close-right-inset: int = 3
   dialog-action-width: int = 92
   dialog-action-spacing: int = 5
+  settings-dialog-width: int = 760
+  settings-dialog-height: int = 540
+  settings-dialog-sidebar-width: int = 180
   form-control-height: int = 30
   profile-plot-height: int = 140
   profile-step-column-width: int = 40

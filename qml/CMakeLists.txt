@@ -25,6 +25,8 @@ set(PANTA_SHELL_QML_FILES
     Components/Atoms/PanelSurface.qml
     Components/Atoms/RibbonComboBox.qml
     Components/Composites/ToolGroup.qml
+    Components/Composites/ApplicationMenu.qml
+    Components/Composites/ApplicationBackstageCommand.qml
     Components/Composites/RibbonTile.qml
     Components/Composites/RibbonGroup.qml
     Components/Composites/RibbonContent.qml
@@ -38,7 +40,10 @@ set(PANTA_SHELL_QML_FILES
     Components/Composites/DialogFrame.qml
     Components/Composites/DialogButtonRow.qml
     Components/Composites/FormSection.qml
+    Panels/PlatformMenuBar.qml
     Panels/TopChromePanel.qml
+    Panels/ApplicationBackstage.qml
+    Panels/SettingsPageRouter.qml
     Panels/RibbonPanel.qml
     Panels/Ribbon/HomeRibbon.qml
     Panels/Ribbon/ResultsRibbon.qml
@@ -61,6 +66,7 @@ set(PANTA_SHELL_QML_FILES
     Dialogs/ImportDialog.qml
     Dialogs/AnalysisSequenceDialog.qml
     Dialogs/MaterialSelectionDialog.qml
+    Dialogs/SettingsDialog.qml
     Dialogs/FillProcessSettingsDialog.qml
     Dialogs/GateLocationSettingsDialog.qml
     Dialogs/HoldingProfileDialog.qml)
@@ -100,7 +106,9 @@ qt_add_qml_module(
   ../native/app/platform_fonts.hpp
   ../native/app/platform_fonts.cpp
   ../native/app/theme_view_model.hpp
-  ../native/app/theme_view_model.cpp)
+  ../native/app/theme_view_model.cpp
+  ../native/app/edit_command_router.hpp
+  ../native/app/edit_command_router.cpp)
 target_sources(panta_shell PRIVATE ../native/app/window_chrome_metrics.cpp
                                    ../native/app/window_chrome_metrics.hpp)
 if(APPLE)

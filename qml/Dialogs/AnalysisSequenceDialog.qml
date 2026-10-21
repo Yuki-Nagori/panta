@@ -9,6 +9,7 @@ DialogWindow {
     property var planSettings: ({})
     property string errorText: ""
     property bool saving: false
+    escapeEnabled: !saving
     // 打开时冻结命令目标；后台或程序化工程切换不能把确认写入另一个方案。
     property var openedSettings: ({})
     signal selectionRequested(string projectPath, double revision, string importId, string sequenceId)
@@ -30,9 +31,7 @@ DialogWindow {
         sequencePanel.selectedIndex = sequences.findIndex(entry => entry.id === openedSettings.sequenceId);
         if (sequencePanel.selectedIndex < 0 || !openedSettings.importId)
             return;
-        centerOnOwner();
-        show();
-        requestActivate();
+        present();
         sequencePanel.focusSelection();
     }
 
@@ -100,11 +99,6 @@ DialogWindow {
                 }
             }
         }
-    }
-    Shortcut {
-        enabled: dialog.visible && !dialog.saving
-        sequence: "Esc"
-        onActivated: dialog.close()
     }
     Shortcut {
         enabled: dialog.visible && !dialog.saving

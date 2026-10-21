@@ -1,17 +1,25 @@
 // Panta.Shell 运行时加载测试：验证资源模块及其可选 Bridge 依赖的链接契约。
 
+#include <QClipboard>
 #include <QGuiApplication>
+#include <QMimeData>
 #include <QObject>
 #include <QQmlApplicationEngine>
+#include <QQmlComponent>
+#include <QQuickWindow>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QtQuickControls2/qquickstyle.h>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <QtTest/qtestmouse.h>
+#include <edit_command_router.hpp>
 #include <icon_provider.hpp>
+#include <memory>
 #include <qcontainerfwd.h>
 #include <qlist.h>
 #include <qlogging.h>
@@ -30,20 +38,17 @@
 #include <QPointF>
 #include <QPointer>
 #include <QQuickItem>
-#include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QVariant>
 #include <QtCore/qnamespace.h>
-#include <QtQml/qqmlextensionplugin.h>
 #include <QtTest/qtestkeyboard.h>
 #include <project_view_model.hpp>
 // App.qml 引入 Panta.Visualization（CaeViewport）：静态模块的消费方二进制
 // 必须同时导入并链接其 plugin，否则运行时报 "module not installed"。
 Q_IMPORT_QML_PLUGIN(Panta_BridgePlugin)
 Q_IMPORT_QML_PLUGIN(Panta_VisualizationPlugin)
-Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
 
 namespace {
 
@@ -63,6 +68,8 @@ void dump_item_tree(const QQuickItem* item, int depth) {
 
 } // namespace
 #endif
+
+Q_IMPORT_QML_PLUGIN(Panta_ShellPlugin)
 
 class ShellModuleLoadTest final : public QObject {
     Q_OBJECT
@@ -163,6 +170,44 @@ class ShellModuleLoadTest final : public QObject {
             return object->property("visible").toBool();
         };
         QVERIFY2(assert_visible("shellCaption"), "Shell caption is missing or hidden");
+        auto* settings_router = root->findChild<QObject*>(QStringLiteral("settingsPageRouter"));
+        auto* settings_dialog = root->findChild<QObject*>(QStringLiteral("settingsPageDialog"));
+        QVERIFY2(settings_router != nullptr, "Settings page router is missing from Panta.Shell");
+        QVERIFY2(settings_dialog != nullptr, "Settings page dialog is missing from Panta.Shell");
+        QVariant settings_route_available;
+        QVERIFY(QMetaObject::invokeMethod(settings_router, "openPage",
+                                          Q_RETURN_ARG(QVariant, settings_route_available),
+                                          Q_ARG(QVariant, QVariant(QStringLiteral("general")))));
+        QVERIFY(settings_route_available.toBool());
+        QTRY_VERIFY(settings_dialog->property("visible").toBool());
+        QMetaObject::invokeMethod(settings_dialog, "close");
+        auto* brand_tile = root->findChild<QObject*>(QStringLiteral("titleBrandTile"));
+        auto* application_button =
+            root->findChild<QObject*>(QStringLiteral("applicationMenuButton"));
+        auto* backstage = root->findChild<QObject*>(QStringLiteral("applicationBackstage"));
+        auto* platform_menu_bar =
+            root->findChild<QObject*>(QStringLiteral("platformApplicationMenuBar"));
+        QVERIFY(brand_tile != nullptr);
+        QVERIFY(application_button != nullptr);
+        QVERIFY(backstage != nullptr);
+        QVERIFY(platform_menu_bar != nullptr);
+        QCOMPARE(platform_menu_bar->property("visible").toBool(),
+                 !brand_tile->property("visible").toBool());
+        QVERIFY(root->findChild<QObject*>(QStringLiteral("applicationSettingsAction")) != nullptr);
+        if (brand_tile->property("visible").toBool()) {
+            QVERIFY(QMetaObject::invokeMethod(application_button, "click"));
+            QTRY_VERIFY(backstage->property("visible").toBool());
+            QCOMPARE(backstage->property("width").toInt(), 440);
+            QCOMPARE(backstage->property("height").toInt(), 560);
+            QVERIFY(root->findChild<QObject*>(QStringLiteral("backstageCloseCommand")) != nullptr);
+            auto* backstage_settings =
+                root->findChild<QObject*>(QStringLiteral("backstageSettingsButton"));
+            QVERIFY(backstage_settings != nullptr);
+            QVERIFY(QMetaObject::invokeMethod(backstage_settings, "click"));
+            QTRY_VERIFY(!backstage->property("visible").toBool());
+            QTRY_VERIFY(settings_dialog->property("visible").toBool());
+            QMetaObject::invokeMethod(settings_dialog, "close");
+        }
 #ifdef PANTA_ENABLE_BRIDGE_MODULE
         QVERIFY2(root->findChild<QObject*>(QStringLiteral("caeViewport")) != nullptr,
                  "CaeViewport is missing from Panta.Shell");
@@ -361,7 +406,13 @@ class ShellModuleLoadTest final : public QObject {
                                     .arg(search->mapToItem(strip, QPointF()).x())
                                     .arg(search->width())
                                     .arg(strip->width())
-                                    .arg(strip->property("contentX").toDouble())));
+                                    .arg(strip->property("contentX").toDouble()) +
+                                QStringLiteral(" active=%1 focus=%2 contentWidth=%3")
+                                    .arg(shellWindow->activeFocusItem()
+                                             ? shellWindow->activeFocusItem()->objectName()
+                                             : QStringLiteral("<null>"))
+                                    .arg(shellWindow->activeFocusItem() == search)
+                                    .arg(strip->property("contentWidth").toDouble())));
         animationButton->setProperty("text", originalText);
         QTest::qWait(50);
 
@@ -441,6 +492,154 @@ class ShellModuleLoadTest final : public QObject {
             }
         }
 #endif
+    }
+
+    void edit_commands_follow_focus_in_separate_window() {
+        QQmlApplicationEngine engine;
+        QQmlComponent component(&engine);
+        component.setData(QByteArrayLiteral("import QtQuick\n"
+                                            "import QtQuick.Controls\n"
+                                            "import Panta.Shell\n"
+                                            "ApplicationWindow {\n"
+                                            "  id: mainWindow\n"
+                                            "  width: 320; height: 200; visible: true\n"
+                                            "  TextField { objectName: 'editField'; text: 'Panta'; "
+                                            "anchors.top: parent.top; focus: true }\n"
+                                            "  Window {\n"
+                                            "    id: dialogWindow\n"
+                                            "    objectName: 'editDialogWindow'\n"
+                                            "    transientParent: mainWindow\n"
+                                            "    width: 240; height: 160; visible: false\n"
+                                            "    TextArea { objectName: 'richEdit'; textFormat: "
+                                            "TextEdit.RichText; anchors.fill: parent }\n"
+                                            "  }\n"
+                                            "}\n"),
+                          QUrl(QStringLiteral("qrc:/EditCommandRouterTest.qml")));
+        std::unique_ptr<QObject> root(component.create());
+        QVERIFY2(root != nullptr, qPrintable(component.errorString()));
+        auto* window = qobject_cast<QQuickWindow*>(root.get());
+        QVERIFY(window != nullptr);
+        auto* field = root->findChild<QObject*>(QStringLiteral("editField"));
+        QVERIFY(field != nullptr);
+        auto* dialog_window = root->findChild<QQuickWindow*>(QStringLiteral("editDialogWindow"));
+        QVERIFY(dialog_window != nullptr);
+        auto* router = engine.singletonInstance<panta::app::EditCommandRouter*>(
+            QStringLiteral("Panta.Shell"), QStringLiteral("EditCommandRouter"));
+        QVERIFY(router != nullptr);
+
+        window->requestActivate();
+        QVERIFY(QMetaObject::invokeMethod(field, "forceActiveFocus"));
+        QTRY_COMPARE(QGuiApplication::focusWindow(), window);
+        QTRY_VERIFY(router->canSelectAll());
+        QVERIFY(QMetaObject::invokeMethod(router, "selectAll"));
+        QTRY_VERIFY(router->canCopy());
+        QVERIFY(QMetaObject::invokeMethod(router, "copy"));
+        QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("Panta"));
+        QTRY_VERIFY(router->canCut());
+        QVERIFY(QMetaObject::invokeMethod(router, "cut"));
+        QCOMPARE(field->property("text").toString(), QString{});
+
+        QGuiApplication::clipboard()->setText(QStringLiteral("Paste from system clipboard"));
+        QTRY_VERIFY(router->canPaste());
+        QVERIFY(QMetaObject::invokeMethod(router, "paste"));
+        QCOMPARE(field->property("text").toString(), QStringLiteral("Paste from system clipboard"));
+
+        auto* rich_edit = root->findChild<QObject*>(QStringLiteral("richEdit"));
+        QVERIFY(rich_edit != nullptr);
+        dialog_window->show();
+        dialog_window->requestActivate();
+        QVERIFY(QMetaObject::invokeMethod(rich_edit, "forceActiveFocus"));
+        QTRY_COMPARE(QGuiApplication::focusWindow(), dialog_window);
+        auto* rich_text = new QMimeData;
+        rich_text->setHtml(QStringLiteral("<b>Rich text</b>"));
+        QGuiApplication::clipboard()->setMimeData(rich_text);
+        QTRY_VERIFY(router->canPaste());
+        QVERIFY(QMetaObject::invokeMethod(router, "paste"));
+        QVERIFY(rich_edit->property("text").toString().contains(QStringLiteral("Rich text")));
+        QVERIFY(router->canUndo());
+        rich_edit->setProperty("readOnly", true);
+        QTRY_VERIFY(!router->canUndo());
+        QVERIFY(QMetaObject::invokeMethod(router, "undo"));
+        QVERIFY(rich_edit->property("text").toString().contains(QStringLiteral("Rich text")));
+
+        rich_edit->setProperty("readOnly", false);
+        QVERIFY(QMetaObject::invokeMethod(router, "undo"));
+        QVERIFY(router->canRedo());
+        rich_edit->setProperty("readOnly", true);
+        QTRY_VERIFY(!router->canRedo());
+        const QString text_before_read_only_redo = rich_edit->property("text").toString();
+        QVERIFY(QMetaObject::invokeMethod(router, "redo"));
+        QCOMPARE(rich_edit->property("text").toString(), text_before_read_only_redo);
+        window->close();
+    }
+
+    void settings_pages_register_and_dialog_actions_work() {
+        QQmlApplicationEngine engine;
+        panta::install_icon_provider(engine);
+        QQmlComponent component(&engine);
+        component.setData(
+            QByteArrayLiteral(
+                "import QtQuick\n"
+                "import QtQuick.Controls\n"
+                "import Panta.Shell\n"
+                "ApplicationWindow {\n"
+                "  id: hostWindow\n"
+                "  width: 640; height: 480; visible: true\n"
+                "  SettingsPageRouter { id: router; objectName: 'settingsPageRouter'; ownerWindow: "
+                "hostWindow }\n"
+                "  Component { id: customPage; Item { objectName: 'customSettingsPage' } }\n"
+                "  function registerCustomPage() { return router.registerPage('custom', 'Custom', "
+                "'history', customPage) }\n"
+                "  function openCustomPage() { return router.openPage('custom') }\n"
+                "}\n"),
+            QUrl(QStringLiteral("qrc:/SettingsPageRouterTest.qml")));
+        std::unique_ptr<QObject> root(component.create());
+        QVERIFY2(root != nullptr, qPrintable(component.errorString()));
+
+        QVariant result;
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "registerCustomPage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        auto* router = root->findChild<QObject*>(QStringLiteral("settingsPageRouter"));
+        auto* dialog = root->findChild<QQuickWindow*>(QStringLiteral("settingsPageDialog"));
+        QVERIFY(router != nullptr);
+        QVERIFY(dialog != nullptr);
+        QSignalSpy accepted_spy(router, SIGNAL(accepted()));
+        QSignalSpy cancelled_spy(router, SIGNAL(cancelled()));
+
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "openCustomPage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QTRY_VERIFY(dialog->isVisible());
+        QCOMPARE(router->property("activeRouteId").toString(), QStringLiteral("custom"));
+        QTRY_VERIFY(dialog->activeFocusItem() != nullptr);
+        auto* loader = dialog->findChild<QObject*>(QStringLiteral("settingsPageLoader"));
+        QVERIFY(loader != nullptr);
+        QTRY_VERIFY(loader->property("item").value<QObject*>() != nullptr);
+        QCOMPARE(loader->property("item").value<QObject*>()->objectName(),
+                 QStringLiteral("customSettingsPage"));
+
+        QVERIFY(QMetaObject::invokeMethod(dialog, "routeSelected",
+                                          Q_ARG(QString, QStringLiteral("general"))));
+        QTRY_COMPARE(router->property("activeRouteId").toString(), QStringLiteral("general"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "routeSelected",
+                                          Q_ARG(QString, QStringLiteral("custom"))));
+        QTRY_COMPARE(router->property("activeRouteId").toString(), QStringLiteral("custom"));
+
+        auto* ok_button = dialog->findChild<QObject*>(QStringLiteral("settingsOkButton"));
+        QVERIFY(ok_button != nullptr);
+        QVERIFY(QMetaObject::invokeMethod(ok_button, "click"));
+        QCOMPARE(accepted_spy.count(), 1);
+        QTRY_VERIFY(!dialog->isVisible());
+
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "openCustomPage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QTRY_VERIFY(dialog->isVisible());
+        QTRY_COMPARE(QGuiApplication::focusWindow(), dialog);
+        QTest::keyClick(dialog, Qt::Key_Escape);
+        QTRY_COMPARE(cancelled_spy.count(), 1);
+        QTRY_VERIFY(!dialog->isVisible());
     }
 
 #ifdef PANTA_ENABLE_BRIDGE_MODULE

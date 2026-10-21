@@ -2,11 +2,32 @@
 import QtQuick
 
 Window {
+    id: baseDialog
+
     property Window ownerWindow
+    property bool escapeEnabled: true
     color: Theme.colorTransparent
     modality: Qt.ApplicationModal
     flags: Qt.Dialog | Qt.FramelessWindowHint
     transientParent: ownerWindow
+
+    onVisibleChanged: {
+        if (!visible && ownerWindow)
+            ownerWindow.requestActivate();
+    }
+
+    Shortcut {
+        sequence: "Escape"
+        enabled: baseDialog.visible && baseDialog.escapeEnabled
+        onActivated: baseDialog.close()
+    }
+
+    function present() {
+        centerOnOwner();
+        show();
+        requestActivate();
+    }
+
     function centerOnOwner() {
         if (ownerWindow) {
             x = ownerWindow.x + Math.round((ownerWindow.width - width) / 2);

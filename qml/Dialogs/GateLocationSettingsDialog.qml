@@ -12,6 +12,7 @@ DialogWindow {
     property var openedSettings: ({})
     property bool saving: false
     property string errorText: ""
+    escapeEnabled: !saving
     signal settingsRequested(string projectPath, double revision, string importId, var settings)
     readonly property var constraints: planSettings.processConstraints ?? ({})
     readonly property var draftValidation: validationModel ? validationModel.validateGateLocationSettingsDraft({
@@ -41,9 +42,7 @@ DialogWindow {
         moldTemperature.text = String(openedSettings.gateLocationSettings.moldTemperature);
         meltTemperature.text = String(openedSettings.gateLocationSettings.meltTemperature);
         numberOfGates.text = String(openedSettings.gateLocationSettings.numberOfGates);
-        centerOnOwner();
-        show();
-        requestActivate();
+        present();
         moldTemperature.forceActiveFocus();
     }
     function acceptSettings() {
@@ -78,7 +77,7 @@ DialogWindow {
     }
     DialogFrame {
         window: dialog
-        closeEnabled: true
+        closeEnabled: !dialog.saving
 
         ThemedLabel {
             Layout.fillWidth: true
@@ -267,10 +266,5 @@ DialogWindow {
                 enabled: false
             }
         }
-    }
-    Shortcut {
-        sequence: "Esc"
-        enabled: dialog.visible && !dialog.saving
-        onActivated: dialog.close()
     }
 }
