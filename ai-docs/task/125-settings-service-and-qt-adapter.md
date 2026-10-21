@@ -75,7 +75,7 @@ Rust core、每帧视口状态持久化、无依据的旧版本自动迁移。
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-10-21 | macOS 本机；`cargo verify-changed`、`cargo format --changed`、NativeFormat CTest | 设置代码、适用质量检查和 NativeFormat 跨进程往返通过 | format、lint、Rust 测试及其余 90 个 CTest 通过；NativeFormat CTest 在受限沙箱中无法写用户偏好目录，获准沙箱外重跑后 1/1 通过。真实窗口恢复仍待实机验收 |
-| 2026-10-21 | PR #82 CI：macOS、Ubuntu、Windows | 三平台构建、适用 lint，以及隔离 NativeFormat 跨进程往返通过 | 原始 CI 检查全部通过；当前新增 NativeFormat 用例尚待更新后的 CI 验证。CI 不覆盖真实窗口恢复 |
+| 2026-10-21 | PR #82（提交 `a11ef43`）CI：macOS、Ubuntu、Windows | 三平台构建、适用 lint，以及隔离 NativeFormat 跨进程往返通过 | 所有 CI 检查通过；三平台 NativeFormat 用例通过。CI 不覆盖真实窗口恢复 |
 
 ## 风险与回退
 
@@ -91,11 +91,12 @@ QSettings 的平台路径、格式和同步时机可能不同；adapter 只暴�
 - 2026-10-21：确定首版使用 QSettings NativeFormat，并仅保存用户偏好快照；设置 schema 为 v1，不实现迁移。窗口只恢复逻辑尺寸与最大化状态；屏幕位置由后续多屏任务处理。无效或未知设置不覆盖原存储。
 - 2026-10-17：独立只读评审确认 125 → 115 → 087 依赖无环、任务职责和文档链接一致；保留 125 对 planned 030、115 对 deferred 051 的既有前置条件。
 - 2026-10-21：单值 JSON 快照避免 Windows 注册表后端多 key 更新的非事务状态；跨进程测试覆盖空、单项和多项最近工程路径。include-cleaner 规则补充声明头/完整类型头的区分及自动修复后的编译验证，不新增全局忽略项。
-- 2026-10-21：独立只读 final review 未发现阻塞问题，检查完整 staged/unstaged diff、分层、存储失败路径、测试与文档。未覆盖 Windows/Linux NativeFormat、真实窗口恢复和断电持久性；这些边界继续由平台验收补齐。
+- 2026-10-21：首轮独立只读 final review 未发现阻塞问题；当时尚未覆盖 Windows/Linux NativeFormat，故增加下方隔离原生存储测试。真实窗口恢复和断电持久性仍不由该测试覆盖。
 - 2026-10-21：PR #82 原有 CI 检查通过；按任务状态规则转为 `implemented`。新增隔离 NativeFormat 跨进程用例后，三平台 CI 需重新验证；真实窗口恢复仍待 Windows/Linux 实机验收，不阻塞依赖任务。
 - 2026-10-21：增加隔离组织/应用标识的 `NativeFormat` 跨进程往返用例；各平台 CI 分别走系统原生 QSettings 后端（Windows 注册表、macOS 原生偏好设置、Linux NativeFormat），真实窗口恢复仍需实机验收。
 - 2026-10-21：本机完整受影响验证中，NativeFormat 用例受沙箱对 `~/Library/Preferences` 的写入限制；在授权沙箱外环境运行对应 CTest 后通过，隔离设置域由测试清理器回收。
+- 2026-10-21：独立只读评审未发现新增 NativeFormat 测试问题；PR #82 的 macOS、Ubuntu、Windows 构建、受影响测试及适用 lint 全部通过，NativeFormat 跨进程用例在三平台 CI 验收通过。
 
 ## 完成摘要
 
-设置服务与持久化适配已完成；隔离的 NativeFormat 跨进程用例已加入，待本次三平台 CI 验证。真实窗口恢复仍待 Windows/Linux 桌面实机验收，不阻塞依赖任务。
+设置服务、持久化适配及三平台 NativeFormat 存储验证已完成。真实窗口恢复仍待 Windows/Linux 桌面实机验收，不阻塞依赖任务。
