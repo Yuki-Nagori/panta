@@ -37,8 +37,8 @@ Popup {
     parent: Overlay.overlay
     x: 0
     y: 0
-    width: Math.min(Theme.applicationMenuWidth, Overlay.overlay ? Overlay.overlay.width - x : Theme.applicationMenuWidth)
-    height: Math.min(Theme.applicationMenuHeight, Overlay.overlay ? Overlay.overlay.height - y : Theme.applicationMenuHeight)
+    width: Overlay.overlay && Overlay.overlay.width > 0 ? Math.max(1, Math.min(Theme.applicationMenuWidth, Overlay.overlay.width - x)) : Theme.applicationMenuWidth
+    height: Overlay.overlay && Overlay.overlay.height > 0 ? Math.max(1, Math.min(Theme.applicationMenuHeight, Overlay.overlay.height - y)) : Theme.applicationMenuHeight
     padding: 0
     modal: false
     focus: true
