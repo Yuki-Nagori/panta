@@ -21,6 +21,8 @@ qt_add_qml_module(
   "${CMAKE_BINARY_DIR}/Panta/Bridge"
   ${PANTA_QML_MODULE_OPTIONS}
   SOURCES
+  src/import_interaction_controller.hpp
+  src/import_interaction_controller.cpp
   src/settings.hpp
   src/settings.cpp
   src/path_host.hpp
@@ -33,8 +35,8 @@ target_include_directories(panta_bridge PUBLIC src)
 # 及其系统库依赖随 target 传播到最终链接者。
 target_include_directories(panta_bridge PUBLIC "${PANTA_FFI_INCLUDE_DIR}"
                                                "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
-target_link_libraries(panta_bridge PUBLIC Qt6::Core Qt6::Qml panta::visualization panta::qt_adapter
-                                          "${PANTA_FFI_STATIC_LIB}")
+target_link_libraries(panta_bridge PUBLIC Qt6::Core Qt6::Qml Qt6::StateMachine panta::visualization
+                                          panta::qt_adapter "${PANTA_FFI_STATIC_LIB}")
 if(UNIX)
   find_package(Threads REQUIRED)
   target_link_libraries(panta_bridge PUBLIC Threads::Threads ${CMAKE_DL_LIBS})

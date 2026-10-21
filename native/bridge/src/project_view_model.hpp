@@ -4,6 +4,7 @@
 /// 本类型缓存工作区的 Qt 投影与当前活动显示 DTO，不拥有第二份领域选择。
 #pragma once
 
+#include "import_interaction_controller.hpp"
 #include "panta_ffi.h"
 #include <QStringList>
 #include <QTimer>
@@ -60,6 +61,10 @@ class ProjectViewModel : public panta::visualization::MeshSource {
                    importPreviewChanged)
     Q_PROPERTY(bool importPending READ importPending NOTIFY importPendingChanged)
     Q_PROPERTY(quint64 importRequestId READ importRequestId NOTIFY importPendingChanged)
+    Q_PROPERTY(
+        quint64 importPreviewRequestId READ importPreviewRequestId NOTIFY importPreviewChanged)
+    Q_PROPERTY(panta::bridge::ImportInteractionController* importInteraction READ importInteraction
+                   CONSTANT)
     Q_PROPERTY(QVariantList openDocuments READ openDocuments NOTIFY documentsChanged)
     Q_PROPERTY(QString activeDocumentId READ activeDocumentId NOTIFY activeDocumentChanged)
     Q_PROPERTY(QString activeDocumentTitle READ activeDocumentTitle NOTIFY activeDocumentChanged)
@@ -109,6 +114,10 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     [[nodiscard]] quint64 importPreviewTriangleCount() const;
     [[nodiscard]] bool importPending() const;
     [[nodiscard]] quint64 importRequestId() const;
+    [[nodiscard]] quint64 importPreviewRequestId() const { return m_previewRequest; }
+    [[nodiscard]] ImportInteractionController* importInteraction() const {
+        return m_importInteraction;
+    }
 
     [[nodiscard]] QVariantList meshTypes() const;
     [[nodiscard]] QString defaultMeshType() const;
@@ -242,7 +251,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void gateLocationSettingsConfirmationFinished(bool succeeded);
     void projectImported();
     void importPendingChanged();
-    void projectImportFinished(quint64 requestId, bool succeeded);
+    void projectImportFinished(quint64 requestId, bool operationSucceeded, bool projectionUpdated);
     void importPreviewChanged();
     /// 当前请求完成且发布快照后触发；取消或在通知中被替换的请求不触发。
     void importPreviewFinished(quint64 requestId, bool succeeded);
@@ -268,6 +277,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
     bool publish_import(const panta::ffi::ProjectImport& imported);
+    bool refresh_committed_import_projection(const panta::ffi::ProjectImport& imported);
     void refreshPlanSettings();
     enum class ConfirmationKind : std::uint8_t {
         None,
@@ -317,6 +327,7 @@ class ProjectViewModel : public panta::visualization::MeshSource {
     quint64 m_importPreviewTriangleCount = 0;
     quint64 m_importRequest = 0;
     bool m_importPending = false;
+    ImportInteractionController* m_importInteraction = nullptr;
     QVariantList m_openDocuments;
     QString m_activeDocumentId;
     /// Rust 当前方案快照的 Qt 投影，不拥有独立领域选择。

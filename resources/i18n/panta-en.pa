@@ -241,6 +241,10 @@ error-generic:
   src: The import operation could not be completed.
   tr: The import operation could not be completed.
 
+error-projection-refresh:
+  src: The STL was imported, but the project view could not be refreshed. Reopen the project to reload its contents.
+  tr: The STL was imported, but the project view could not be refreshed. Reopen the project to reload its contents.
+
 [ImportDialogFile]
 choose-title:
   src: Choose STL File

@@ -10,9 +10,9 @@
 # SHA256 校验与来源无关，始终强制。
 # 供给结果缓存在 QT_PROVISION_DIR（默认构建树 qt/；任务 041 起由
 # build.rs 传入 target/panta-deps/qt，跨 profile 与 presets 共享）。
-# 模块构成：qtbase + qtdeclarative（005）与 qttools（034，含 lrelease，
-# i18n 的 QM 编译经 `native/i18n` 消费）与 qtsvg（029，图标资源经 Image
-# 渲染依赖 qsvg 图像格式插件）；qt5compat 等未取，需要时按 task 扩展。
+# 模块构成：qtbase + qtdeclarative（005）、qttools（034，含 lrelease）、
+# qtsvg（029，图标资源经 Image 渲染依赖 qsvg 图像格式插件）与 qtscxml
+# （074，提供 Qt StateMachine）；其他附加模块按实际消费者扩展。
 
 if(NOT DEFINED QT_PROVISION_DIR)
   set(QT_PROVISION_DIR "${CMAKE_BINARY_DIR}/qt")
@@ -29,6 +29,10 @@ set(QT_EXTRACTED "${QT_PROVISION_DIR}/extracted")
 
 if(APPLE)
   set(_qt_repo_path "mac_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.clang_64")
+  set(_qt_addon_repo_path "mac_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.addons.qtscxml.clang_64")
+  set(_qt_addon_archives
+      "6.11.2-0-202608131016qtscxml-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|9cabcf73b1ef81cb396a205380950d947535e20b7b6e21204e59a52199a98bfe"
+  )
   set(_qt_archives
       "6.11.2-0-202608131016qtbase-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|9592f84f7e26d532c5c56824d1da7c9214a766cb0a17beb5af71022bcfbcd271"
       "6.11.2-0-202608131016qtdeclarative-MacOS-MacOS_15-Clang-MacOS-MacOS_15-X86_64-ARM64.7z|ceb8e3f3830531a52de5007ef3f50ffc5525021feb132ee322f59583eb2903cf"
@@ -38,6 +42,12 @@ if(APPLE)
 elseif(WIN32)
   set(_qt_repo_path
       "windows_x86/desktop/qt6_6112/qt6_6112_msvc2022_64/qt.qt6.6112.win64_msvc2022_64")
+  set(_qt_addon_repo_path
+      "windows_x86/desktop/qt6_6112/qt6_6112_msvc2022_64/qt.qt6.6112.addons.qtscxml.win64_msvc2022_64"
+  )
+  set(_qt_addon_archives
+      "6.11.2-0-202608131017qtscxml-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|47539713e42a72f29ef0da0be2ad82428eefb7158bfe766b2e1dc7e63640e058"
+  )
   set(_qt_archives
       "6.11.2-0-202608131017qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|fd984b7264361b4dd3fd2a417702ca1258e4086268f2ee6a69b9a393d9c3f6bb"
       "6.11.2-0-202608131017qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z|5591ca564c1a9299a45a15b6b1d324c86e0aaed7cf6c47b7e6fe464aecae2587"
@@ -46,6 +56,11 @@ elseif(WIN32)
   )
 elseif(UNIX)
   set(_qt_repo_path "linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.linux_gcc_64")
+  set(_qt_addon_repo_path
+      "linux_x64/desktop/qt6_6112/qt6_6112/qt.qt6.6112.addons.qtscxml.linux_gcc_64")
+  set(_qt_addon_archives
+      "6.11.2-0-202608131018qtscxml-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|8579d82fba91dfe1b24e3203f740ac5647d5515c51182a4158b0e748dc6f00f7"
+  )
   set(_qt_archives
       "6.11.2-0-202608131018qtbase-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|0f86f13b161141e77b1d056b54e2b6fc40fb16f243e71123346f9fb35d418027"
       "6.11.2-0-202608131018qtdeclarative-Linux-RHEL_9_6-GCC-Linux-RHEL_9_6-X86_64.7z|5f0ce87c077f749723dbb6e923142adb860c146ecaf93c68197feda5307f22dd"
@@ -156,6 +171,23 @@ foreach(entry IN LISTS _qt_archives)
   file(WRITE "${_extract_marker}" "${_archive_sha}\n")
 endforeach()
 
+# Qt StateMachine 是在线安装器的 qtscxml 附加包提供的独立模块。它与主 kit
+# 归档分目录发布，因此单独登记来源并复用相同 SHA256、解包与缓存指纹策略。
+foreach(entry IN LISTS _qt_addon_archives)
+  string(REPLACE "|" ";" _kv "${entry}")
+  list(GET _kv 0 _archive_name)
+  list(GET _kv 1 _archive_sha)
+  set(_extract_marker "${QT_EXTRACTED}/${_archive_name}.sha256")
+  if(EXISTS "${_extract_marker}" AND EXISTS "${QT_STAGING}/bin")
+    file(STRINGS "${_extract_marker}" _recorded_sha)
+    if(_recorded_sha STREQUAL "${_archive_sha}")
+      continue()
+    endif()
+  endif()
+  panta_qt_fetch_extract("${entry}" "${_qt_addon_repo_path}" "${QT_STAGING}")
+  file(WRITE "${_extract_marker}" "${_archive_sha}\n")
+endforeach()
+
 if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.73")
   foreach(entry IN LISTS _qt_runtime_archives)
     panta_qt_fetch_extract("${entry}" "${_qt_repo_path}" "${QT_STAGING}/lib")
@@ -163,6 +195,8 @@ if(DEFINED _qt_runtime_archives AND NOT EXISTS "${QT_STAGING}/lib/libicui18n.so.
 endif()
 
 unset(_qt_repo_path)
+unset(_qt_addon_repo_path)
+unset(_qt_addon_archives)
 unset(_qt_archives)
 unset(_qt_source_roots)
 unset(_qt_mirror_root)

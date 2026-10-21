@@ -169,7 +169,7 @@ Cargo 的 [build script 规则](https://doc.rust-lang.org/cargo/reference/build-
 
 ## Qt 交互状态与演进门槛
 
-复杂 UI 交互明确采用 Qt 自带的 `QStateMachine`，由 [074](../task/074-qt-interaction-state-machine.md) 独立接入，设计见 [Qt 交互状态机](qt-interaction-state-machines.md)。首期由 C++ ViewModel / 控制器管理导入窗口的选文件、预览、等待回执与关闭；Qt 拥有这些局部交互状态，业务结果仍来自 Rust。Qt StateMachine 当前尚未在构建供给与链接中登记，不把本决策写成已实现。
+复杂 UI 交互采用 Qt 自带的 `QStateMachine`，由 [074](../task/074-qt-interaction-state-machine.md) 接入，准则见[Qt 交互状态机](qt-interaction-state-machines.md)。当前由 C++ ViewModel / 控制器管理导入窗口的选文件、预览、等待回执与关闭；Qt 拥有这些局部交互状态，业务结果仍来自 Rust。
 
 简单展示继续使用属性绑定和 QML `states / transitions`；[Qt Quick States](https://doc.qt.io/qt-6/qtquick-statesanimations-states.html) 描述对象 / 属性配置，不等同于领域事务执行器。Qt 状态机依赖事件循环，不能替代业务工作线程或 Rust 领域状态机。
 
@@ -179,7 +179,7 @@ UI 关闭、重建或重载后的业务展示以 Rust 快照为准，表单草�
 |---|---|
 | 视口按需读取已提交 STL 资产 | 由 073 / 080 首先验证只读资源激活与迟到结果处理 |
 | STEP 等写入型导入任务准备就绪 | 新增业务消费者，扩展 073 或另立实施范围以涵盖提交裁决 |
-| Qt 复杂交互需要集中编排 | 由 074 独立接入 QStateMachine 与导入窗口；不等待 073 完成，异步业务能力随后按实际契约联调 |
+| Qt 复杂交互需要集中编排 | 由 074 接入 QStateMachine 与导入窗口；不等待 073 完成，异步业务能力按实际契约联调 |
 | 第二个领域需要 FSM | 复用已有 DSL 内核；只在实际共同语义明确时提取执行辅助，不自动建立 `panta-fsm / panta-common` |
 | 多处出现相同调度、异步 action、层级 / 并行状态需求 | 先记录具体难点，再核验 `rust-fsm`、`smlang` 等上游能力及依赖成本，不以库名提前承诺解决方案 |
 | 希望在类型层限制合法调用序列 | 单独评估 typestate 与运行期事件的适配；不将某个库直接等同于完整形式化证明 |
