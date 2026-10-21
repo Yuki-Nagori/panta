@@ -60,7 +60,7 @@
 | 029 | [QML 原子组件库与 Theme 尺寸参数化](task/029-qml-component-library.md) | 应用平台扩展 | 005 | done |
 | 030 | [DSL 主题配置与运行期主题切换](task/030-theme-dsl.md) | 应用平台扩展 | 025, 029 | done |
 | 050 | [QML 页面设计 HTML 先行复刻](task/050-qml-html-page-replica.md) | 应用平台扩展 | 028, 029 | done |
-| 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | in-progress |
+| 051 | [无边框外观与一体化窗口标题栏](task/051-integrated-window-titlebar.md) | 应用平台扩展 | 005, 029 | implemented |
 | 052 | [QML 图标规范与首页布局优化](task/052-qml-icon-and-layout-polish.md) | 应用平台扩展 | 029, 050 | done |
 | 053 | [默认视口立体 panta 字样](task/053-default-panta-wordmark.md) | 应用平台扩展 | 007, 081 | done |
 | 054 | [顶部折叠图标与搜索框引导](task/054-titlebar-search-details.md) | 应用平台扩展 | 052 | done |
@@ -98,7 +98,7 @@
 | 100 | [tests 整体整理与性能入口统一](task/100-tests-consolidation.md) | 验证基础 | 048, 099 | done |
 | 113 | [Tools 工具栏内容](task/113-tools-ribbon.md) | 应用平台扩展 | 050, 062, 096 | done |
 | 114 | [View 工具栏内容](task/114-view-ribbon.md) | 应用平台扩展 | 060, 062, 064, 080 | done |
-| 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 125 | planned |
+| 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 125 | ready |
 | 116 | [Rust 工艺参数约束统一暴露](task/116-rust-process-parameter-constraints.md) | 应用平台扩展 | 094, 095, 099 | done |
 | 117 | [Rust 工程文档工作区状态](task/117-rust-project-document-workspace.md) | Rust 架构整理 | 067, 080, 107 | done |
 | 118 | [实际依赖图与应用命令层设计](task/118-layering-lint-and-command-boundaries.md) | Rust 架构整理 | 106, 111 | done |
