@@ -8,9 +8,11 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QString>
 #include <QStringList>
+#include <QTemporaryDir>
 #include <QUrl>
 #include <QVariant>
 #include <QtQml/qqml.h>
@@ -26,9 +28,13 @@ class SettingsTest final : public QObject {
 
   private slots:
     void language_switch_retranslates_qml_and_invalid_input_preserves_state() {
+        QTemporaryDir settingsDirectory;
+        QVERIFY(settingsDirectory.isValid());
+        const QString settingsPath = settingsDirectory.filePath(QStringLiteral("settings.ini"));
         const int settingsTypeId = qmlRegisterSingletonType<Settings>(
-            "Panta.Test", 1, 0, "Settings",
-            [](QQmlEngine*, QJSEngine*) -> QObject* { return new Settings; });
+            "Panta.Test", 1, 0, "Settings", [settingsPath](QQmlEngine*, QJSEngine*) -> QObject* {
+                return new Settings(settingsPath);
+            });
         QQmlEngine engine;
         auto* settings = engine.singletonInstance<Settings*>(settingsTypeId);
         QVERIFY(settings != nullptr);
@@ -60,23 +66,22 @@ class SettingsTest final : public QObject {
         QVERIFY(settings->availableLanguages().contains(QStringLiteral("zh-CN")));
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("Ready"));
         QSignalSpy changed(settings, &Settings::languageChanged);
-        QSignalSpy errors(settings, &Settings::languageErrorChanged);
+        QSignalSpy errors(settings, &Settings::settingsErrorChanged);
         QVERIFY(changed.isValid());
         QVERIFY(errors.isValid());
 
         QVERIFY(!settings->setLanguage(QStringLiteral("fr")));
-        QVERIFY(
-            settings->languageError().startsWith(QStringLiteral("language.unsupported_locale")));
+        QVERIFY(settings->settingsError().startsWith(QStringLiteral("settings.invalid_language")));
         QCOMPARE(settings->language(), QStringLiteral("en"));
         QCOMPARE(changed.count(), 0);
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("Ready"));
 
         QVERIFY2(settings->setLanguage(QStringLiteral("zh-CN")),
-                 qPrintable(settings->languageError()));
+                 qPrintable(settings->settingsError()));
         QCOMPARE(settings->language(), QStringLiteral("zh-CN"));
         QCOMPARE(changed.count(), 1);
         QCOMPARE(errors.count(), 2);
-        QVERIFY(settings->languageError().isEmpty());
+        QVERIFY(settings->settingsError().isEmpty());
         QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("就绪"));
         QCOMPARE(errorObject->property("errorText").toString(),
@@ -89,7 +94,7 @@ class SettingsTest final : public QObject {
 
         const QString invalidEncoding(QChar(0xD800));
         QVERIFY(!settings->setLanguage(invalidEncoding));
-        QCOMPARE(settings->languageError(), QStringLiteral("language.invalid_locale_encoding"));
+        QCOMPARE(settings->settingsError(), QStringLiteral("settings.invalid_utf8"));
         QCOMPARE(settings->language(), QStringLiteral("zh-CN"));
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("就绪"));
 
@@ -100,6 +105,69 @@ class SettingsTest final : public QObject {
         QCOMPARE(textObject->property("label").toString(), QStringLiteral("Ready"));
         QCOMPARE(errorObject->property("errorText").toString(),
                  QStringLiteral("Enter a valid project name."));
+
+        QVERIFY(settings->setThemeId(QStringLiteral("dark")));
+        QVERIFY(settings->saveWindowState(QSize(1600, 900), false));
+        QVERIFY(
+            settings->recordRecentProject(settingsDirectory.filePath(QStringLiteral("one.panta"))));
+
+        Settings restored(settingsPath);
+        QCOMPARE(restored.language(), QStringLiteral("en"));
+        QCOMPARE(restored.themeId(), QStringLiteral("dark"));
+        QCOMPARE(restored.windowWidth(), 1600);
+        QCOMPARE(restored.windowHeight(), 900);
+        QVERIFY(!restored.windowMaximized());
+        QCOMPARE(restored.recentProjectPaths(),
+                 QStringList{settingsDirectory.filePath(QStringLiteral("one.panta"))});
+        QVERIFY(restored.settingsError().isEmpty());
+    }
+
+    void invalid_stored_snapshot_is_preserved_and_disables_writes() {
+        QTemporaryDir settingsDirectory;
+        QVERIFY(settingsDirectory.isValid());
+        const QString settingsPath = settingsDirectory.filePath(QStringLiteral("settings.ini"));
+        {
+            QSettings stored(settingsPath, QSettings::IniFormat);
+            stored.beginGroup(QStringLiteral("preferences"));
+            stored.setValue(QStringLiteral("snapshot"),
+                            QStringLiteral("{\"schemaVersion\":99,\"themeId\":\"light\","
+                                           "\"language\":\"en\",\"windowWidth\":1280,"
+                                           "\"windowHeight\":720,\"windowMaximized\":true,"
+                                           "\"recentProjectPaths\":[]}"));
+            stored.endGroup();
+            stored.sync();
+            QCOMPARE(stored.status(), QSettings::NoError);
+        }
+
+        Settings settings(settingsPath);
+        QCOMPARE(settings.themeId(), QStringLiteral("light"));
+        QVERIFY(
+            settings.settingsError().startsWith(QStringLiteral("settings.unsupported_version")));
+        QVERIFY(!settings.setThemeId(QStringLiteral("dark")));
+
+        QSettings stored(settingsPath, QSettings::IniFormat);
+        QVERIFY(stored.value(QStringLiteral("preferences/snapshot"))
+                    .toString()
+                    .contains(QStringLiteral("\"schemaVersion\":99")));
+        QVERIFY(
+            settings.settingsError().startsWith(QStringLiteral("settings.unsupported_version")));
+    }
+
+    void failed_write_keeps_state_and_same_value_theme_rollback_keeps_diagnostic() {
+        QTemporaryDir settingsDirectory;
+        QVERIFY(settingsDirectory.isValid());
+        const QString settingsPath = settingsDirectory.filePath(QStringLiteral("settings.ini"));
+        Settings settings(settingsPath);
+        QVERIFY(settings.settingsError().isEmpty());
+        QVERIFY(QDir().mkdir(settingsPath));
+
+        QVERIFY(!settings.setThemeId(QStringLiteral("dark")));
+        QCOMPARE(settings.themeId(), QStringLiteral("light"));
+        QVERIFY(
+            settings.settingsError().startsWith(QStringLiteral("settings.storage_access_error")));
+        QVERIFY(!settings.setThemeId(QStringLiteral("light")));
+        QVERIFY(
+            settings.settingsError().startsWith(QStringLiteral("settings.storage_access_error")));
     }
 };
 

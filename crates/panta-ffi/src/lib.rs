@@ -29,16 +29,16 @@ use support::{
     finish_background_writes, install_crash_handler, panic_probe, process, session_close,
     session_create, session_label, session_live_count,
 };
-mod language;
-pub use language::LanguageService;
-use language::{
-    language_service_commit, language_service_current, language_service_new,
-    language_service_supported_locales, language_service_validate,
-};
 mod theme;
 pub use theme::ThemeService;
 use theme::{
     theme_service_current, theme_service_new, theme_service_select, theme_service_theme_ids,
+};
+mod settings;
+pub use settings::UserSettingsService;
+use settings::{
+    settings_service_candidate_recent_project, settings_service_commit, settings_service_current,
+    settings_service_new, settings_service_supported_languages, settings_service_validate,
 };
 mod path;
 pub use path::PathService;
@@ -152,6 +152,18 @@ pub mod bridge {
     pub struct ThemeSnapshot {
         pub id: String,
         pub tokens: Vec<ThemeToken>,
+    }
+
+    /// Rust 校验后的应用偏好快照；窗口尺寸是 Qt 逻辑像素，不包含屏幕坐标。
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct UserSettingsSnapshot {
+        pub schema_version: u32,
+        pub theme_id: String,
+        pub language: String,
+        pub window_width: u32,
+        pub window_height: u32,
+        pub window_maximized: bool,
+        pub recent_project_paths: Vec<String>,
     }
 
     /// 已导入网格的持久化元数据。尺寸拆成标量，避免 CXX shared struct
@@ -502,21 +514,24 @@ pub mod bridge {
         fn session_close(session: Box<Session>) -> u32;
         fn session_live_count() -> u32;
 
-        /// locale 标识和当前语言属于应用领域状态。C++ 先校验、安装 Qt
-        /// 字典，再提交当前 locale。
-        type LanguageService;
+        /// Rust 拥有用户偏好 schema、默认值和候选校验；Qt adapter 负责持久化。
+        type UserSettingsService;
 
-        fn language_service_new() -> Box<LanguageService>;
-        fn language_service_supported_locales() -> Vec<String>;
-        fn language_service_current(service: &LanguageService) -> String;
-        fn language_service_validate(
-            service: &LanguageService,
-            candidate: String,
-        ) -> Result<String>;
-        fn language_service_commit(
-            service: &mut LanguageService,
-            candidate: String,
-        ) -> Result<String>;
+        fn settings_service_new() -> Box<UserSettingsService>;
+        fn settings_service_current(service: &UserSettingsService) -> UserSettingsSnapshot;
+        fn settings_service_supported_languages() -> Vec<String>;
+        fn settings_service_candidate_recent_project(
+            service: &UserSettingsService,
+            path: String,
+        ) -> Result<UserSettingsSnapshot>;
+        fn settings_service_validate(
+            service: &UserSettingsService,
+            candidate: &UserSettingsSnapshot,
+        ) -> Result<UserSettingsSnapshot>;
+        fn settings_service_commit(
+            service: &mut UserSettingsService,
+            candidate: &UserSettingsSnapshot,
+        ) -> Result<UserSettingsSnapshot>;
 
         /// 主题基线、主题定义与 token 校验由 Rust 服务拥有；此服务不读写设置。
         type ThemeService;

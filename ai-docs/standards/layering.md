@@ -88,7 +88,7 @@ Cargo 表覆盖 workspace manifest 中声明的正常、build 与 dev 依赖；C
 - locale 支持集、校验和当前选择由 Rust 服务拥有；Qt adapter 管理 `QTranslator`，Bridge `Settings` 将 Rust locale 选择与 Qt resource 加载、QML 重翻译协调起来。Rust 不接触 Qt 类型、QML/Qt 事件循环或 QM resource URL；QML 不维护第二份 locale 列表。
 - surface 坐标、窗口尺寸、设备像素以及 Wayland/Win32/Cocoa 对象归 C++ 平台适配层，不搬入主题 token 或 Rust 逐帧路径。
 - Qt Quick 与 VTK hardware window 生命周期紧密耦合的原生 surface 代码归 `native/visualization`，不得为了平台 API 归类而让通用 Qt adapter 反向依赖 VTK。
-- 用户设置的 schema、默认值、持久化与界面尚在任务 087/115/125 规划；实施时由 Rust 定义业务设置，Qt adapter 负责平台持久化，QML 与领域 core 不直接依赖 `QSettings`。
+- 用户设置由 Rust 定义 schema、默认值与校验；C++ Qt adapter 通过单个版本化 QSettings 快照值负责平台存取，Bridge 暴露状态给 QML。QML 与 Rust core 不直接依赖 `QSettings`。设置服务与持久化边界见[任务 125](../task/125-settings-service-and-qt-adapter.md)，界面和菜单入口分别见 087 与 115。
 - 手写 unsafe 仅在登记的边界模块（当前 `panta-foundation::crash`），逐块说明安全前提；CXX 的 unsafe 声明与生成胶水按 FFI 规则审查，不扩散到业务调用方。
 - External MoldSolver 只经进程协议接入，不链接其 ABI。
 

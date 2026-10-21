@@ -108,7 +108,7 @@
 | 122 | [Rust CLI 创建工程](task/122-rust-cli-project-create.md) | Rust 架构整理 | 057, 107, 121 | done |
 | 123 | [Rust CLI 检查 STL](task/123-rust-cli-stl-inspection.md) | CAE 领域模块迁移 | 063, 067, 121 | done |
 | 124 | [Rust CLI 导入 STL](task/124-rust-cli-stl-import.md) | CAE 领域模块迁移 | 063, 067, 073, 088, 121, 123 | done |
-| 125 | [设置服务与 Qt 持久化适配](task/125-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | planned |
+| 125 | [设置服务与 Qt 持久化适配](task/125-settings-service-and-qt-adapter.md) | 应用平台扩展 | 006, 023, 030 | in-progress |
 | 126 | [OCCT Shape 仓库与 Netgen 复用](task/126-native-shape-repository-and-netgen-reuse.md) | CAE 领域模块迁移 | 009, 010, 066, 067, 119 | done |
 | 127 | [Rust 与 Qt 职责边界收尾](task/127-rust-qt-boundary-followup.md) | Rust 架构整理 | 057, 080, 088, 092, 107, 117, 124 | done |
 | 128 | [冗余代码与状态收敛](task/128-dead-code-and-redundancy-cleanup.md) | Rust 架构整理 | 008, 029, 056, 109, 117, 127 | done |

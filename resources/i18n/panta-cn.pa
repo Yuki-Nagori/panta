@@ -86,6 +86,10 @@ ready:
   src: Ready
   tr: 就绪
 
+settings-unavailable:
+  src: Some application preferences could not be applied. (%1)
+  tr: 部分应用偏好未能应用。（%1）
+
 [AppNoBridge]
 caption:
   src: panta — Minimal Shell (Bridge disabled)

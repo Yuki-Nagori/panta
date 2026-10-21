@@ -7,9 +7,11 @@ target_sources(
   panta_qt_adapter
   PRIVATE include/panta/qt_adapter/standard_paths.hpp
           include/panta/qt_adapter/system_motion_preference.hpp
+          include/panta/qt_adapter/user_settings_store.hpp
           include/panta/qt_adapter/translation_catalog.hpp
           src/standard_paths.cpp
           src/system_motion_preference.cpp
+          src/user_settings_store.cpp
           src/translation_catalog.cpp)
 target_include_directories(panta_qt_adapter PUBLIC include)
 target_link_libraries(panta_qt_adapter PUBLIC Qt6::Core)
@@ -46,4 +48,12 @@ if(BUILD_TESTING)
                                                                   Qt6::Test)
   add_test(NAME QtAdapter.TranslationCatalog COMMAND panta_qt_adapter_translation_test)
   set_tests_properties(QtAdapter.TranslationCatalog PROPERTIES LABELS "qt-adapter")
+
+  add_executable(panta_qt_adapter_user_settings_store_test
+                 ../../tests/cpp/qt-adapter/user_settings_store_test.cpp)
+  panta_native_defaults(panta_qt_adapter_user_settings_store_test)
+  target_link_libraries(panta_qt_adapter_user_settings_store_test PRIVATE panta::qt_adapter
+                                                                          Qt6::Test)
+  add_test(NAME QtAdapter.UserSettingsStore COMMAND panta_qt_adapter_user_settings_store_test)
+  set_tests_properties(QtAdapter.UserSettingsStore PROPERTIES LABELS "qt-adapter")
 endif()
