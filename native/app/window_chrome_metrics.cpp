@@ -44,6 +44,20 @@ void WindowChromeMetrics::observeWindow(QQuickWindow* window) {
     emit trailingSystemControlsInsetChanged();
 }
 
+#ifndef Q_OS_MACOS
+void WindowChromeMetrics::performTitlebarDoubleClickAction() {
+    if (window_ == nullptr) {
+        return;
+    }
+
+    if (window_->windowStates().testFlag(Qt::WindowMaximized)) {
+        window_->showNormal();
+    } else {
+        window_->showMaximized();
+    }
+}
+#endif
+
 bool WindowChromeMetrics::eventFilter(QObject* watched, QEvent* event) {
     if (watched == window_ &&
         (event->type() == QEvent::Expose || event->type() == QEvent::DevicePixelRatioChange ||

@@ -26,6 +26,9 @@ class WindowChromeMetrics final : public QObject {
     /// 跟踪主窗口生命周期，使原生按钮几何变化时刷新 QML 布局。
     Q_INVOKABLE void observeWindow(QQuickWindow* window);
 
+    /// 按 macOS 系统偏好执行标题栏双击动作。
+    Q_INVOKABLE void performTitlebarDoubleClickAction();
+
     /// 返回最左侧系统标题栏控件右边缘相对客户区左侧的位置。
     qreal leadingSystemControlsInset() const;
 

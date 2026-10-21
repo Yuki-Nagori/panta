@@ -6,6 +6,36 @@
 
 namespace panta {
 
+void WindowChromeMetrics::performTitlebarDoubleClickAction() {
+    QQuickWindow* window = window_.data();
+    if (window == nullptr || QGuiApplication::platformName() != QStringLiteral("cocoa") ||
+        window->handle() == nullptr) {
+        return;
+    }
+
+    auto* view = reinterpret_cast<NSView*>(window->winId()); // NOLINT(performance-no-int-to-ptr)
+    NSWindow* native_window = view.window;
+    NSButton* zoom_button = [native_window standardWindowButton:NSWindowZoomButton];
+    if (native_window == nil || zoom_button == nil || ![zoom_button isEnabled]) {
+        return;
+    }
+
+    NSString* action =
+        [[NSUserDefaults standardUserDefaults] stringForKey:@"AppleActionOnDoubleClick"];
+    if ([action isEqualToString:@"Minimize"]) {
+        [native_window performMiniaturize:zoom_button];
+    } else if ([action isEqualToString:@"Fill"]) {
+        if (window->windowStates().testFlag(Qt::WindowMaximized)) {
+            window->showNormal();
+        } else {
+            window->showMaximized();
+        }
+    } else if (action == nil || [action isEqualToString:@"Maximize"] ||
+               [action isEqualToString:@"Zoom"]) {
+        [native_window performZoom:zoom_button];
+    }
+}
+
 auto WindowChromeMetrics::leadingSystemControlsInset() const -> qreal {
     QQuickWindow* window = window_.data();
     if (window == nullptr || QGuiApplication::platformName() != QStringLiteral("cocoa") ||
