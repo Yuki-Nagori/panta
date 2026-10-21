@@ -1,6 +1,6 @@
 # 115 — 平台应用菜单与 Settings 入口
 
-- 状态：in-progress
+- 状态：implemented
 - 阶段：应用平台扩展
 - 依赖：[051 无边框外观与一体化窗口标题栏](051-integrated-window-titlebar.md)、[125 设置服务与 Qt 持久化适配](125-settings-service-and-qt-adapter.md)
 - 优先级：P2
@@ -67,8 +67,9 @@
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-10-21 | `node --check`、Python HTML parser、SVG 引用核对、`git diff --check`、独立只读评审、维护者对照参考图确认 | 原型脚本/HTML 可解析；菜单图标统一复用 SVG；Settings 弹窗使用 Cancel / OK 并可重复打开、关闭；布局符合确认后的参考图 | 静态检查和独立评审通过，维护者确认布局。菜单 SVG 复用 shell symbol，P 品牌块完整包含在展开面板内；展开时按原品牌区实测位置对齐，不使用轮询。左侧 Close 紧跟 Study Properties 且带右箭头，为不实现动作的占位项；Publish/Print、Print/Project、Study Properties/Close 之间有分隔线；面板覆盖标题栏和 Community 等菜单行，右下角为 Settings / Exit。当前环境未完成浏览器实窗渲染，维护者对照原型确认了主要位置与布局；文字换行和小窗口滚动仍需在后续验收中检查。QML 实现已开始，受影响 qmllint 和测试待本阶段执行。 |
-| 2026-10-21 | `cargo lint qmllint`、`cargo format --check --changed`、`edit_commands_follow_focus_in_separate_window` | 编辑命令使用 Qt 当前焦点对象；TextField 和独立 Window 中的 TextArea 支持选择、复制、剪切、普通/HTML 粘贴，TextArea 只读时 Undo/Redo 不改内容 | 格式与 QML lint 通过；C++ 构建通过；隔离 Shell 用例 3/3 通过。`Qml.ShellModuleLoads` 聚合测试仍在既有 `loads_shell_module` 的 `searchVisible()` 断言失败（search x=2384、宽 200、strip 宽 1160、scroll=0），并在 20 秒测试超时；需单独定位。macOS 原生菜单行为仍待实机验收。独立只读复核未发现焦点路由遗留问题。 |
+| 2026-10-21 | `cargo lint qmllint`、`cargo format --check --changed`、`edit_commands_follow_focus_in_separate_window` | 编辑命令使用 Qt 当前焦点对象；TextField 和独立 Window 中的 TextArea 支持选择、复制、剪切、普通/HTML 粘贴，TextArea 只读时 Undo/Redo 不改内容 | 格式与 QML lint 通过；C++ 构建通过；隔离 Shell 用例 3/3 通过。`Qml.ShellModuleLoads` 首次运行在既有 `loads_shell_module` 的 `searchVisible()` 断言失败并超时；后续重跑通过（见下方 final review 验证记录）。macOS 原生菜单行为仍待实机验收。独立只读复核未发现焦点路由遗留问题。 |
 | 2026-10-21 | `cargo format --changed`、`ninja -C target/native/debug all_qmllint`、`ctest --test-dir target/native/debug --output-on-failure -R Qml.ShellModuleLoads`、macOS 实窗打开 Settings 并按 Escape | 所有弹窗共用 Escape 行为和统一显示/激活入口；保存期间不能经 Escape 或标题栏关闭；Settings 关闭后焦点返回主窗口 | 格式、QML lint、Shell 聚合测试通过；构建真实 macOS 应用成功。实窗确认原生 panta 菜单可以打开 Settings，Escape 关闭弹窗并返回主窗口焦点；macOS 将标签显示为 Preferences（Qt/macOS 菜单角色行为，已在风险说明中记录）。`DialogWindow.present()` 合并重复的居中/显示/激活逻辑；修复 Fill 与 Gate 弹窗保存时标题栏关闭按钮仍可用。独立只读评审未发现新问题。Windows/Linux 实机验收仍待维护者设备确认，不阻塞实现状态。 |
+| 2026-10-21 | Final review：缺省设置图标路由；`QT_QPA_PLATFORM=offscreen QT_QUICK_CONTROLS_STYLE=Basic target/native/debug/performance/panta_qml_cpu_benchmark measures_application_menu_construct` | 替换已有页面时保留原图标呈现方式；无图标的新页面使用可着色 glyph；记录菜单和 Settings 的实际构造、打开与布局成本 | 回归验证覆盖 General 页面替换时保留彩色图标、新页面缺省使用单色 `history` glyph；Shell 定向用例 5/5、`Qml.ShellModuleLoads` 1/1、QML lint、`git diff --check` 通过。CPU 基准运行于 macOS 27.0.1 arm64、Qt 6.11.2、Debug 基准目标，31 个采样；范围为创建/显示宿主窗口、打开菜单/弹窗和处理布局事件，不包含销毁成本及 GPU 呈现。PlatformMenuBar/ApplicationMenu 构造 p50/p95 为 906/1169 μs；后台菜单最近项目 0/8/100 个 p50/p95 为 1767/2191、2208/2643、2746/3070 μs（100 项模型实际实例化 20 个 ListView 委托，可能包括缓存区域）；三页 Settings 弹窗为 1116/1447 μs。GPU harness 增加后台面板 0/8/100 项渲染场景并可编译；本机本轮无法执行：offscreen QPA 不支持创建图形上下文，默认 Cocoa 启动又报告无屏幕。Settings 是独立 `QQuickWindow`，现有离屏 renderer 不覆盖该窗口；上述性能数值仅描述 CPU 构造/布局。原生菜单栏由系统绘制，Qt Quick GPU 基准不代表其平台呈现成本。 |
 
 ## 风险与回退
 
@@ -84,4 +85,4 @@ Qt Quick Controls `MenuBar` 在 macOS 使用原生菜单栏，Qt 平台插件负
 
 ## 完成摘要
 
-HTML 原型与 QML 实现已完成；自动验证、macOS 实窗检查与独立评审通过。Windows/Linux 实机行为仍待维护者设备验收。
+HTML 原型与 QML 实现已完成；自动验证、macOS 实窗检查与独立评审通过。任务状态为 `implemented`；Windows/Linux 实机行为仍待维护者设备验收，不阻塞实现状态。

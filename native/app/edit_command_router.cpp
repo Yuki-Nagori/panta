@@ -3,7 +3,11 @@
 #include <QGuiApplication>
 #include <QMetaMethod>
 #include <QMetaProperty>
+#include <QObject>
 #include <QVariant>
+#include <QtCore/qnamespace.h>
+#include <QtCore/qobjectdefs.h>
+#include <qtmetamacros.h>
 
 namespace panta::app {
 

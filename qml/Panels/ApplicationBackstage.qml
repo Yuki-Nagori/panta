@@ -272,6 +272,7 @@ Popup {
                 model: backstage.filteredRecentProjects
                 delegate: ItemDelegate {
                     id: recentProjectDelegate
+                    objectName: "recentProjectDelegate"
                     required property string modelData
                     width: recentProjectsList.width
                     height: Theme.applicationMenuCommandHeight

@@ -37,17 +37,18 @@ Item {
     signal accepted
     signal cancelled
 
-    function registerPage(routeId, title, iconName, pageComponent) {
+    function registerPage(routeId, title, iconName, pageComponent, preserveSourceColors) {
         if (typeof routeId !== "string" || routeId.length === 0 || typeof title !== "string" || !pageComponent)
             return false;
 
         const pages = registeredPages.slice();
         const existingIndex = pages.findIndex(page => page.routeId === routeId);
+        const existingPage = existingIndex < 0 ? null : pages[existingIndex];
         const page = {
             routeId: routeId,
             title: title,
-            iconName: iconName || "tools-options",
-            preserveSourceColors: false,
+            iconName: iconName || existingPage?.iconName || "history",
+            preserveSourceColors: typeof preserveSourceColors === "boolean" ? preserveSourceColors : existingPage?.preserveSourceColors ?? false,
             pageComponent: pageComponent
         };
         if (existingIndex < 0)

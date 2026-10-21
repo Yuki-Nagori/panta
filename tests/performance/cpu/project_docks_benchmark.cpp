@@ -31,6 +31,7 @@
 #include <functional>
 #include <icon_provider.hpp>
 #include <iterator>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -53,7 +54,10 @@ enum class Panels : std::uint8_t {
     Controls,
     MeshTool,
     AnalysisSequence,
-    AnalysisSequenceDialog
+    AnalysisSequenceDialog,
+    ApplicationBackstage,
+    PlatformMenuBar,
+    SettingsDialog
 };
 enum class DocumentTabWorkload : std::uint8_t { Construct, Switch, Close };
 enum class IconSourceMode : std::uint8_t { Empty, MonochromeProvider, SourceColors };
@@ -129,6 +133,9 @@ class QmlPerformanceBenchmark final : public QObject {
         QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
     QQmlComponent m_themedIconComponent{
         &m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedIcon.qml"))};
+    QQmlComponent m_backstageHostComponent{&m_engine};
+    QQmlComponent m_menuBarHostComponent{&m_engine};
+    QQmlComponent m_settingsHostComponent{&m_engine};
 
     QObject* create(QQmlComponent& component, const QVariantMap& properties, QObject& owner) {
         QObject* object = component.createWithInitialProperties(properties);
@@ -147,6 +154,103 @@ class QmlPerformanceBenchmark final : public QObject {
     }
 
     Sample measure_once(Panels panels, const QStringList& names) {
+        if (panels == Panels::ApplicationBackstage || panels == Panels::PlatformMenuBar ||
+            panels == Panels::SettingsDialog) {
+            QQmlComponent& component =
+                panels == Panels::ApplicationBackstage ? m_backstageHostComponent
+                : panels == Panels::PlatformMenuBar    ? m_menuBarHostComponent
+                                                       : m_settingsHostComponent;
+            QVariantList recent_projects;
+            for (const QString& name : names) {
+                recent_projects.append(QStringLiteral("/benchmarks/%1.panta").arg(name));
+            }
+            QElapsedTimer timer;
+            timer.start();
+            std::unique_ptr<QObject> host_object(component.createWithInitialProperties(
+                panels == Panels::ApplicationBackstage
+                    ? QVariantMap{{QStringLiteral("recentProjects"), recent_projects}}
+                    : QVariantMap{}));
+            if (!host_object) {
+                QTest::qFail(qPrintable(component.errorString()), __FILE__, __LINE__);
+                return {};
+            }
+            auto* host = qobject_cast<QQuickWindow*>(host_object.get());
+            if (host == nullptr) {
+                QTest::qFail("QML benchmark host did not create a QQuickWindow", __FILE__,
+                             __LINE__);
+                return {};
+            }
+            host->resize(1000, 700);
+            host->show();
+            if (panels != Panels::PlatformMenuBar) {
+                const char* action =
+                    panels == Panels::ApplicationBackstage ? "openBackstage" : "openSettings";
+                if (!QMetaObject::invokeMethod(host, action)) {
+                    QTest::qFail("QML benchmark host did not expose its open action", __FILE__,
+                                 __LINE__);
+                    return {};
+                }
+            }
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+            if (panels == Panels::PlatformMenuBar) {
+                const QStringList required_objects{
+                    QStringLiteral("platformApplicationMenuBar"),
+                    QStringLiteral("platformApplicationMenu"), QStringLiteral("platformFileMenu"),
+                    QStringLiteral("platformEditMenu"), QStringLiteral("platformWindowMenu")};
+                for (const QString& object_name : required_objects) {
+                    if (host->findChild<QObject*>(object_name) == nullptr) {
+                        QTest::qFail(
+                            qPrintable(QStringLiteral("Missing menu object: %1").arg(object_name)),
+                            __FILE__, __LINE__);
+                        return {};
+                    }
+                }
+                const int menu_count = static_cast<int>(required_objects.size()) - 1;
+                return {timer.nsecsElapsed(), menu_count, menu_count, false};
+            }
+
+            QObject* surface = host->findChild<QObject*>(
+                panels == Panels::ApplicationBackstage ? QStringLiteral("applicationBackstage")
+                                                       : QStringLiteral("settingsPageDialog"));
+            if (surface == nullptr) {
+                QTest::qFail("QML benchmark surface was not instantiated", __FILE__, __LINE__);
+                return {};
+            }
+            const bool visible = surface->property("visible").toBool();
+            if (!visible) {
+                QTest::qFail("QML benchmark surface did not open", __FILE__, __LINE__);
+            }
+            if (panels == Panels::ApplicationBackstage) {
+                auto* list = host->findChild<QQuickItem*>(QStringLiteral("recentProjectsList"));
+                if (list == nullptr) {
+                    QTest::qFail("Backstage recent-project list was not instantiated", __FILE__,
+                                 __LINE__);
+                    return {};
+                }
+                const int model_rows = list->property("count").toInt();
+                const int realized_rows = static_cast<int>(
+                    visual_items(list, QStringLiteral("recentProjectDelegate")).size());
+                return {timer.nsecsElapsed(), model_rows, realized_rows, false};
+            }
+            auto* dialog = qobject_cast<QQuickWindow*>(surface);
+            if (dialog == nullptr) {
+                QTest::qFail("Settings dialog host did not create a QQuickWindow", __FILE__,
+                             __LINE__);
+                return {};
+            }
+            const int page_count = 3;
+            int realized_pages = 0;
+            for (const QString& route : {QStringLiteral("general"), QStringLiteral("appearance"),
+                                         QStringLiteral("language")}) {
+                realized_pages +=
+                    visual_item(dialog->contentItem(),
+                                QStringLiteral("settingsPageButton_") + route) != nullptr
+                        ? 1
+                        : 0;
+            }
+            return {timer.nsecsElapsed(), page_count, realized_pages, false};
+        }
+
         QObject owner;
         QElapsedTimer timer;
         timer.start();
@@ -492,7 +596,44 @@ class QmlPerformanceBenchmark final : public QObject {
         m_analysisSequences = analysis_sequence_catalog();
         m_emptyComponent.setData(QByteArrayLiteral("import QtQuick\nItem {}"),
                                  QUrl(QStringLiteral("qrc:/benchmark/Empty.qml")));
+        m_backstageHostComponent.setData(
+            QByteArrayLiteral(
+                "import QtQuick\n"
+                "import QtQuick.Controls\n"
+                "import Panta.Shell\n"
+                "ApplicationWindow {\n"
+                "  id: host; visible: false; width: 1000; height: 700\n"
+                "  property var recentProjects: []\n"
+                "  function openBackstage() { backstage.open() }\n"
+                "  ApplicationBackstage { id: backstage; recentProjects: host.recentProjects }\n"
+                "}\n"),
+            QUrl(QStringLiteral("qrc:/benchmark/ApplicationBackstageHost.qml")));
+        m_menuBarHostComponent.setData(
+            QByteArrayLiteral("import QtQuick\n"
+                              "import QtQuick.Controls\n"
+                              "import Panta.Shell\n"
+                              "ApplicationWindow {\n"
+                              "  id: host; visible: false; width: 1000; height: 700\n"
+                              "  menuBar: PlatformMenuBar { hostWindow: host }\n"
+                              "}\n"),
+            QUrl(QStringLiteral("qrc:/benchmark/PlatformMenuBarHost.qml")));
+        m_settingsHostComponent.setData(
+            QByteArrayLiteral("import QtQuick\n"
+                              "import QtQuick.Controls\n"
+                              "import Panta.Shell\n"
+                              "ApplicationWindow {\n"
+                              "  id: host; visible: false; width: 1000; height: 700\n"
+                              "  function openSettings() { settingsRouter.openPage('general') }\n"
+                              "  SettingsPageRouter { id: settingsRouter; ownerWindow: host }\n"
+                              "}\n"),
+            QUrl(QStringLiteral("qrc:/benchmark/SettingsHost.qml")));
         QVERIFY(m_emptyComponent.isReady());
+        QVERIFY2(m_backstageHostComponent.isReady(),
+                 qPrintable(m_backstageHostComponent.errorString()));
+        QVERIFY2(m_menuBarHostComponent.isReady(),
+                 qPrintable(m_menuBarHostComponent.errorString()));
+        QVERIFY2(m_settingsHostComponent.isReady(),
+                 qPrintable(m_settingsHostComponent.errorString()));
         QVERIFY2(m_controlsComponent.isReady(), qPrintable(m_controlsComponent.errorString()));
         QVERIFY2(m_tasksComponent.isReady(), qPrintable(m_tasksComponent.errorString()));
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
@@ -572,6 +713,35 @@ class QmlPerformanceBenchmark final : public QObject {
                  [this, panels] { return measure_once(panels, {}); },
                  [this, panels](const Sample& sample) { verify_sample(panels, 0, sample); }});
         }
+    }
+
+    void measures_application_menu_construct() {
+        run_scenario({QStringLiteral("application menu"), QStringLiteral("platform menu bar"), 4,
+                      [this] { return measure_once(Panels::PlatformMenuBar, {}); },
+                      [](const Sample& sample) {
+                          QCOMPARE(sample.task_model_rows, 4);
+                          QCOMPARE(sample.task_delegate_rows, 4);
+                      }});
+        for (const int recent_count : {0, 8, 100}) {
+            run_scenario(
+                {QStringLiteral("application menu"), QStringLiteral("backstage"), recent_count,
+                 [this, recent_count] {
+                     return measure_once(Panels::ApplicationBackstage, make_names(recent_count));
+                 },
+                 [recent_count](const Sample& sample) {
+                     QCOMPARE(sample.task_model_rows, recent_count);
+                     QVERIFY(sample.task_delegate_rows <= sample.task_model_rows);
+                     if (recent_count > 0) {
+                         QVERIFY(sample.task_delegate_rows > 0);
+                     }
+                 }});
+        }
+        run_scenario({QStringLiteral("application menu"), QStringLiteral("settings dialog"), 3,
+                      [this] { return measure_once(Panels::SettingsDialog, {}); },
+                      [](const Sample& sample) {
+                          QCOMPARE(sample.task_model_rows, 3);
+                          QCOMPARE(sample.task_delegate_rows, 3);
+                      }});
     }
 };
 

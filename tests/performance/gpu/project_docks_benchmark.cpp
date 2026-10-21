@@ -60,6 +60,7 @@ enum class Panels : std::uint8_t {
     Tasks,
     Layers,
     Both,
+    ApplicationBackstage,
     DocTabs,
     Controls,
     MeshTool,
@@ -142,6 +143,7 @@ class ProjectDocksGpuBenchmark final : public QObject {
     QQmlComponent m_documentTabBarComponent{
         &m_engine,
         QUrl(QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Composites/DocumentTabBar.qml"))};
+    QQmlComponent m_backstageComponent{&m_engine};
 
     QObject* create(QQmlComponent& component, const QVariantMap& properties, QObject& owner,
                     const QPoint& position, const QSize& size) {
@@ -270,6 +272,16 @@ class ProjectDocksGpuBenchmark final : public QObject {
                    QPoint(0, 0), QSize(1000, 700));
         } else if (scenario.panels == Panels::MeshTool) {
             create(m_meshToolComponent, {}, owner, QPoint(0, 0), QSize(440, 700));
+        } else if (scenario.panels == Panels::ApplicationBackstage) {
+            QObject* root =
+                create(m_backstageComponent, QVariantMap{{QStringLiteral("recentProjects"), names}},
+                       owner, QPoint(0, 0), QSize(1000, 700));
+            QVERIFY(root != nullptr);
+            QObject* popup = root->findChild<QObject*>(QStringLiteral("applicationBackstage"));
+            QVERIFY(popup != nullptr);
+            QVERIFY(QMetaObject::invokeMethod(popup, "open"));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QVERIFY(popup->property("visible").toBool());
         } else {
             if (scenario.panels == Panels::Tasks || scenario.panels == Panels::Both) {
                 QVariantMap properties = names_property;
@@ -374,12 +386,17 @@ class ProjectDocksGpuBenchmark final : public QObject {
         }
         // 虚拟列表在 polish/预热后才补齐可视行；以正式采样时的负载报告和断言。
         const int realized_rows =
-            tasks_item == nullptr
+            scenario.panels == Panels::ApplicationBackstage
+                ? static_cast<int>(
+                      visual_items(m_window.contentItem(), QStringLiteral("recentProjectDelegate"))
+                          .size())
+            : tasks_item == nullptr
                 ? 0
                 : static_cast<int>(
                       visual_items(tasks_item, QStringLiteral("importedPartEntry")).size());
         QVERIFY(realized_rows <= scenario.item_count);
-        if ((scenario.panels == Panels::Tasks || scenario.panels == Panels::Both) &&
+        if ((scenario.panels == Panels::Tasks || scenario.panels == Panels::Both ||
+             scenario.panels == Panels::ApplicationBackstage) &&
             scenario.item_count > 0) {
             QVERIFY(realized_rows > 0);
         }
@@ -454,6 +471,18 @@ class ProjectDocksGpuBenchmark final : public QObject {
         QVERIFY2(m_tasksComponent.isReady(), qPrintable(m_tasksComponent.errorString()));
         QVERIFY2(m_layersComponent.isReady(), qPrintable(m_layersComponent.errorString()));
         QVERIFY2(m_meshToolComponent.isReady(), qPrintable(m_meshToolComponent.errorString()));
+        m_backstageComponent.setData(
+            QByteArrayLiteral(
+                "import QtQuick\n"
+                "import QtQuick.Controls\n"
+                "import Panta.Shell\n"
+                "Item {\n"
+                "  id: host; property var recentProjects: []\n"
+                "  ApplicationBackstage { id: backstage; objectName: 'applicationBackstage'; "
+                "recentProjects: host.recentProjects }\n"
+                "}\n"),
+            QUrl(QStringLiteral("qrc:/benchmark/ApplicationBackstageScene.qml")));
+        QVERIFY2(m_backstageComponent.isReady(), qPrintable(m_backstageComponent.errorString()));
 
         m_window.resize(1000, 700);
         qInfo() << "Render size:" << m_window.size() << "DPR:" << m_window.devicePixelRatio();
@@ -517,6 +546,10 @@ class ProjectDocksGpuBenchmark final : public QObject {
             {"document tabs close/reopen", Panels::DocTabs, 8, TabWorkload::CloseReopen},
             {"document tabs close/reopen", Panels::DocTabs, 24, TabWorkload::CloseReopen}};
         if (!qEnvironmentVariableIsSet("PANTA_BENCHMARK_DOCUMENT_TABS_ONLY")) {
+            for (const int item_count : {0, 8, 100}) {
+                cases.push_back(
+                    {"application backstage", Panels::ApplicationBackstage, item_count});
+            }
             for (const int item_count : kItemCounts) {
                 cases.push_back({"tasks", Panels::Tasks, item_count});
                 cases.push_back({"layers", Panels::Layers, item_count});
@@ -553,6 +586,16 @@ class ProjectDocksGpuBenchmark final : public QObject {
         run_scenario({"mesh tool", Panels::MeshTool, 0}, api);
         for (const int count : {1, 8, 24}) {
             run_scenario({"controls", Panels::Controls, count}, api);
+        }
+    }
+
+    void measures_application_backstage_rendering() {
+        const char* api = graphics_api_name(m_window.rendererInterface()->graphicsApi());
+        for (const int item_count : {0, 8, 100}) {
+            run_scenario({"application backstage", Panels::ApplicationBackstage, item_count}, api);
+            if (QTest::currentTestFailed()) {
+                return;
+            }
         }
     }
 };

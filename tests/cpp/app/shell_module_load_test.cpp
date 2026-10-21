@@ -1,5 +1,6 @@
 // Panta.Shell 运行时加载测试：验证资源模块及其可选 Bridge 依赖的链接契约。
 
+#include <QByteArray>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QMimeData>
@@ -590,6 +591,11 @@ class ShellModuleLoadTest final : public QObject {
                 "  Component { id: customPage; Item { objectName: 'customSettingsPage' } }\n"
                 "  function registerCustomPage() { return router.registerPage('custom', 'Custom', "
                 "'history', customPage) }\n"
+                "  function replaceGeneralPage() { return router.registerPage('general', 'General "
+                "custom', "
+                "'', customPage) }\n"
+                "  function registerPageWithoutIcon() { return router.registerPage('missing-icon', "
+                "'Missing icon', '', customPage) }\n"
                 "  function openCustomPage() { return router.openPage('custom') }\n"
                 "}\n"),
             QUrl(QStringLiteral("qrc:/SettingsPageRouterTest.qml")));
@@ -604,6 +610,28 @@ class ShellModuleLoadTest final : public QObject {
         auto* dialog = root->findChild<QQuickWindow*>(QStringLiteral("settingsPageDialog"));
         QVERIFY(router != nullptr);
         QVERIFY(dialog != nullptr);
+
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "replaceGeneralPage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QVERIFY(QMetaObject::invokeMethod(router, "pageForRoute", Q_RETURN_ARG(QVariant, result),
+                                          Q_ARG(QVariant, QVariant(QStringLiteral("general")))));
+        const QVariantMap replaced_general = result.toMap();
+        QCOMPARE(replaced_general.value(QStringLiteral("iconName")).toString(),
+                 QStringLiteral("tools-options"));
+        QVERIFY(replaced_general.value(QStringLiteral("preserveSourceColors")).toBool());
+
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "registerPageWithoutIcon",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QVERIFY(
+            QMetaObject::invokeMethod(router, "pageForRoute", Q_RETURN_ARG(QVariant, result),
+                                      Q_ARG(QVariant, QVariant(QStringLiteral("missing-icon")))));
+        const QVariantMap fallback_page = result.toMap();
+        QCOMPARE(fallback_page.value(QStringLiteral("iconName")).toString(),
+                 QStringLiteral("history"));
+        QVERIFY(!fallback_page.value(QStringLiteral("preserveSourceColors")).toBool());
+
         QSignalSpy accepted_spy(router, SIGNAL(accepted()));
         QSignalSpy cancelled_spy(router, SIGNAL(cancelled()));
 
