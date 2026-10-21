@@ -22,6 +22,10 @@ shellTemplate.innerHTML = `
     <symbol id="i-image" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="2.5" width="12" height="10" stroke="currentColor" stroke-width="1.2"/><circle cx="5" cy="6" r="1.2" fill="currentColor"/><path d="M3 11l3.5-3.5 2.5 2 2-2 3 3.5" stroke="currentColor" stroke-width="1.2"/></symbol>
     <symbol id="i-export" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3"/><path d="M2 12.5h11" stroke="currentColor" stroke-width="1.3"/></symbol>
     <symbol id="i-delete" viewBox="0 0 15 15" fill="none"><path d="M2.5 4h10M5.5 4V2.5h4V4M4 4l1 9h5l1-9" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-history" viewBox="0 0 16 16" fill="none"><path d="M2.2 5.5A6 6 0 1 1 2 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><path d="M1.5 2.8v3h3M8 4.5V8l2.4 1.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-left" viewBox="0 0 15 15" fill="none"><path d="m9.5 2.5-5 5 5 5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="4" r="1.7" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="8" r="1.7" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="5" cy="12" r="1.7" fill="#fff" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 16 16" fill="none"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4h1.1a1.5 1.5 0 0 0 1.1-2.5c-.6-.7-.1-1.7.8-1.7h.8A2.2 2.2 0 0 0 14 7.8 6 6 0 0 0 8 1.8Z" stroke="currentColor" stroke-width="1.2"/><circle cx="4.7" cy="7" r=".8" fill="currentColor"/><circle cx="6.7" cy="4.5" r=".8" fill="currentColor"/><circle cx="10" cy="4.7" r=".8" fill="currentColor"/></symbol>
     <symbol id="i-layers" viewBox="0 0 16 16" fill="none"><path d="m1.5 4 6.5-3 6.5 3-6.5 3zM1.5 7l6.5 3 6.5-3M1.5 10l6.5 3 6.5-3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
     <symbol id="i-caret" viewBox="0 0 7 5" fill="none"><path d="M0.7 0.6h5.6L3.5 4.4z" fill="currentColor"/></symbol>
     <symbol id="i-globe" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.4" stroke="currentColor" stroke-width="1.3"/><ellipse cx="8.5" cy="8.5" rx="2.9" ry="6.4" stroke="currentColor" stroke-width="1.3"/><path d="M2.4 8.5h12.2" stroke="currentColor" stroke-width="1.3"/></symbol>
@@ -358,12 +362,15 @@ if (document.body.classList.contains("project-workspace")) {
 }
 
 const dialogFocus = new WeakMap();
+const dialogFrameFocus = new WeakMap();
 const openDialog = (dialog) => {
   dialogFocus.set(dialog, document.activeElement);
   document.querySelectorAll('[data-dialog-panel]:not([hidden])').forEach((parent) => { parent.inert = true; });
   dialog.inert = false;
   dialog.hidden = false;
-  (dialog.querySelector('input, select') || dialog.querySelector('button'))?.focus();
+  const initialFocus = [...dialog.querySelectorAll('input, select, button')]
+    .find((control) => !control.disabled && control.getClientRects().length);
+  initialFocus?.focus();
 };
 const closeDialog = (dialog) => {
   if (!dialog || dialog.hidden) return;
@@ -371,7 +378,60 @@ const closeDialog = (dialog) => {
   const parent = [...document.querySelectorAll('[data-dialog-panel]:not([hidden])')].at(-1);
   if (parent) parent.inert = false;
   dialogFocus.get(dialog)?.focus();
+  if (document.body.hasAttribute("data-dialog-frame-page") && window.parent !== window) {
+    window.parent.postMessage({ type: "panta-dialog-frame-closed" }, "*");
+  }
 };
+
+document.querySelectorAll("[data-dialog-frame-host]").forEach((host) => {
+  const frame = host.querySelector("iframe");
+  if (!frame) return;
+
+  frame.addEventListener("load", () => {
+    frame.dataset.dialogFrameLoaded = "true";
+    if (host.dataset.dialogOpenPending !== "true" || host.hidden) return;
+    frame.contentWindow?.postMessage({ type: "panta-dialog-frame-open" }, "*");
+    delete host.dataset.dialogOpenPending;
+  });
+
+  // The frame may finish loading before the deferred shell script runs.
+  try {
+    if (frame.contentDocument?.readyState === "complete") {
+      frame.dataset.dialogFrameLoaded = "true";
+    }
+  } catch {
+    // Cross-origin frames will be notified from their load event instead.
+  }
+});
+
+document.querySelectorAll("[data-dialog-frame]").forEach((trigger) => {
+  trigger.addEventListener("click", () => {
+    const id = trigger.dataset.dialogFrame;
+    const host = document.querySelector(`[data-dialog-frame-host="${id}"]`);
+    const frame = host?.querySelector("iframe");
+    if (!host || !frame) return;
+    dialogFrameFocus.set(host, document.activeElement);
+    host.dataset.dialogOpenPending = "true";
+    host.hidden = false;
+    frame.focus();
+    if (frame.dataset.dialogFrameLoaded === "true") {
+      frame.contentWindow?.postMessage({ type: "panta-dialog-frame-open" }, "*");
+      delete host.dataset.dialogOpenPending;
+    }
+  });
+});
+
+window.addEventListener("message", (event) => {
+  if (event.data?.type !== "panta-dialog-frame-closed") return;
+  const host = [...document.querySelectorAll("[data-dialog-frame-host]")]
+    .find(candidate => candidate.querySelector("iframe")?.contentWindow === event.source);
+  if (!host) return;
+  host.hidden = true;
+  dialogFrameFocus.get(host)?.focus();
+  document.dispatchEvent(new CustomEvent("panta:dialog-frame-closed", {
+    detail: { id: host.dataset.dialogFrameHost }
+  }));
+});
 
 document.querySelectorAll("[data-dialog]").forEach((trigger) => {
   trigger.addEventListener("click", () => {
@@ -394,6 +454,30 @@ document.querySelectorAll("[data-dialog]").forEach((trigger) => {
 document.querySelectorAll("[data-dialog-close]").forEach((trigger) => {
   trigger.addEventListener("click", () => closeDialog(trigger.closest("[data-dialog-panel]")));
 });
+
+document.querySelectorAll("[data-dismiss-on-backdrop]").forEach((backdrop) => {
+  backdrop.addEventListener("pointerdown", (event) => {
+    if (event.target === backdrop) closeDialog(backdrop);
+  });
+});
+
+const initialDialog = document.querySelector('[data-dialog-panel]:not([hidden])');
+if (initialDialog && document.body.hasAttribute("data-dialog-frame-page")) openDialog(initialDialog);
+
+if (document.body.hasAttribute("data-dialog-frame-page") && window.parent !== window) {
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent || event.data?.type !== "panta-dialog-frame-open") return;
+    const dialog = document.querySelector('[data-dialog-panel="settings"]');
+    if (!dialog) return;
+    if (dialog.hidden) {
+      openDialog(dialog);
+      return;
+    }
+    const initialFocus = [...dialog.querySelectorAll('input, select, button')]
+      .find((control) => !control.disabled && control.getClientRects().length);
+    initialFocus?.focus();
+  });
+}
 
 document.querySelectorAll("[data-file-picker]").forEach((trigger) => {
   trigger.addEventListener("click", () => {

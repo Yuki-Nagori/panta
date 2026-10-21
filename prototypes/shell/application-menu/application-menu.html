@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<!-- 任务 115：跨平台应用菜单与共享 Settings 页面入口原型。 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>panta — Application Menu</title>
+  <link rel="stylesheet" href="../shell.css">
+  <link rel="stylesheet" href="application-menu.css">
+  <script src="../shell.js" defer></script>
+  <script src="application-menu.js" defer></script>
+</head>
+<body data-platform="desktop">
+<div class="prototype-controls" role="group" aria-label="Prototype platform">
+  <span>Preview platform</span>
+  <button type="button" data-platform-choice="desktop" aria-pressed="true">Windows / Linux</button>
+  <button type="button" data-platform-choice="macos" aria-pressed="false">macOS</button>
+</div>
+
+<div class="mac-system-menubar" hidden>
+  <!-- panta 应用菜单与 File 菜单由应用定义；Edit、Window、Help 交给 macOS/Qt 系统菜单。 -->
+  <button type="button" class="mac-app-menu-trigger" aria-haspopup="menu" aria-expanded="false">panta</button>
+  <button type="button" class="mac-menubar-trigger" data-menubar="file" aria-haspopup="menu" aria-expanded="false">File</button>
+  <span class="system-menubar-item">Edit</span>
+  <span class="system-menubar-item">Window</span>
+  <span class="system-menubar-item">Help</span>
+  <div class="application-menu mac-application-menu" role="menu" aria-label="Panta application menu" hidden>
+    <button type="button" role="menuitem">About panta</button>
+    <hr>
+    <button type="button" role="menuitem" data-dialog-frame="settings">Settings…</button>
+    <hr>
+    <button type="button" role="menuitem">Quit panta</button>
+  </div>
+  <div class="application-menu mac-file-menu" role="menu" aria-label="File menu" hidden>
+    <button type="button" role="menuitem" data-command="new">New Project…</button>
+    <button type="button" role="menuitem" data-command="open">Open Project…</button>
+    <hr>
+    <button type="button" role="menuitem" disabled>Save</button>
+    <button type="button" role="menuitem" disabled>Close</button>
+  </div>
+</div>
+
+<template id="page-menu">
+  <button type="button" aria-current="page">Start &amp; Learn</button>
+  <button type="button">Community</button>
+  <button type="button">Tools</button>
+  <button type="button">View</button>
+</template>
+<template id="page-ribbon">
+  <section class="ribbon" aria-label="Start and Learn tools">
+    <div class="ribbon-group"><div class="ribbon-tools"><button class="ribbon-button" type="button"><span class="label">New Project</span></button><button class="ribbon-button" type="button"><span class="label">Open Project</span></button></div><span class="ribbon-label">Start</span></div>
+    <div class="ribbon-group"><div class="ribbon-tools"><button class="ribbon-button" type="button"><span class="label">New Features</span></button></div><span class="ribbon-label">New Features</span></div>
+    <div class="ribbon-group"><div class="ribbon-tools"><button class="ribbon-button" type="button"><span class="label">Start Here</span></button><button class="ribbon-button" type="button"><span class="label">Tutorials</span></button><button class="ribbon-button" type="button"><span class="label">Videos</span></button><button class="ribbon-button" type="button"><span class="label">Help</span></button></div><span class="ribbon-label">Learn</span></div>
+  </section>
+</template>
+<template id="page-tasks"><button type="button" class="task-item">Open Project…</button><button type="button" class="task-item">New Project…</button></template>
+
+<section class="backstage" role="dialog" aria-modal="true" aria-labelledby="backstage-title" tabindex="-1" hidden>
+  <button type="button" class="backstage-brand" data-close-backstage aria-label="Close application menu">P</button>
+  <nav class="backstage-navigation" aria-label="Application commands">
+    <button type="button" class="backstage-command" data-command="new">
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-new"/></svg>
+      <span>New</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <button type="button" class="backstage-command" data-command="open">
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-open"/></svg>
+      <span>Open</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <button type="button" class="backstage-command" disabled>
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-save"/></svg>
+      <span>Save</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <button type="button" class="backstage-command" disabled>
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-export"/></svg>
+      <span>Export</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <button type="button" class="backstage-command" disabled>
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-export"/></svg>
+      <span>Publish</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <div class="backstage-separator"></div>
+    <button type="button" class="backstage-command" disabled>
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-print"/></svg>
+      <span>Print</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <div class="backstage-separator"></div>
+    <button type="button" class="backstage-command" disabled>
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-ribbon-project"/></svg>
+      <span>Project</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <button type="button" class="backstage-command" disabled>
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-ribbon-analysis-sequence"/></svg>
+      <span>Study Properties</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+    <div class="backstage-separator"></div>
+    <button type="button" class="backstage-command">
+      <svg class="icon backstage-icon" aria-hidden="true"><use href="#i-close"/></svg>
+      <span>Close</span>
+      <svg class="icon command-chevron" aria-hidden="true"><use href="#i-right"/></svg>
+    </button>
+  </nav>
+  <section class="backstage-content">
+    <header class="backstage-header">
+      <label class="backstage-search">
+        <input type="search" aria-label="Search recent projects" placeholder="Search recent projects">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      </label>
+    </header>
+    <div class="backstage-page" data-backstage-view="recent">
+      <div class="recent-projects-heading"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg><h1 id="backstage-title">Recent Projects</h1></div>
+      <div class="recent-projects-toolbar"><label class="recent-projects-sort"><span>Sort by</span><select aria-label="Sort recent projects"><option>Last opened</option><option>Name</option></select></label><button type="button" class="recent-projects-view" aria-label="List view" title="List view"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg></button></div>
+      <div class="recent-projects-empty">Projects you open will appear here.</div>
+    </div>
+    <div class="backstage-page" data-backstage-view="new" hidden><h2>New Project</h2><p>The existing New Project dialog opens from this command.</p></div>
+    <div class="backstage-page" data-backstage-view="open" hidden><h2>Open Project</h2><p>The existing project picker opens from this command.</p></div>
+    <footer class="backstage-footer">
+      <button type="button" class="backstage-settings" data-dialog-frame="settings">Settings</button>
+      <button type="button" class="backstage-exit" data-command="exit">Exit panta</button>
+    </footer>
+  </section>
+</section>
+<div class="dialog-frame-host" data-dialog-frame-host="settings" role="dialog" aria-modal="true" aria-label="Settings" hidden>
+  <iframe class="dialog-frame" title="Settings" src="settings-dialog.html"></iframe>
+</div>
+<noscript>This design reference requires JavaScript to display the shared layout.</noscript>
+</body>
+</html>

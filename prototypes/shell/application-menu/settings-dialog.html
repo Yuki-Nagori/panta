@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!-- 任务 115：独立 Settings 弹窗原型，由应用菜单通过共享弹窗框架打开。 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>panta — Settings</title>
+  <link rel="stylesheet" href="../shell.css">
+  <script src="../shell.js" defer></script>
+</head>
+<body class="settings-dialog-document" data-dialog-frame-page>
+<div class="modal-backdrop" data-dialog-panel="settings" data-dismiss-on-backdrop>
+  <section class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1">
+    <header class="dialog-titlebar">
+      <h2 id="settings-title">Settings</h2>
+      <button type="button" class="dialog-close" data-dialog-close aria-label="Close Settings"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="dialog-body settings-dialog-body">
+      <div class="settings-dialog-content">
+        <nav class="settings-categories" aria-label="Settings categories">
+          <button type="button" class="is-current">
+            <svg class="icon settings-category-icon" aria-hidden="true"><use href="#i-settings"/></svg>
+            <span>General</span>
+          </button>
+          <button type="button">
+            <svg class="icon settings-category-icon" aria-hidden="true"><use href="#i-palette"/></svg>
+            <span>Appearance</span>
+          </button>
+          <button type="button">
+            <svg class="icon settings-category-icon" aria-hidden="true"><use href="#i-globe"/></svg>
+            <span>Language</span>
+          </button>
+        </nav>
+        <div class="settings-dialog-page">
+          <h3>General</h3>
+          <p class="settings-dialog-description">Common application preferences are managed here.</p>
+          <section class="settings-preview-card" aria-label="Settings page preview">
+            <span class="settings-preview-title">Preferences</span>
+            <span class="settings-preview-copy">Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.</span>
+          </section>
+        </div>
+      </div>
+      <div class="dialog-actions settings-dialog-actions">
+        <button type="button" data-dialog-close>Cancel</button>
+        <button type="button" class="dialog-primary" data-dialog-close>OK</button>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

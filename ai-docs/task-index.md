@@ -98,7 +98,7 @@
 | 100 | [tests 整体整理与性能入口统一](task/100-tests-consolidation.md) | 验证基础 | 048, 099 | done |
 | 113 | [Tools 工具栏内容](task/113-tools-ribbon.md) | 应用平台扩展 | 050, 062, 096 | done |
 | 114 | [View 工具栏内容](task/114-view-ribbon.md) | 应用平台扩展 | 060, 062, 064, 080 | done |
-| 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 125 | ready |
+| 115 | [平台应用菜单与 Settings 入口](task/115-platform-application-menu-and-settings-entry.md) | 应用平台扩展 | 051, 125 | in-progress |
 | 116 | [Rust 工艺参数约束统一暴露](task/116-rust-process-parameter-constraints.md) | 应用平台扩展 | 094, 095, 099 | done |
 | 117 | [Rust 工程文档工作区状态](task/117-rust-project-document-workspace.md) | Rust 架构整理 | 067, 080, 107 | done |
 | 118 | [实际依赖图与应用命令层设计](task/118-layering-lint-and-command-boundaries.md) | Rust 架构整理 | 106, 111 | done |
