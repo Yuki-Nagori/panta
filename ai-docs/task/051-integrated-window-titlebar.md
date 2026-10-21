@@ -1,6 +1,6 @@
 # 051 — 无边框外观与一体化窗口标题栏
 
-- 状态：in-progress
+- 状态：implemented
 - 阶段：应用平台扩展
 - 依赖：[005 Qt/QML 主窗口](005-qt-qml-shell.md)、[029 QML 组件库](029-qml-component-library.md)
 - 优先级：P1
@@ -17,7 +17,7 @@
 - Windows 与 Linux：保留左侧应用 P 标记，隐藏原生应用图标和标题，并保留系统最小化、最大化及关闭按钮。Windows 按 Qt 当前标题栏几何从 Windows DPI 系统指标运行时计算右侧避让；Linux 保留窗口管理器装饰和原生按钮，使用零宽标题并不请求系统菜单图标，仍需 Linux/Wayland 实机验收。
 - 点击带红底的 P 打开应用菜单、菜单中的 Settings 入口，以及 macOS 以系统菜单栏承载这些菜单职责，属于独立后续任务 115；本任务只预留不冲突的窗口标题区域，不实现菜单或设置页面。后续依赖顺序为：125 提供设置服务，115 提供跨平台菜单入口与共享设置路由，087 将语言选择页面接入该路由。
 
-可行性结论：目标可实施，但“Qt 6.5 引入 `QWindow::setTitleBar(QWidget*)`”不成立，不能采用该示例。项目使用 Qt Quick，亦不应为此引入 QWidget 标题栏。当前实现基于 Qt 6.11.2 扩展客户区方案；macOS 已通过真实窗口验收，Windows/Linux 及 Wayland 的窗口行为仍待实机验证，不能据此宣称各平台仅设置 flags 即可完整保留所有系统功能。
+可行性结论：目标可实施，但“Qt 6.5 引入 `QWindow::setTitleBar(QWidget*)`”不成立，不能采用该示例。项目使用 Qt Quick，亦不应为此引入 QWidget 标题栏。当前实现基于 Qt 6.11.2 扩展客户区方案；macOS 当前系统 Zoom 偏好下的真实窗口行为已验收，Windows/Linux 及 Wayland 的窗口行为仍待实机验证，不能据此宣称各平台仅设置 flags 即可完整保留所有系统功能。
 
 ## 必读与官方依据
 
@@ -80,12 +80,15 @@
 - [x] 搜索焦点滚动、标题行几何、键盘 Tab 顺序、QML 资源加载、无 Bridge 启动变体及相关静态检查由既有验证覆盖；详见下方验证记录。
 - [x] macOS 实机确认全屏进入/退出、最小化后恢复、原生窗口按钮及边框缩放；确认窗口恢复后布局可用。
 - [x] macOS 实机复验居中标题空白区拖动和当前系统双击动作；确认拖动和缩放工作正常，未再观察到约 1 秒的缩放等待；业务控件与搜索输入不会触发窗口移动。
-- [ ] macOS 其它双击偏好（Fill、Minimize、No Action）、跨屏 DPR 与四角缩放仍待实机核对；Fill 与 Qt 最大化请求是否完全等效原生 Fill 尚未确认。
-- [ ] macOS 实机确认四角缩放及恢复后 VTK 视口输入；边框缩放已由维护者确认。
 - [ ] Windows 实机确认原生最小化、最大化、关闭、恢复、边缘缩放、标题区拖动/双击、Win+方向键和 Snap Layouts；确认系统按钮命中区与按 DPI 计算的内容避让一致，并检查 100%/150%/200% 缩放与跨屏时无错位。
 - [ ] Linux/Wayland 在明确记录的 compositor 下实机确认原生标题栏、按钮、系统移动/缩放及最大化恢复、内容避让和跨屏 DPI 行为；记录 compositor 的双击标题栏偏好是否可由客户端沿用，确认 VTK 视口对齐、输入和显示生命周期正常。
-- [ ] macOS、Windows、Linux 实机确认点击业务控件、编辑/选择搜索文本、使用菜单及键盘焦点不会误触窗口移动；原生窗口控制具有正确的可访问名称和交互状态。
-- [ ] 无 Bridge 变体真实窗口仍可启动、移动、缩放与关闭；记录 Qt 平台插件、系统/窗口管理器、DPR、窗口状态和结果。macOS 可用平台验收项全部完成后可标为 `implemented`；Windows/Linux 实机验收完成后转为 `done`。
+- [ ] Windows/Linux 实机确认业务控件、搜索输入、菜单和键盘焦点不会误触窗口移动；系统窗口控件的可访问名称及交互状态正常。
+- [ ] Windows/Linux 无 Bridge 变体真实窗口可启动、移动、缩放与关闭；记录 Qt 平台插件、系统/窗口管理器、DPR、窗口状态和结果。完成这些跨平台实机验收后转为 `done`。
+
+## 后续补充核验（不阻塞 `implemented`）
+
+- macOS 非默认标题栏双击偏好（Fill、Minimize、No Action）、跨屏 DPR、四角缩放、恢复后的 VTK 输入和无 Bridge 实窗尚无实机证据；本次只将维护者确认的当前 Zoom 配置及标题栏操作记为通过。
+- macOS 实窗下的业务控件/搜索编辑、键盘焦点与原生窗口控件可访问名称及状态尚未逐项人工核对；自动化焦点顺序覆盖见上方验收项和验证记录。
 
 ## 验证计划与结果
 
@@ -111,6 +114,7 @@
 | 2026-10-21 | `qml/App.qml` 信号处理；`cargo build --locked` | 确认构建日志不再提示 `visibility` 隐式注入弃用 | 将窗口状态、宽度和高度处理器改为显式参数，并在尺寸处理器中读取窗口的 `visibility` 属性。构建通过，日志中未出现该弃用警告。 |
 | 2026-10-21 | macOS arm64；维护者重新运行当前分支窗口并双击标题栏 | 当前系统 Zoom 偏好立即触发缩放；输入法诊断日志不影响窗口行为 | 维护者确认操作“好像没什么问题”，未再报告约 1 秒等待。运行期间仍出现 `IMKCFRunLoopWakeUpReliable` 日志；窗口控制调用链不涉及输入法，且用户未报告输入异常。 |
 | 2026-10-21 | `cargo build --locked`、`cargo format --check`、`cargo lint qmllint`、`git diff HEAD --check`；`gpt-6.1-sol` medium 独立只读评审 | 构建、格式、QML lint 与变更空白检查通过；评审核对完整实现和状态证据 | 全部检查通过。评审未发现代码阻塞问题；指出 macOS 剩余验收尚未完成，因此状态保留 `in-progress`；Windows/Linux 与待验证 macOS 场景继续列在验收清单。 |
+| 2026-10-21 | 维护者状态决策；核对本任务验收记录、任务索引及 115 依赖 | 当前 macOS 主流程可标为已实现；剩余平台设备验收不阻塞后续依赖任务 | 按维护者决定将 051 改为 `implemented`，将 macOS 非默认偏好及边缘场景保留为未通过的非阻塞补充核验；Windows/Linux 实机验收仍是转为 `done` 的条件。依赖 051、125 的任务 115 因前置实现已具备，状态改为 `ready`。 |
 
 ## 风险与回退
 
@@ -135,8 +139,8 @@
 - 2026-10-17：维护者确认 macOS、Windows、Linux 三平台真实窗口的标题栏视觉效果均正常；完成相应外观验收。窗口管理器行为继续单独验证。
 - 2026-10-17：按维护者决定暂缓窗口行为验收，状态曾改为 `deferred`。
 - 2026-10-21：维护者确认 macOS 原生按钮、边框缩放、全屏退出及最小化恢复正常；首次检查时标题区拖动和双击系统动作未生效。三平台标题空白区统一使用 Qt 的系统移动请求；Windows/Linux 双击经 Qt 向窗口系统请求最大化/还原，macOS 按标题栏双击偏好分派原生动作。后续维护者复测当前 Zoom 配置下的标题区操作，反馈无明显问题。macOS Fill 与 Cocoa Zoom 的等效性、Linux compositor 的可配置双击语义仍待核实。同步修复 `App.qml` 信号参数弃用写法；Windows/Linux 实机行为仍待验证。
-- 2026-10-21：为标题栏 `TapHandler` 显式设置 `exclusiveSignals: TapHandler.DoubleTap`，让该区域只识别双击动作。维护者重新运行后反馈窗口操作“好像没什么问题”；仍观察到 macOS `IMKCFRunLoopWakeUpReliable` 输入法诊断日志，但未报告输入异常，且未发现它与缩放调用链相关。macOS 当前系统 Zoom 偏好下的标题栏行为已复验；其它 macOS 偏好、跨屏 DPI、四角缩放、VTK 输入和无 Bridge 实窗验收仍未完成，因此状态按索引约定保持 `in-progress`。上述 macOS 验收完成后可转为 `implemented`，Windows/Linux 实机验收后转为 `done`。
+- 2026-10-21：为标题栏 `TapHandler` 显式设置 `exclusiveSignals: TapHandler.DoubleTap`，让该区域只识别双击动作。维护者重新运行后反馈窗口操作“好像没什么问题”；仍观察到 macOS `IMKCFRunLoopWakeUpReliable` 输入法诊断日志，但未报告输入异常，且未发现它与缩放调用链相关。维护者确认 macOS 当前系统 Zoom 偏好下的标题栏行为可用，并决定将非默认偏好及其它 macOS 边缘场景作为非阻塞补充核验；状态更新为 `implemented`。Windows/Linux 实机验收仍未完成，全部跨平台验收通过后转为 `done`。
 
 ## 完成摘要
 
-标题栏融合实现已完成；维护者确认三平台视觉布局正常，macOS 本机确认原生按钮、边框缩放、全屏进入/退出、最小化恢复、标题区拖动及当前 Zoom 双击行为可用。因 macOS 其它双击偏好、跨屏 DPI、四角缩放、VTK 输入和无 Bridge 实窗验收仍未完成，任务保持 `in-progress`；这些 macOS 验收完成后可转为 `implemented`。Windows 原生 hit-test、Snap Layouts / DPI 行为，以及 Linux/Wayland 窗口管理器行为待实机验收，完成后转为 `done`。`IMKCFRunLoopWakeUpReliable` 日志仍出现，但当前未影响用户输入或窗口操作，且未发现其与标题栏调用链的联系。
+标题栏融合实现已完成；维护者确认三平台视觉布局正常，macOS 本机确认原生按钮、边框缩放、全屏进入/退出、最小化恢复、标题区拖动及当前 Zoom 双击行为可用，任务状态为 `implemented`。macOS 非默认双击偏好、跨屏 DPR、四角缩放、VTK 输入和无 Bridge 实窗仅列为非阻塞补充核验，未记为通过。Windows 原生 hit-test、Snap Layouts / DPI 行为，以及 Linux/Wayland 窗口管理器行为待实机验收；完成后转为 `done`。`IMKCFRunLoopWakeUpReliable` 日志仍出现，但当前未影响用户输入或窗口操作，且未发现其与标题栏调用链的联系。
