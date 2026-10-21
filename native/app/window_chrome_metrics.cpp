@@ -4,6 +4,9 @@
 #include <QObject>
 #include <QQuickWindow>
 #include <QWindow>
+#ifndef Q_OS_MACOS
+#include <QtCore/qnamespace.h>
+#endif
 #include <QtCore/qtmetamacros.h>
 #ifdef Q_OS_WIN
 #include <QtCore/qt_windows.h>
@@ -43,6 +46,20 @@ void WindowChromeMetrics::observeWindow(QQuickWindow* window) {
     emit leadingSystemControlsInsetChanged();
     emit trailingSystemControlsInsetChanged();
 }
+
+#ifndef Q_OS_MACOS
+void WindowChromeMetrics::performTitlebarDoubleClickAction() {
+    if (window_ == nullptr) {
+        return;
+    }
+
+    if (window_->windowStates().testFlag(Qt::WindowMaximized)) {
+        window_->showNormal();
+    } else {
+        window_->showMaximized();
+    }
+}
+#endif
 
 bool WindowChromeMetrics::eventFilter(QObject* watched, QEvent* event) {
     if (watched == window_ &&

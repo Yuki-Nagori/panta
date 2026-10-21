@@ -32,18 +32,18 @@ ApplicationWindow {
         else
             Settings.saveWindowState(Qt.size(lastWindowedWidth, lastWindowedHeight), lastRestorableMaximized);
     }
-    onVisibilityChanged: {
+    onVisibilityChanged: function (visibility) {
         if (visibility === Window.Maximized)
             lastRestorableMaximized = true;
         else if (visibility === Window.Windowed)
             lastRestorableMaximized = false;
     }
-    onWidthChanged: {
-        if (visibility === Window.Windowed)
+    onWidthChanged: function (width) {
+        if (shellWindow.visibility === Window.Windowed)
             lastWindowedWidth = width;
     }
-    onHeightChanged: {
-        if (visibility === Window.Windowed)
+    onHeightChanged: function (height) {
+        if (shellWindow.visibility === Window.Windowed)
             lastWindowedHeight = height;
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
@@ -196,6 +196,7 @@ ApplicationWindow {
             activeRibbonTab: shellWindow.activeRibbonTab
             nativeControlsLeftInset: shellWindow.nativeControlsLeftInset
             nativeControlsRightInset: WindowChromeMetrics.trailingSystemControlsInset
+            hostWindow: shellWindow
             onMenuRequested: key => shellWindow.selectRibbonTab(key)
         }
 

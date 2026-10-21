@@ -13,6 +13,7 @@ Rectangle {
     property string activeRibbonTab: "start-learn"
     property real nativeControlsLeftInset: 0
     property real nativeControlsRightInset: 0
+    property Window hostWindow
 
     // 面板仅报告稳定菜单 key，由宿主决定哪些入口可导航。
     signal menuRequested(string key)
@@ -116,17 +117,46 @@ Rectangle {
                             color: Theme.colorIcon
                         }
                     }
-                    ThemedLabel {
-                        objectName: "shellCaption"
+                    Item {
+                        id: chromeCaptionArea
+                        objectName: "shellCaptionDragArea"
                         Layout.fillWidth: true
                         Layout.minimumWidth: Theme.spacingLarge
-                        horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
-                        text: chrome.caption
-                        visible: text.length > 0
-                        textSize: Theme.fontTitle
-                        textColor: Theme.colorText
-                        font.weight: Font.DemiBold
+                        implicitHeight: Theme.titlebarHeight
+
+                        ThemedLabel {
+                            objectName: "shellCaption"
+                            anchors.fill: parent
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            text: chrome.caption
+                            visible: text.length > 0
+                            textSize: Theme.fontTitle
+                            textColor: Theme.colorText
+                            font.weight: Font.DemiBold
+                        }
+
+                        // 扩展客户区覆盖了系统标题栏；窗口移动交给各平台的系统窗口管理器。
+                        DragHandler {
+                            parent: chromeCaptionArea
+                            target: null
+                            acceptedButtons: Qt.LeftButton
+                            onActiveChanged: function () {
+                                if (active && chrome.hostWindow && !chrome.hostWindow.startSystemMove())
+                                    console.warn("The platform window system rejected the title-bar move request.");
+                            }
+                        }
+
+                        TapHandler {
+                            parent: chromeCaptionArea
+                            acceptedButtons: Qt.LeftButton
+                            exclusiveSignals: TapHandler.DoubleTap
+                            onDoubleTapped: (eventPoint, button) => {
+                                if (button === Qt.LeftButton)
+                                    WindowChromeMetrics.performTitlebarDoubleClickAction();
+                            }
+                        }
                     }
                     ToolGroup {
                         id: searchActions
