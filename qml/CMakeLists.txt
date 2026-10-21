@@ -124,11 +124,23 @@ qt_add_resources(panta_shell "panta_shell_branding" PREFIX "/qt/qml/Panta/Shell"
                  branding/panta-placeholder.svg)
 
 if(BUILD_TESTING)
-  add_executable(panta_qml_theme_component_test ../tests/qml/theme_component_test.cpp)
-  panta_native_defaults(panta_qml_theme_component_test)
-  target_link_libraries(
-    panta_qml_theme_component_test PRIVATE panta_shell panta_shellplugin Qt6::Gui Qt6::Qml
-                                           Qt6::Test Qt6::Quick)
+  # 每组组件使用独立 QtTest 进程，便于本地和 CTest 精确选择失败范围。
+  function(panta_add_shell_qml_component_test target source test_name)
+    add_executable(${target} ../tests/qml/${source})
+    panta_native_defaults(${target})
+    target_link_libraries(${target} PRIVATE panta_shell panta_shellplugin Qt6::Gui Qt6::Qml
+                                            Qt6::Test Qt6::Quick)
+    if(PANTA_ENABLE_BRIDGE_MODULE)
+      target_link_libraries(${target} PRIVATE panta::bridge panta_bridgeplugin)
+      target_compile_definitions(${target} PRIVATE PANTA_TEST_WITH_BRIDGE=1)
+      panta_add_qml_test(${test_name} ${target} bridge)
+    else()
+      panta_add_qml_test(${test_name} ${target})
+    endif()
+  endfunction()
+
+  panta_add_shell_qml_component_test(panta_qml_theme_component_test theme_component_test.cpp
+                                     Qml.ThemeAtoms)
   # 测试对照正式 HTML symbol 清单与打包的 QML SVG 资源集合。
   qt_add_resources(
     panta_qml_theme_component_test
@@ -139,10 +151,28 @@ if(BUILD_TESTING)
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototypes/shell"
     FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototypes/shell/shell.js")
-  panta_add_qml_test(Qml.ThemeComponentParameters panta_qml_theme_component_test)
+  panta_add_shell_qml_component_test(panta_qml_ribbon_panel_test ribbon_panel_test.cpp
+                                     Qml.RibbonPanels)
+  panta_add_shell_qml_component_test(panta_qml_dialog_workflow_test dialog_workflow_test.cpp
+                                     Qml.DialogWorkflows)
+  panta_add_shell_qml_component_test(panta_qml_analysis_panel_test analysis_panel_test.cpp
+                                     Qml.AnalysisPanels)
+  panta_add_shell_qml_component_test(panta_qml_document_tab_bar_test document_tab_bar_test.cpp
+                                     Qml.DocumentTabs)
   if(PANTA_ENABLE_BRIDGE_MODULE)
-    target_link_libraries(panta_qml_theme_component_test PRIVATE panta::bridge panta_bridgeplugin)
-    target_compile_definitions(panta_qml_theme_component_test PRIVATE PANTA_TEST_WITH_BRIDGE=1)
+    add_executable(panta_qml_import_dialog_test ../tests/qml/import_dialog_test.cpp)
+    panta_native_defaults(panta_qml_import_dialog_test)
+    target_link_libraries(
+      panta_qml_import_dialog_test
+      PRIVATE panta_shell
+              panta_shellplugin
+              panta::bridge
+              panta_bridgeplugin
+              Qt6::Gui
+              Qt6::Qml
+              Qt6::Test
+              Qt6::Quick)
+    panta_add_qml_test(Qml.ImportDialogSession panta_qml_import_dialog_test bridge)
   endif()
   # QML 格式门禁（任务 032）：qmlformat 来自 Qt 预编译供给（与 qmllint
   # 同源、同版本锁定），三平台同路径。

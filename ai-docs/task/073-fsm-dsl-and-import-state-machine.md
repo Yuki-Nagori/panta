@@ -5,7 +5,7 @@
 - 依赖：[008](008-tasks-errors-logging.md)、[034](034-rust-panta-artifact-parser.md)、[035](035-pa-formatter-and-validator.md)、[067](067-rust-mesh-domain-migration.md)、[072](072-flow-state-machine-planning.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-17
+- 创建 / 更新：2026-09-24 / 2026-10-21
 
 ## 目标与背景
 
@@ -32,7 +32,7 @@
 2. 080 已登记并依赖 073；开始实现前，080 需冻结请求/结果 DTO、tab 重复打开语义与 session generation。两任务按“先提供 Rust 异步只读激活接口，再由 080 接 UI”的顺序联调，不要求 080 完成后 073 才能开始，也不形成互相完成依赖。
 3. 冻结读取记录 ID、工程 generation、attempt、取消检查点、工作线程与 Mesh 快照所有者；结果只有在记录和运行期请求仍有效时才可交给 UI。加载不修改工程 revision / dirty，也不写存储。
 4. 允许取消在解析器安全检查点生效；无法中断的解析需在结果边界验证过期身份并释放快照。不能因 UI tab 关闭或工程会话析构而在 GUI 线程同步等待长任务。
-5. 通用 Task 终态只是 Rust 只读激活结果的投影；Task `Succeeded` 意味着资产读取/解析快照就绪，不代表持久化提交，也不能由 UI 事件自行制造。
+5. 只读激活的终态由 `crates/panta-core/src/fsm/open_saved_stl.rs` 中的 `OutcomeKind` 表达；`Succeeded` 表示资产读取与解析完成、快照可供视口使用，不代表持久化提交，也不能由 UI 事件自行制造。
 6. Qt 模块供给与导入窗口交互状态机由 [074](074-qt-interaction-state-machine.md) 独立实施，不是本任务的 Rust 核心前置条件；tab 交互也不需要借用导入窗口状态机。未来写入型导入的事务协调、发布核对与重开恢复需另登记消费者任务。
 
 ## 实施步骤

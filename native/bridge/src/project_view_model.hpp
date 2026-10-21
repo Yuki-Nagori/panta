@@ -261,6 +261,10 @@ class ProjectViewModel : public panta::visualization::MeshSource {
   protected:
     /// 启动只等待独占 Rust 请求的线程；启动失败抛 system_error，调用方尚未准入领域任务。
     virtual void startBackgroundWaiter(std::function<void()> work);
+    /// 工程导入已提交后同步展示投影；可在行为测试中确定性模拟刷新失败。
+    virtual bool publish_import(const panta::ffi::ProjectImport& imported);
+    /// 首次刷新失败时重试已提交结果的展示同步；可在行为测试中注入持续失败。
+    virtual bool refresh_committed_import_projection(const panta::ffi::ProjectImport& imported);
 
   private:
     bool beginProjectOperation(panta::ffi::ProjectOperationInput input, const QString& operation);
@@ -276,8 +280,6 @@ class ProjectViewModel : public panta::visualization::MeshSource {
                                quint64 expectedRevision);
     void applyImports(const rust::Vec<panta::ffi::ProjectImport>& imports);
     bool refreshImports();
-    bool publish_import(const panta::ffi::ProjectImport& imported);
-    bool refresh_committed_import_projection(const panta::ffi::ProjectImport& imported);
     void refreshPlanSettings();
     enum class ConfirmationKind : std::uint8_t {
         None,

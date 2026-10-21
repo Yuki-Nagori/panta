@@ -41,7 +41,7 @@
 
 ## 预计改动
 
-native/geometry/（include/panta/geometry/step_import.hpp 公共契约 + src/occt/step_reader.cpp 适配器，均已创建）、tests/cpp/geometry/step_import_test.cpp、tests/fixtures/geometry/ 样例与 README（已创建）、native/CMakeLists.txt 挂接新模块（已改）；Windows 嵌套 bin 运行库目录收集（crates/panta-build/src/lib.rs，见决策记录）。
+native/geometry/（include/panta/geometry/step_import.hpp 公共契约 + src/occt/step_reader.cpp 适配器，均已创建）、tests/cpp/geometry/step_import_test.cpp、tests/fixtures/geometry/ 样例与 README（已创建）、native/CMakeLists.txt 挂接新模块（已改）；Windows 嵌套 bin 运行库目录收集（crates/panta-build/src/environment.rs，见决策记录）。
 
 ## 清理与兼容例外
 
