@@ -8,7 +8,7 @@
 
 Rust 负责工程、工作区、命令、序列化和后台操作状态；当前工程操作的调度由私有 `ProjectExecution` 提供。工程撤销/重做模型、统一任务 / 作业服务和求解器客户端尚未实现，待真实业务形成共同需求后设计。插件体系是长期方向，V1 不要求先实现插件加载平台。C++ 负责 Qt 桥接以及几何、网格和渲染的 native 实现。
 
-当前 Bridge `Settings` 提供会话内语言切换和 reduced-motion 状态，不实现偏好持久化。Rust 设置 schema、Qt 平台持久化适配与设置界面分别由[125](../task/125-settings-service-and-qt-adapter.md)、[087](../task/087-language-settings-ui.md)规划；平台菜单入口由[115](../task/115-platform-application-menu-and-settings-entry.md)规划。主题配置也尚未接入 `.pa` 运行期切换（任务 030）。
+当前 Bridge `Settings` 提供会话内语言切换和 reduced-motion 状态，不实现偏好持久化。Rust 设置 schema、Qt 平台持久化适配与设置界面分别由[125](../task/125-settings-service-and-qt-adapter.md)、[087](../task/087-language-settings-ui.md)规划；平台菜单入口由[115](../task/115-platform-application-menu-and-settings-entry.md)规划。主题视觉 token 已由 030 接入 `.pa`，主题 ID 的跨重启持久化仍由 125 负责。
 
 应用服务将用户命令转换为跨模块操作；Rust 与 C++ 之间优先传递明确所有权的 DTO、句柄和结果。工程创建、读取、保存、重命名及 STL 导入等路径已通过 CXX 接入；稳定错误码和线程边界见[职责审计](native-domain-boundaries.md)。字符串编码、缓冲区归属、释放接口、线程约束和错误映射必须明确，异常与 panic 不得未经处理跨越 FFI 边界。GUI 的文件读取与资产激活已有后台入口，CLI 保持同步。
 

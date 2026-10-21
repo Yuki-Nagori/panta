@@ -521,6 +521,15 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             plan.native_labels.extend(all_native_labels.iter().cloned());
             continue;
         }
+        if path.starts_with("qml/Themes/") && path.ends_with(".pa") {
+            plan.rust = true;
+            changed_packages.insert("panta-core".into());
+            plan.qml = true;
+            plan.native = true;
+            plan.native_labels
+                .extend(["bridge".to_owned(), "qml".to_owned()]);
+            continue;
+        }
         if path.starts_with("qml/")
             || path.starts_with("tests/qml/")
             || path.starts_with("prototypes/shell/")
@@ -1012,6 +1021,26 @@ mod tests {
         assert!(plan.packages_l2.contains("panta-launcher"));
         assert!(plan.native_labels.contains("i18n"));
         assert!(plan.native_labels.contains("qt-adapter"));
+        Ok(())
+    }
+
+    #[test]
+    fn theme_sources_select_core_consumers_and_qml_tests() -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for path in [
+            "qml/Themes/gui-default.pa",
+            "qml/Themes/dark.pa",
+            "qml/Themes/light.pa",
+        ] {
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.rust, "{plan:?}");
+            assert!(plan.packages_l1.contains("panta-core"), "{plan:?}");
+            assert!(plan.packages_l2.contains("panta-ffi"), "{plan:?}");
+            assert!(plan.native && plan.qml, "{plan:?}");
+            assert!(plan.native_labels.contains("bridge"), "{plan:?}");
+            assert!(plan.native_labels.contains("qml"), "{plan:?}");
+            assert!(!plan.full, "{plan:?}");
+        }
         Ok(())
     }
 

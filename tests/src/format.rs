@@ -69,9 +69,7 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
         .collect::<Vec<_>>();
     let pa_files = files_with_extensions(&changed_files, &["pa"])
         .into_iter()
-        .filter(|path| {
-            path.starts_with(root.join("crates")) || path.starts_with(root.join("resources"))
-        })
+        .filter(|path| is_pa_source_path(root, path))
         .collect::<Vec<_>>();
     if !pa_files.is_empty() {
         run_pa_formatter(check, &pa_files)?;
@@ -239,8 +237,8 @@ fn format_qml_files(check: bool, files: &[PathBuf]) -> Result<(), Box<dyn Error>
 fn run_pa_format(check: bool) -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
     let mut files = Vec::new();
-    for directory in ["crates", "resources"] {
-        files.extend(pa_sources(&root.join(directory))?);
+    for directory in pa_source_roots(root) {
+        files.extend(pa_sources(&directory)?);
     }
     if files.is_empty() {
         return Err(".pa 源文件清单为空".into());
@@ -248,6 +246,20 @@ fn run_pa_format(check: bool) -> Result<(), Box<dyn Error>> {
     files.sort();
 
     run_pa_formatter(check, &files)
+}
+
+fn pa_source_roots(root: &Path) -> [PathBuf; 3] {
+    [
+        root.join("crates"),
+        root.join("resources"),
+        root.join("qml/Themes"),
+    ]
+}
+
+fn is_pa_source_path(root: &Path, path: &Path) -> bool {
+    pa_source_roots(root)
+        .iter()
+        .any(|directory| path.starts_with(directory))
 }
 
 fn pa_sources(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -402,4 +414,20 @@ fn cmake_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     }
     files.sort();
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn theme_sources_are_included_in_changed_and_full_pa_format_scopes()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        let theme_file = root.join("qml/Themes/gui-default.pa");
+        assert!(is_pa_source_path(root, &theme_file));
+        assert!(pa_sources(&root.join("qml/Themes"))?.contains(&theme_file));
+        assert!(!is_pa_source_path(root, &root.join("qml/Other.qml")));
+        Ok(())
+    }
 }

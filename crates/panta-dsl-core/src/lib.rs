@@ -20,7 +20,7 @@ pub use ast::{
     Document, Kind, Message, SourceKind, Status, Translation, ValueType, Variable, source_prefix,
 };
 pub use diagnostic::{Diagnostic, Diagnostics};
-pub use evaluation::{EvaluatedValue, EvaluatedVariables, evaluate_variables};
+pub use evaluation::{EvaluatedValue, EvaluatedVariables, evaluate_theme, evaluate_variables};
 pub use format::{format_document, format_source};
 pub use parser::parse;
 // Pest 派生的 Rule 原已公开，移动 grammar 时保留其根路径。
@@ -59,6 +59,27 @@ mod tests {
         assert_eq!(document.values[0].name, "spacing-small");
         assert!(
             parse("version: 1\nkind: variables\n\nvalues:\n  spacing_small: real = 8\n").is_err()
+        );
+    }
+
+    #[test]
+    fn evaluates_theme_values_with_theme_kind_only() {
+        let theme = "version: 1\nkind: theme\n\nvalues:\n  color-background: string = \"#ffffff\"\n  spacing-small: int = 8\n";
+        let evaluated = evaluate_theme(theme).expect("valid theme values");
+        assert_eq!(
+            evaluated.get("color-background"),
+            Some(&EvaluatedValue::String("#ffffff".to_owned()))
+        );
+        assert_eq!(
+            evaluated.get("spacing-small"),
+            Some(&EvaluatedValue::Int(8))
+        );
+        assert_eq!(
+            evaluate_theme("version: 1\nkind: variables\n\nvalues:\n  size: int = 8\n")
+                .expect_err("theme evaluator rejects variables")
+                .diagnostics[0]
+                .code,
+            "theme.wrong_document_kind"
         );
     }
 

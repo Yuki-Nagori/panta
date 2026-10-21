@@ -11,7 +11,7 @@
 
 为复杂 Qt UI 交互统一采用 Qt 自带的 `QStateMachine`，并为仓库内每个实际使用点建立唯一、可审阅的交互状态所有者。首个消费者是现有导入窗口：集中管理打开、选文件、预览、编辑选项、等待提交结果和关闭。Qt 管理交互流程，Rust 继续拥有解析、修订、提交和业务取消的决定权。
 
-仓库源码盘点发现，目前只有导入交互需要 C++ `QStateMachine`；页签选择、hover 等简单视觉状态不构成额外状态机消费者。实现已开始，将模块接入 Qt 官方锁定版本附加包，并把导入交互收敛到 ProjectViewModel 会话内的 C++ 控制器；本任务同时更新后续 Qt 状态机准则和全部受影响架构说明。
+仓库源码盘点确认，当前只有导入交互使用 C++ `QStateMachine`；页签选择、hover 等简单视觉状态不需要额外状态机。模块接入、ProjectViewModel 会话内的 C++ 控制器、回归测试及 Qt 状态机准则均已完成，最终验收见下文。
 
 ## 必读
 
@@ -33,7 +33,7 @@
 ## 前置条件与任务关系
 
 - 063、073 已提供异步导入及只读激活能力；实施前核对当前请求身份、取消、失败与迟到结果契约，以及 026 的 QML 注册入口。
-- Qt 6.11.2 的 StateMachine C++ 模块由官方 qtscxml 附加包提供；三平台归档及 SHA256 已实算并登记到 `native/cmake/qt-provision.cmake`，仍需通过干净缓存的三平台 CI 构建验证消费和部署。
+- Qt 6.11.2 的 StateMachine C++ 模块由官方 qtscxml 附加包提供；三平台归档及 SHA256 已实算并登记到 `native/cmake/qt-provision.cmake`，PR #78 的三平台 CI 已验证干净缓存构建、消费与部署。
 - 074 不以 073 为 Rust 核心实现前置条件，也不把 073 的只读资产激活 FSM 接入导入对话框；两者按各自请求身份和取消语义独立验收。
 - 063 的预检与导入写入均已有异步入口，不能再以“导入同步”作为当前限制。Qt `QStateMachine` 只协调交互阶段，不提供异步 I/O 或业务取消能力；界面能力必须依据现有 Rust 回执呈现。
 - 027 的热重载不是前置条件；本任务验证普通销毁 / 重建，027 后续复用恢复契约。
@@ -65,18 +65,14 @@
 
 ## 验证计划与结果
 
-仓库源码审计确认当前只有 STL 导入交互使用 Qt `QStateMachine`；页签、hover 与视口激活分别保持 QML 绑定或 Rust FSM。控制器和 QML 已实现。macOS 本地已覆盖真实窗口操作、窗口对象销毁 / 重建后的会话复用，以及持久化成功但展示投影刷新失败的确定性故障注入。剩余验收聚焦三平台干净缓存构建、部署与 CI；不把静态检查当成运行行为证明。
+仓库源码审计确认只有 STL 导入交互使用 Qt `QStateMachine`；页签和 hover 保持 QML 绑定，视口激活保持 Rust FSM。macOS 本地完成真实窗口、销毁 / 重建后的会话复用及提交成功但展示投影刷新失败的确定性故障注入；PR #78 的三平台 CI 完成干净缓存构建、测试与部署验收。
 
 | 日期 | 场景 | 结果 / 证据 |
 |---|---|---|
-| 2026-10-21 | PR [#78](https://github.com/Yuki-Nagori/panta/pull/78)，GitHub Actions run [39535255574](https://github.com/Yuki-Nagori/panta/actions/runs/39535255574) | 全部适用 CI 通过：macOS / Linux / Windows 构建和受影响测试、Ubuntu clang-tidy / include-cleaner / cppcheck / layering、macOS Objective-C++、QML lint、CMake lint 与格式检查。 |
-| 2026-10-21 | macOS arm64，`cargo format --changed`、`cargo verify-changed`；QML 组件分组回归 | 通过。CTest 90/90；QML 测试分为 `Qml.ThemeAtoms`、`Qml.RibbonPanels`、`Qml.DialogWorkflows`、`Qml.AnalysisPanels`、`Qml.DocumentTabs` 和 `Qml.ImportDialogSession`，可单独选择。新增窗口对象销毁 / 重建后保留同一 ViewModel 会话的回归，以及提交成功但展示投影刷新失败时不重复导入的确定性故障注入。格式、Cargo 分层、CMake 分层、clang-tidy/include-cleaner、受影响测试和 CTest 均通过；跨平台 CI 随后由 PR #78 验收通过。 |
-| 2026-10-21 | macOS arm64，`cargo build --locked`、`cargo verify-changed`、真实窗口导入对话框 | `cargo build --locked` 与最终 `cargo verify-changed` 通过：格式、Rust / CMake / QML lint、clang-tidy（55 个翻译单元）、include-cleaner、cppcheck、受影响 Rust 包测试、CTest（84/84）均通过。真实窗口确认打开导入对话框、取消原生 STL 选择器、关闭重开后表单重置。三平台干净缓存部署待 CI；窗口销毁重建及提交后展示刷新失败仍缺独立故障注入验收。 |
-| 2026-10-21 | Qt 6.11.2 官方仓库 qtscxml 附加包；macOS arm64、Linux x86_64、Windows x64 | 已实算并登记完整 SHA256：macOS `9cabcf73b1ef81cb396a205380950d947535e20b7b6e21204e59a52199a98bfe`、Linux `8579d82fba91dfe1b24e3203f740ac5647d5515c51182a4158b0e748dc6f00f7`、Windows `47539713e42a72f29ef0da0be2ad82428eefb7158bfe766b2e1dc7e63640e058`。macOS 本地 configure/build 已验证组件可消费；三平台干净缓存构建、部署与 CI 验证仍待完成。 |
-| 2026-09-24 | 代码与官方资料核对 | 已确认当前导入窗口、Qt 模块消费缺口与官方 API 入口；仅规划，未验证模块制品或运行行为 |
-| 2026-09-24 | 仓库根目录临时 Python 标准库检查与 `git diff HEAD --check` | 通过：本次 9 份 Markdown、207 个本地链接、围栏 / 空白、072 / 073 / 074 索引状态一致；073 与 074 无互相完成依赖。仅文档验证，未运行应用构建或行为测试 |
-| 2026-09-24 | 整体复审与修正后的同类文档检查；macOS arm64，仓库根目录 `cargo format --check` | 文档检查通过；格式命令退出 0，输出 `format 检查通过`。已复核首期真实同步接口与后续异步 / 重载验收边界，未执行 UI 状态机行为测试 |
-
+| 2026-10-21 | PR [#78](https://github.com/Yuki-Nagori/panta/pull/78) 最终 PR head `469eb8d`，GitHub Actions run [39536255182](https://github.com/Yuki-Nagori/panta/actions/runs/39536255182) | macOS、Linux、Windows 构建、受影响测试及适用的 Rust/C++/QML/CMake 质量检查全部通过。 |
+| 2026-10-21 | macOS arm64，本地构建、受影响验证与真实窗口 | `cargo build --locked`、`cargo verify-changed`、CTest 90/90 和真实窗口导入对话框验收通过；覆盖原生选择器取消、关闭重开、ViewModel 会话复用，以及提交成功后展示刷新失败不重复提交。 |
+| 2026-10-21 | Qt 6.11.2 官方 qtscxml 附加包 | 三平台 SHA256 已实算并登记：macOS `9cabcf73b1ef81cb396a205380950d947535e20b7b6e21204e59a52199a98bfe`、Linux `8579d82fba91dfe1b24e3203f740ac5647d5515c51182a4158b0e748dc6f00f7`、Windows `47539713e42a72f29ef0da0be2ad82428eefb7158bfe766b2e1dc7e63640e058`；供给、消费与部署由上述 PR CI 验证。 |
+| 2026-09-24 | 初始规划检查 | 仅核对规划文档与本地链接；当时未实施状态机功能，历史记录不作为当前验收依据。 |
 ## 清理与兼容例外
 
 已将导入窗口的流程控制和服务命令入口迁入 ProjectViewModel 持有的 C++ 控制器，QML 保留表单呈现和属性绑定；无兼容例外。已删除被替代的 QML 命令路径，不并行保留新旧交互实现。服务契约未来升级按实际消费者一起修改，不预建兼容适配层。
@@ -91,8 +87,9 @@
 - 2026-09-24：完成 Qt 交互设计、模块导航、Qt 规范、界面架构及 072 / 073 衔接说明，文档检查通过；任务保持 planned，模块供给与控制器实现尚未开始。
 - 2026-09-24：按用户要求整体复审后本地提交；核对现有 `inspectStl` / `importStl` 的返回值与同步通知、`ProjectViewModel` 对 Rust 服务的所有权，修正首期验收和未来异步联调的边界。
 - 2026-09-24：复审修正及适用检查完成，未发现阻碍本规划提交的剩余问题；本次以 074 为主任务，同步 072 的决策记录和 073 的交付边界，属于同一 Qt 状态机规划变更。无代码或依赖变更、无废弃项、无兼容例外；实际功能继续保持 planned。
-- 2026-10-21：实现 Qt 6.11.2 StateMachine 供给和 STL 导入交互控制器，改造 ImportDialog / ProjectViewModel，补充交互回归测试、中文 / 英文文案与架构文档；模块准则改为基于当前导入流程的动作、API 与职责对照表。macOS 本地构建和真实窗口打开 / 取消 / 重开验收完成；三平台 CI、清洁缓存部署、销毁重建与投影刷新失败故障注入仍待验证。独立只读复审未发现其他阻塞问题，并移除了一项与真实后台导入竞争的非确定性合成回执测试。
-- 2026-10-21：Issue #76 收尾时纠正文档中的旧 Task / 构建路径描述；为提交后的投影刷新失败增加确定性回归，并验证 ImportDialog 对象销毁 / 重建后沿用同一 ViewModel 会话。将原合并式 QML QtTest 拆为主题原子、Ribbon、对话框、分析面板和文档页签五组独立 CTest，再加独立 ImportDialog 会话测试；本地 `cargo verify-changed` 的 CTest 90/90 与 PR #78 跨平台 CI 均通过。
+- 2026-10-21：完成 Qt 6.11.2 StateMachine 供给和 STL 导入交互控制器，改造 ImportDialog / ProjectViewModel，补充交互回归测试、中文 / 英文文案与架构文档；macOS 本地验收及 PR #78 三平台 CI 均通过。独立只读复审未发现阻塞问题，并移除了一项与真实后台导入竞争的非确定性合成回执测试。
+- 2026-10-21：按 Issue #79 巡检修正文档状态，将验收表链接更新为 PR #78 最终 PR head `469eb8d` 对应的 Actions run `39536255182`（main 合并提交为 `e66de56`）；删除会与完成状态冲突的阶段性待验收描述，保留的 2026-09-24 记录明确标为历史规划。
+- 2026-10-21：Issue #76 收尾时修正文档路径，为提交后的投影刷新失败增加确定性回归，并验证 ImportDialog 对象销毁 / 重建后沿用同一 ViewModel 会话。将合并式 QML QtTest 拆为主题原子、Ribbon、对话框、分析面板、文档页签及独立 ImportDialog 会话测试；本地 CTest 90/90 与 PR #78 跨平台 CI 均通过。
 
 ## 完成摘要
 

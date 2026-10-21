@@ -5,7 +5,7 @@
 - 依赖：[006](006-rust-cpp-boundary.md)、[023](023-cross-platform-paths.md)、[030](030-theme-dsl.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-20 / 2026-10-17
+- 创建 / 更新：2026-09-20 / 2026-10-21
 
 ## 目标与背景
 
@@ -43,14 +43,16 @@ Rust core、每帧视口状态持久化、无依据的旧版本自动迁移。
 1. 冻结设置 schema、默认值、范围、版本和错误码，Rust 单测覆盖非法值与未知版本。
 2. 经 CXX 暴露明确 DTO/命令；C++ adapter 将 DTO 映射到 QSettings，并在 GUI 线程
    完成读取、写入和变更通知。
-3. 将内置 `.pa` 主题作为 Qt resource 只读加载，QSettings 只保存选中的主题 ID
-   和用户偏好；读取损坏或缺失时回退默认快照并报告诊断。
+3. 复用 030 提供的 `qml/Themes/*.pa` 资源与 `ThemeViewModel`；本任务只将选中的
+   主题 ID 持久化到 QSettings，并在启动时恢复选择，不重复加载或实现主题解析。
+   读取损坏或缺失的主题 ID 时回退到默认主题并报告诊断。
 4. 覆盖三平台启动恢复、写入失败保留上一份有效值、版本拒绝和 QML 绑定更新。
 
 ## 预计改动
 
 预计新增 `crates/panta-core` 或设置专用 Rust service、`crates/panta-ffi` 设置 DTO、
-`native/bridge` Qt adapter/测试，以及 `resources/themes/` 和用户设置测试夹具；
+`native/bridge` Qt adapter/测试，以及用户设置测试夹具；主题资源由 030 提供于
+`qml/Themes/`，本任务不重复新增主题资源；
 具体路径以实施时现有模块为准，不提前创建空模块。
 
 ## 清理与兼容例外

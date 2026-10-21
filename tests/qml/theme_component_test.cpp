@@ -33,6 +33,7 @@ using panta::bridge::ProjectViewModel;
 #include <QUrl>
 #include <QVariantMap>
 #include <QVector>
+#include <QtCore/qbytearray.h>
 #include <QtCore/qcontainerfwd.h>
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qtmetamacros.h>
@@ -82,6 +83,83 @@ class ThemeAtomTest final : public QObject {
         QVERIFY(surface != nullptr);
         QCOMPARE(surface->property("surfaceColor").value<QColor>(),
                  QColor(QStringLiteral("#ffffff")));
+    }
+    void theme_switch_updates_live_bindings_and_rejects_invalid_ids() {
+        QQmlEngine engine;
+        panta::install_icon_provider(engine);
+        QObject owner;
+        QQmlComponent overrideComponent(&engine);
+        overrideComponent.setData(QByteArrayLiteral("import QtQuick\nimport Panta.Shell\n"
+                                                    "ThemedLabel { textColor: \"#ff00ff\" }"),
+                                  QUrl(QStringLiteral("inline:ThemeOverride.qml")));
+        QTRY_VERIFY(overrideComponent.isReady() || overrideComponent.isError());
+        QVERIFY2(overrideComponent.isReady(), qPrintable(overrideComponent.errorString()));
+        QObject* label = overrideComponent.create();
+        QVERIFY2(label != nullptr, qPrintable(overrideComponent.errorString()));
+        label->setParent(&owner);
+        QObject* boundLabel = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedLabel.qml"),
+            owner);
+        QVERIFY(boundLabel != nullptr);
+        QObject* boundButton = create_component(
+            engine, QStringLiteral("qrc:/qt/qml/Panta/Shell/Components/Atoms/ThemedToolButton.qml"),
+            owner);
+        QVERIFY(boundButton != nullptr);
+        QObject* themeViewModel =
+            engine.singletonInstance<QObject*>("Panta.Shell", "ThemeViewModel");
+        QVERIFY(themeViewModel != nullptr);
+        QSignalSpy tokensChanged(themeViewModel, SIGNAL(tokensChanged()));
+        QSignalSpy activeThemeChanged(themeViewModel, SIGNAL(activeThemeChanged()));
+        QVERIFY(tokensChanged.isValid());
+        QVERIFY(activeThemeChanged.isValid());
+
+        QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#ff00ff")));
+        QCOMPARE(boundLabel->property("textColor").value<QColor>(),
+                 QColor(QStringLiteral("#1c1c1c")));
+        QCOMPARE(boundLabel->property("font").value<QFont>().pixelSize(), 13);
+        QCOMPARE(boundButton->property("implicitHeight").toInt(), 24);
+        bool selected = false;
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, QStringLiteral("dark"))));
+        QVERIFY(selected);
+        QTRY_COMPARE(boundLabel->property("textColor").value<QColor>(),
+                     QColor(QStringLiteral("#f1f3f4")));
+        QCOMPARE(boundLabel->property("font").value<QFont>().pixelSize(), 15);
+        QCOMPARE(boundButton->property("implicitHeight").toInt(), 28);
+        QCOMPARE(tokensChanged.count(), 1);
+        QCOMPARE(activeThemeChanged.count(), 1);
+
+        const QVariantMap darkTokens = themeViewModel->property("tokens").toMap();
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, QStringLiteral("missing"))));
+        QVERIFY(!selected);
+        QVERIFY(!themeViewModel->property("error").toString().isEmpty());
+        QCOMPARE(themeViewModel->property("tokens").toMap(), darkTokens);
+        QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#ff00ff")));
+        QCOMPARE(tokensChanged.count(), 1);
+        QCOMPARE(activeThemeChanged.count(), 1);
+
+        const QString unpairedSurrogate(QChar(0xd800));
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, unpairedSurrogate)));
+        QVERIFY(!selected);
+        QCOMPARE(themeViewModel->property("tokens").toMap(), darkTokens);
+        QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#ff00ff")));
+
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, QStringLiteral("light"))));
+        QVERIFY(selected);
+        QTRY_COMPARE(boundLabel->property("textColor").value<QColor>(),
+                     QColor(QStringLiteral("#1c1c1c")));
+        QCOMPARE(boundLabel->property("font").value<QFont>().pixelSize(), 13);
+        QCOMPARE(boundButton->property("implicitHeight").toInt(), 24);
+        QCOMPARE(label->property("textColor").value<QColor>(), QColor(QStringLiteral("#ff00ff")));
+        QCOMPARE(tokensChanged.count(), 2);
+        QCOMPARE(activeThemeChanged.count(), 2);
     }
     void consolidated_controls_keep_fixed_sizes_and_stable_tabs() {
         QQmlEngine engine;

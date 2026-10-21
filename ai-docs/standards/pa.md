@@ -77,9 +77,9 @@ Qt 运行时按 context + ID 或 source 精确查 QM，不做隐式全局字符�
 
 `panta-dslc check file.pa` 只读执行 UTF-8、缩进、版本、kind、键名、重复键、类型/表达式、locale、占位符和域 schema 校验；失败返回稳定 code、源字节范围和行列，不写文件。`panta-dslc format file.pa` 输出规范形式，`panta-dslc format --check file.pa` 在需要修改时返回非零，不自动改变源码。
 
-根目录 `cargo format` 会用同一 CLI 格式化 `crates/` 与 `resources/` 中的 `.pa` 源文件；扫描会跳过名为 `fixtures` 的测试夹具目录，以保留刻意非规范的输入样本。`cargo format --check` 检查生产源文件是否已规范化，并作为 CI 格式门禁的一部分。
+根目录 `cargo format` 会用同一 CLI 格式化 `crates/`、`resources/` 与 `qml/Themes/` 中的 `.pa` 源文件；扫描会跳过名为 `fixtures` 的测试夹具目录，以保留刻意非规范的输入样本。`cargo format --changed` 也会检查这些目录内有改动的 `.pa` 文件。`cargo format --check` 检查生产源文件是否已规范化，并作为 CI 格式门禁的一部分。
 
-格式化只改变空白、缩进和可安全排序的映射键，不改变 context、ID、src、translation、状态、表达式、声明顺序或注释语义。写回使用临时文件、fsync/替换和失败保留策略；不能把格式化失败当成校验通过。formatter 不补引号、不把 Unicode 转义成 `\\u`、不重排变量声明来改变诊断顺序。
+格式化会规范化空白与缩进，并保留值声明顺序；不会重排 Theme token。Theme 的 `values` 当前不支持条目间空行或行内注释，因此需要分组时按颜色、字号、尺寸等顺序排列声明；例如 `dark.pa` 将颜色放在字号和尺寸之前。写回使用临时文件、fsync/替换和失败保留策略；不能把格式化失败当成校验通过。formatter 不补引号、不把 Unicode 转义成 `\\u`，也不重排变量声明来改变诊断顺序。
 
 035 评估直接使用 `yaml-format`/同类工具与 Rust AST formatter：只有能证明不引入 YAML 隐式语义、保留无引号值、source 条目、指令和注释时才可复用；否则实现小型确定性 formatter。无论选型如何，`pa check` 是唯一权威校验入口。
 

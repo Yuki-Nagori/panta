@@ -1,4 +1,4 @@
-// 当前 Shell 的只读主题参数；主题 DSL 接入由任务 030 承接。
+// Shell 唯一主题门面；默认值和主题覆盖经 Rust schema 校验后由 ViewModel 发布。
 pragma Singleton
 
 import QtQuick
@@ -6,199 +6,199 @@ import Panta.Shell
 
 QtObject {
     // 界面色彩
-    readonly property color colorBackground: "#ffffff"
-    readonly property color colorPanel: "#ffffff"
-    readonly property color colorTransparent: "transparent"
-    readonly property color colorChrome: "#e9e9e9"
-    readonly property color colorChromeHover: "#d9d9d9"
-    readonly property color colorChromePressed: "#c9c9c9"
-    readonly property color colorChromeLine: "#d0d0d0"
-    readonly property color colorPanelLine: "#c9c9c9"
-    readonly property color colorStatus: "#efefef"
-    readonly property color colorText: "#1c1c1c"
-    readonly property color colorTextMuted: "#5a5a5a"
-    readonly property color colorIcon: "#4a4a4a"
-    readonly property color colorHover: "#e5f1fb"
-    readonly property color colorSelected: "#e8f3fd"
-    readonly property color colorFocus: "#2e7ce0"
-    readonly property color colorBrand: "#c8322b"
-    readonly property color colorError: "#c62828"
-    readonly property color colorMenubar: "#2b2b2b"
-    readonly property color colorMenubarText: "#f2f2f2"
-    readonly property color colorMenubarHover: "#454545"
-    readonly property color colorRibbon: "#b0b0b0"
-    readonly property color colorCloseHover: "#e81123"
-    readonly property color colorDocumentBand: "#e7e4e1"
-    readonly property color colorDocumentBandLine: "#c8c4c0"
-    readonly property color colorDocumentHover: "#f0eeec"
-    readonly property color colorDocumentClosePressed: "#d5e3ef"
-    readonly property color colorDialogPrimary: "#e5f1fb"
-    readonly property color colorDialogPrimaryBorder: "#5d9fc7"
+    readonly property color colorBackground: ThemeViewModel.tokens.colorBackground
+    readonly property color colorPanel: ThemeViewModel.tokens.colorPanel
+    readonly property color colorTransparent: ThemeViewModel.tokens.colorTransparent
+    readonly property color colorChrome: ThemeViewModel.tokens.colorChrome
+    readonly property color colorChromeHover: ThemeViewModel.tokens.colorChromeHover
+    readonly property color colorChromePressed: ThemeViewModel.tokens.colorChromePressed
+    readonly property color colorChromeLine: ThemeViewModel.tokens.colorChromeLine
+    readonly property color colorPanelLine: ThemeViewModel.tokens.colorPanelLine
+    readonly property color colorStatus: ThemeViewModel.tokens.colorStatus
+    readonly property color colorText: ThemeViewModel.tokens.colorText
+    readonly property color colorTextMuted: ThemeViewModel.tokens.colorTextMuted
+    readonly property color colorIcon: ThemeViewModel.tokens.colorIcon
+    readonly property color colorHover: ThemeViewModel.tokens.colorHover
+    readonly property color colorSelected: ThemeViewModel.tokens.colorSelected
+    readonly property color colorFocus: ThemeViewModel.tokens.colorFocus
+    readonly property color colorBrand: ThemeViewModel.tokens.colorBrand
+    readonly property color colorError: ThemeViewModel.tokens.colorError
+    readonly property color colorMenubar: ThemeViewModel.tokens.colorMenubar
+    readonly property color colorMenubarText: ThemeViewModel.tokens.colorMenubarText
+    readonly property color colorMenubarHover: ThemeViewModel.tokens.colorMenubarHover
+    readonly property color colorRibbon: ThemeViewModel.tokens.colorRibbon
+    readonly property color colorCloseHover: ThemeViewModel.tokens.colorCloseHover
+    readonly property color colorDocumentBand: ThemeViewModel.tokens.colorDocumentBand
+    readonly property color colorDocumentBandLine: ThemeViewModel.tokens.colorDocumentBandLine
+    readonly property color colorDocumentHover: ThemeViewModel.tokens.colorDocumentHover
+    readonly property color colorDocumentClosePressed: ThemeViewModel.tokens.colorDocumentClosePressed
+    readonly property color colorDialogPrimary: ThemeViewModel.tokens.colorDialogPrimary
+    readonly property color colorDialogPrimaryBorder: ThemeViewModel.tokens.colorDialogPrimaryBorder
 
     // 字体与字号
     readonly property string analysisLogFontFamily: PlatformFonts.fixedFamily
-    readonly property int fontTitle: 13
-    readonly property int fontBody: 13
-    readonly property int fontSmall: 12
-    readonly property int fontRibbon: 10
+    readonly property int fontTitle: ThemeViewModel.tokens.fontTitle
+    readonly property int fontBody: ThemeViewModel.tokens.fontBody
+    readonly property int fontSmall: ThemeViewModel.tokens.fontSmall
+    readonly property int fontRibbon: ThemeViewModel.tokens.fontRibbon
 
     // 通用间距（逻辑像素）
-    readonly property int spacingTiny: 2
-    readonly property int spacingXSmall: 4
-    readonly property int spacingSmall: 6
-    readonly property int spacingMedium: 8
-    readonly property int spacingLarge: 12
-    readonly property int spacingStrip: 10
+    readonly property int spacingTiny: ThemeViewModel.tokens.spacingTiny
+    readonly property int spacingXSmall: ThemeViewModel.tokens.spacingXSmall
+    readonly property int spacingSmall: ThemeViewModel.tokens.spacingSmall
+    readonly property int spacingMedium: ThemeViewModel.tokens.spacingMedium
+    readonly property int spacingLarge: ThemeViewModel.tokens.spacingLarge
+    readonly property int spacingStrip: ThemeViewModel.tokens.spacingStrip
 
     // 通用图标尺寸（逻辑像素）
-    readonly property int iconSizeSmall: 16
-    readonly property int iconSizeDefault: 18
-    readonly property int iconSizeRibbon: 26
-    readonly property int iconSizeCompact: 12
-    readonly property int iconSizePaneClose: 10
+    readonly property int iconSizeSmall: ThemeViewModel.tokens.iconSizeSmall
+    readonly property int iconSizeDefault: ThemeViewModel.tokens.iconSizeDefault
+    readonly property int iconSizeRibbon: ThemeViewModel.tokens.iconSizeRibbon
+    readonly property int iconSizeCompact: ThemeViewModel.tokens.iconSizeCompact
+    readonly property int iconSizePaneClose: ThemeViewModel.tokens.iconSizePaneClose
 
     // 圆角与边框（逻辑像素）
-    readonly property int radiusSmall: 3
-    readonly property int borderWidth: 1
-    readonly property int focusBorderWidth: 2
+    readonly property int radiusSmall: ThemeViewModel.tokens.radiusSmall
+    readonly property int borderWidth: ThemeViewModel.tokens.borderWidth
+    readonly property int focusBorderWidth: ThemeViewModel.tokens.focusBorderWidth
 
     // 通用控件尺寸（逻辑像素）
-    readonly property int comboBoxHeight: 30
-    readonly property int controlHeight: 24
-    readonly property int selectionIndicatorSize: 16
-    readonly property int searchHeight: 22
-    readonly property int searchFieldWidth: 200
-    readonly property int toolbarButtonWidth: 24
-    readonly property int toolbarButtonHeight: 22
-    readonly property int paneCloseSize: 20
-    readonly property int tabSegmentWidth: 96
+    readonly property int comboBoxHeight: ThemeViewModel.tokens.comboBoxHeight
+    readonly property int controlHeight: ThemeViewModel.tokens.controlHeight
+    readonly property int selectionIndicatorSize: ThemeViewModel.tokens.selectionIndicatorSize
+    readonly property int searchHeight: ThemeViewModel.tokens.searchHeight
+    readonly property int searchFieldWidth: ThemeViewModel.tokens.searchFieldWidth
+    readonly property int toolbarButtonWidth: ThemeViewModel.tokens.toolbarButtonWidth
+    readonly property int toolbarButtonHeight: ThemeViewModel.tokens.toolbarButtonHeight
+    readonly property int paneCloseSize: ThemeViewModel.tokens.paneCloseSize
+    readonly property int tabSegmentWidth: ThemeViewModel.tokens.tabSegmentWidth
 
     // Shell 条带与标题布局（逻辑像素）
-    readonly property int chromeImplicitWidth: 800
-    readonly property int titlebarHeight: 30
-    readonly property int menubarHeight: 24
-    readonly property int statusbarHeight: 26
-    readonly property int titlebarMinimumContentWidth: 1100
-    readonly property int logoWidth: 46
+    readonly property int chromeImplicitWidth: ThemeViewModel.tokens.chromeImplicitWidth
+    readonly property int titlebarHeight: ThemeViewModel.tokens.titlebarHeight
+    readonly property int menubarHeight: ThemeViewModel.tokens.menubarHeight
+    readonly property int statusbarHeight: ThemeViewModel.tokens.statusbarHeight
+    readonly property int titlebarMinimumContentWidth: ThemeViewModel.tokens.titlebarMinimumContentWidth
+    readonly property int logoWidth: ThemeViewModel.tokens.logoWidth
 
     // Ribbon 布局（尺寸为逻辑像素，行数为计数）
-    readonly property int ribbonHeight: 96
-    readonly property int ribbonToolMinimumWidth: 56
-    readonly property int ribbonToolHeight: 68
-    readonly property int ribbonLabelHeight: 22
-    readonly property int ribbonMacroSlotSize: 19
-    readonly property int ribbonMacroSlotSpacing: 3
-    readonly property int ribbonMacroGroupWidth: 176
-    readonly property int ribbonContentSpacing: 3
-    readonly property int ribbonTextLineHeight: 12
-    readonly property int ribbonTextLines: 2
-    readonly property int ribbonCaretHeight: 5
-    readonly property int ribbonTrailingWidth: 64
-    readonly property int ribbonCompactHeight: 22
-    readonly property int ribbonCompactWidth: 24
-    readonly property int ribbonCompactIconSize: 20
-    readonly property int ribbonResultsControlWidth: 210
-    readonly property int ribbonTimeDisplayWidth: 44
-    readonly property int ribbonScaleValueWidth: 28
-    readonly property int ribbonComboBoxHeight: 22
-    readonly property int viewAppearanceGroupWidth: 244
-    readonly property int viewWindowGroupWidth: 337
-    readonly property int viewLockingGroupWidth: 122
-    readonly property int viewBrowseGroupWidth: 408
-    readonly property int viewCuttingPlaneGroupWidth: 70
-    readonly property int viewControlsGroupWidth: 260
-    readonly property int viewCompactActionWidth: 88
-    readonly property int viewWindowTileWidth: 48
-    readonly property int viewBrowseActionWidth: 108
-    readonly property int viewLockActionWidth: 116
-    readonly property int viewAppearanceControlWidth: 136
-    readonly property int viewUnitsComboWidth: 112
-    readonly property int viewControlFieldWidth: 120
+    readonly property int ribbonHeight: ThemeViewModel.tokens.ribbonHeight
+    readonly property int ribbonToolMinimumWidth: ThemeViewModel.tokens.ribbonToolMinimumWidth
+    readonly property int ribbonToolHeight: ThemeViewModel.tokens.ribbonToolHeight
+    readonly property int ribbonLabelHeight: ThemeViewModel.tokens.ribbonLabelHeight
+    readonly property int ribbonMacroSlotSize: ThemeViewModel.tokens.ribbonMacroSlotSize
+    readonly property int ribbonMacroSlotSpacing: ThemeViewModel.tokens.ribbonMacroSlotSpacing
+    readonly property int ribbonMacroGroupWidth: ThemeViewModel.tokens.ribbonMacroGroupWidth
+    readonly property int ribbonContentSpacing: ThemeViewModel.tokens.ribbonContentSpacing
+    readonly property int ribbonTextLineHeight: ThemeViewModel.tokens.ribbonTextLineHeight
+    readonly property int ribbonTextLines: ThemeViewModel.tokens.ribbonTextLines
+    readonly property int ribbonCaretHeight: ThemeViewModel.tokens.ribbonCaretHeight
+    readonly property int ribbonTrailingWidth: ThemeViewModel.tokens.ribbonTrailingWidth
+    readonly property int ribbonCompactHeight: ThemeViewModel.tokens.ribbonCompactHeight
+    readonly property int ribbonCompactWidth: ThemeViewModel.tokens.ribbonCompactWidth
+    readonly property int ribbonCompactIconSize: ThemeViewModel.tokens.ribbonCompactIconSize
+    readonly property int ribbonResultsControlWidth: ThemeViewModel.tokens.ribbonResultsControlWidth
+    readonly property int ribbonTimeDisplayWidth: ThemeViewModel.tokens.ribbonTimeDisplayWidth
+    readonly property int ribbonScaleValueWidth: ThemeViewModel.tokens.ribbonScaleValueWidth
+    readonly property int ribbonComboBoxHeight: ThemeViewModel.tokens.ribbonComboBoxHeight
+    readonly property int viewAppearanceGroupWidth: ThemeViewModel.tokens.viewAppearanceGroupWidth
+    readonly property int viewWindowGroupWidth: ThemeViewModel.tokens.viewWindowGroupWidth
+    readonly property int viewLockingGroupWidth: ThemeViewModel.tokens.viewLockingGroupWidth
+    readonly property int viewBrowseGroupWidth: ThemeViewModel.tokens.viewBrowseGroupWidth
+    readonly property int viewCuttingPlaneGroupWidth: ThemeViewModel.tokens.viewCuttingPlaneGroupWidth
+    readonly property int viewControlsGroupWidth: ThemeViewModel.tokens.viewControlsGroupWidth
+    readonly property int viewCompactActionWidth: ThemeViewModel.tokens.viewCompactActionWidth
+    readonly property int viewWindowTileWidth: ThemeViewModel.tokens.viewWindowTileWidth
+    readonly property int viewBrowseActionWidth: ThemeViewModel.tokens.viewBrowseActionWidth
+    readonly property int viewLockActionWidth: ThemeViewModel.tokens.viewLockActionWidth
+    readonly property int viewAppearanceControlWidth: ThemeViewModel.tokens.viewAppearanceControlWidth
+    readonly property int viewUnitsComboWidth: ThemeViewModel.tokens.viewUnitsComboWidth
+    readonly property int viewControlFieldWidth: ThemeViewModel.tokens.viewControlFieldWidth
 
     // 侧栏布局（尺寸为逻辑像素，比例无量纲）
-    readonly property int panelToolbarHeight: 32
-    readonly property int leftPanelMinimumWidth: 320
-    readonly property int layersTabWidth: 92
-    readonly property real leftPanelRatio: 0.26
-    readonly property real layersPanelRatio: 0.42
-    readonly property real projectTreeHeightRatio: 0.36
+    readonly property int panelToolbarHeight: ThemeViewModel.tokens.panelToolbarHeight
+    readonly property int leftPanelMinimumWidth: ThemeViewModel.tokens.leftPanelMinimumWidth
+    readonly property int layersTabWidth: ThemeViewModel.tokens.layersTabWidth
+    readonly property real leftPanelRatio: ThemeViewModel.tokens.leftPanelRatio
+    readonly property real layersPanelRatio: ThemeViewModel.tokens.layersPanelRatio
+    readonly property real projectTreeHeightRatio: ThemeViewModel.tokens.projectTreeHeightRatio
 
     // 文档页签（逻辑像素）
-    readonly property int documentTabWelcomeIconSize: 17
-    readonly property int documentTabRadius: 8
-    readonly property int documentTabCloseRadius: 5
-    readonly property int documentTabBottomLineHeight: 3
-    readonly property int documentTabWidth: 130
-    readonly property int documentTabBarHeight: 39
-    readonly property int documentTabContentInset: 11
-    readonly property int documentTabCloseSize: 19
-    readonly property int documentTabCloseRightInset: 3
+    readonly property int documentTabWelcomeIconSize: ThemeViewModel.tokens.documentTabWelcomeIconSize
+    readonly property int documentTabRadius: ThemeViewModel.tokens.documentTabRadius
+    readonly property int documentTabCloseRadius: ThemeViewModel.tokens.documentTabCloseRadius
+    readonly property int documentTabBottomLineHeight: ThemeViewModel.tokens.documentTabBottomLineHeight
+    readonly property int documentTabWidth: ThemeViewModel.tokens.documentTabWidth
+    readonly property int documentTabBarHeight: ThemeViewModel.tokens.documentTabBarHeight
+    readonly property int documentTabContentInset: ThemeViewModel.tokens.documentTabContentInset
+    readonly property int documentTabCloseSize: ThemeViewModel.tokens.documentTabCloseSize
+    readonly property int documentTabCloseRightInset: ThemeViewModel.tokens.documentTabCloseRightInset
 
     // 弹窗与表单控件（逻辑像素）
-    readonly property int dialogActionWidth: 92
-    readonly property int dialogActionSpacing: 5
-    readonly property int formControlHeight: 30
-    readonly property int profilePlotHeight: 140
-    readonly property int profileStepColumnWidth: 40
-    readonly property int processValueColumnWidth: 126
+    readonly property int dialogActionWidth: ThemeViewModel.tokens.dialogActionWidth
+    readonly property int dialogActionSpacing: ThemeViewModel.tokens.dialogActionSpacing
+    readonly property int formControlHeight: ThemeViewModel.tokens.formControlHeight
+    readonly property int profilePlotHeight: ThemeViewModel.tokens.profilePlotHeight
+    readonly property int profileStepColumnWidth: ThemeViewModel.tokens.profileStepColumnWidth
+    readonly property int processValueColumnWidth: ThemeViewModel.tokens.processValueColumnWidth
 
     // 日志面板（尺寸为逻辑像素，比例无量纲）
-    readonly property int analysisLogHeight: 220
-    readonly property int analysisLogRunWidth: 100
-    readonly property real analysisLogMaximumRatio: 0.45
+    readonly property int analysisLogHeight: ThemeViewModel.tokens.analysisLogHeight
+    readonly property int analysisLogRunWidth: ThemeViewModel.tokens.analysisLogRunWidth
+    readonly property real analysisLogMaximumRatio: ThemeViewModel.tokens.analysisLogMaximumRatio
 
     // 交互阈值（逻辑像素）与时长（毫秒）
-    readonly property int tabSlideDuration: 120
-    readonly property int documentTabDragThreshold: 4
-    readonly property int documentTabAnimationDuration: 150
-    readonly property int toolTipDelay: 600
+    readonly property int tabSlideDuration: ThemeViewModel.tokens.tabSlideDuration
+    readonly property int documentTabDragThreshold: ThemeViewModel.tokens.documentTabDragThreshold
+    readonly property int documentTabAnimationDuration: ThemeViewModel.tokens.documentTabAnimationDuration
+    readonly property int toolTipDelay: ThemeViewModel.tokens.toolTipDelay
 
     // 禁用状态
-    readonly property real disabledOpacity: 0.4
+    readonly property real disabledOpacity: ThemeViewModel.tokens.disabledOpacity
 
     // 主窗口最小尺寸（逻辑像素）
-    readonly property int windowMinimumWidth: 1280
-    readonly property int windowMinimumHeight: 720
+    readonly property int windowMinimumWidth: ThemeViewModel.tokens.windowMinimumWidth
+    readonly property int windowMinimumHeight: ThemeViewModel.tokens.windowMinimumHeight
 
     // 新建工程窗口尺寸与最小约束（逻辑像素）
-    readonly property int newProjectDialogWidth: 620
-    readonly property int newProjectDialogHeight: 360
-    readonly property int newProjectDialogMinimumWidth: 520
-    readonly property int newProjectDialogMinimumHeight: 320
+    readonly property int newProjectDialogWidth: ThemeViewModel.tokens.newProjectDialogWidth
+    readonly property int newProjectDialogHeight: ThemeViewModel.tokens.newProjectDialogHeight
+    readonly property int newProjectDialogMinimumWidth: ThemeViewModel.tokens.newProjectDialogMinimumWidth
+    readonly property int newProjectDialogMinimumHeight: ThemeViewModel.tokens.newProjectDialogMinimumHeight
 
     // 导入窗口尺寸与最小约束（逻辑像素）
-    readonly property int importDialogWidth: 680
-    readonly property int importDialogHeight: 430
-    readonly property int importDialogMinimumWidth: 580
-    readonly property int importDialogMinimumHeight: 360
+    readonly property int importDialogWidth: ThemeViewModel.tokens.importDialogWidth
+    readonly property int importDialogHeight: ThemeViewModel.tokens.importDialogHeight
+    readonly property int importDialogMinimumWidth: ThemeViewModel.tokens.importDialogMinimumWidth
+    readonly property int importDialogMinimumHeight: ThemeViewModel.tokens.importDialogMinimumHeight
 
     // 分析序列窗口尺寸与最小约束（逻辑像素）
-    readonly property int analysisSequenceDialogWidth: 560
-    readonly property int analysisSequenceDialogHeight: 380
-    readonly property int analysisSequenceDialogMinimumWidth: 420
-    readonly property int analysisSequenceDialogMinimumHeight: 340
+    readonly property int analysisSequenceDialogWidth: ThemeViewModel.tokens.analysisSequenceDialogWidth
+    readonly property int analysisSequenceDialogHeight: ThemeViewModel.tokens.analysisSequenceDialogHeight
+    readonly property int analysisSequenceDialogMinimumWidth: ThemeViewModel.tokens.analysisSequenceDialogMinimumWidth
+    readonly property int analysisSequenceDialogMinimumHeight: ThemeViewModel.tokens.analysisSequenceDialogMinimumHeight
 
     // 材料选择窗口尺寸与最小约束（逻辑像素）
-    readonly property int materialDialogWidth: 680
-    readonly property int materialDialogHeight: 540
-    readonly property int materialDialogMinimumWidth: 640
-    readonly property int materialDialogMinimumHeight: 460
+    readonly property int materialDialogWidth: ThemeViewModel.tokens.materialDialogWidth
+    readonly property int materialDialogHeight: ThemeViewModel.tokens.materialDialogHeight
+    readonly property int materialDialogMinimumWidth: ThemeViewModel.tokens.materialDialogMinimumWidth
+    readonly property int materialDialogMinimumHeight: ThemeViewModel.tokens.materialDialogMinimumHeight
 
     // Fill 工艺设置窗口尺寸与最小约束（逻辑像素）
-    readonly property int fillSettingsDialogWidth: 720
-    readonly property int fillSettingsDialogHeight: 600
-    readonly property int fillSettingsDialogMinimumWidth: 660
-    readonly property int fillSettingsDialogMinimumHeight: 480
+    readonly property int fillSettingsDialogWidth: ThemeViewModel.tokens.fillSettingsDialogWidth
+    readonly property int fillSettingsDialogHeight: ThemeViewModel.tokens.fillSettingsDialogHeight
+    readonly property int fillSettingsDialogMinimumWidth: ThemeViewModel.tokens.fillSettingsDialogMinimumWidth
+    readonly property int fillSettingsDialogMinimumHeight: ThemeViewModel.tokens.fillSettingsDialogMinimumHeight
 
     // Gate Location 工艺设置窗口尺寸与最小约束（逻辑像素）
-    readonly property int gateLocationSettingsDialogWidth: 720
-    readonly property int gateLocationSettingsDialogHeight: 480
-    readonly property int gateLocationSettingsDialogMinimumWidth: 660
-    readonly property int gateLocationSettingsDialogMinimumHeight: 400
+    readonly property int gateLocationSettingsDialogWidth: ThemeViewModel.tokens.gateLocationSettingsDialogWidth
+    readonly property int gateLocationSettingsDialogHeight: ThemeViewModel.tokens.gateLocationSettingsDialogHeight
+    readonly property int gateLocationSettingsDialogMinimumWidth: ThemeViewModel.tokens.gateLocationSettingsDialogMinimumWidth
+    readonly property int gateLocationSettingsDialogMinimumHeight: ThemeViewModel.tokens.gateLocationSettingsDialogMinimumHeight
 
     // 保压曲线窗口尺寸与最小约束（逻辑像素）
-    readonly property int holdingProfileDialogWidth: 540
-    readonly property int holdingProfileDialogHeight: 400
-    readonly property int holdingProfileDialogMinimumWidth: 480
-    readonly property int holdingProfileDialogMinimumHeight: 320
+    readonly property int holdingProfileDialogWidth: ThemeViewModel.tokens.holdingProfileDialogWidth
+    readonly property int holdingProfileDialogHeight: ThemeViewModel.tokens.holdingProfileDialogHeight
+    readonly property int holdingProfileDialogMinimumWidth: ThemeViewModel.tokens.holdingProfileDialogMinimumWidth
+    readonly property int holdingProfileDialogMinimumHeight: ThemeViewModel.tokens.holdingProfileDialogMinimumHeight
 }

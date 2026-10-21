@@ -98,7 +98,9 @@ qt_add_qml_module(
   ${PANTA_SHELL_QML_FILES}
   SOURCES
   ../native/app/platform_fonts.hpp
-  ../native/app/platform_fonts.cpp)
+  ../native/app/platform_fonts.cpp
+  ../native/app/theme_view_model.hpp
+  ../native/app/theme_view_model.cpp)
 target_sources(panta_shell PRIVATE ../native/app/window_chrome_metrics.cpp
                                    ../native/app/window_chrome_metrics.hpp)
 if(APPLE)
@@ -110,7 +112,28 @@ panta_native_defaults(panta_shell)
 add_library(panta::shell ALIAS panta_shell)
 target_sources(panta_shell PRIVATE ../native/app/icon_provider.cpp ../native/app/icon_provider.hpp)
 target_include_directories(panta_shell PUBLIC ../native/app)
-target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick Qt6::QuickDialogs2)
+target_include_directories(panta_shell PRIVATE "${PANTA_FFI_INCLUDE_DIR}"
+                                               "${CMAKE_SOURCE_DIR}/../crates/panta-ffi/include")
+target_link_libraries(panta_shell PRIVATE Qt6::Svg Qt6::Quick Qt6::QuickDialogs2
+                                          "${PANTA_FFI_STATIC_LIB}")
+if(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(panta_shell PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+elseif(WIN32)
+  # 无 Bridge 的 QML 测试也会直接消费 Rust staticlib，需要显式携带其系统库。
+  target_link_libraries(panta_shell PRIVATE ws2_32 userenv ntdll)
+endif()
+
+# 视觉 token 的默认值由 Rust 主题 schema 校验；QML Theme 只消费 C++ ViewModel 快照。
+qt_add_resources(
+  panta_shell
+  panta_shell_themes
+  PREFIX
+  "/qt/qml/Panta/Shell"
+  FILES
+  Themes/gui-default.pa
+  Themes/light.pa
+  Themes/dark.pa)
 
 # 彩色图标由 ThemedIcon 从 qrc 原色加载；单色 utility 图标由 panta-icons provider 着色。
 # CONFIGURE_DEPENDS 收集资源；视觉、功能及来源清单见 ai-docs/standards/icons.md。

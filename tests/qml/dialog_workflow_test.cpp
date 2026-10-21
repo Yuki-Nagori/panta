@@ -115,6 +115,44 @@ class DialogWorkflowTest final : public QObject {
         QVERIFY(QMetaObject::invokeMethod(profileDialog, "open", Q_ARG(QVariant, profile)));
         auto* profileWindow = qobject_cast<QQuickWindow*>(profileDialog);
         QVERIFY(profileWindow != nullptr);
+        profileWindow->show();
+        auto* plot =
+            visual_item(profileWindow->contentItem(), QStringLiteral("holdingProfilePlot"));
+        QVERIFY(plot != nullptr);
+        QObject* themeViewModel =
+            engine.singletonInstance<QObject*>("Panta.Shell", "ThemeViewModel");
+        QVERIFY(themeViewModel != nullptr);
+        bool selected = false;
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, QStringLiteral("light"))));
+        QVERIFY(selected);
+        profileDialog->setProperty("plotVisible", true);
+        QTRY_VERIFY(plot->property("visible").toBool());
+        QTRY_VERIFY(plot->width() > 0 && plot->height() > 0);
+        const auto grabPlot = [plot]() {
+            const auto grab = plot->grabToImage();
+            if (!grab)
+                return QImage{};
+            QSignalSpy ready(grab.data(), &QQuickItemGrabResult::ready);
+            if (ready.isValid() && ready.isEmpty())
+                ready.wait(1000);
+            return grab->image();
+        };
+        const QImage lightPlot = grabPlot();
+        QVERIFY(!lightPlot.isNull());
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, QStringLiteral("dark"))));
+        QVERIFY(selected);
+        const QImage darkPlot = grabPlot();
+        QVERIFY(!darkPlot.isNull());
+        QVERIFY2(lightPlot != darkPlot,
+                 "the holding profile plot should repaint when the active theme changes");
+        QVERIFY(QMetaObject::invokeMethod(themeViewModel, "selectTheme",
+                                          Q_RETURN_ARG(bool, selected),
+                                          Q_ARG(QString, QStringLiteral("light"))));
+        QVERIFY(selected);
         auto* duration =
             visual_item(profileWindow->contentItem(), QStringLiteral("profileDuration0"));
         auto* pressure =

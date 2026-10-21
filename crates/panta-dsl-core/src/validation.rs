@@ -160,11 +160,11 @@ pub(crate) fn validate_document(
                     source,
                 );
             }
-            if document.values.is_empty() {
+            if document.kind == Kind::Variables && document.values.is_empty() {
                 push_diagnostic(
                     diagnostics,
                     "pa.empty_values",
-                    "theme or variables requires values",
+                    "variables requires values",
                     source.len(),
                     source,
                 );

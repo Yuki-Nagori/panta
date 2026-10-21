@@ -36,7 +36,7 @@ Rust Solver Client → 进程协议 → [External] MoldSolver
 | 层级 | 当前成员 | 允许的 Native target 依赖 | 跨语言边界 |
 |---|---|---|---|
 | Native L1：适配与基础服务 | `panta_foundation`、`panta_geometry`、`panta_qt_adapter`、`panta_i18n`、`panta_visualization` | 各自依赖职责范围内的 Qt、OCCT、Netgen、VTK 或平台库 | 无 Rust/C++ 依赖逆转 |
-| Native L2：领域适配与 UI bridge | `panta_mesh`、`panta_bridge` / `panta::bridge`、`panta_shell` / `Panta.Shell` | Mesh → `panta::geometry`；Bridge → `panta::visualization`、`panta::qt_adapter`；QML module 启用 Bridge 时 → `panta_bridge`、`panta_visualization` | `panta_mesh` 还链接 Rust FFI staticlib，属于显式 Rust/C++ 边界；Bridge 调用 Rust FFI；QML 只经 ViewModel/Bridge 使用服务 |
+| Native L2：领域适配与 UI bridge | `panta_mesh`、`panta_bridge` / `panta::bridge`、`panta_shell` / `Panta.Shell` | Mesh → `panta::geometry`；Bridge → `panta::visualization`、`panta::qt_adapter`；Shell 主题 ViewModel → Rust FFI staticlib；QML module 启用 Bridge 时 → `panta_bridge`、`panta_visualization` | `panta_mesh`、Bridge 和 Shell 主题 ViewModel 通过 Rust FFI staticlib 调用 Rust；QML 只经 ViewModel 使用服务 |
 | Native L3：应用组合根 | `panta_native_app` | → `panta::foundation`、`panta::shell`、`panta_shellplugin`、`panta::i18n`；启用 Bridge 时还 → `panta::visualization`、Bridge/Visualization plugins | 直接链接 Rust FFI staticlib，并通过 Qt/CXX 连接运行时 |
 | 测试与性能（生产层外） | native test、benchmark targets | 可依赖被测生产 target，不进入生产依赖图 | 性能基准由单独入口运行 |
 
