@@ -3,6 +3,7 @@
 #include "mesh_frame_tracker.hpp"
 #include "panta/visualization/mesh_source.hpp"
 #include "panta/visualization/render_scene.hpp"
+#include "panta_ffi.h"
 #include "project_operation_helpers.hpp"
 #include "project_view_model.hpp"
 #include <QCoreApplication>
@@ -71,6 +72,23 @@ class HeldBackgroundViewModel : public ProjectViewModel {
         } else {
             ProjectViewModel::startBackgroundWaiter(std::move(work));
         }
+    }
+};
+
+class ImportProjectionFailureViewModel : public ProjectViewModel {
+  public:
+    int publishAttempts = 0;
+    int recoveryAttempts = 0;
+
+  protected:
+    bool publish_import(const panta::ffi::ProjectImport&) override {
+        ++publishAttempts;
+        return false;
+    }
+
+    bool refresh_committed_import_projection(const panta::ffi::ProjectImport&) override {
+        ++recoveryAttempts;
+        return false;
     }
 };
 
@@ -1053,6 +1071,50 @@ TEST(ProjectViewModelTest, ImportInteractionStateMachineGatesAndSerializesComman
     QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Closed);
     EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("state-machine")});
     EXPECT_FALSE(model.importPending());
+}
+
+TEST(ProjectViewModelTest, ImportProjectionRefreshFailureDoesNotRepeatCommittedImport) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto path = fixture.filePath(QStringLiteral("projection-failure.stl"));
+    QFile source(path);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+
+    ImportProjectionFailureViewModel model;
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("ProjectionFailure"), fixture.path())));
+    auto* interaction = model.importInteraction();
+    ASSERT_NE(interaction, nullptr);
+    ASSERT_TRUE(interaction->open());
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
+    ASSERT_TRUE(interaction->previewFile(path));
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Ready);
+
+    QSignalSpy finished(&model, &ProjectViewModel::projectImportFinished);
+    ASSERT_TRUE(finished.isValid());
+    ASSERT_TRUE(interaction->submit());
+    EXPECT_FALSE(interaction->submit());
+    QTRY_COMPARE(interaction->state(),
+                 panta::bridge::ImportInteractionController::State::ProjectionRefreshFailed);
+    ASSERT_EQ(finished.count(), 1);
+    EXPECT_TRUE(finished.at(0).at(1).toBool());
+    EXPECT_FALSE(finished.at(0).at(2).toBool());
+    EXPECT_EQ(model.publishAttempts, 1);
+    EXPECT_EQ(model.recoveryAttempts, 1);
+    EXPECT_FALSE(interaction->canSubmit());
+    EXPECT_FALSE(interaction->submit());
+
+    const QString projectPath = model.currentPath();
+    QFile manifest(projectPath);
+    ASSERT_TRUE(manifest.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(manifest.readAll().contains("projection-failure"));
+
+    ProjectViewModel reopened;
+    ASSERT_TRUE(finish_project_operation(
+        reopened, reopened.openProjectUrl(QUrl::fromLocalFile(projectPath))));
+    EXPECT_EQ(reopened.importedPartNames(), QStringList{QStringLiteral("projection-failure")});
 }
 
 TEST(ProjectViewModelTest, ImportInteractionQueuesOpenBeforeStateMachineStarts) {
