@@ -1,5 +1,6 @@
 #include "project_view_model.hpp"
 
+#include "import_interaction_controller.hpp"
 #include "panta/visualization/mesh_source.hpp"
 #include "panta_ffi.h"
 #include "path_host.hpp"
@@ -140,6 +141,7 @@ ProjectViewModel::ProjectViewModel(QObject* parent)
     } else {
         fail(material.error);
     }
+    m_importInteraction = new ImportInteractionController(this, this);
     connect(this, &ProjectViewModel::activeDocumentChanged, this,
             &ProjectViewModel::refreshPlanSettings);
     connect(this, &ProjectViewModel::projectChanged, this, &ProjectViewModel::refreshPlanSettings);
@@ -953,14 +955,19 @@ void ProjectViewModel::finish_stl_import() {
     m_stlImportPoll.stop();
     m_importRequest = 0;
     m_importPending = false;
-    bool succeeded = false;
+    bool operationSucceeded = false;
+    bool projectionUpdated = false;
     if (!result.error.code.empty()) {
         fail(result.error);
         cancelImportPreview();
     } else {
-        succeeded = publish_import(result.value);
+        operationSucceeded = true;
+        projectionUpdated = publish_import(result.value);
+        if (!projectionUpdated) {
+            projectionUpdated = refresh_committed_import_projection(result.value);
+        }
     }
-    emit projectImportFinished(request, succeeded);
+    emit projectImportFinished(request, operationSucceeded, projectionUpdated);
     emit importPendingChanged();
 }
 
@@ -972,6 +979,20 @@ bool ProjectViewModel::publish_import(const panta::ffi::ProjectImport& imported)
     panta::ffi::project_service_workspace_publish_import(*m_service, imported.id,
                                                          imported.display_name);
     refresh_workspace();
+    emit projectImported();
+    return true;
+}
+
+bool ProjectViewModel::refresh_committed_import_projection(
+    const panta::ffi::ProjectImport& imported) {
+    const auto snapshot = panta::ffi::project_service_current(*m_service);
+    if (!applySnapshot(snapshot) || !refreshImports()) {
+        return false;
+    }
+    panta::ffi::project_service_workspace_publish_import(*m_service, imported.id,
+                                                         imported.display_name);
+    refresh_workspace();
+    clearError();
     emit projectImported();
     return true;
 }

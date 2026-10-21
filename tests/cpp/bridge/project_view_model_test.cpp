@@ -975,6 +975,7 @@ TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelReq
     EXPECT_TRUE(model.importPending() || finished.count() == 1);
     QTRY_COMPARE(finished.count(), 1);
     EXPECT_TRUE(finished.at(0).at(1).toBool());
+    EXPECT_TRUE(finished.at(0).at(2).toBool());
     EXPECT_FALSE(model.importPending());
     EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("part")});
     EXPECT_EQ(model.openDocuments().size(), 2);
@@ -990,6 +991,94 @@ TEST(ProjectViewModelTest, ConfirmedImportCompletesThroughBackgroundViewModelReq
     EXPECT_TRUE(
         QFile::exists(QDir(fixture.filePath(QStringLiteral("Demo")))
                           .filePath(QStringLiteral("assets/meshes/mesh-import-1-r1.pmesh"))));
+}
+
+TEST(ProjectViewModelTest, ImportInteractionStateMachineGatesAndSerializesCommands) {
+    QTemporaryDir fixture;
+    ASSERT_TRUE(fixture.isValid());
+    const auto path = fixture.filePath(QStringLiteral("state-machine.stl"));
+    QFile source(path);
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_GT(source.write("vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"), 0);
+    source.close();
+
+    ProjectViewModel model;
+    ASSERT_TRUE(finish_project_operation(
+        model, model.createProject(QStringLiteral("StateMachine"), fixture.path())));
+    auto* interaction = model.importInteraction();
+    ASSERT_NE(interaction, nullptr);
+
+    EXPECT_TRUE(interaction->open());
+    EXPECT_TRUE(interaction->open());
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
+    const auto staleSelection = interaction->beginFileSelection();
+    ASSERT_NE(staleSelection, 0);
+    QTRY_COMPARE(interaction->state(),
+                 panta::bridge::ImportInteractionController::State::ChoosingFile);
+    interaction->detachWindow();
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
+    EXPECT_TRUE(interaction->open());
+    EXPECT_FALSE(interaction->previewFileForSelection(path, staleSelection));
+
+    const auto supersededSelection = interaction->beginFileSelection();
+    ASSERT_NE(supersededSelection, 0);
+    QTRY_COMPARE(interaction->state(),
+                 panta::bridge::ImportInteractionController::State::ChoosingFile);
+    EXPECT_TRUE(interaction->close());
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Closed);
+    EXPECT_TRUE(interaction->open());
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
+    EXPECT_FALSE(interaction->previewFileForSelection(path, supersededSelection));
+
+    EXPECT_TRUE(interaction->previewFile(path + QStringLiteral(".missing")));
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
+    EXPECT_FALSE(model.error().isEmpty());
+    EXPECT_TRUE(interaction->previewFile(path));
+    EXPECT_FALSE(interaction->previewFile(path));
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Ready);
+    EXPECT_TRUE(interaction->canSubmit());
+    const auto cancelledSelection = interaction->beginFileSelection();
+    ASSERT_NE(cancelledSelection, 0);
+    QTRY_COMPARE(interaction->state(),
+                 panta::bridge::ImportInteractionController::State::ChoosingFile);
+    EXPECT_TRUE(interaction->cancelFileSelection(cancelledSelection));
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Ready);
+    const auto selectedPath = interaction->sourcePath();
+    EXPECT_TRUE(interaction->open());
+    EXPECT_EQ(interaction->sourcePath(), selectedPath);
+    EXPECT_EQ(interaction->state(), panta::bridge::ImportInteractionController::State::Ready);
+
+    EXPECT_TRUE(interaction->submit());
+    EXPECT_FALSE(interaction->submit());
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Closed);
+    EXPECT_EQ(model.importedPartNames(), QStringList{QStringLiteral("state-machine")});
+    EXPECT_FALSE(model.importPending());
+}
+
+TEST(ProjectViewModelTest, ImportInteractionQueuesOpenBeforeStateMachineStarts) {
+    ProjectViewModel model;
+    auto* interaction = model.importInteraction();
+    ASSERT_NE(interaction, nullptr);
+    QSignalSpy closed(interaction, &panta::bridge::ImportInteractionController::closed);
+    ASSERT_TRUE(closed.isValid());
+
+    EXPECT_TRUE(interaction->open());
+    QTRY_COMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
+    EXPECT_EQ(closed.count(), 0);
+}
+
+TEST(ProjectViewModelTest, ImportInteractionQueuesCloseDuringPendingOpen) {
+    ProjectViewModel model;
+    auto* interaction = model.importInteraction();
+    ASSERT_NE(interaction, nullptr);
+    QSignalSpy closed(interaction, &panta::bridge::ImportInteractionController::closed);
+    ASSERT_TRUE(closed.isValid());
+
+    EXPECT_TRUE(interaction->open());
+    EXPECT_TRUE(interaction->close());
+    EXPECT_FALSE(interaction->open());
+    QTRY_COMPARE(closed.count(), 1);
+    EXPECT_EQ(interaction->state(), panta::bridge::ImportInteractionController::State::Closed);
 }
 
 TEST(ProjectViewModelTest, PreviewNotificationsCanReplaceOrCancelTheCompletedRequest) {

@@ -28,7 +28,7 @@
 | 依赖 | 权威配置 / 制品说明 | 消费边界与验证任务 |
 |---|---|---|
 | CMake / Ninja / LLVM | [assets.rs](../../crates/panta-build/src/assets.rs) | 官方预编译工具；Unix 用 clang/clang++，Windows 用 clang-cl；格式与 LLVM 检查使用同一工具链。任务 020 / 042。 |
-| Qt | [qt-provision.cmake](../../native/cmake/qt-provision.cmake) | 官方 qtbase / qtdeclarative / qttools / qtsvg 包；Core / Gui / Qml / Quick / QuickControls2 / Test、固定 lrelease 及 qsvg 插件。任务 005 / 029 / 034。 |
+| Qt | [qt-provision.cmake](../../native/cmake/qt-provision.cmake) | 官方 qtbase / qtdeclarative / qttools / qtsvg 与 qtscxml 包；Core / Gui / Qml / Quick / QuickControls2 / Test / StateMachine、固定 lrelease 及 qsvg 插件。StateMachine 仅在启用 bridge 时查找和链接。任务 005 / 029 / 034 / 074。 |
 | Linux ICU | 同 Qt 供给配置 | ICU 73.2 与 Qt Linux 工具 ABI 匹配，解包到 `qt/staging/lib`；不替换为系统 ICU、不伪造 SONAME。任务 036。 |
 | VTK / Dawn | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[制品说明](../../tools/sdk/releases/vtk-9.7.0.md) | `find_package(VTK CONFIG)` / `Dawn`；`VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn`。Cocoa / Wayland / Win32 hardware window；Linux 制品由 Ubuntu 24.04 / GCC 13 生产、Wayland-only。任务 031 / 038 管供给，007 管窗口。 |
 | OCCT | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[配对制品说明](../../tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md) | `find_package(OpenCASCADE CONFIG)`；无命名空间的 `TKernel` / `TKDESTEP` 等 targets。共享库、关闭 Draw / Visualization / DETools / FreeType / Xlib，保留 STEP；进一步裁剪由 009 决定。Windows 运行库可能位于嵌套 `win64/vc14/bin/`。 |

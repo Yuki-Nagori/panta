@@ -968,22 +968,29 @@ class ShellModuleLoadTest final : public QObject {
         auto* model =
             root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
         QVERIFY(dialog && model);
+        auto* interaction = model->importInteraction();
         auto* accept = dialog->findChild<QObject*>(QStringLiteral("importAccept"));
         QVERIFY(accept);
         QSignalSpy finished(model, &panta::bridge::ProjectViewModel::importPreviewFinished);
         QVERIFY(finished.isValid());
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
-        dialog->setProperty("sourcePath", path);
-        QVERIFY(model->inspectStl(path));
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Editing);
+        QVERIFY(interaction->previewFile(path));
         QVERIFY(model->importPreviewPending());
         QVERIFY(!accept->property("enabled").toBool());
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Closed);
         QVERIFY(!model->importPreviewPending());
         QVERIFY(!model->importPreviewReady());
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
-        dialog->setProperty("sourcePath", path);
-        QVERIFY(model->inspectStl(path));
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Editing);
+        QVERIFY(interaction->previewFile(path));
         QTRY_VERIFY(model->importPreviewReady());
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Ready);
         QVERIFY(accept->property("enabled").toBool());
         QCOMPARE(finished.count(), 1);
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
@@ -1009,27 +1016,35 @@ class ShellModuleLoadTest final : public QObject {
         auto* model =
             root->findChild<panta::bridge::ProjectViewModel*>(QStringLiteral("projectModel"));
         QVERIFY(dialog && model);
+        auto* interaction = model->importInteraction();
         QVERIFY(model->createProject(QStringLiteral("Reopen"), fixture.path()));
         QTRY_VERIFY(!model->projectOperationPending());
         QVERIFY(model->errorCode().isEmpty());
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
-        dialog->setProperty("sourcePath", path);
-        QVERIFY(model->inspectStl(path));
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Editing);
+        QVERIFY(interaction->previewFile(path));
         QTRY_VERIFY(model->importPreviewReady());
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Ready);
         QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
         QVERIFY(model->importPending());
-        const auto request = dialog->property("pendingImportRequestId").toULongLong();
+        const auto request = model->importRequestId();
         QVERIFY(request > 0);
 
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Closed);
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QTRY_COMPARE(interaction->state(),
+                     panta::bridge::ImportInteractionController::State::Editing);
         QVERIFY(dialog->property("visible").toBool());
         QVERIFY(QMetaObject::invokeMethod(model, "projectImportFinished", Qt::DirectConnection,
-                                          Q_ARG(quint64, request), Q_ARG(bool, true)));
+                                          Q_ARG(quint64, request), Q_ARG(bool, true),
+                                          Q_ARG(bool, true)));
         QVERIFY(dialog->property("visible").toBool());
-        QTRY_VERIFY(!model->importPending());
+        QCOMPARE(interaction->state(), panta::bridge::ImportInteractionController::State::Editing);
         QVERIFY(dialog->property("visible").toBool());
-        QVERIFY(dialog->property("pendingImportRequestId").toULongLong() == 0);
     }
 
     void layers_tab_row_tracks_imports_and_reopened_projects() {

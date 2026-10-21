@@ -241,6 +241,10 @@ error-generic:
   src: The import operation could not be completed.
   tr: 导入操作无法完成。
 
+error-projection-refresh:
+  src: The STL was imported, but the project view could not be refreshed. Reopen the project to reload its contents.
+  tr: STL 已导入，但工程视图未能刷新。重新打开工程即可重新加载内容。
+
 [ImportDialogFile]
 choose-title:
   src: Choose STL File

@@ -9,8 +9,6 @@ DialogWindow {
     objectName: "importDialog"
 
     required property ProjectViewModel projectModel
-    property string sourcePath: ""
-    property var pendingImportRequestId: 0
 
     width: Theme.importDialogWidth
     height: Theme.importDialogHeight
@@ -21,44 +19,40 @@ DialogWindow {
     readonly property var meshTypes: projectModel.meshTypes
     readonly property var unitValues: ["millimeters", "centimeters", "inches"]
 
-    onVisibleChanged: {
-        if (!visible) {
-            pendingImportRequestId = 0;
-            projectModel.cancelImportPreview();
-            projectModel.cancelImport();
-        }
+    onClosing: event => {
+        projectModel.importInteraction.close();
+        fileDialog.close();
     }
 
-    function resetFields() {
-        projectModel.cancelImportPreview();
-        projectModel.clearError();
-        sourcePath = "";
-        meshTypeCombo.currentIndex = meshTypes.findIndex(entry => entry.id === projectModel.defaultMeshType);
-        unitsCombo.currentIndex = 0;
-        showImportLogCheckBox.checked = true;
-        helpText.visible = false;
+    Component.onDestruction: {
+        projectModel.importInteraction.detachWindow();
     }
 
     function open() {
-        resetFields();
-        pendingImportRequestId = 0;
+        helpText.visible = false;
+        if (!projectModel.importInteraction.open())
+            return;
         centerOnOwner();
         visible = true;
         requestActivate();
     }
 
     function chooseFile() {
+        fileDialog.selectionId = projectModel.importInteraction.beginFileSelection();
+        if (fileDialog.selectionId === 0)
+            return;
         fileDialog.open();
     }
 
     function submit() {
-        if (!sourcePath || !projectModel.importPreviewReady)
-            return;
-        if (projectModel.beginImportStl(sourcePath, meshTypes[meshTypeCombo.currentIndex].id, unitValues[unitsCombo.currentIndex], showImportLogCheckBox.checked))
-            pendingImportRequestId = projectModel.importRequestId;
+        projectModel.importInteraction.submit();
     }
 
     function errorMessage() {
+        if (projectModel.importInteraction.stateName === "projection-refresh-failed") {
+            const message = qsTranslate("ImportDialogErrors", "The STL was imported, but the project view could not be refreshed. Reopen the project to reload its contents.");
+            return projectModel.errorDetail.length > 0 ? message + "\n" + projectModel.errorDetail : message;
+        }
         if (projectModel.errorCode === "project.import_file_missing")
             return qsTranslate("ImportDialogErrors", "The selected STL file does not exist.");
         if (projectModel.errorCode === "project.import_invalid_file")
@@ -109,14 +103,14 @@ DialogWindow {
                         id: sourceField
                         Layout.fillWidth: true
                         Layout.preferredHeight: Theme.controlHeight
-                        text: dialog.sourcePath
+                        text: dialog.projectModel.importInteraction.sourcePath
                         readOnly: true
                         placeholderText: qsTranslate("ImportDialogForm", "Choose an STL file")
                         Accessible.name: qsTranslate("ImportDialogForm", "STL file")
                     }
                     ThemedButton {
                         text: qsTranslate("UiCommonNavigation", "Browse")
-                        enabled: !dialog.projectModel.importPending
+                        enabled: dialog.projectModel.importInteraction.canEdit
                         iconName: "open"
                         preserveIconColors: true
                         contentPadding: Theme.spacingSmall
@@ -133,9 +127,11 @@ DialogWindow {
                 ThemedComboBox {
                     id: meshTypeCombo
                     Layout.fillWidth: true
-                    enabled: !dialog.projectModel.importPending
+                    enabled: dialog.projectModel.importInteraction.canEdit
                     model: dialog.meshTypes.map(entry => qsTranslate("MeshType", entry.sourceText))
+                    currentIndex: Math.max(0, dialog.meshTypes.findIndex(entry => entry.id === dialog.projectModel.importInteraction.meshType))
                     Accessible.name: qsTranslate("ImportDialogForm", "Mesh type")
+                    onActivated: index => dialog.projectModel.importInteraction.meshType = dialog.meshTypes[index].id
                 }
 
                 ThemedLabel {
@@ -145,9 +141,11 @@ DialogWindow {
                 ThemedComboBox {
                     id: unitsCombo
                     Layout.fillWidth: true
-                    enabled: !dialog.projectModel.importPending
+                    enabled: dialog.projectModel.importInteraction.canEdit
                     model: [qsTranslate("UiCommonUnitMillimeters", "Millimeters"), qsTranslate("UiCommonUnitCentimeters", "Centimeters"), qsTranslate("UiCommonUnitInches", "Inches")]
+                    currentIndex: Math.max(0, dialog.unitValues.indexOf(dialog.projectModel.importInteraction.units))
                     Accessible.name: qsTranslate("ImportDialogForm", "Units")
+                    onActivated: index => dialog.projectModel.importInteraction.units = dialog.unitValues[index]
                 }
 
                 ThemedLabel {
@@ -156,7 +154,7 @@ DialogWindow {
                 }
                 ThemedLabel {
                     Layout.fillWidth: true
-                    text: dialog.projectModel.importPreviewReady && dialog.sourcePath.length > 0 ? dialog.projectModel.importPreviewDimensions + " " + unitsCombo.currentText.toLowerCase() : qsTranslate("ImportDialogStatus", "Select an STL file")
+                    text: dialog.projectModel.importPreviewReady && dialog.projectModel.importInteraction.sourcePath.length > 0 ? dialog.projectModel.importPreviewDimensions + " " + unitsCombo.currentText.toLowerCase() : qsTranslate("ImportDialogStatus", "Select an STL file")
                     textSize: Theme.fontBody
                     textColor: Theme.colorTextMuted
                 }
@@ -176,7 +174,9 @@ DialogWindow {
 
                 text: qsTranslate("ImportDialogForm", "Show import log")
                 Layout.fillWidth: true
-                enabled: !dialog.projectModel.importPending
+                enabled: dialog.projectModel.importInteraction.canEdit
+                checked: dialog.projectModel.importInteraction.showImportLog
+                onToggled: dialog.projectModel.importInteraction.showImportLog = checked
             }
 
             ThemedLabel {
@@ -191,7 +191,7 @@ DialogWindow {
 
             ThemedLabel {
                 Layout.fillWidth: true
-                visible: dialog.projectModel.importPending
+                visible: dialog.projectModel.importInteraction.stateName === "submitting" || dialog.projectModel.importPending
                 text: qsTranslate("ImportDialogStatus", "Adding the STL file to the project…")
                 textSize: Theme.fontSmall
                 textColor: Theme.colorTextMuted
@@ -199,7 +199,7 @@ DialogWindow {
 
             ThemedLabel {
                 Layout.fillWidth: true
-                visible: dialog.projectModel.error.length > 0
+                visible: dialog.projectModel.error.length > 0 || dialog.projectModel.importInteraction.stateName === "projection-refresh-failed"
                 text: dialog.errorMessage()
                 textSize: Theme.fontSmall
                 textColor: Theme.colorError
@@ -217,7 +217,7 @@ DialogWindow {
 
                 ThemedButton {
                     text: qsTranslate("UiCommonHelp", "Help")
-                    enabled: !dialog.projectModel.importPending
+                    enabled: dialog.projectModel.importInteraction.canEdit
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     borderColor: Theme.colorPanelLine
@@ -232,7 +232,7 @@ DialogWindow {
                     text: dialog.projectModel.importPending ? qsTranslate("ImportDialogStatus", "Importing…") : qsTranslate("DialogAction", "OK")
                     objectName: "importAccept"
                     primaryAction: true
-                    enabled: dialog.sourcePath.length > 0 && dialog.projectModel.importPreviewReady && !dialog.projectModel.importPending
+                    enabled: dialog.projectModel.importInteraction.canSubmit
                     contentColor: Theme.colorText
                     hoverColor: Theme.colorHover
                     onClicked: dialog.submit()
@@ -257,20 +257,21 @@ DialogWindow {
             if (!dialog.visible)
                 return;
             const selectedPath = dialog.projectModel.localPath(selectedFile);
-            if (!selectedPath)
+            if (!selectedPath) {
+                dialog.projectModel.importInteraction.cancelFileSelection(selectionId);
                 return;
-            dialog.sourcePath = selectedPath;
-            dialog.projectModel.inspectStl(selectedPath);
+            }
+            dialog.projectModel.importInteraction.previewFileForSelection(selectedPath, selectionId);
         }
+        onRejected: dialog.projectModel.importInteraction.cancelFileSelection(selectionId)
+        property var selectionId: 0
     }
 
     Connections {
-        target: dialog.projectModel
-        function onProjectImportFinished(requestId, succeeded) {
-            if (succeeded && dialog.visible && requestId === dialog.pendingImportRequestId) {
-                dialog.pendingImportRequestId = 0;
+        target: dialog.projectModel.importInteraction
+        function onClosed() {
+            if (dialog.visible)
                 dialog.close();
-            }
         }
     }
 }

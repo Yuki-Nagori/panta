@@ -67,6 +67,9 @@ set(_panta_qt_components
 if(BUILD_TESTING)
   list(APPEND _panta_qt_components Test)
 endif()
+if(PANTA_ENABLE_BRIDGE_MODULE)
+  list(APPEND _panta_qt_components StateMachine)
+endif()
 if(UNIX
    AND NOT APPLE
    AND PANTA_ENABLE_BRIDGE_MODULE)
