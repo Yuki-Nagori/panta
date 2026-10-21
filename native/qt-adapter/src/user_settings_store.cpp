@@ -128,12 +128,18 @@ UserSettingsStore::UserSettingsStore() = default;
 UserSettingsStore::UserSettingsStore(QString fileName, QSettings::Format format)
     : m_fileName(std::move(fileName)), m_format(format) {}
 
+UserSettingsStore::UserSettingsStore(QString organizationName, QString applicationName)
+    : m_organizationName(std::move(organizationName)),
+      m_applicationName(std::move(applicationName)) {}
+
 QSettings UserSettingsStore::createSettings() const {
     if (!m_fileName.isEmpty()) {
         return QSettings(m_fileName, m_format);
     }
-    return QSettings(QSettings::NativeFormat, QSettings::UserScope, QStringLiteral("Yuki-Nagori"),
-                     QStringLiteral("Panta"));
+    return QSettings(QSettings::NativeFormat, QSettings::UserScope,
+                     m_organizationName.isEmpty() ? QStringLiteral("Yuki-Nagori")
+                                                  : m_organizationName,
+                     m_applicationName.isEmpty() ? QStringLiteral("Panta") : m_applicationName);
 }
 
 bool UserSettingsStore::load(UserSettingsRecord* record, bool* found, QString* error) const {

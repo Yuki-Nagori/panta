@@ -5,14 +5,53 @@
 #include <QProcess>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QUuid>
 #include <QtTest/qtest.h>
 #include <QtTest/qtestcase.h>
 #include <panta/qt_adapter/user_settings_store.hpp>
 #include <qcontainerfwd.h>
 #include <qtmetamacros.h>
+#include <utility>
 
 using panta::qt_adapter::UserSettingsRecord;
 using panta::qt_adapter::UserSettingsStore;
+
+namespace {
+
+QList<QStringList> recentProjectPathVariants() {
+    return {{},
+            {QStringLiteral("/tmp/one,with-comma.panta")},
+            {QStringLiteral("/tmp/one.panta"), QStringLiteral("/tmp/two.panta")}};
+}
+
+UserSettingsRecord expectedRecord(qsizetype index) {
+    return {1,
+            QStringLiteral("dark"),
+            QStringLiteral("zh-CN"),
+            1440,
+            900,
+            false,
+            recentProjectPathVariants().at(index)};
+}
+
+class NativeSettingsCleanup final {
+  public:
+    NativeSettingsCleanup(QString organization, QString application)
+        : m_organization(std::move(organization)), m_application(std::move(application)) {}
+
+    ~NativeSettingsCleanup() {
+        QSettings settings(QSettings::NativeFormat, QSettings::UserScope, m_organization,
+                           m_application);
+        settings.clear();
+        settings.sync();
+    }
+
+  private:
+    QString m_organization;
+    QString m_application;
+};
+
+} // namespace
 
 class UserSettingsStoreTest final : public QObject {
     Q_OBJECT
@@ -36,14 +75,9 @@ class UserSettingsStoreTest final : public QObject {
         QTemporaryDir temporaryDirectory;
         QVERIFY(temporaryDirectory.isValid());
         const QString fileName = temporaryDirectory.filePath(QStringLiteral("settings.ini"));
-        const QList<QStringList> recentLists{
-            {},
-            {QStringLiteral("/tmp/one,with-comma.panta")},
-            {QStringLiteral("/tmp/one.panta"), QStringLiteral("/tmp/two.panta")}};
+        const auto recentLists = recentProjectPathVariants();
         for (qsizetype index = 0; index < recentLists.size(); ++index) {
-            const UserSettingsRecord expected{
-                1,     QStringLiteral("dark"), QStringLiteral("zh-CN"), 1440, 900,
-                false, recentLists[index]};
+            const UserSettingsRecord expected = expectedRecord(index);
             UserSettingsStore store(fileName, QSettings::IniFormat);
             QString error;
             QVERIFY2(store.save(expected, &error), qPrintable(error));
@@ -52,6 +86,29 @@ class UserSettingsStoreTest final : public QObject {
             reader.start(
                 QCoreApplication::applicationFilePath(),
                 {QStringLiteral("--verify-stored-settings"), fileName, QString::number(index)});
+            QVERIFY2(reader.waitForStarted(), qPrintable(reader.errorString()));
+            QVERIFY2(reader.waitForFinished(), qPrintable(reader.errorString()));
+            QCOMPARE(reader.exitStatus(), QProcess::NormalExit);
+            QCOMPARE(reader.exitCode(), 0);
+        }
+    }
+
+    void native_format_snapshot_round_trips_across_processes_in_isolated_settings() {
+        const QString organization = QStringLiteral("PantaTests");
+        const QString application =
+            QStringLiteral("Settings-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const NativeSettingsCleanup cleanup(organization, application);
+        const auto recentLists = recentProjectPathVariants();
+        for (qsizetype index = 0; index < recentLists.size(); ++index) {
+            const UserSettingsRecord expected = expectedRecord(index);
+            UserSettingsStore store(organization, application);
+            QString error;
+            QVERIFY2(store.save(expected, &error), qPrintable(error));
+
+            QProcess reader;
+            reader.start(QCoreApplication::applicationFilePath(),
+                         {QStringLiteral("--verify-native-settings"), organization, application,
+                          QString::number(index)});
             QVERIFY2(reader.waitForStarted(), qPrintable(reader.errorString()));
             QVERIFY2(reader.waitForFinished(), qPrintable(reader.errorString()));
             QCOMPARE(reader.exitStatus(), QProcess::NormalExit);
@@ -117,23 +174,31 @@ class UserSettingsStoreTest final : public QObject {
 int main(int argc, char* argv[]) {
     QCoreApplication application(argc, argv);
     const QStringList arguments = application.arguments();
+    if (arguments.size() == 5 && arguments[1] == QStringLiteral("--verify-native-settings")) {
+        const int index = arguments[4].toInt();
+        const auto recentLists = recentProjectPathVariants();
+        if (index < 0 || index >= recentLists.size()) {
+            return 2;
+        }
+        UserSettingsStore store(arguments[2], arguments[3]);
+        UserSettingsRecord actual;
+        bool found = false;
+        QString error;
+        return store.load(&actual, &found, &error) && found && actual == expectedRecord(index) ? 0
+                                                                                               : 1;
+    }
     if (arguments.size() == 4 && arguments[1] == QStringLiteral("--verify-stored-settings")) {
         const int index = arguments[3].toInt();
-        const QList<QStringList> expectedRecentLists{
-            {},
-            {QStringLiteral("/tmp/one,with-comma.panta")},
-            {QStringLiteral("/tmp/one.panta"), QStringLiteral("/tmp/two.panta")}};
-        if (index < 0 || index >= expectedRecentLists.size()) {
+        const auto recentLists = recentProjectPathVariants();
+        if (index < 0 || index >= recentLists.size()) {
             return 2;
         }
         UserSettingsStore store(arguments[2], QSettings::IniFormat);
         UserSettingsRecord actual;
         bool found = false;
         QString error;
-        const UserSettingsRecord expected{
-            1,     QStringLiteral("dark"),    QStringLiteral("zh-CN"), 1440, 900,
-            false, expectedRecentLists[index]};
-        return store.load(&actual, &found, &error) && found && actual == expected ? 0 : 1;
+        return store.load(&actual, &found, &error) && found && actual == expectedRecord(index) ? 0
+                                                                                               : 1;
     }
 
     UserSettingsStoreTest test;
