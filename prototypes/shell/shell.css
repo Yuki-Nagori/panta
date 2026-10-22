@@ -750,8 +750,15 @@ body.settings-dialog-document .statusbar { display: none !important; }
 .settings-categories button.is-current { background: var(--color-selected); }
 .settings-category-icon { width: 16px; height: 16px; color: #5a6f7f; }
 .settings-dialog-page { padding: 18px 22px; }
+.settings-dialog-page[hidden] { display: none; }
 .settings-dialog-page h3 { margin: 0 0 16px; font-size: 17px; font-weight: 500; }
 .settings-dialog-description { margin: 0 0 20px; color: var(--color-muted); line-height: 1.5; }
+.settings-form-row { display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: center; gap: 14px; max-width: 520px; }
+.settings-form-row label { color: var(--color-text); }
+.settings-form-row select { width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: var(--color-panel); color: var(--color-text); }
+.settings-form-row select:focus { outline: var(--focus-border-width) solid var(--color-focus); outline-offset: var(--focus-outline-offset); }
+.settings-error { margin: 14px 0 0; padding: 9px 11px; border-left: 3px solid #c8322b; background: #faecea; color: #8b211c; line-height: 1.4; }
+.settings-error[hidden] { display: none; }
 .settings-preview-card { display: flex; flex-direction: column; gap: 7px; padding: 14px 16px; border: 1px solid var(--color-panel-line); border-radius: var(--radius); background: #fff; }
 .settings-preview-title { font-weight: 600; }
 .settings-preview-copy { color: var(--color-muted); line-height: 1.5; }

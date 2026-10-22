@@ -57,7 +57,9 @@ enum class Panels : std::uint8_t {
     AnalysisSequenceDialog,
     ApplicationBackstage,
     PlatformMenuBar,
-    SettingsDialog
+    SettingsDialog,
+    SettingsLanguagePage,
+    SettingsLanguageFailure
 };
 enum class DocumentTabWorkload : std::uint8_t { Construct, Switch, Close };
 enum class IconSourceMode : std::uint8_t { Empty, MonochromeProvider, SourceColors };
@@ -155,7 +157,8 @@ class QmlPerformanceBenchmark final : public QObject {
 
     Sample measure_once(Panels panels, const QStringList& names) {
         if (panels == Panels::ApplicationBackstage || panels == Panels::PlatformMenuBar ||
-            panels == Panels::SettingsDialog) {
+            panels == Panels::SettingsDialog || panels == Panels::SettingsLanguagePage ||
+            panels == Panels::SettingsLanguageFailure) {
             QQmlComponent& component =
                 panels == Panels::ApplicationBackstage ? m_backstageHostComponent
                 : panels == Panels::PlatformMenuBar    ? m_menuBarHostComponent
@@ -183,8 +186,11 @@ class QmlPerformanceBenchmark final : public QObject {
             host->resize(1000, 700);
             host->show();
             if (panels != Panels::PlatformMenuBar) {
-                const char* action =
-                    panels == Panels::ApplicationBackstage ? "openBackstage" : "openSettings";
+                const char* action = panels == Panels::ApplicationBackstage ? "openBackstage"
+                                     : panels == Panels::SettingsDialog     ? "openSettings"
+                                     : panels == Panels::SettingsLanguagePage
+                                         ? "openLanguageSettings"
+                                         : "openLanguageFailure";
                 if (!QMetaObject::invokeMethod(host, action)) {
                     QTest::qFail("QML benchmark host did not expose its open action", __FILE__,
                                  __LINE__);
@@ -193,10 +199,10 @@ class QmlPerformanceBenchmark final : public QObject {
             }
             QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
             if (panels == Panels::PlatformMenuBar) {
-                const QStringList required_objects{
-                    QStringLiteral("platformApplicationMenuBar"),
-                    QStringLiteral("platformApplicationMenu"), QStringLiteral("platformFileMenu"),
-                    QStringLiteral("platformEditMenu"), QStringLiteral("platformWindowMenu")};
+                const QStringList required_objects{QStringLiteral("platformApplicationMenuBar"),
+                                                   QStringLiteral("platformFileMenu"),
+                                                   QStringLiteral("platformEditMenu"),
+                                                   QStringLiteral("platformWindowMenu")};
                 for (const QString& object_name : required_objects) {
                     if (host->findChild<QObject*>(object_name) == nullptr) {
                         QTest::qFail(
@@ -237,6 +243,41 @@ class QmlPerformanceBenchmark final : public QObject {
                 QTest::qFail("Settings dialog host did not create a QQuickWindow", __FILE__,
                              __LINE__);
                 return {};
+            }
+            if (panels == Panels::SettingsLanguagePage ||
+                panels == Panels::SettingsLanguageFailure) {
+                QObject* language_page =
+                    dialog->findChild<QObject*>(QStringLiteral("languageSettingsPage"));
+                QObject* picker =
+                    dialog->findChild<QObject*>(QStringLiteral("settingsLanguagePicker"));
+                QObject* error =
+                    dialog->findChild<QObject*>(QStringLiteral("settingsLanguageError"));
+                QObject* router = host->findChild<QObject*>(QStringLiteral("settingsPageRouter"));
+                if (language_page == nullptr || picker == nullptr || error == nullptr ||
+                    router == nullptr) {
+                    QTest::qFail("Settings language page dependencies were not instantiated",
+                                 __FILE__, __LINE__);
+                    return {};
+                }
+                const int locale_count = picker->property("count").toInt();
+                if (panels == Panels::SettingsLanguageFailure) {
+                    if (!QMetaObject::invokeMethod(language_page, "languageSelected",
+                                                   Q_ARG(QString, QStringLiteral("zh-CN"))) ||
+                        !QMetaObject::invokeMethod(router, "acceptPendingChanges")) {
+                        QTest::qFail("Settings language failure flow could not be invoked",
+                                     __FILE__, __LINE__);
+                        return {};
+                    }
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+                    const bool error_visible = error->property("visible").toBool() &&
+                                               !error->property("text").toString().isEmpty();
+                    if (!error_visible || !surface->property("visible").toBool()) {
+                        QTest::qFail("Settings language failure was not shown in the open dialog",
+                                     __FILE__, __LINE__);
+                    }
+                    return {timer.nsecsElapsed(), locale_count, error_visible ? 1 : 0, false};
+                }
+                return {timer.nsecsElapsed(), locale_count, 1, false};
             }
             const int page_count = 3;
             int realized_pages = 0;
@@ -618,14 +659,28 @@ class QmlPerformanceBenchmark final : public QObject {
                               "}\n"),
             QUrl(QStringLiteral("qrc:/benchmark/PlatformMenuBarHost.qml")));
         m_settingsHostComponent.setData(
-            QByteArrayLiteral("import QtQuick\n"
-                              "import QtQuick.Controls\n"
-                              "import Panta.Shell\n"
-                              "ApplicationWindow {\n"
-                              "  id: host; visible: false; width: 1000; height: 700\n"
-                              "  function openSettings() { settingsRouter.openPage('general') }\n"
-                              "  SettingsPageRouter { id: settingsRouter; ownerWindow: host }\n"
-                              "}\n"),
+            QByteArrayLiteral(
+                "import QtQuick\n"
+                "import QtQuick.Controls\n"
+                "import Panta.Shell\n"
+                "ApplicationWindow {\n"
+                "  id: host; visible: false; width: 1000; height: 700\n"
+                "  function openSettings() { settingsRouter.openPage('general') }\n"
+                "  function openLanguageSettings() { fakeSettings.rejectLanguage = false; "
+                "settingsRouter.openPage('language') }\n"
+                "  function openLanguageFailure() { fakeSettings.rejectLanguage = true; "
+                "settingsRouter.openPage('language') }\n"
+                "  QtObject {\n"
+                "    id: fakeSettings\n"
+                "    property string language: 'en'\n"
+                "    property var availableLanguages: ['en', 'zh-CN']\n"
+                "    property bool rejectLanguage: false\n"
+                "    function setLanguage(locale) { if (rejectLanguage) return false; language = "
+                "locale; return true }\n"
+                "  }\n"
+                "  SettingsPageRouter { id: settingsRouter; objectName: 'settingsPageRouter'; "
+                "ownerWindow: host; settingsService: fakeSettings }\n"
+                "}\n"),
             QUrl(QStringLiteral("qrc:/benchmark/SettingsHost.qml")));
         QVERIFY(m_emptyComponent.isReady());
         QVERIFY2(m_backstageHostComponent.isReady(),
@@ -716,11 +771,11 @@ class QmlPerformanceBenchmark final : public QObject {
     }
 
     void measures_application_menu_construct() {
-        run_scenario({QStringLiteral("application menu"), QStringLiteral("platform menu bar"), 4,
+        run_scenario({QStringLiteral("application menu"), QStringLiteral("platform menu bar"), 3,
                       [this] { return measure_once(Panels::PlatformMenuBar, {}); },
                       [](const Sample& sample) {
-                          QCOMPARE(sample.task_model_rows, 4);
-                          QCOMPARE(sample.task_delegate_rows, 4);
+                          QCOMPARE(sample.task_model_rows, 3);
+                          QCOMPARE(sample.task_delegate_rows, 3);
                       }});
         for (const int recent_count : {0, 8, 100}) {
             run_scenario(
@@ -741,6 +796,19 @@ class QmlPerformanceBenchmark final : public QObject {
                       [](const Sample& sample) {
                           QCOMPARE(sample.task_model_rows, 3);
                           QCOMPARE(sample.task_delegate_rows, 3);
+                      }});
+        run_scenario({QStringLiteral("application menu"), QStringLiteral("settings language page"),
+                      2, [this] { return measure_once(Panels::SettingsLanguagePage, {}); },
+                      [](const Sample& sample) {
+                          QCOMPARE(sample.task_model_rows, 2);
+                          QCOMPARE(sample.task_delegate_rows, 1);
+                      }});
+        run_scenario({QStringLiteral("application menu"),
+                      QStringLiteral("settings language failure"), 2,
+                      [this] { return measure_once(Panels::SettingsLanguageFailure, {}); },
+                      [](const Sample& sample) {
+                          QCOMPARE(sample.task_model_rows, 2);
+                          QCOMPARE(sample.task_delegate_rows, 1);
                       }});
     }
 };

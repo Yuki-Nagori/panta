@@ -391,56 +391,6 @@ label:
   src: Close dialog
   tr: Close dialog
 
-[IconActionNewOutput]
-label:
-  src: New output
-  tr: New output
-
-[IconActionOpenOutput]
-label:
-  src: Open output
-  tr: Open output
-
-[IconActionSaveOutput]
-label:
-  src: Save output
-  tr: Save output
-
-[IconActionCheckOutput]
-label:
-  src: Check output
-  tr: Check output
-
-[IconActionOutputWizard]
-label:
-  src: Output wizard
-  tr: Output wizard
-
-[IconActionClearOutput]
-label:
-  src: Clear output
-  tr: Clear output
-
-[IconActionCopyOutput]
-label:
-  src: Copy output
-  tr: Copy output
-
-[IconActionOutputImage]
-label:
-  src: Output image
-  tr: Output image
-
-[IconActionExportOutput]
-label:
-  src: Export output
-  tr: Export output
-
-[IconActionDeleteOutput]
-label:
-  src: Delete output
-  tr: Delete output
-
 [IconActionSearch]
 label:
   src: Search
@@ -1761,10 +1711,6 @@ model-display:
   tr: Model Display
 
 [ApplicationMenu]
-panta:
-  src: panta
-  tr: panta
-
 file:
   src: File
   tr: File
@@ -1934,3 +1880,20 @@ preferences-description:
 registered-pages-description:
   src: Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.
   tr: Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.
+
+[SettingsLanguagePage]
+choose-language:
+  src: Choose the language used by the application. The change is applied when you select OK.
+  tr: Choose the language used by the application. The change is applied when you select OK.
+
+application-language:
+  src: Application language
+  tr: Application language
+
+language-unavailable:
+  src: Language settings are unavailable in this build.
+  tr: Language settings are unavailable in this build.
+
+language-apply-failed:
+  src: The selected language could not be applied. Your current language is unchanged.
+  tr: The selected language could not be applied. Your current language is unchanged.

@@ -64,12 +64,6 @@ MenuBar {
         onTriggered: platformMenuBar.hostWindow.showMinimized()
     }
 
-    ApplicationMenu {
-        objectName: "platformApplicationMenu"
-        onSettingsRequested: platformMenuBar.settingsRequested()
-        onQuitRequested: platformMenuBar.quitRequested()
-    }
-
     Menu {
         objectName: "platformFileMenu"
         title: qsTranslate("ApplicationMenu", "File")
@@ -94,6 +88,23 @@ MenuBar {
         MenuItem {
             text: qsTranslate("ApplicationMenu", "Close")
             enabled: false
+        }
+
+        MenuSeparator {}
+        MenuItem {
+            objectName: "applicationAboutAction"
+            text: qsTranslate("ApplicationMenu", "About panta")
+            enabled: false
+        }
+        MenuItem {
+            objectName: "applicationSettingsAction"
+            text: qsTranslate("ApplicationMenu", "Settings…")
+            onTriggered: platformMenuBar.settingsRequested()
+        }
+        MenuItem {
+            objectName: "applicationQuitAction"
+            text: qsTranslate("ApplicationMenu", "Quit panta")
+            onTriggered: platformMenuBar.quitRequested()
         }
     }
 

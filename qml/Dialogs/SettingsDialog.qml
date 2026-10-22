@@ -14,8 +14,15 @@ DialogWindow {
     property bool intentionalClose: false
 
     signal routeSelected(string routeId)
+    signal acceptRequested
     signal accepted
     signal cancelled
+
+    function completeAccept() {
+        intentionalClose = true;
+        accepted();
+        close();
+    }
 
     width: Theme.settingsDialogWidth
     height: Theme.settingsDialogHeight
@@ -121,11 +128,7 @@ DialogWindow {
                         objectName: "settingsOkButton"
                         text: qsTranslate("DialogAction", "OK")
                         primaryAction: true
-                        onClicked: {
-                            dialog.intentionalClose = true;
-                            dialog.accepted();
-                            dialog.close();
-                        }
+                        onClicked: dialog.acceptRequested()
                     }
                 }
             }

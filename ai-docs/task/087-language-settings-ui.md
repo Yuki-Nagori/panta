@@ -1,11 +1,11 @@
 # 087 — 语言设置界面
 
-- 状态：planned
+- 状态：done
 - 阶段：应用平台扩展
 - 依赖：[022](022-ui-internationalization.md)、[029](029-qml-component-library.md)、[086](086-qt-platform-adapter.md)、[115](115-platform-application-menu-and-settings-entry.md)、[125](125-settings-service-and-qt-adapter.md)
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-29 / 2026-10-17
+- 创建 / 更新：2026-09-29 / 2026-10-22
 
 ## 目标与背景
 
@@ -20,7 +20,7 @@
 
 ## 范围与非目标
 
-包含设置页的语言选择控件、对 `Settings` locale 属性/切换 API 的调用、失败反馈、设置服务持久化和启动恢复。
+包含设置页的语言选择控件、对 `Settings` locale 属性/切换 API 的调用、失败反馈、设置服务持久化和启动恢复，以及应用语言切换时 macOS Cocoa 原生菜单角色所需的本地化词条。
 
 不包含 locale 目录定义、QM 资源编译、QTranslator 生命周期、Rust locale 校验、其他设置类别、RTL 支持或翻译覆盖扩充。
 
@@ -34,10 +34,11 @@
 
 ## 实施步骤
 
-1. 在设置页加入语言选择控件，以 Rust 返回的支持列表填充，不在 QML 维护第二份 locale 列表。
-2. 用户切换时调用 `Settings` 后端；失败保留旧选项并展示稳定诊断，成功后保存偏好。
-3. 启动时从设置服务恢复 locale；无效/缺失偏好回退英文并确保 QML/C++ 展示字符串一致。
-4. 记录实际窗口验收、格式/构建验证和失败路径结果。
+1. [x] 更新并由维护者确认 HTML 原型，覆盖 Settings 的 Language 页面、可用语言、提交/取消及失败状态。
+2. [x] 以 Rust 返回的支持列表构造语言选择控件，不在 QML 维护第二份 locale 列表。
+3. [x] 对话框内暂存候选语言；OK 提交，失败时保留对话框并显示诊断；Cancel 丢弃候选。
+4. [x] 启动时从设置服务恢复 locale；无效或缺失偏好使用英文默认，并保持显示文案一致。
+5. [x] 记录真实窗口、自动回归、构建验证和独立评审结果。
 
 ## 预计改动
 
@@ -49,11 +50,12 @@
 
 ## 验收标准
 
-- [ ] 设置界面只展示 Rust 返回的可用语言，并调用 `Settings` 后端完成切换。
-- [ ] 成功切换后 QML 与 C++ 展示文本更新，偏好持久化且重启恢复。
-- [ ] QM 加载或设置写入失败时保留上一有效语言和偏好，并向用户提供可理解反馈。
-- [ ] QML 不访问 QSettings、不解析 `.pa`、不操作 `QTranslator`；Rust 不依赖 Qt。
-- [ ] 代码、配置、task 与索引一致，真实验证记录在本任务。
+- [x] 设置界面只展示 Rust 返回的可用语言，并调用 `Settings` 后端完成切换。
+- [x] 成功切换后 QML 与 C++ 展示文本更新；非默认语言持久化并在重新创建设置服务时恢复。
+- [x] QM 加载或设置写入失败时保留上一有效语言和偏好，并向用户提供可理解反馈。
+- [x] macOS 切换应用语言后 About / Settings / Quit 仍合并进系统应用菜单，不出现第二个自定义应用名菜单；系统 Settings 文案随应用语言显示。
+- [x] QML 不访问 QSettings、不解析 `.pa`、不操作 `QTranslator`；Rust 不依赖 Qt。
+- [x] 代码、配置、task 与索引一致，真实验证记录在本任务。
 
 ## 验证计划与结果
 
@@ -61,7 +63,8 @@
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| — | 待实施 | UI 切换、失败保留与启动恢复 | 未执行 |
+| 2026-10-22 | 原型与 QML 迁移 | 可切换设置分类并演示语言候选、OK/Cancel 与错误状态；QML 结构复用共享 DialogWindow / Settings 路由 | `node --check prototypes/shell/shell.js`、`git diff --check` 通过；维护者逐步确认布局要求后完成 QML 迁移。独立评审后修复错误状态被隐藏及内部术语文案。当前浏览器策略拒绝 `file://`，原型未完成浏览器实窗渲染验收 |
+| 2026-10-22 | macOS 中文菜单与重启实窗验收；中英文目录清理；`cargo build --locked`；`I18n.CompiledQmLoads`、`Qml.SettingsLanguageSwitch`、`QtAdapter.TranslationCatalog`；`cargo format --check --changed` | Cocoa 能识别简体中文 About / Settings / Quit 等角色，系统菜单显示“设置…”且不留下第二个 `panta` 顶级项；目录只保留有效条目；非默认语言重启恢复，加载或写入失败不破坏旧翻译和偏好 | 通过：实窗从 Settings 选择简体中文后，菜单栏只有系统 `Panta`、File、Edit、Window；`Panta` 菜单包含“关于 Panta / 设置… / 服务 / 隐藏 Panta / 隐藏其他 / 全部显示 / 退出 Panta”，点击“设置…”打开共享设置弹窗。实窗退出并重新启动后仍显示简体中文。`Qml.SettingsLanguageSwitch` 验证非默认 `zh-CN` 持久化并在新 `Settings` 服务实例初始化时恢复，且失败写入回滚 translator 并保留磁盘偏好；`QtAdapter.TranslationCatalog` 验证 QM 加载失败时保留已安装翻译。上述三个 CTest 定向用例通过，语言目录解析与格式检查通过，构建生成 QM 成功。全量 `cargo verify-changed` 中 Rust、格式、lint 与 90/91 native/QML 测试通过；唯一失败的 `QtAdapter.UserSettingsStore` 因沙箱拒绝写入 `~/Library/Preferences`。静态引用审计删除两份目录中无消费者的 10 个 `IconAction*Output` context 和已移除顶级菜单的 `ApplicationMenu.panta`；保留跨 context 同文案（Qt 按 context + source 查找），中英文共有 447 项一致，中文另有 20 条 Cocoa 专用菜单译文 |
 
 ## 风险与回退
 
@@ -70,7 +73,10 @@
 ## 决策与工作记录
 
 - 2026-09-29：登记为 086 翻译后端的独立 UI 消费任务。语言目录和切换规则来自 Rust/`Settings`，QML 不复制 locale 列表。
+- 2026-10-22：选择在 Settings 对话框内暂存候选语言；仅 OK 时提交，以保持 Cancel 语义。失败时不关闭对话框，并展示后端诊断。实现以原型确认结果为准。
+- 2026-10-22：Qt macOS 原生菜单会依赖 `QCocoaMenuItem` 翻译识别菜单角色；应用中文目录补充角色关键词与 `MAC_APPLICATION_MENU` 标准标题，并由 115 移除重复的自定义应用名顶级菜单，将角色候选合入系统菜单。真实窗口通过中文切换及 Settings 路由验收。
+- 2026-10-22：核对中英文目录：清理后共有 447 项 context / ID / source 对齐；移除两边均无调用方的 10 个旧 `IconAction*Output` context。相同 source 若属于不同 Qt context 必须分别保留；英文基线显式保留 `tr == src`，供当前 `QTranslator::translate()` 直接查询契约使用。评审发现 Cocoa 精确识别 `Copy` 角色要求两处译文一致，已统一为“复制”并添加交叉 context 回归断言。
 
 ## 完成摘要
 
-未完成。语言后端 086 与字典/运行时任务 022 已完成；设置界面与持久化仍等待 115 的菜单路由、125 的设置服务及 029 的组件能力。
+语言设置页、共享 Settings 路由、偏好持久化与启动恢复、失败回滚和 macOS 菜单角色本地化已实现并通过自动回归；macOS 中文菜单、Settings 路由及重启恢复通过真实窗口验收。HTML 原型的主要布局与交互由维护者确认；当前环境的浏览器策略拒绝 `file://`，未能在内置浏览器完成渲染检查。

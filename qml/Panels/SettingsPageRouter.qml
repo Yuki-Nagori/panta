@@ -1,4 +1,6 @@
 // 管理 Settings 页面路由，并打开 Dialogs 中的共享弹窗。
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 Item {
@@ -28,11 +30,15 @@ Item {
             title: qsTranslate("SettingsDialog", "Language"),
             iconName: "globe",
             preserveSourceColors: false,
-            pageComponent: null
+            pageComponent: languagePageComponent
         }
     ]
     property string activeRouteId: "general"
     required property Window ownerWindow
+    property var settingsService: null
+    property string originalLanguage: ""
+    property string candidateLanguage: ""
+    property string languageError: ""
 
     signal accepted
     signal cancelled
@@ -66,9 +72,44 @@ Item {
     function openPage(routeId) {
         const requestedPage = pageForRoute(routeId);
         const initialPage = requestedPage || pageForRoute("general") || registeredPages[0] || null;
+        originalLanguage = settingsService ? settingsService.language : "";
+        candidateLanguage = originalLanguage;
+        languageError = "";
         activeRouteId = initialPage ? initialPage.routeId : "";
         settingsDialog.open();
         return Boolean(requestedPage);
+    }
+
+    function discardPendingLanguage() {
+        candidateLanguage = originalLanguage;
+        languageError = "";
+    }
+
+    function acceptPendingChanges() {
+        if (settingsService && candidateLanguage.length > 0 && candidateLanguage !== originalLanguage) {
+            if (!settingsService.setLanguage(candidateLanguage)) {
+                languageError = qsTranslate("SettingsLanguagePage", "The selected language could not be applied. Your current language is unchanged.");
+                candidateLanguage = originalLanguage;
+                activeRouteId = "language";
+                return;
+            }
+            originalLanguage = candidateLanguage;
+        }
+        settingsDialog.completeAccept();
+    }
+
+    Component {
+        id: languagePageComponent
+
+        LanguageSettingsPage {
+            availableLanguages: router.settingsService ? router.settingsService.availableLanguages : []
+            selectedLanguage: router.candidateLanguage
+            errorText: router.languageError
+            onLanguageSelected: locale => {
+                router.candidateLanguage = locale;
+                router.languageError = "";
+            }
+        }
     }
 
     SettingsDialog {
@@ -77,7 +118,11 @@ Item {
         pages: router.registeredPages
         activeRouteId: router.activeRouteId
         onRouteSelected: routeId => router.activeRouteId = routeId
+        onAcceptRequested: router.acceptPendingChanges()
         onAccepted: router.accepted()
-        onCancelled: router.cancelled()
+        onCancelled: {
+            router.discardPendingLanguage();
+            router.cancelled();
+        }
     }
 }
