@@ -5,7 +5,7 @@
 - 依赖：[018](018-cross-platform-ci.md)、[032](032-cross-language-quality-gates.md)、[038](038-native-sdk-artifact-production.md)
 - 优先级：P2
 - 负责人：待分配
-- 创建 / 更新：2026-09-18 / 2026-10-20
+- 创建 / 更新：2026-09-18 / 2026-10-22
 
 ## sanitizer 支持矩阵增量（2026-09-21，实施步骤 6）
 
@@ -37,6 +37,10 @@ CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/370057
 ### STL 后台导入与文档激活排除补登记（2026-10-14，Issue #17）
 
 Nightly Linux TSan [run 38475008747](https://github.com/Yuki-Nagori/panta/actions/runs/38475008747) 报告 `ConfirmedImportCompletesThroughBackgroundViewModelRequest` 与 `DuplicateImportOrdinalsFollowImportOrderAcrossActivationAndClose`。前者涉及 Rust std `mpsc` 的 STL 预览 / 导入结果交付；后者涉及 `ActivationCoordinator` 由 Rust `Mutex<CoordinatorState>` 保护的 `VecDeque<Outcome>`，随后将网格 `Vec` 所有权交给 C++。两条路径的报告栈均落在 Rust `core` / `alloc` / `std` 的跨线程数据读写或释放；C++ TSan 插桩无法观察未插桩 Rust std 建立的 happens-before 关系。结合生产端与消费端共用同一 Rust 锁 / 通道，这符合本节已登记的同步边界，没有发现自有 C++ 共享字段直接竞争。`cargo sanitize` 的 TSan CTest 按精确名称排除这两个跨 Rust 异步结果交付的用例；普通测试和 ASan/UBSan 仍运行它们，其余 `ProjectViewModelTest` 与纯自有 C++ TSan 检查保留。没有扩大为整组排除或添加运行时抑制。
+
+### ProjectViewModel TSan 排除增量（2026-10-21 nightly；2026-10-22 修正平台范围）
+
+GitHub Actions [run 39674848676](https://github.com/Yuki-Nagori/panta/actions/runs/39674848676) 中，Ubuntu TSan 对 23 个 `ProjectViewModelTest` 报告的访问栈落在 Rust `std::sync::mpmc` 通道及 Rust `core` / `alloc`；这些新增用例仍由普通 CTest 与 ASan/UBSan 执行，Rust 同步逻辑由 Miri 检查。macOS TSan 另在 `ImportInteractionStateMachineGatesAndSerializesCommands` 报告 Qt `QFuture` 结果存储的 `QPromise::addResult` / `QFutureInterface::clear` 并发访问；Qt 文档将 `QFuture` 与 `QPromise` 操作声明为线程安全，但 CI 使用未插桩 Qt，TSan 无法看到其内部同步。runner 将 9 个既有 Rust 异步同步边界用例作为两平台共用排除，Ubuntu 仅额外排除日志中的 23 个用例，macOS 仅额外排除上述 1 个 Qt 用例；普通测试、ASan/UBSan 与 Miri 仍覆盖 Rust 排除项，macOS TSan 保留其余 22 个 Ubuntu 新增用例。回归测试分别锁定 Linux/macOS 的过滤范围；修复后的 CI 待复验。
 
 ## 本轮修复范围（2026-09-19）
 
