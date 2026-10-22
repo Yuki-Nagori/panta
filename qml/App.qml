@@ -68,6 +68,7 @@ ApplicationWindow {
         id: settingsPageRouter
         objectName: "settingsPageRouter"
         ownerWindow: shellWindow
+        settingsService: Settings
     }
     readonly property bool projectOpen: projectModel.currentPath.length > 0
     readonly property real nativeControlsLeftInset: WindowChromeMetrics.leadingSystemControlsInset

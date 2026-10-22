@@ -3,6 +3,7 @@
 #include "settings.hpp"
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QJSEngine>
 #include <QObject>
 #include <QQmlComponent>
@@ -122,6 +123,28 @@ class SettingsTest final : public QObject {
         QVERIFY(restored.settingsError().isEmpty());
     }
 
+    void non_default_language_restores_after_service_restart() {
+        QTemporaryDir settingsDirectory;
+        QVERIFY(settingsDirectory.isValid());
+        const QString settingsPath = settingsDirectory.filePath(QStringLiteral("settings.ini"));
+
+        QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("Ready"));
+        {
+            Settings writer(settingsPath);
+            QVERIFY(writer.setLanguage(QStringLiteral("zh-CN")));
+            QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
+        }
+        QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("Ready"));
+
+        {
+            Settings restored(settingsPath);
+            QCOMPARE(restored.language(), QStringLiteral("zh-CN"));
+            QVERIFY(restored.settingsError().isEmpty());
+            QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
+        }
+        QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("Ready"));
+    }
+
     void invalid_stored_snapshot_is_preserved_and_disables_writes() {
         QTemporaryDir settingsDirectory;
         QVERIFY(settingsDirectory.isValid());
@@ -153,21 +176,34 @@ class SettingsTest final : public QObject {
             settings.settingsError().startsWith(QStringLiteral("settings.unsupported_version")));
     }
 
-    void failed_write_keeps_state_and_same_value_theme_rollback_keeps_diagnostic() {
+    void failed_language_write_restores_translation_and_persisted_preference() {
         QTemporaryDir settingsDirectory;
         QVERIFY(settingsDirectory.isValid());
         const QString settingsPath = settingsDirectory.filePath(QStringLiteral("settings.ini"));
         Settings settings(settingsPath);
         QVERIFY(settings.settingsError().isEmpty());
+        QVERIFY(settings.setLanguage(QStringLiteral("zh-CN")));
+        QCOMPARE(settings.language(), QStringLiteral("zh-CN"));
+        QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
+
+        const QString backupPath =
+            settingsDirectory.filePath(QStringLiteral("settings.ini.backup"));
+        QVERIFY(QFile::rename(settingsPath, backupPath));
         QVERIFY(QDir().mkdir(settingsPath));
 
-        QVERIFY(!settings.setThemeId(QStringLiteral("dark")));
-        QCOMPARE(settings.themeId(), QStringLiteral("light"));
-        QVERIFY(
-            settings.settingsError().startsWith(QStringLiteral("settings.storage_access_error")));
+        QVERIFY(!settings.setLanguage(QStringLiteral("en")));
+        QCOMPARE(settings.language(), QStringLiteral("zh-CN"));
+        QCOMPARE(QCoreApplication::translate("App", "Ready"), QStringLiteral("就绪"));
+        const QString write_error = settings.settingsError();
+        QVERIFY(write_error.startsWith(QStringLiteral("settings.storage_access_error")));
+
         QVERIFY(!settings.setThemeId(QStringLiteral("light")));
-        QVERIFY(
-            settings.settingsError().startsWith(QStringLiteral("settings.storage_access_error")));
+        QCOMPARE(settings.settingsError(), write_error);
+
+        QSettings stored(backupPath, QSettings::IniFormat);
+        QVERIFY(stored.value(QStringLiteral("preferences/snapshot"))
+                    .toString()
+                    .contains(QStringLiteral("\"language\":\"zh-CN\"")));
     }
 };
 

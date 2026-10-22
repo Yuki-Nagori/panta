@@ -18,20 +18,20 @@
     <div class="dialog-body settings-dialog-body">
       <div class="settings-dialog-content">
         <nav class="settings-categories" aria-label="Settings categories">
-          <button type="button" class="is-current">
+          <button type="button" class="is-current" data-settings-route="general" aria-current="page">
             <svg class="icon settings-category-icon" aria-hidden="true"><use href="#i-settings"/></svg>
             <span>General</span>
           </button>
-          <button type="button">
+          <button type="button" data-settings-route="appearance">
             <svg class="icon settings-category-icon" aria-hidden="true"><use href="#i-palette"/></svg>
             <span>Appearance</span>
           </button>
-          <button type="button">
+          <button type="button" data-settings-route="language">
             <svg class="icon settings-category-icon" aria-hidden="true"><use href="#i-globe"/></svg>
             <span>Language</span>
           </button>
         </nav>
-        <div class="settings-dialog-page">
+        <div class="settings-dialog-page" data-settings-page="general">
           <h3>General</h3>
           <p class="settings-dialog-description">Common application preferences are managed here.</p>
           <section class="settings-preview-card" aria-label="Settings page preview">
@@ -39,10 +39,26 @@
             <span class="settings-preview-copy">Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.</span>
           </section>
         </div>
+        <div class="settings-dialog-page" data-settings-page="appearance" hidden>
+          <h3>Appearance</h3>
+          <p class="settings-dialog-description">Appearance preferences will be available here.</p>
+        </div>
+        <div class="settings-dialog-page" data-settings-page="language" hidden>
+          <h3>Language</h3>
+          <p class="settings-dialog-description">Choose the language used by the application. The change is applied when you select OK.</p>
+          <div class="settings-form-row">
+            <label for="settings-language">Application language</label>
+            <select id="settings-language" name="language" data-settings-language>
+              <option value="en" selected>English</option>
+              <option value="zh-CN">简体中文</option>
+            </select>
+          </div>
+          <p class="settings-error" data-settings-error role="alert" tabindex="-1" hidden>The selected language could not be applied. Your current language is unchanged.</p>
+        </div>
       </div>
       <div class="dialog-actions settings-dialog-actions">
         <button type="button" data-dialog-close>Cancel</button>
-        <button type="button" class="dialog-primary" data-dialog-close>OK</button>
+        <button type="button" class="dialog-primary" data-settings-accept>OK</button>
       </div>
     </div>
   </section>

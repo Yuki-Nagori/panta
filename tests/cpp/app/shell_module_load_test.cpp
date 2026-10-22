@@ -195,6 +195,9 @@ class ShellModuleLoadTest final : public QObject {
         QCOMPARE(platform_menu_bar->property("visible").toBool(),
                  !brand_tile->property("visible").toBool());
         QVERIFY(root->findChild<QObject*>(QStringLiteral("applicationSettingsAction")) != nullptr);
+        QVERIFY(root->findChild<QObject*>(QStringLiteral("applicationAboutAction")) != nullptr);
+        QVERIFY(root->findChild<QObject*>(QStringLiteral("applicationQuitAction")) != nullptr);
+        QVERIFY(root->findChild<QObject*>(QStringLiteral("platformApplicationMenu")) == nullptr);
         if (brand_tile->property("visible").toBool()) {
             QVERIFY(QMetaObject::invokeMethod(application_button, "click"));
             QTRY_VERIFY(backstage->property("visible").toBool());
@@ -586,8 +589,21 @@ class ShellModuleLoadTest final : public QObject {
                 "ApplicationWindow {\n"
                 "  id: hostWindow\n"
                 "  width: 640; height: 480; visible: true\n"
+                "  QtObject {\n"
+                "    id: mockSettingsService\n"
+                "    objectName: 'mockSettingsService'\n"
+                "    property string language: 'en'\n"
+                "    property var availableLanguages: ['en', 'zh-CN']\n"
+                "    property string settingsError: ''\n"
+                "    property bool failNext: false\n"
+                "    function setLanguage(locale) {\n"
+                "      if (failNext) { failNext = false; settingsError = 'mock.failure'; return "
+                "false }\n"
+                "      language = locale; settingsError = ''; return true\n"
+                "    }\n"
+                "  }\n"
                 "  SettingsPageRouter { id: router; objectName: 'settingsPageRouter'; ownerWindow: "
-                "hostWindow }\n"
+                "hostWindow; settingsService: mockSettingsService }\n"
                 "  Component { id: customPage; Item { objectName: 'customSettingsPage' } }\n"
                 "  function registerCustomPage() { return router.registerPage('custom', 'Custom', "
                 "'history', customPage) }\n"
@@ -597,6 +613,7 @@ class ShellModuleLoadTest final : public QObject {
                 "  function registerPageWithoutIcon() { return router.registerPage('missing-icon', "
                 "'Missing icon', '', customPage) }\n"
                 "  function openCustomPage() { return router.openPage('custom') }\n"
+                "  function openLanguagePage() { return router.openPage('language') }\n"
                 "}\n"),
             QUrl(QStringLiteral("qrc:/SettingsPageRouterTest.qml")));
         std::unique_ptr<QObject> root(component.create());
@@ -634,6 +651,8 @@ class ShellModuleLoadTest final : public QObject {
 
         QSignalSpy accepted_spy(router, SIGNAL(accepted()));
         QSignalSpy cancelled_spy(router, SIGNAL(cancelled()));
+        auto* mock_settings = root->findChild<QObject*>(QStringLiteral("mockSettingsService"));
+        QVERIFY(mock_settings != nullptr);
 
         QVERIFY(QMetaObject::invokeMethod(root.get(), "openCustomPage",
                                           Q_RETURN_ARG(QVariant, result)));
@@ -667,6 +686,64 @@ class ShellModuleLoadTest final : public QObject {
         QTRY_COMPARE(QGuiApplication::focusWindow(), dialog);
         QTest::keyClick(dialog, Qt::Key_Escape);
         QTRY_COMPARE(cancelled_spy.count(), 1);
+        QTRY_VERIFY(!dialog->isVisible());
+
+        auto* cancel_button = dialog->findChild<QObject*>(QStringLiteral("settingsCancelButton"));
+        QVERIFY(cancel_button != nullptr);
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "openLanguagePage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QTRY_VERIFY(dialog->isVisible());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "routeSelected",
+                                          Q_ARG(QString, QStringLiteral("language"))));
+        auto* language_page = root->findChild<QObject*>(QStringLiteral("languageSettingsPage"));
+        auto* language_picker = root->findChild<QObject*>(QStringLiteral("settingsLanguagePicker"));
+        QVERIFY(language_page != nullptr);
+        QVERIFY(language_picker != nullptr);
+        QCOMPARE(language_picker->property("currentIndex").toInt(), 0);
+        QVERIFY(QMetaObject::invokeMethod(language_page, "languageSelected",
+                                          Q_ARG(QString, QStringLiteral("zh-CN"))));
+        QCOMPARE(router->property("candidateLanguage").toString(), QStringLiteral("zh-CN"));
+        QCOMPARE(language_picker->property("currentIndex").toInt(), 1);
+        QVERIFY(QMetaObject::invokeMethod(cancel_button, "click"));
+        QTRY_VERIFY(!dialog->isVisible());
+        QCOMPARE(mock_settings->property("language").toString(), QStringLiteral("en"));
+        QCOMPARE(router->property("candidateLanguage").toString(), QStringLiteral("en"));
+        QCOMPARE(cancelled_spy.count(), 2);
+
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "openLanguagePage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QTRY_VERIFY(dialog->isVisible());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "routeSelected",
+                                          Q_ARG(QString, QStringLiteral("language"))));
+        QVERIFY(QMetaObject::invokeMethod(language_page, "languageSelected",
+                                          Q_ARG(QString, QStringLiteral("zh-CN"))));
+        QVERIFY(QMetaObject::invokeMethod(ok_button, "click"));
+        QTRY_VERIFY(!dialog->isVisible());
+        QCOMPARE(mock_settings->property("language").toString(), QStringLiteral("zh-CN"));
+        QCOMPARE(accepted_spy.count(), 2);
+
+        QVERIFY(mock_settings->setProperty("failNext", true));
+        QVERIFY(QMetaObject::invokeMethod(root.get(), "openLanguagePage",
+                                          Q_RETURN_ARG(QVariant, result)));
+        QVERIFY(result.toBool());
+        QTRY_VERIFY(dialog->isVisible());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "routeSelected",
+                                          Q_ARG(QString, QStringLiteral("language"))));
+        QVERIFY(QMetaObject::invokeMethod(language_page, "languageSelected",
+                                          Q_ARG(QString, QStringLiteral("en"))));
+        QVERIFY(QMetaObject::invokeMethod(ok_button, "click"));
+        QTRY_VERIFY(dialog->isVisible());
+        QCOMPARE(router->property("activeRouteId").toString(), QStringLiteral("language"));
+        QCOMPARE(router->property("candidateLanguage").toString(), QStringLiteral("zh-CN"));
+        QCOMPARE(mock_settings->property("language").toString(), QStringLiteral("zh-CN"));
+        QCOMPARE(accepted_spy.count(), 2);
+        QCOMPARE(
+            language_page->property("errorText").toString(),
+            QStringLiteral(
+                "The selected language could not be applied. Your current language is unchanged."));
+        QVERIFY(QMetaObject::invokeMethod(cancel_button, "click"));
         QTRY_VERIFY(!dialog->isVisible());
     }
 

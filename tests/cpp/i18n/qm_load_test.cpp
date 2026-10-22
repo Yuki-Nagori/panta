@@ -73,6 +73,30 @@ void QmLoadTest::zhCnDictionaryTranslates() {
              QStringLiteral("请输入有效的工程名称。"));
     QCOMPARE(translator.translate("ViewRibbonAccessibility", "Model Display"),
              QStringLiteral("模型显示"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "About"), QStringLiteral("关于"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Setting"), QStringLiteral("设置"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Quit"), QStringLiteral("退出"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Cut"), QStringLiteral("剪切"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Copy"), QStringLiteral("复制"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Paste"), QStringLiteral("粘贴"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Select All"), QStringLiteral("全选"));
+    QCOMPARE(translator.translate("ApplicationMenu", "About panta"), QStringLiteral("关于 panta"));
+    QCOMPARE(translator.translate("ApplicationMenu", "Settings…"), QStringLiteral("设置…"));
+    QCOMPARE(translator.translate("ApplicationMenu", "Quit panta"), QStringLiteral("退出 panta"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Cut"),
+             translator.translate("ApplicationMenu", "Cut"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Copy"),
+             translator.translate("ApplicationMenu", "Copy"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Paste"),
+             translator.translate("ApplicationMenu", "Paste"));
+    QCOMPARE(translator.translate("QCocoaMenuItem", "Select All"),
+             translator.translate("ApplicationMenu", "Select All"));
+    QCOMPARE(translator.translate("MAC_APPLICATION_MENU", "About %1").arg(QStringLiteral("Panta")),
+             QStringLiteral("关于 Panta"));
+    QCOMPARE(translator.translate("MAC_APPLICATION_MENU", "Preferences..."),
+             QStringLiteral("设置…"));
+    QCOMPARE(translator.translate("MAC_APPLICATION_MENU", "Quit %1").arg(QStringLiteral("Panta")),
+             QStringLiteral("退出 Panta"));
 }
 
 void QmLoadTest::enBaselineDictionaryLoads() {

@@ -25,7 +25,6 @@ set(PANTA_SHELL_QML_FILES
     Components/Atoms/PanelSurface.qml
     Components/Atoms/RibbonComboBox.qml
     Components/Composites/ToolGroup.qml
-    Components/Composites/ApplicationMenu.qml
     Components/Composites/ApplicationBackstageCommand.qml
     Components/Composites/RibbonTile.qml
     Components/Composites/RibbonGroup.qml
@@ -67,6 +66,7 @@ set(PANTA_SHELL_QML_FILES
     Dialogs/AnalysisSequenceDialog.qml
     Dialogs/MaterialSelectionDialog.qml
     Dialogs/SettingsDialog.qml
+    Dialogs/LanguageSettingsPage.qml
     Dialogs/FillProcessSettingsDialog.qml
     Dialogs/GateLocationSettingsDialog.qml
     Dialogs/HoldingProfileDialog.qml)

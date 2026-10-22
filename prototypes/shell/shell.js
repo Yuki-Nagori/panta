@@ -455,6 +455,58 @@ document.querySelectorAll("[data-dialog-close]").forEach((trigger) => {
   trigger.addEventListener("click", () => closeDialog(trigger.closest("[data-dialog-panel]")));
 });
 
+if (document.body.classList.contains("settings-dialog-document")) {
+  const dialog = document.querySelector('[data-dialog-panel="settings"]');
+  const categories = [...document.querySelectorAll("[data-settings-route]")];
+  const pages = [...document.querySelectorAll("[data-settings-page]")];
+  const language = document.querySelector("[data-settings-language]");
+  const error = document.querySelector("[data-settings-error]");
+  const accept = document.querySelector("[data-settings-accept]");
+  let committedLanguage = language?.value ?? "en";
+
+  const selectRoute = (routeId) => {
+    categories.forEach((candidate) => {
+      const selected = candidate.dataset.settingsRoute === routeId;
+      candidate.classList.toggle("is-current", selected);
+      if (selected) candidate.setAttribute("aria-current", "page");
+      else candidate.removeAttribute("aria-current");
+    });
+    pages.forEach((page) => { page.hidden = page.dataset.settingsPage !== routeId; });
+  };
+
+  categories.forEach((category) => category.addEventListener("click", () => {
+    selectRoute(category.dataset.settingsRoute);
+  }));
+
+  language?.addEventListener("change", () => { if (error) error.hidden = true; });
+  document.querySelectorAll("[data-dialog-close]").forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      if (trigger.closest('[data-dialog-panel="settings"]')) {
+        if (language) language.value = committedLanguage;
+        if (error) error.hidden = true;
+      }
+    });
+  });
+  accept?.addEventListener("click", () => {
+    if (!dialog) return;
+    if (language?.value !== committedLanguage && new URLSearchParams(window.location.search).has("preview-failure")) {
+      selectRoute("language");
+      if (error) error.hidden = false;
+      if (language) language.value = committedLanguage;
+      error?.focus();
+      return;
+    }
+    committedLanguage = language?.value ?? committedLanguage;
+    closeDialog(dialog);
+  });
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent || event.data?.type !== "panta-dialog-frame-open") return;
+    if (language) language.value = committedLanguage;
+    if (error) error.hidden = true;
+  });
+}
+
 document.querySelectorAll("[data-dismiss-on-backdrop]").forEach((backdrop) => {
   backdrop.addEventListener("pointerdown", (event) => {
     if (event.target === backdrop) closeDialog(backdrop);

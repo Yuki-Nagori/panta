@@ -83,7 +83,7 @@
 | 081 | [QML 视觉语言与图标体系统一](task/081-qml-visual-language-and-iconography.md) | 应用平台扩展 | 029, 050, 069, 078, 080 | deferred |
 | 085 | [Qt reduced-motion 原生属性迁移](task/085-qt-reduced-motion-preference-migration.md) | 应用平台扩展 | 080, 086, 002 | planned |
 | 086 | [Qt 平台服务适配层](task/086-qt-platform-adapter.md) | 应用平台扩展 | 002, 005, 023, 034 | done |
-| 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 086, 115, 125 | planned |
+| 087 | [语言设置界面](task/087-language-settings-ui.md) | 应用平台扩展 | 022, 029, 086, 115, 125 | done |
 | 088 | [Mesh 资产旁置存储与按需加载](task/088-mesh-asset-sidecar-storage.md) | CAE 领域模块迁移 | 063, 067, 073, 080 | done |
 | 090 | [Mesh Tool QML 界面](task/090-mesh-tool-qml-ui.md) | 应用平台扩展 | 050, 068, 081 | done |
 | 091 | [Analysis Sequence 选择弹窗](task/091-analysis-sequence-dialog-ui.md) | 应用平台扩展 | 050, 068, 081, 090 | done |

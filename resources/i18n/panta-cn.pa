@@ -391,56 +391,6 @@ label:
   src: Close dialog
   tr: 关闭对话框
 
-[IconActionNewOutput]
-label:
-  src: New output
-  tr: 新建输出
-
-[IconActionOpenOutput]
-label:
-  src: Open output
-  tr: 打开输出
-
-[IconActionSaveOutput]
-label:
-  src: Save output
-  tr: 保存输出
-
-[IconActionCheckOutput]
-label:
-  src: Check output
-  tr: 检查输出
-
-[IconActionOutputWizard]
-label:
-  src: Output wizard
-  tr: 输出向导
-
-[IconActionClearOutput]
-label:
-  src: Clear output
-  tr: 清空输出
-
-[IconActionCopyOutput]
-label:
-  src: Copy output
-  tr: 复制输出
-
-[IconActionOutputImage]
-label:
-  src: Output image
-  tr: 输出图像
-
-[IconActionExportOutput]
-label:
-  src: Export output
-  tr: 导出输出
-
-[IconActionDeleteOutput]
-label:
-  src: Delete output
-  tr: 删除输出
-
 [IconActionSearch]
 label:
   src: Search
@@ -1761,10 +1711,6 @@ model-display:
   tr: 模型显示
 
 [ApplicationMenu]
-panta:
-  src: panta
-  tr: panta
-
 file:
   src: File
   tr: 文件
@@ -1836,6 +1782,88 @@ paste:
 select-all:
   src: Select All
   tr: 全选
+
+[QCocoaMenuItem]
+about-qt:
+  src: About Qt
+  tr: 关于 Qt
+
+about:
+  src: About
+  tr: 关于
+
+config:
+  src: Config
+  tr: 配置
+
+preference:
+  src: Preference
+  tr: 偏好设置
+
+options:
+  src: Options
+  tr: 选项
+
+setting:
+  src: Setting
+  tr: 设置
+
+setup:
+  src: Setup
+  tr: 设置
+
+quit:
+  src: Quit
+  tr: 退出
+
+exit:
+  src: Exit
+  tr: 退出
+
+cut:
+  src: Cut
+  tr: 剪切
+
+copy:
+  src: Copy
+  tr: 复制
+
+paste:
+  src: Paste
+  tr: 粘贴
+
+select-all:
+  src: Select All
+  tr: 全选
+
+[MAC_APPLICATION_MENU]
+about:
+  src: About %1
+  tr: 关于 %1
+
+preferences:
+  src: Preferences...
+  tr: 设置…
+
+services:
+  src: Services
+  tr: 服务
+
+hide:
+  src: Hide %1
+  tr: 隐藏 %1
+
+hide-others:
+  src: Hide Others
+  tr: 隐藏其他
+
+show-all:
+  src: Show All
+  tr: 全部显示
+
+quit:
+  src: Quit %1
+  tr: 退出 %1
 
 [ApplicationBackstage]
 close-application-menu:
@@ -1934,3 +1962,20 @@ preferences-description:
 registered-pages-description:
   src: Settings pages can be registered in this shared dialog on Windows, Linux, and macOS.
   tr: Windows、Linux 和 macOS 共用此弹窗，设置页面可注册到这里。
+
+[SettingsLanguagePage]
+choose-language:
+  src: Choose the language used by the application. The change is applied when you select OK.
+  tr: 选择应用程序使用的语言。点击“确定”后应用更改。
+
+application-language:
+  src: Application language
+  tr: 应用程序语言
+
+language-unavailable:
+  src: Language settings are unavailable in this build.
+  tr: 此版本无法使用语言设置。
+
+language-apply-failed:
+  src: The selected language could not be applied. Your current language is unchanged.
+  tr: 无法应用所选语言。当前语言保持不变。

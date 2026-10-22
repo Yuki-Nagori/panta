@@ -4,15 +4,15 @@
 
 ## 目标与选择
 
-UI 源文案统一使用 English，默认语言为英文。当前 Rust locale service 与 Bridge `Settings` 提供会话内语言选择和运行时重翻译；设置界面与偏好持久化尚未实现，分别见任务 087、125。项目采用简洁的 `.pa` 字典源码作为唯一权威数据，Artifact 引擎按 `kind` 聚合成语言、Theme 或变量产物。Rust 编译器在构建目录生成临时 Qt TS XML，再由 QtTools 的 `lrelease` 生成 QM。仓库不直接维护 `*.ts`；代码标识、工程数据和 DSL 关键字不随语言变化。
+UI 源文案统一使用 English，默认语言为英文。Rust locale service 与 Bridge `Settings` 提供语言选择和运行时重翻译；087 提供设置界面，125 持久化并在启动时恢复用户偏好。项目采用简洁的 `.pa` 字典源码作为唯一权威数据，Artifact 引擎按 `kind` 聚合成语言、Theme 或变量产物。Rust 编译器在构建目录生成临时 Qt TS XML，再由 QtTools 的 `lrelease` 生成 QM。仓库不直接维护 `*.ts`；代码标识、工程数据和 DSL 关键字不随语言变化。
 
-QML/C++ 使用 context + ID 或 source 查找；`.pa` 保存条目 ID、English `src` 与各 locale 文本，编译器负责生成 Qt TS 所需的 context/source/translation 节点。`[Context]` 是 Qt 的调用上下文分组，用来区分同一文案在不同界面语境下的含义，不是注释；条目内的 `comment` 才是给翻译人员看的注释。每个语言文件只维护一个目标 locale，构建器再聚合多个文件。整句翻译并传入占位参数，不拼接已翻译片段；处理复数和翻译说明。源文案修改时重新校验 ID、src、占位符和失效条目。机制依据：[Qt 翻译源代码指南](https://doc.qt.io/qt-6/i18n-source-translation.html)、[QTranslator](https://doc.qt.io/qt-6/qtranslator.html)（查阅 2026-09-16，页面 Qt 6.11；实施核对锁定版本）。
+QML/C++ 使用 context + ID 或 source 查找；`.pa` 保存条目 ID、English `src` 与各 locale 文本，编译器负责生成 Qt TS 所需的 context/source/translation 节点。`[Context]` 是 Qt 的调用上下文分组，用来区分同一文案在不同界面语境下的含义，不是注释；条目内的 `comment` 才是给翻译人员看的注释。每个语言文件只维护一个目标 locale，构建器再聚合多个文件。整句翻译并传入占位参数，不拼接已翻译片段；处理复数和翻译说明。源文案修改时重新校验 ID、src、占位符和失效条目。新增 locale 若用于 macOS 原生菜单，还需提供 Qt Cocoa 的 `QCocoaMenuItem` 角色关键词及 `MAC_APPLICATION_MENU` 系统文案；`Cut`、`Copy`、`Paste`、`Select All` 按 Cocoa 的精确匹配要求，角色 context 的译文须与应用菜单对应命令一致。机制依据：[Qt 翻译源代码指南](https://doc.qt.io/qt-6/i18n-source-translation.html)、[QTranslator](https://doc.qt.io/qt-6/qtranslator.html)（查阅 2026-09-16，页面 Qt 6.11；实施核对锁定版本）。
 
 ## 数据流与生命周期
 
-Settings API 校验候选 locale → Bridge 按构建命名规则找到 QM 并通过 Qt adapter 安装 `QTranslator` → 安装成功后提交 Rust 会话内 locale → Bridge 调用 [QQmlEngine::retranslate](https://doc.qt.io/qt-6/qqmlengine.html#retranslate) 更新翻译绑定。安装失败时保留旧翻译和旧 locale；当前选择不会跨进程持久化。运行时只查 QM，不解析 `.pa` 或 TS XML。C++ 缓存的字符串还需明确 NOTIFY/重新计算，不假定自动更新。语言切换无需销毁引擎或依赖热重载。Rust 不接触 QTranslator、Qt 事件循环或 QM resource URL；QML 不直接操作 translator 或维护 locale 支持列表。
+Settings API 校验候选 locale → Bridge 按构建命名规则找到 QM 并通过 Qt adapter 安装 `QTranslator` → 安装成功后持久化并提交 Rust locale → Bridge 调用 [QQmlEngine::retranslate](https://doc.qt.io/qt-6/qqmlengine.html#retranslate) 更新翻译绑定。安装或持久化失败时回滚到先前的有效翻译和 locale；启动时无法加载已保存的目录则保留英文默认并阻止覆盖失效偏好。运行时只查 QM，不解析 `.pa` 或 TS XML。C++ 缓存的字符串还需明确 NOTIFY/重新计算，不假定自动更新。语言切换无需销毁引擎或依赖热重载。Rust 不接触 QTranslator、Qt 事件循环或 QM resource URL；QML 不直接操作 translator 或维护 locale 支持列表。
 
-未设置语言时使用英文；显式语言选择只接受 Rust locale 注册表中的规范标识，未知标识拒绝且保留当前值。QM 缺少单项译文时回退 English source；用户主动选择的字典若损坏或加载失败，保留上一有效语言并显示错误。系统 locale 自动识别和偏好持久化仍属后续设计。数字、日期显示可使用 locale；文件存储、DSL 数字字面量和协议编码保持语言无关。
+未设置语言时使用英文；显式语言选择只接受 Rust locale 注册表中的规范标识，未知标识拒绝且保留当前值。QM 缺少单项译文时回退 English source；用户主动选择的字典若损坏或加载失败，保留上一有效语言并显示错误。系统 locale 自动识别仍属后续设计。数字、日期显示可使用 locale；文件存储、DSL 数字字面量和协议编码保持语言无关。
 
 服务错误保存稳定 code 与参数，展示层负责翻译，不以译文作为分支条件；现有错误字符串在 022 中梳理，未来跨语言服务按 008 的结构化错误契约接入。用户输入的名称、文件名及外部工具原始诊断不自动翻译。
 
@@ -47,4 +47,4 @@ open-file:
 
 同一 context 的 source-text 兼容查找采用最长 `src` 匹配：`ok ok` 先于 `ok`，重复 source 直接报错；不同且等长的 source 可以共存，因为它们不会同时匹配同一输入。正常 QML/C++ 路径始终用 context + ID 或完整 source 精确查找，避免在任意用户文本中替换短词。
 
-022 验证展示文案、占位参数、缺项回退、运行时加载失败与重翻译。语言设置 UI 由 087、菜单入口由 115、持久化由 125 规划；任务状态以索引和任务文件为准。完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。
+022 验证展示文案、占位参数、缺项回退、运行时加载失败与重翻译。语言设置 UI 由 087、菜单入口由 115、持久化由 125 提供；实现状态以索引和任务文件为准。完整语言覆盖、RTL 适配与翻译协作平台不包含在首批交付。新增 UI 文案遵循英文源文本规则，注释和开发文档无需改为英文。
