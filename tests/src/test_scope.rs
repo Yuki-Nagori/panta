@@ -904,7 +904,7 @@ mod tests {
     fn native_analysis_follows_build_and_generated_header_inputs() {
         for input in [
             "qml/CMakeLists.txt",
-            "tools/sdk/toolchain.cmake",
+            "native/cmake/sdk-provision.cmake",
             "native/removed_header.hpp",
             "crates/panta-ffi/src/lib.rs",
             "crates/panta-ffi/Cargo.toml",

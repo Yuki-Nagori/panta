@@ -30,10 +30,10 @@
 | CMake / Ninja / LLVM | [assets.rs](../../crates/panta-build/src/assets.rs) | 官方预编译工具；Unix 用 clang/clang++，Windows 用 clang-cl；格式与 LLVM 检查使用同一工具链。任务 020 / 042。 |
 | Qt | [qt-provision.cmake](../../native/cmake/qt-provision.cmake) | 官方 qtbase / qtdeclarative / qttools / qtsvg 与 qtscxml 包；Core / Gui / Qml / Quick / QuickControls2 / Test / StateMachine、固定 lrelease 及 qsvg 插件。StateMachine 仅在启用 bridge 时查找和链接。任务 005 / 029 / 034 / 074。 |
 | Linux ICU | 同 Qt 供给配置 | ICU 73.2 与 Qt Linux 工具 ABI 匹配，解包到 `qt/staging/lib`；不替换为系统 ICU、不伪造 SONAME。任务 036。 |
-| VTK / Dawn | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[制品说明](../../tools/sdk/releases/vtk-9.7.0.md) | `find_package(VTK CONFIG)` / `Dawn`；`VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn`。Cocoa / Wayland / Win32 hardware window；Linux 制品由 Ubuntu 24.04 / GCC 13 生产、Wayland-only。任务 031 / 038 管供给，007 管窗口。 |
-| OCCT | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[配对制品说明](../../tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md) | `find_package(OpenCASCADE CONFIG)`；无命名空间的 `TKernel` / `TKDESTEP` 等 targets。共享库、关闭 Draw / Visualization / DETools / FreeType / Xlib，保留 STEP；进一步裁剪由 009 决定。Windows 运行库可能位于嵌套 `win64/vc14/bin/`。 |
+| VTK / Dawn | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[外部生产说明](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/vtk-9.7.0.md) | `find_package(VTK CONFIG)` / `Dawn`；`VTK::RenderingWebGPU`、`VTK::RenderingUI`、`dawn::webgpu_dawn`。Cocoa / Wayland / Win32 hardware window；Linux 制品由 Ubuntu 24.04 / GCC 13 生产、Wayland-only。任务 031 / 038 管消费，007 管窗口。 |
+| OCCT | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[外部配对生产说明](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md) | `find_package(OpenCASCADE CONFIG)`；无命名空间的 `TKernel` / `TKDESTEP` 等 targets。共享库、关闭 Draw / Visualization / DETools / FreeType / Xlib，保留 STEP；进一步裁剪由 009 决定。Windows 运行库可能位于嵌套 `win64/vc14/bin/`。 |
 | Netgen | 同 OCCT 配对 manifest / 制品说明 | 必须以大写 N 调用 `find_package(Netgen CONFIG)`；targets 为 `ngcore` / `nglib`，`USE_OCC=ON`；GUI / Python / MPI / JPEG / MPEG 关闭。网格正确性见 010。 |
-| GoogleTest | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[制品说明](../../tools/sdk/releases/googletest-1.18.0.md) | 仅 `BUILD_TESTING=ON` 获取静态 SDK；`find_package(GTest CONFIG)`、`GTest::gtest` / `GTest::gtest_main`。上游 CMake 安装、C++17、关闭 GMock，Windows Release `/MD`。任务 019 / 070 / 071。 |
+| GoogleTest | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[外部生产说明](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/googletest-1.18.0.md) | 仅 `BUILD_TESTING=ON` 获取静态 SDK；`find_package(GTest CONFIG)`、`GTest::gtest` / `GTest::gtest_main`。上游 CMake 安装、C++17、关闭 GMock，Windows Release `/MD`。任务 019 / 070 / 071。 |
 
 Qt 缓存为 `.toolchain/deps/qt/staging`，归档指纹位于 `qt/extracted`，跨 profile 共享。官方源失败或摘要不符时可尝试 TUNA 镜像；`PANTA_QT_MIRROR` 可插入同构镜像，所有来源均强校验。SDK 使用 `panta_require_sdk`，在 `.toolchain/deps/sdk/<name>/<version>/<triple>` 缓存，并用受限的 `find_package(... CONFIG ... NO_DEFAULT_PATH)` 消费。
 
@@ -41,7 +41,7 @@ Qt 缓存为 `.toolchain/deps/qt/staging`，归档指纹位于 `qt/extracted`，
 
 ## 依赖间版本关系
 
-- **Netgen ↔ OCCT**：Netgen 只与构建时链接的 OCCT ABI 配对；038 使用同工具链生产并作为一个 Release 成对发布，任何一侧升级都须成对重建。历史候选回退点为 OCCT `V7_9_3`，不能单独替换现有配对中的 OCCT；实际构建与几何到网格证据见 009 / 010。
+- **Netgen ↔ OCCT**：Netgen 只与构建时链接的 OCCT ABI 配对；外部生产仓库使用同工具链构建并作为一个 Release 成对发布，任何一侧升级都须成对重建。历史候选回退点为 OCCT `V7_9_3`，不能单独替换现有配对中的 OCCT；实际构建与几何到网格证据见 009 / 010。
 - **VTK ↔ Qt**：WebGPU SDK 不依赖 Qt VTK GUI 模块；Qt Quick 承载界面，平台桥接管理 native view / layer / surface。窗口、事件及运行时加载由 007 验证，保留 WebGPU 与 Qt Quick 叠加的实机验收边界。
 - **Rust / CXX**：固定编译器与 MSRV 的区别、升级规则见 [Rust 规范](rust.md)；Rust 侧版本不替代 native ABI 验证。
 

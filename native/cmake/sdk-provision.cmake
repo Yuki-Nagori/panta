@@ -388,8 +388,11 @@ panta_sdk_declare_version(vtk 9.7.0)
 # 2026-09-20 三平台 production/selfcheck/package success；2026-09-21 随任务
 # 049 单一 tag 重产覆盖。2026-10-14 以 macOS 13.0 为部署目标再次重产，
 # workflow run 38509650210 三平台自检、打包、发布全绿；下方 SHA 按 sidecar
-# 与 Release API digest 实测回填。发布说明与合规元数据见
-# tools/sdk/releases/vtk-9.7.0.md。源码 tag
+# 与 Release API digest 实测回填。发布说明与合规元数据见外部生产记录：
+# https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/vtk-9.7.0.md。
+# 2026-10-25 外部生产 run 40123093281 的三平台构建、自检、打包及发布通过；
+# 当前 SHA 与外部 Release sidecar / API digest 一致。
+# 源码 tag
 # v9.7.0 → commit 23f0a095621e91bbdbeace8451e22b950c8e5f46（unmodified）；
 # Release/共享库/C++20/WebGPU hardware-window，不链接 Qt；Dawn 与 VTK 同包，
 # 三平台 REQUIRED_TARGETS 以真实归档内的 imported targets 为准。
@@ -399,9 +402,9 @@ panta_sdk_declare_asset(
   vtk
   macos-arm64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-macos-arm64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-macos-arm64.tar.gz
   SHA256
-  fd8cbab6bdf5db1d9ae919c73b4fb3c3e7b60d5ed369bfc4b01c6c5b8d03ac6e
+  0982f3650e0cf82fc0a2ba4b5ba9b471fcda16c7a463670d4a19ce8c764cfa77
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -423,9 +426,9 @@ panta_sdk_declare_asset(
   vtk
   linux-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-linux-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-linux-x86_64.tar.gz
   SHA256
-  82b8fa2df5c8e275fa81eab618050584994150adbab8f14c268bb1ce586093d7
+  28d09a5e19dc5e62c7b4cf60a5e9d760f3169b82851f460835e984ca1427d0b4
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -447,9 +450,9 @@ panta_sdk_declare_asset(
   vtk
   windows-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-windows-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-windows-x86_64.tar.gz
   SHA256
-  9015243120fd22d2f1ba509d6213b1d1579b699d7f83b8d3b32cd3586ec72e49
+  27cefa24dafdb8911dafef8b935a10965dbf82d8d23f2a1626dd68373aae45b4
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -473,8 +476,10 @@ panta_sdk_declare_version(occt 8.0.1)
 # 2026-09-18 登记；2026-09-21 随任务 049 单一 tag 重产覆盖，与 Netgen 同管线
 # 成对生产。2026-10-14 以 macOS 13.0 为部署目标再次重产，workflow run
 # 38509650514 三平台自检、打包、发布全绿；下方 SHA 按 sidecar 与 Release API
-# digest 实测回填，见 tools/sdk/releases/
-# occt-netgen-8.0.1-6.2.2604.md）。维护者决策：三平台统一自托管，官方
+# digest 实测回填，见外部生产记录：
+# https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md）。
+# 外部仓库 2026-10-24 Release sidecar 与 API digest 已核对，下方摘要为外部新资产。
+# 维护者决策：三平台统一自托管，官方
 # Windows SDK 不再消费（仅 Windows 有归档、跨平台工具链不一致）。源码 tag
 # V8.0.1 → commit b8f597c677811d1f9f4d8a97f5ae2825c0353a42（unmodified）；
 # Release/Shared，Draw/Visualization/DETools 与 USE_FREETYPE/USE_XLIB 关闭
@@ -483,9 +488,9 @@ panta_sdk_declare_asset(
   occt
   macos-arm64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
   SHA256
-  863f6bf5bba3d4cf623f697e429b34a4c9f5a32bba8d310e9dd85c0bffa4b2d7
+  57927882ad4eed791e4b20643637ba0dcf1380c3f008875b6beb9d115da41d4b
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -503,9 +508,9 @@ panta_sdk_declare_asset(
   occt
   linux-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
   SHA256
-  a87e1c47a8a1c74beb7c8d1103df3f89c03e2733084e2cac0b101440eeb4d80c
+  706ab1e5ac70629d1d01f75df057b70480277619b9cebe41e7f895d6339d2037
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -523,9 +528,9 @@ panta_sdk_declare_asset(
   occt
   windows-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
   SHA256
-  211d950c888c56137f2862573fd1d296fdecf16e3105bdda0a583ee297079513
+  0efe2ba4735edf82ad4500b5ab83b3522d6926b0b5c573a14fe3e726633df43e
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -555,9 +560,9 @@ panta_sdk_declare_asset(
   netgen
   macos-arm64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
   SHA256
-  f68ef20b69632f0cf9c32ea4fd922d5279ddf3303e62f3820c0ac62343afcbfe
+  691c830f213c4905883e000f28ce803f70eff89a55272ba55ee1bae5ab62ffdc
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -579,9 +584,9 @@ panta_sdk_declare_asset(
   netgen
   linux-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
   SHA256
-  cdd4f2f27b2eacb09de16a4efeeb2c92647b1b6fb2adfe83d90d6904683496f4
+  68f958630bba59793c2939cfbdb8c538d87b8e8a330fcdc3acdaa65610180c3b
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -603,9 +608,9 @@ panta_sdk_declare_asset(
   netgen
   windows-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
   SHA256
-  a986842033c69185d0ff651da30fb73b375c6ca2b86e702f3e53ef3d78c0b7de
+  3d5a5c11fb4161e6333b2a1d4e61cd84893f160ca1ef943379816b287e713a0c
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -630,13 +635,14 @@ panta_sdk_declare_version(googletest 1.18.0)
 # 2026-10-14 workflow run 38509650651 按 macOS 13.0 目标重产并通过三平台自检、
 # 打包、发布，下方 SHA 按 sidecar 与 Release API digest 实测更新。上游 commit
 # 063de7e9578f82b369302001269680b4b1553359；C++17，Windows /MD；不含 gmock。
+# 2026-10-24 生产 Release 迁至 sdk-packaging；下方摘要与新 sidecar / API digest 一致。
 panta_sdk_declare_asset(
   googletest
   macos-arm64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-macos-arm64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-macos-arm64.tar.gz
   SHA256
-  5c7c6467a1988da5891ff57a864308bbc54f7cc5c593bd3b30b6f6dd43678a18
+  67ab330555df2de5241fc71a98c281113565f13ae638f7a83f99f5f9c44b5785
   PACKAGE
   GTest
   REQUIRED_TARGETS
@@ -650,9 +656,9 @@ panta_sdk_declare_asset(
   googletest
   linux-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-linux-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-linux-x86_64.tar.gz
   SHA256
-  2c3f1941a732475106a3caea607299fe8f8cd7a0481af3f8246d2e6e2794c841
+  715edc457e936f24e1f51146dff308f02f0c69fd7fd1333ff2bdf3961c38215b
   PACKAGE
   GTest
   REQUIRED_TARGETS
@@ -666,9 +672,9 @@ panta_sdk_declare_asset(
   googletest
   windows-x86_64
   URL
-  https://github.com/Yuki-Nagori/panta/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-windows-x86_64.tar.gz
+  https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-windows-x86_64.tar.gz
   SHA256
-  0fc2f014e6b2b5c7c84fd5020fb53cac30072717008d238bd06af03cfcd70a33
+  1a3e7acfd6c227979dd5f1a97e97cb6a992fad0c268ae04f4800e83bfe79bb3a
   PACKAGE
   GTest
   REQUIRED_TARGETS

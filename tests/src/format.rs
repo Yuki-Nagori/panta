@@ -107,7 +107,7 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
                     .is_some_and(|extension| extension == "cmake")
         })
         .filter(|path| {
-            ["native", "qml", "tools"]
+            ["native", "qml"]
                 .iter()
                 .any(|directory| path.starts_with(root.join(directory)))
         })
@@ -410,7 +410,7 @@ fn cmake_sources(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
 
 fn cmake_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut files = Vec::new();
-    for directory in ["native", "qml", "tools"] {
+    for directory in ["native", "qml"] {
         files.extend(cmake_sources(&root.join(directory))?);
     }
     if files.is_empty() {

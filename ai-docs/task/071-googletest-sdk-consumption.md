@@ -5,11 +5,11 @@
 - 依赖：[070 GoogleTest 三平台 SDK 制品 CI](070-googletest-sdk-ci.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-14
+- 创建 / 更新：2026-09-24 / 2026-10-25
 
 ## 目标与背景
 
-任务 070 已把 GoogleTest v1.18.0 静态 SDK 发布到 `sdk-googletest-1.18.0`。各平台归档均有 `.sha256` sidecar，且经下载实测与 GitHub Release API digest 相符。把 `BUILD_TESTING=ON` 时的 GTest 获取切换到仓库 `sdk-provision` 固定 manifest，使 `cargo test --locked --workspace` 不再触发完整 Git 历史克隆，并能在 `target/panta-deps/sdk` 缓存已校验的包。
+任务 070 已把 GoogleTest v1.18.0 静态 SDK 发布到 `sdk-googletest-1.18.0`。各平台归档均有 `.sha256` sidecar，且经下载实测与 GitHub Release API digest 相符。生产流程现由 [sdk-packaging](https://github.com/Jack-Lab-at-EIT/sdk-packaging) 维护。把 `BUILD_TESTING=ON` 时的 GTest 获取切换到仓库 `sdk-provision` 固定 manifest，使 `cargo test --locked --workspace` 不再触发完整 Git 历史克隆，并能在 `.toolchain/deps/sdk` 缓存已校验的包。
 
 ## 必读
 
@@ -21,7 +21,7 @@
 - [仓库文件规范](../standards/repository-hygiene.md)
 - [提交规范](../standards/commits.md)
 - [代码生命周期](../standards/code-lifecycle.md)
-- [GoogleTest SDK Release](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-googletest-1.18.0)（2026-10-14 重产）
+- Panta 历史 GoogleTest SDK Release（2026-10-14 重产，已于 2026-10-25 删除）；现行生产源见 [sdk-packaging Release](https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/tag/sdk-googletest-1.18.0)。
 
 ## 范围与非目标
 
@@ -33,10 +33,10 @@
 
 ## 前置条件与待决策
 
-- Release `sdk-googletest-1.18.0` 已由 run [38509650651](https://github.com/Yuki-Nagori/panta/actions/runs/38509650651) 按 macOS 13.0 最低部署目标重产三平台资产与 sidecar。新归档 SHA256 与 sidecar 内容及 Release API digest 一致：
-  - macOS arm64：`5c7c6467a1988da5891ff57a864308bbc54f7cc5c593bd3b30b6f6dd43678a18`
-  - Linux x86_64：`2c3f1941a732475106a3caea607299fe8f8cd7a0481af3f8246d2e6e2794c841`
-  - Windows x86_64：`0fc2f014e6b2b5c7c84fd5020fb53cac30072717008d238bd06af03cfcd70a33`
+- 当前 manifest 使用 [sdk-packaging 的 `sdk-googletest-1.18.0` Release](https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/tag/sdk-googletest-1.18.0)。2026-10-24 三平台归档 SHA256 与 sidecar、Release API digest 一致：
+  - macOS arm64：`67ab330555df2de5241fc71a98c281113565f13ae638f7a83f99f5f9c44b5785`
+  - Linux x86_64：`715edc457e936f24e1f51146dff308f02f0c69fd7fd1333ff2bdf3961c38215b`
+  - Windows x86_64：`1a3e7acfd6c227979dd5f1a97e97cb6a992fad0c268ae04f4800e83bfe79bb3a`
 - 归档内包含 `GTestConfig.cmake`、静态库、headers、`panta-sdk.json` 和 BSD-3-Clause license。
 
 ## 实施步骤
@@ -58,7 +58,7 @@
 - `ai-docs/architecture/build-and-development.md`
 - `ai-docs/task/019-gtest-native-testing.md`
 - `ai-docs/task/070-googletest-sdk-ci.md`
-- `tools/sdk/releases/googletest-1.18.0.md`
+- [外部 GoogleTest 制品说明](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/googletest-1.18.0.md)
 - `ai-docs/task-index.md`
 - `ai-docs/task/071-googletest-sdk-consumption.md`
 
@@ -80,7 +80,7 @@
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-09-24 | 下载三平台 Release 归档及 sidecar，`shasum -a 256` 与 `tar tzf` | 摘要一致，SDK 含 CMake config、静态库、headers 与 license | 通过；见前置条件中的 SHA256 |
+| 2026-09-24 | 下载三平台历史 Release 归档及 sidecar，`shasum -a 256` 与 `tar tzf` | 当时归档摘要一致，SDK 含 CMake config、静态库、headers 与 license | 当时资产校验通过；现行摘要见前置条件。旧 Panta Release 与 tags 已于 2026-10-25 删除。 |
 | 2026-09-24 | macOS：`cargo test --locked --workspace` | Rust 与 native/GoogleTest 聚合测试通过 | 两次均通过；native CTest 56/56，包含 `Build.SdkProvision` |
 | 2026-09-24 | macOS：缓存命中后再次运行 `cargo test --locked --workspace` | GoogleTest staging marker 命中且不需要归档下载 | 通过；`.panta-sdk-provisioned` SHA256 与 manifest 一致，SDK `archives` 目录无归档 |
 | 2026-09-24 | macOS：managed CMake configure `-DBUILD_TESTING=OFF`、`-DPANTA_ENABLE_FFI_TEST=OFF` | 不请求 GoogleTest，其他产品依赖正常配置 | 通过；cache 确认为 `BUILD_TESTING:BOOL=OFF`，configure 输出无 GoogleTest 供给步骤 |
