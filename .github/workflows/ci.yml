@@ -3,9 +3,9 @@
 # linux-gl-prereqs、panta-cache-restore / panta-cache-save（cargo-home 与 SDK 缓存，
 # 仅 check 在 main push 保存）、panta-cargo-tool-cache（质量工具独立缓存）。
 # - changes：按变更路径拆分触发，未知路径一律保守触发全量检查并输出测试闭包；
-# - check：每个平台执行 check/build/工具核验和受影响测试；
+# - check：Ubuntu 执行 check/build/工具核验和受影响测试；
 # - lint：Ubuntu 上每个工具独立成一个矩阵检查，失败项可直接定位，按域触发；
-# - lint-objcxx：macOS 按影响范围补扫手写 Objective-C++ 的 clang-tidy 与 include；
+# - Objective-C++ 完整检查与 macOS/Windows 平台验收由 nightly.yml 承担；
 # - format：Ubuntu 上通过 cargo format --check 检查 Rust、C++/CXX、CMake、QML 和 `.pa`；
 # - dependency-audit：仅在依赖清单/审计配置变更时运行；
 # - 完整 Rust/native coverage 与长时动态检查由 nightly.yml 每日运行；
@@ -165,31 +165,6 @@ jobs:
           PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
         run: cargo lint "${{ matrix.tool }}" --changed --check
 
-  # Apple 条件编译的 .mm 不会出现在 Ubuntu 编译数据库；仅补扫这一集合。
-  lint-objcxx:
-    name: cargo lint (Objective-C++, macOS)
-    needs: [changes]
-    if: needs.changes.outputs.native == 'true'
-    runs-on: macos-latest
-    timeout-minutes: 60
-    env:
-      CMAKE_GENERATOR: Ninja
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/panta-toolchain
-
-      - uses: ./.github/actions/panta-cache-restore
-
-      - name: Check affected handwritten Objective-C++ translation units
-        shell: bash
-        env:
-          PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
-          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
-        run: |
-          cargo lint clang-tidy --objcxx-only --changed --check
-          cargo lint includes --objcxx-only --changed --check
-
   # machete 只读 Rust 清单与源码，不进 native 构建图：按 rust 域触发，
   # 且不需要托管工具/依赖缓存。
   lint-machete:
@@ -305,16 +280,11 @@ jobs:
         run: cargo format --changed --check
 
   check:
-    name: cargo check and build (${{ matrix.os }})
+    name: cargo check and build (ubuntu)
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-2022]
-    runs-on: ${{ matrix.os }}
-    # Windows 冷启动含 LLVM 2 GiB 归档下载解包与全量 native 构建。
-    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       CMAKE_GENERATOR: Ninja
     steps:

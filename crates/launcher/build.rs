@@ -39,7 +39,7 @@ const RERUN_PATHS: &[&str] = &[
 const RERUN_ENVS: &[&str] = &[
     "CMAKE",
     "PANTA_USE_SYSTEM_TOOLS",
-    "PANTA_TOOL_CACHE_ROOT",
+    "PANTA_TOOLCHAIN_ROOT",
     "PANTA_QT_MIRROR",
     "CC",
     "CXX",
@@ -102,7 +102,7 @@ fn orchestrate() -> Result<PathBuf, String> {
         native_profile = format!("{native_profile}-sanitizer-{}", sanitizer.replace(',', "-"));
     }
     let binary_dir = target_root.join("native").join(&native_profile);
-    let deps_root = target_root.join("panta-deps");
+    let deps_root = provision::toolchain_root(&target_root).join("deps");
 
     // i18n（任务 034）：解析 resources/i18n/*.pa 并把语言字典写成构建树
     // TS，供 CMake 侧锁定 lrelease 编 QM。解析失败立即终止构建，旧 TS 保持

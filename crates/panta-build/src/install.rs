@@ -38,7 +38,7 @@ pub(super) fn ensure_tool(
     cmake: Option<&Path>,
 ) -> Result<PathBuf, String> {
     // 覆盖率使用独立对象目录，但复用主 target 已校验的编译工具。
-    let cache_root = std::env::var_os("PANTA_TOOL_CACHE_ROOT").map(PathBuf::from);
+    let cache_root = std::env::var_os("PANTA_TOOLCHAIN_ROOT").map(PathBuf::from);
     let target_root = cache_root.as_deref().unwrap_or(target_root);
     let name = tool.name();
     let Some(asset) = tool.asset() else {
@@ -95,14 +95,14 @@ pub(super) fn ensure_tool(
         }
         Ok(())
     };
-    let mut directory = install_directory(target_root, name, &identity, install)?;
+    let mut directory = install_directory_at(&tools_root(target_root), name, &identity, install)?;
     // 历史缓存树可能被旧版裁剪留下悬空链接（如 clang++ → clang-<ver> 真身
     // 被删）；marker 命中但二进制缺失时，删除该版本目录重装一次自愈，仍
     // 失败才报损坏，不再要求手工清理。
     if tool.locate_installed(&directory).is_none() {
         eprintln!("[panta-tools] {name}：安装树不完整，删除后重装自愈");
         fs::remove_dir_all(&directory).map_err(|e| e.to_string())?;
-        directory = install_directory(target_root, name, &identity, install)?;
+        directory = install_directory_at(&tools_root(target_root), name, &identity, install)?;
     }
     tool.locate_installed(&directory).ok_or_else(|| {
         format!(
@@ -114,26 +114,7 @@ pub(super) fn ensure_tool(
 
 /// OS 锁在进程退出时自动释放；锁文件不能删除，否则等待者可能锁住不同 inode。
 pub fn install_lock(target_root: &Path, name: &str) -> Result<fs::File, String> {
-    let locks = tools_root(target_root).join("locks");
-    fs::create_dir_all(&locks).map_err(|e| e.to_string())?;
-    let file = fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(locks.join(format!("{name}.lock")))
-        .map_err(|e| e.to_string())?;
-    // 未竞争时不输出；只有真的发生等待才记录，避免例行日志刷屏。
-    match FileExt::try_lock(&file) {
-        Ok(()) => {}
-        Err(TryLockError::WouldBlock) => {
-            eprintln!("[panta-tools] {name}：等待安装锁");
-            FileExt::lock(&file).map_err(|error| format!("获取 {name} 安装锁失败：{error}"))?;
-            eprintln!("[panta-tools] {name}：已获得安装锁");
-        }
-        Err(TryLockError::Error(error)) => return Err(format!("获取 {name} 安装锁失败：{error}")),
-    }
-    Ok(file)
+    install_lock_at(&tools_root(target_root), name)
 }
 
 /// 在互斥区内构建临时目录，写入完成标记后原子重命名；中断残留只在下次持锁时清理。
@@ -143,8 +124,17 @@ pub fn install_directory(
     identity: &str,
     install: impl FnOnce(&Path) -> Result<(), String>,
 ) -> Result<PathBuf, String> {
-    let _lock = install_lock(target_root, name)?;
-    let parent = tools_root(target_root).join(name);
+    install_directory_at(&tools_root(target_root), name, identity, install)
+}
+
+fn install_directory_at(
+    tools_root: &Path,
+    name: &str,
+    identity: &str,
+    install: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<PathBuf, String> {
+    let _lock = install_lock_at(tools_root, name)?;
+    let parent = tools_root.join(name);
     let destination = parent.join(identity);
     if fs::read_to_string(destination.join(".complete"))
         .ok()
@@ -168,6 +158,29 @@ pub fn install_directory(
     fs::rename(&staging, &destination).map_err(|e| e.to_string())?;
     eprintln!("[panta-tools] {name}：安装完成 {}", destination.display());
     Ok(destination)
+}
+
+fn install_lock_at(tools_root: &Path, name: &str) -> Result<fs::File, String> {
+    let locks = tools_root.join("locks");
+    fs::create_dir_all(&locks).map_err(|e| e.to_string())?;
+    let lock_path = locks.join(format!("{name}.lock"));
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .map_err(|error| format!("打开 {} 失败：{error}", lock_path.display()))?;
+    match FileExt::try_lock(&file) {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => {
+            eprintln!("[panta-tools] {name}：等待安装锁");
+            FileExt::lock(&file).map_err(|error| format!("获取 {name} 安装锁失败：{error}"))?;
+            eprintln!("[panta-tools] {name}：已获得安装锁");
+        }
+        Err(TryLockError::Error(error)) => return Err(format!("获取 {name} 安装锁失败：{error}")),
+    }
+    Ok(file)
 }
 
 /// 官方 LLVM 发布包面向全量工具链消费者：bin 是数百个各 100–290 MB 的
@@ -251,6 +264,21 @@ fn slim_llvm(root: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::paths::default_toolchain_root;
+
+    fn install_fixture(
+        target_root: &Path,
+        name: &str,
+        identity: &str,
+        install: impl FnOnce(&Path) -> Result<(), String>,
+    ) -> Result<PathBuf, String> {
+        install_directory_at(
+            &default_toolchain_root(target_root).join("tools"),
+            name,
+            identity,
+            install,
+        )
+    }
 
     #[test]
     fn llvm_slim_keeps_whitelist_and_resource_dir() -> Result<(), String> {
@@ -305,16 +333,17 @@ mod tests {
             atomic::{AtomicUsize, Ordering},
         };
         let root = std::env::temp_dir().join(format!("panta-lock-test-{}", std::process::id()));
+        let target_root = root.join("target");
         if root.exists() {
             fs::remove_dir_all(&root).map_err(|e| e.to_string())?;
         }
         let count = Arc::new(AtomicUsize::new(0));
         let workers: Vec<_> = (0..4)
             .map(|_| {
-                let root = root.clone();
+                let root = target_root.clone();
                 let count = count.clone();
                 std::thread::spawn(move || {
-                    install_directory(&root, "fixture", "v1", |staging| {
+                    install_fixture(&root, "fixture", "v1", |staging| {
                         count.fetch_add(1, Ordering::SeqCst);
                         fs::write(staging.join("binary"), "v1").map_err(|e| e.to_string())
                     })
@@ -326,19 +355,19 @@ mod tests {
         }
         assert_eq!(count.load(Ordering::SeqCst), 1);
         assert!(
-            install_directory(&root, "fixture", "v2", |staging| {
+            install_fixture(&target_root, "fixture", "v2", |staging| {
                 fs::write(staging.join("partial"), "incomplete").map_err(|e| e.to_string())?;
                 Err("模拟安装中断".into())
             })
             .is_err()
         );
-        let original = root.join("panta-tools/fixture/v1/binary");
+        let original = root.join(".toolchain/tools/fixture/v1/binary");
         assert_eq!(
             fs::read_to_string(&original).map_err(|e| e.to_string())?,
             "v1"
         );
-        assert!(!root.join("panta-tools/fixture/v2").exists());
-        let upgraded = install_directory(&root, "fixture", "v2", |staging| {
+        assert!(!root.join(".toolchain/tools/fixture/v2").exists());
+        let upgraded = install_fixture(&target_root, "fixture", "v2", |staging| {
             assert!(!staging.join("partial").exists());
             fs::write(staging.join("binary"), "v2").map_err(|e| e.to_string())
         })?;
@@ -346,22 +375,19 @@ mod tests {
             fs::read_to_string(upgraded.join("binary")).map_err(|e| e.to_string())?,
             "v2"
         );
-        install_directory(&root, "fixture", "v1", |_| Err("旧版本不应重新安装".into()))?;
+        install_fixture(&target_root, "fixture", "v1", |_| {
+            Err("旧版本不应重新安装".into())
+        })?;
         fs::remove_dir_all(root).map_err(|e| e.to_string())
     }
     #[test]
     fn crash_during_install() -> Result<(), String> {
         if let Some(root) = std::env::var_os("PANTA_TEST_INSTALL_CRASH") {
-            install_directory(
-                std::path::Path::new(&root),
-                "crash-fixture",
-                "v1",
-                |staging| {
-                    fs::write(staging.join("partial"), "partial").map_err(|e| e.to_string())?;
-                    // 不执行析构函数，模拟进程中断；OS 必须释放安装锁。
-                    std::process::exit(23);
-                },
-            )?;
+            install_fixture(&PathBuf::from(&root), "crash-fixture", "v1", |staging| {
+                fs::write(staging.join("partial"), "partial").map_err(|e| e.to_string())?;
+                // 不执行析构函数，模拟进程中断；OS 必须释放安装锁。
+                std::process::exit(23);
+            })?;
         }
         Ok(())
     }
@@ -369,14 +395,15 @@ mod tests {
     #[test]
     fn process_exit_releases_install_lock_and_retry_discards_partial_files() -> Result<(), String> {
         let root = std::env::temp_dir().join(format!("panta-crash-test-{}", std::process::id()));
+        let target_root = root.join("target");
         let status =
             std::process::Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
                 .args(["--exact", "install::tests::crash_during_install"])
-                .env("PANTA_TEST_INSTALL_CRASH", &root)
+                .env("PANTA_TEST_INSTALL_CRASH", &target_root)
                 .status()
                 .map_err(|e| e.to_string())?;
         assert_eq!(status.code(), Some(23));
-        let directory = install_directory(&root, "crash-fixture", "v1", |staging| {
+        let directory = install_fixture(&target_root, "crash-fixture", "v1", |staging| {
             assert!(!staging.join("partial").exists());
             fs::write(staging.join("binary"), "complete").map_err(|e| e.to_string())
         })?;
@@ -387,11 +414,12 @@ mod tests {
     #[test]
     fn invalid_marker_rebuilds_without_publishing_failed_attempt() -> Result<(), String> {
         let root = std::env::temp_dir().join(format!("panta-marker-test-{}", std::process::id()));
-        let directory = install_directory(&root, "fixture", "v1", |staging| {
+        let target_root = root.join("target");
+        let directory = install_fixture(&target_root, "fixture", "v1", |staging| {
             fs::write(staging.join("binary"), "original").map_err(|e| e.to_string())
         })?;
         fs::write(directory.join(".complete"), "wrong identity").map_err(|e| e.to_string())?;
-        let failure = install_directory(&root, "fixture", "v1", |staging| {
+        let failure = install_fixture(&target_root, "fixture", "v1", |staging| {
             fs::write(staging.join("partial"), "incomplete").map_err(|e| e.to_string())?;
             Err("interrupted".to_owned())
         });
@@ -400,7 +428,7 @@ mod tests {
             fs::read_to_string(directory.join("binary")).map_err(|e| e.to_string())?,
             "original"
         );
-        let replacement = install_directory(&root, "fixture", "v1", |staging| {
+        let replacement = install_fixture(&target_root, "fixture", "v1", |staging| {
             assert!(!staging.join("partial").exists());
             fs::write(staging.join("binary"), "replacement").map_err(|e| e.to_string())
         })?;
@@ -413,7 +441,7 @@ mod tests {
             fs::read_to_string(directory.join(".complete")).map_err(|e| e.to_string())?,
             "v1"
         );
-        install_directory(&root, "fixture", "v1", |_| {
+        install_fixture(&target_root, "fixture", "v1", |_| {
             Err("cache hit must not install".to_owned())
         })?;
         fs::remove_dir_all(root).map_err(|e| e.to_string())

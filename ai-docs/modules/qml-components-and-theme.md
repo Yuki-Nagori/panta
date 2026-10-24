@@ -77,7 +77,7 @@ created.png / opened.png，以及保留已打开工程的 start-learn.png，工�
 `QT_SCALE_FACTOR` 可模拟不同 DPR）：
 
 ```sh
-STAGING=target/panta-deps/qt/staging
+STAGING=.toolchain/deps/qt/staging
 QT_QPA_PLATFORM=offscreen \
 QT_PLUGIN_PATH="$PWD/$STAGING/plugins" \
 QML_IMPORT_PATH="$PWD/$STAGING/qml" \

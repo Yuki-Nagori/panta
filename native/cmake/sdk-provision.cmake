@@ -8,7 +8,7 @@
 #   仅服务本次下载校验与解包，发布即删；复用只看 marker，损坏走受限重下载。
 # - 消费统一走 `find_package(... CONFIG ... PATHS staging NO_DEFAULT_PATH)`，
 #   平台库名不散落到适配器。
-# - Cargo 入口由 build.rs 注入共享根 `target/panta-deps/sdk`（任务 041，
+# - Cargo 入口由 build.rs 注入共享根 `.toolchain/deps/sdk`（任务 041，
 #   跨 profile 复用）；presets 直接 configure 时默认构建树内（与 Qt 供给同型）。
 #
 # 消费方（007/009/010）落地前生产构建不触发任何 SDK 下载；本模块逻辑由

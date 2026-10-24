@@ -44,6 +44,7 @@
 | 039 | [CI FFI 构建链修复](task/039-ci-ffi-build-fix.md) | 验证基础 | 006, 018, 036 | done |
 | 040 | [统一 Cargo 构建编排入口](task/040-cargo-build-orchestration.md) | 验证基础 | 004, 039 | done |
 | 041 | [构建产物归一与第三方缓存共享](task/041-build-artifact-consolidation.md) | 验证基础 | 004, 020 | done |
+| 130 | [工具链目录与 PR CI 收敛](task/130-toolchain-root-and-pr-ci.md) | 验证基础 | 012, 020, 041, 120 | in-progress |
 
 ## 应用平台扩展队列
 

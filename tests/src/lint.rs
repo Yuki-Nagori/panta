@@ -382,7 +382,7 @@ fn scan_cppcheck() -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
     // Qt 6.11 的编译器宏超出 Cppcheck 解析能力；使用 Qt 库模型，LLVM 负责真实头文件。
     for entry in &mut entries {
-        entry.exclude_include_root(&target_root().join("panta-deps/qt"))?;
+        entry.exclude_include_root(&panta_build::toolchain_root(target_root()).join("deps/qt"))?;
     }
     let database = database.with_file_name("cppcheck-configured.json");
     panta_build::database::write(&database, &entries)?;
