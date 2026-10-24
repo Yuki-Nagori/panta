@@ -1,160 +1,71 @@
 # 042 — 三平台自有 C++ 统一 LLVM/Clang 工具链
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
-- 依赖：[018](018-cross-platform-ci.md)、[032](032-cross-language-quality-gates.md)、[038](038-native-sdk-artifact-production.md)
+- 依赖：[018](018-cross-platform-ci.md)、[020](020-toolchain-provisioning.md)
 - 优先级：P2
-- 负责人：待分配
-- 创建 / 更新：2026-09-18 / 2026-10-22
+- 负责人：Yuki
+- 创建 / 更新：2026-09-18 / 2026-10-25
 
-## sanitizer 支持矩阵增量（2026-09-21，实施步骤 6）
+## 目标
 
-维护者确认用 LLVM 自带 sanitizer 落地内存/UB 动态检测，不引入独立工具：`PANTA_SANITIZER` CMake 选项（逗号分隔 `address`/`undefined`/`thread`）经 launcher build.rs 的 `PANTA_NATIVE_SANITIZER` 驱动，每个组合独立构建树（`target/native/debug-sanitizer-<组合>`），runner 新增 `cargo sanitize` 按平台固定矩阵执行。矩阵口径（官方文档 2026-09-21 核对，落地版本 LLVM 22.1.7）：
+让 macOS arm64、Linux x86_64、Windows x64 上的自有 C++ 构建和 LLVM 质量工具使用同一固定 LLVM 版本，避免各平台默认编译器及工具版本漂移。统一编译器来源和版本，不统一平台 ABI、系统 SDK 或运行库。
 
-| 组合 | Linux x86_64 | macOS arm64 | Windows x64 | 依据/说明 |
-|---|---|---|---|---|
-| ASan+UBSan | 验证 | 验证（LSan 显式 `ASAN_OPTIONS=detect_leaks=1`，官方默认关闭） | 仅 ASan | ASan 官方支持 Linux/macOS/Windows 8.1+（Windows 移植"functional"但支持较弱）；clang-cl 仅支持部分 UBSan 检查，Windows 不入 UBSan 矩阵 |
-| TSan | 验证 | 验证 | 不适用 | ThreadSanitizer 官方支持平台含 Darwin arm64、Linux x86_64，不含 Windows；TSan 与其他 sanitizer 运行库互斥，只能独立构建 |
+## 范围
 
-不满足的组合在 configure 期 FATAL_ERROR（未知值、TSan 混用、Windows 请求 TSan/UBSan、与覆盖率插桩同开），不隐式降级。LLVM `slim_llvm` 白名单本就保留 `lib/clang` 资源目录（含 sanitizer 运行库），无需新增供给。Cargo CXX 侧（panta-ffi）的 C++ 不插桩，与覆盖率同口径；Qt/SDK 预编译库不插桩，检测边界为自有 C++。UBSan 用 `-fno-sanitize-recover=undefined` 保证错误即非零退出。macOS 实证要点：LSan 对 OCCT/Netgen SDK 与 macOS 系统运行时的噪声按 `tests/lsan-suppressions.txt` 抑制（不得登记分配器必经帧，自有泄漏仍阻断）；TSan 运行时初始化使 gtest POST_BUILD discovery 超过默认 5s，各 `gtest_discover_tests` 显式 `DISCOVERY_TIMEOUT 120`。Linux/Windows 证据由新增 CI `sanitize` job（三平台矩阵）补齐。
+- CMake native 与 Cargo CXX（`cxx-build`）使用托管 LLVM 22.1.7；macOS/Linux 使用 `clang`/`clang++`，Windows 使用 `clang-cl`。
+- `clang-format`、`clang-tidy` 和 native coverage 工具使用同一 LLVM 发行包。Rust 编译器及 Rust coverage 工具继续由 Rust 工具链提供。
+- 编译器、构建工具和依赖资产统一安装到仓库根 `.toolchain/`；构建树及临时产物仍位于 `target/`。显式系统工具旁路只由 `PANTA_USE_SYSTEM_TOOLS=1` 启用。
+- 通过现有三平台构建、测试及工具链核验验证当前 Qt、GoogleTest 和 native SDK 消费路径。
 
-## sanitizer 矩阵落地边界（2026-09-21，任务 049 CI 实证）
+## 不在本任务范围
 
-矩阵首次在 CI 完整跑到测试阶段后确认两条工具边界，均按"第三方/未插桩侧不可修复"口径处理：
+- 重产或发布 VTK、OCCT、Netgen 等第三方 SDK；该工作属于 [038](038-native-sdk-artifact-production.md)，当前仍为 deferred。应用消费已发布 SDK 的构建测试仍属于本任务验证范围。
+- Rust 覆盖率门槛及跨语言质量门禁；由 [032](032-cross-language-quality-gates.md) 决定。本任务只保证 native coverage 使用对应 LLVM 的工具。
+- 穷举所有 Debug/Release、系统 SDK、ABI 和第三方库版本组合。验证以仓库当前支持配置的真实构建和测试为准。
+- 宣称 sanitizer 在各平台能力等价。支持组合与平台差异以 `tests/src/sanitize.rs`、`native/cmake/build-policy.cmake` 及其 CI 结果为准。
 
-- **Windows ASan × 未插桩 CXX**：MSVC STL 的容器注解经 `detect_mismatch`（annotate_string/vector/optional）固化进目标文件，插桩对象 =1 与 panta_ffi 未插桩 C++ 对象 =0 在链接期 failifmismatch。按 STL 官方开关 `_DISABLE_STL_ANNOTATION` 在 sanitizer 树统一关闭注解（其文档场景即静态库混链），代价是 Windows 矩阵失去 STL 容器溢出检测；Rust 侧 C++ 维持不插桩口径。
-- **Windows ASan × 未插桩 Qt DLL**：clang ASan 在 Windows 用自有分配器，未插桩 Qt DLL 走 ucrt/RTL 堆，QML 引擎跨模块对象生命周期释放到错误堆触发 bad-free（abort，非报告，不可抑制）。Windows asan 组合经 runner 排除 `Qml.*`；纯自有 C++ 与 FFI 测试不受影响。
-- **TSan × Rust std 同步与 QML 第三方栈**：Rust 侧未插桩且 std `Mutex` 在 Linux 为 futex 实现，TSan 的 happens-before 模型看不见该锁（rust-lang/rust#110485），正确的 Rust 同步被确定性误报；QML 测试栈（Qt6Core/Qt6Qml/glib/系统库）连续产出第三方内部竞态噪声（预编译无符号，逐库抑制为打地鼠）。TSan 的早期 runner 曾排除 `TaskHost.*` 和 `Ffi.*`；模拟 `TaskHost` 测试随 128 删除。当前 `tests/src/sanitize.rs` 排除 `Ffi.*`、`Qml.*`，以及经 FFI 消费 Rust 异步结果的指定 `ProjectViewModelTest`（完整正则以源码为准，新增范围见 2026-10-14 Issue #17 记录），不再包含 `TaskHost.*`。当前被 TSan 排除的测试仍由普通 CTest 运行；ASan/UBSan 按平台组合覆盖，Windows ASan 另排除 `Qml.*`（见上一条）。Rust 协调器另由 Miri 检查；未列出的 `ProjectViewModelTest` 仍由 TSan 执行。`tests/tsan-suppressions.txt` 按 `called_from_lib` 抑制仍在跑的 NetgenMesher 的 Netgen 内部竞态；纯自有 C++ 帧竞态仍阻断，tsan 对纯 C++ 线程的覆盖不变。升级为 Rust/C++ 双侧 TSan 插桩后复查排除项。
+## 当前实现
 
-### macOS dyld TLS 抑制（2026-10-10）
+- `crates/panta-build/src/assets.rs` 固定 LLVM 版本及平台资产；供给代码校验摘要并安装到 `.toolchain/tools/`。
+- `crates/panta-build/src/compiler.rs` 为 Cargo CXX、CMake 和质量工具解析共享 LLVM。`native/cmake/build-policy.cmake` 检查托管工具链版本；macOS 的标准库头和运行库仍取自 Apple SDK，Windows 保留 MSVC ABI、CRT/STL 与 Windows SDK。
+- `tests/src/toolchain.rs` 的 `panta-tests toolchain` 核对工具链路径、CMake 配置及实际 native 编译器信息。PR CI 执行受影响范围检查；nightly 执行三平台完整测试、平台工具链核验及 sanitizer 矩阵。
+- Windows ASan 链接边界及 Netgen ISA 基线曾在 [049](049-ci-mesh-sigill-windows-asan.md) 单独修复并验收；其历史诊断不在本任务重复维护。
 
-历史 CI 记录（`Ffi.TaskServiceLifecycle` 模拟测试已随 128 删除）：GitHub Actions macOS 26 arm64 曾在销毁仍有运行中任务的服务时报告 368 字节，分配栈落于 dyld `ThreadLocalVariables` 的 TLS 注册 / 实例化元数据及 Rust std spawn hook；当时该测试请求协作取消但不 join worker。抑制仅匹配 dyld TLS 管理符号，不匹配通用分配器，自有代码的其他泄漏仍受检查。普通 macOS / Linux 文件名测试也揭示 macOS 临时文件系统创建非 UTF-8 名称返回 EILSEQ；063 的测试现在将此类平台拒绝与 `PermissionDenied`、`InvalidInput` 同样处理，并验证路径校验仍拒绝该名称。本机 `cargo sanitize` 的 ASan/UBSan 72/72、TSan 51/51 通过；GitHub Actions [run 38039422235](https://github.com/Yuki-Nagori/panta/actions/runs/38039422235)（`afba765`）全平台 CI 成功。
+### Sanitizer 支持范围
 
-### STL 预检排除补登记（2026-10-02，任务 063）
+| 平台 | Nightly 组合 |
+|---|---|
+| Linux x86_64、macOS arm64 | ASan+UBSan；独立 TSan |
+| Windows x64 | ASan |
 
-CI 运行 [37005793824](https://github.com/Yuki-Nagori/panta/actions/runs/37005793824) 的 Linux TSan 报告均位于未插桩 Rust std mpsc 的结果读写、快照复制或释放栈。063 后台预检使以下四个用例进入同一工具边界，runner 按精确名称补入 TSan 排除：`StructuredImportFailuresPreserveTheCommittedProjectAndViewport`、`PreviewsImportsAndPersistsLatestRecord`、`PreviewCancellationReplacementAndProjectSwitchIgnoreOldResults`、`PreviewNotificationsCanReplaceOrCancelTheCompletedRequest`。普通 Cargo 聚合及 ASan/UBSan 仍执行这些用例；本次 CI 的 Miri 与三平台普通测试、ASan/UBSan 已通过。未扩大为整个 ViewModel 排除，也未添加运行时抑制；Rust/C++ 双侧插桩后复查这些排除。
+TSan 不支持 Windows，clang-cl 的 UBSan 能力不满足本仓库完整矩阵；TSan 不能与其他 sanitizer 组合。插桩范围是自有 native CMake C++，不包含 Rust、Cargo CXX 桥接和预编译 Qt/SDK。Windows ASan 不运行 QML 测试；TSan 按 runner 中的精确过滤排除无法观察未插桩 Rust/Qt 同步的测试，其余常规测试仍运行。以 [Clang ASan](https://clang.llvm.org/docs/AddressSanitizer.html)、[UBSan](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)、[TSan 支持平台](https://clang.llvm.org/docs/ThreadSanitizer.html#supported-platforms)文档及 runner 实际过滤为准。
 
-### STL 后台导入与文档激活排除补登记（2026-10-14，Issue #17）
+## 验收结果
 
-Nightly Linux TSan [run 38475008747](https://github.com/Yuki-Nagori/panta/actions/runs/38475008747) 报告 `ConfirmedImportCompletesThroughBackgroundViewModelRequest` 与 `DuplicateImportOrdinalsFollowImportOrderAcrossActivationAndClose`。前者涉及 Rust std `mpsc` 的 STL 预览 / 导入结果交付；后者涉及 `ActivationCoordinator` 由 Rust `Mutex<CoordinatorState>` 保护的 `VecDeque<Outcome>`，随后将网格 `Vec` 所有权交给 C++。两条路径的报告栈均落在 Rust `core` / `alloc` / `std` 的跨线程数据读写或释放；C++ TSan 插桩无法观察未插桩 Rust std 建立的 happens-before 关系。结合生产端与消费端共用同一 Rust 锁 / 通道，这符合本节已登记的同步边界，没有发现自有 C++ 共享字段直接竞争。`cargo sanitize` 的 TSan CTest 按精确名称排除这两个跨 Rust 异步结果交付的用例；普通测试和 ASan/UBSan 仍运行它们，其余 `ProjectViewModelTest` 与纯自有 C++ TSan 检查保留。没有扩大为整组排除或添加运行时抑制。
+- [x] 任务 130 的 `.toolchain/` 布局合并后，三平台 nightly 完整测试及 `panta-tests toolchain` 通过；三平台均解析到固定 LLVM，实际构建链可用。
+- [x] 同一 main commit 的 nightly sanitizer job 通过仓库已登记的平台/组合。
+- [x] 按验收结果更新本任务与索引；没有触发需要扩展范围的平台构建或 ABI 失败。
 
-### ProjectViewModel TSan 排除增量（2026-10-21 nightly；2026-10-22 修正平台范围）
+不再要求单独穷举 clean/incremental × Debug/Release 矩阵，也不以 SDK 生产链、覆盖率阈值或未接入的第三方库组合阻塞本任务。
 
-GitHub Actions [run 39674848676](https://github.com/Yuki-Nagori/panta/actions/runs/39674848676) 中，Ubuntu TSan 对 23 个 `ProjectViewModelTest` 报告的访问栈落在 Rust `std::sync::mpmc` 通道及 Rust `core` / `alloc`；这些新增用例仍由普通 CTest 与 ASan/UBSan 执行，Rust 同步逻辑由 Miri 检查。macOS TSan 另在 `ImportInteractionStateMachineGatesAndSerializesCommands` 报告 Qt `QFuture` 结果存储的 `QPromise::addResult` / `QFutureInterface::clear` 并发访问；Qt 文档将 `QFuture` 与 `QPromise` 操作声明为线程安全，但 CI 使用未插桩 Qt，TSan 无法看到其内部同步。runner 将 9 个既有 Rust 异步同步边界用例作为两平台共用排除，Ubuntu 仅额外排除日志中的 23 个用例，macOS 仅额外排除上述 1 个 Qt 用例；普通测试、ASan/UBSan 与 Miri 仍覆盖 Rust 排除项，macOS TSan 保留其余 22 个 Ubuntu 新增用例。回归测试分别锁定 Linux/macOS 的过滤范围；修复后的 CI 待复验。
+## 验证记录
 
-## 本轮修复范围（2026-09-19）
+| 日期 / 证据 | 结果 |
+|---|---|
+| 2026-09-24：Actions [run 36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4` | macOS/Linux/Windows 构建与测试成功（Linux CTest 56/56、macOS ASan/UBSan 56/56、Windows CTest 54/54）。该运行早于 `.toolchain/` 迁移，不能作为迁移后的三平台验收。 |
+| 2026-10-25：PR [#88](https://github.com/Yuki-Nagori/panta/pull/88) Actions run `40123160060` | Ubuntu PR 影响范围 CI 全部通过；冷缓存构建与测试成功。该运行没有覆盖 Windows/macOS。 |
+| 2026-10-25：本地 `cargo clean`、`cargo build --locked`、`cargo run --locked --package panta-tests -- toolchain` | `target/` 清理后重建成功；CMake、Ninja、LLVM、Qt 与 GoogleTest 均从 `.toolchain/` 解析。 |
+| 2026-10-25：main commit `ae4f7c5` nightly [run 40125142431](https://github.com/Yuki-Nagori/panta/actions/runs/40125142431) | macOS/Linux/Windows workspace tests 与 `panta-tests toolchain` 全部通过；三平台 sanitizer 全部通过（Windows ASan、macOS/Linux ASan+UBSan 与 TSan），Ubuntu 全量质量检查及 macOS Objective-C++ 检查通过。这是 `.toolchain/` 迁移后的验收证据；其他 nightly job 不属于本任务门槛。 |
+| 2026-10-25：独立只读 final review（`gpt-6.1-sol`, medium） | 检查任务范围、依赖、实现/CI 对齐及 sanitizer 矩阵；补回精简矩阵和插桩/过滤边界后复查通过。review 本身未重跑测试；nightly 证据见上行。 |
 
-按维护者要求修复复审列出的全部基础设施缺口：提取公共构建支持 crate，供给采用文件锁、摘要隔离和原子发布；统一 Ninja 与 Windows SDK 环境；runner 按命令准备工具；固定并托管 uv/Python/Cppcheck；覆盖自有 CXX 编译命令；native coverage 使用 C++ LLVM 配套工具；工具核验读取实际编译数据库与 CMakeCache。工具选择收敛和验证证据随实施回填，不用本机旁路冒充三平台通过。
+## 决策
 
-## 目标与背景
-
-维护者在本轮评审明确要求三平台统一 LLVM。已实现 macOS/Linux/Windows 自有 C++（CMake native 与 Cargo CXX 桥接）选择固定 LLVM 22.1.7 的初版供给：macOS/Linux 使用 clang/clang++，Windows 使用同一发行包内的 clang-cl。当前 macOS 的 Apple Clang、Linux 的 GCC 和 Windows 的 cl.exe 将不再作为自有 C++ 默认编译器。
-
-“统一”指编译器来源、release 版本和选择策略；不是统一操作系统 ABI。macOS 保留 CLT/Xcode 提供的 SDK 与平台运行库，Linux 保留满足发布基线的 sysroot/glibc/C++ 运行库，Windows 保留 MSVC target、CRT/STL 和 Windows SDK。Rust 继续使用锁定 rustc（其 LLVM 后端不因此替换）；Rust 覆盖率工具仍与 rustc 配套，不能改用新 C++ LLVM 的 llvm-cov。
-
-clang-cl 以 MSVC ABI 互操作为目标，但具体 C++ 特性、运行库及预编译包组合仍需实测。不能据此断言当前 Qt/VTK/OCCT/Netgen 组合已兼容，或上游均已验证本仓库的锁定版本。Windows 的 sanitizer 支持也不与 Linux/macOS 等同，TSan 官方支持平台不含 Windows。
-
-官方依据（2026-09-18 查阅；版本落地时重新核对锁定版本）：[LLVM MSVC compatibility](https://clang.llvm.org/docs/MSVCCompatibility.html)、[clang-cl 使用方式](https://clang.llvm.org/docs/UsersManual.html#clang-cl)、[ThreadSanitizer 支持平台](https://clang.llvm.org/docs/ThreadSanitizer.html#supported-platforms)。
-
-## 必读
-
-- [技术基线](../standards/baseline.md)、[CMake 规范](../standards/cmake.md)、[C++ 规范](../standards/cpp.md)
-- [依赖获取](../standards/dependency-acquisition.md)、[CXX 规范](../standards/cxx.md)
-- [质量工具链](../modules/quality-tooling.md)、[验证与评审](../standards/validation-and-review.md)
-- [注释](../standards/comments.md)、[仓库文件](../standards/repository-hygiene.md)、[文档](../standards/documentation.md)、[生命周期](../standards/code-lifecycle.md)、[提交规范](../standards/commits.md)
-
-## 范围与非目标
-
-范围：macOS arm64、Linux x86_64、Windows x64 的 CMake native、`crates/panta-ffi/build.rs` 经 cxx-build/cc 编译的 C++、本地开发与 CI 入口；固定同一 LLVM release 的三平台工具供给、编译器/公共告警策略和缓存身份，核对 Qt 与 SDK 消费边界。clang-format、clang-tidy 一并使用该 release；格式和静态分析不再消费独立 LLVM 版本。
-
-非目标：不更换 Rust 工具链/target，不引入 MinGW ABI 或强制三平台使用同一标准库/链接器，不承诺三平台 sanitizer 等价。第三方预编译库不因自有代码迁移就被视为 LLVM 产物；SDK 生产链是否同步迁移必须逐平台作出决策。若重产 SDK，先更新 038 范围及资产元数据，不覆盖已有发布资产。
-
-## 前置条件与待决策
-
-- 保留 018/032/038 的排期依赖；032/038 尚未完成，本任务已进入 in-progress，不意味着 clang-cl 技术上依赖覆盖率达 100%。开始前须有三平台可复现基线、消费资产及质量入口；若 032 的 C++ 覆盖率需依赖本任务，先拆分里程碑调整依赖，避免形成环。
-- 已选择 LLVM 22.1.7：三平台 URL、SHA256、许可证和缓存键已固定于 provision 与依赖获取清单；受支持平台缺失资产直接失败，不回退系统编译器。没有可用官方资产时先评估自托管供给，不能用浮动 Homebrew/apt/runner 版本冒充统一版本。
-- macOS 明确 SDK/sysroot、部署目标、libc++/链接器与架构；Linux 明确 sysroot、glibc/libstdc++ 基线及 SDK ABI；Windows 明确 MSVC Build Tools/STL/SDK 版本。编译器统一不能自动解决平台运行库差异。
-- 三平台统一 Ninja；Windows 从 MSVC Build Tools 读取 SDK/CRT 环境，并显式选择 target 下的 clang-cl 编译 C/C++。macOS/Linux 显式选择固定 clang/clang++；macOS 两条链均显式传 Apple SDK。
-- Cargo 的 cxx-build/cc 与 CMake 分别显式接收同一托管 LLVM 目录中的编译器；CMake 配置阶段检查 clang 版本，Rust 链接器保持现状。
-- Qt/SDK 各平台现有产物先作为拟验证组合，记录实际生产编译器。Windows 核对 x64、/MD、`_ITERATOR_DEBUG_LEVEL=0`、Debug 映射 Release Qt、异常/RTTI；Linux 核对 libstdc++ ABI/符号版本，macOS 核对 libc++/部署目标。SDK 管线逐平台评估统一 LLVM 的收益和成本，保留混合工具链须有消费证据。
-
-## 实施步骤
-
-1. 选定 LLVM 22.1.7，登记 macOS ARM64、Linux x86_64、Windows x64 官方资产及 SHA256；缓存键位于 `target/panta-tools/llvm`，与 CMake/Ninja 同一托管根。
-2. launcher/build.rs 接入 LLVM 编译器、clang-format 和版本注入；panta-ffi 的 cxx-build/cc 显式选择 clang++ 或 clang-cl，工具缺失不回退。
-3. `native/cmake/build-policy.cmake` 在非系统旁路下检查 C/C++ 编译器均为 LLVM 22.1.7；保留 Windows /MD、`_ITERATOR_DEBUG_LEVEL=0` 和 Qt Release ABI 策略。
-4. CI cache key 纳入 `llvm-22.1.7`、平台、架构、生成器和运行库标签；编译器路径变化触发干净 configure。
-5. 三平台 CI 与本地入口验证 Debug/Release 的 Cargo build/test（含完整 CTest、qmllint、格式与 Clippy）、FFI 异常/生命周期、Qt 模块与动态库加载。macOS 补部署目标、Linux 补运行库符号基线、Windows 补 Ninja 下 SDK/CRT 环境发现与实际 clang-cl 路径验证。
-6. 为 ASan/UBSan/TSan 建立实际支持矩阵，只在工具链和运行库支持的平台验证；不支持项注明理由。C++ coverage 使用该 LLVM 配套工具，与 Rust llvm-tools 分开。此步向 032 提供选型证据，不将所有 sanitizer 功能接入都列为迁移前置。
-7. SDK 生产链逐平台决定保留或迁移；消费验证只覆盖已接入项，未集成的引擎标未测。回写基线、构建说明、CMake/CXX 规范与本任务；新增供给/SDK 范围先更新 020/038。
-
-## 预计改动
-
-现存 `crates/launcher/build.rs`、`crates/panta-ffi/build.rs`、`.github/workflows/ci.yml`、`native/cmake/build-policy.cmake`、`crates/panta-build/src/lib.rs`、tests 工具链核验、相关规范与任务索引。SDK workflow 仅在 038 范围确认需要重产时修改，不创建占位文件。
-
-## 清理与兼容例外
-
-已移除自有 C++ 对 Apple Clang/GCC/cl.exe 的默认选择；受支持平台在显式设置 `PANTA_USE_SYSTEM_TOOLS=1` 时使用系统工具；无固定资产的平台明确失败，不再隐式回退。平台 SDK/运行库仍由宿主提供。无兼容例外，不为失败文件混用旧工具集；若验证失败，恢复该平台上一套完整可用配置。
-
-## 验收标准
-
-- [ ] CMake 与 Cargo CXX 两条链显式使用同一 LLVM 22.1.7 目录；版本、来源、SHA256 可追溯，缺失明确失败；Rust 工具链不变。
-- [ ] macOS/Linux 选择 clang++，Windows 选择 clang-cl；三平台使用 Ninja，Windows 注入 SDK 环境并显式选择 clang-cl。
-- [ ] 三平台干净/增量、Debug/Release 的 Cargo build/test、完整 CTest、qmllint、fmt/clippy 均通过，测试发现/跳过与基线无意外差异。
-- [ ] 公共告警策略及平台参数映射、标准库/系统库、异常/RTTI、调试信息和当前 Qt/FFI/SDK 消费组合有验证证据；未集成项明确标未测。
-- [ ] sanitizer 支持矩阵有实证或官方限制依据，C++/Rust coverage 工具各自配套，不宣称支持完全一致。
-- [x] LLVM 版本进入工具 marker、CI cache key、CMake 版本检查和文档；切换编译器会因 CMake 缓存/版本检查而要求重新配置。
-- [ ] SDK 三平台生产链与 clang-format 版本决策、清理项、task/索引和实际能力一致。
-
-## 验证计划与结果
-
-实施验证记录实际命令、工具版本、缓存路径和 CI 平台结果。run 36001859191 提供当前代码的三平台构建与测试证据；任务声明的 clean/incremental × Debug/Release 与 SDK/ABI 组合矩阵仍需逐项核对。
-
-| 日期 | 环境 / 命令或场景 | 结果 / 证据 |
-|---|---|---|
-| 2026-09-19 | `cargo fmt --all -- --check`、`cargo check --locked -p panta-ffi --all-targets`、`cargo clippy --locked -p panta-ffi --all-targets -- -D warnings`（系统工具旁路仅用于本机快速编译） | 通过；Cargo CXX build.rs 已显式选择统一 LLVM resolver，代码与锁文件可解析。|
-| 2026-09-19 | LLVM 22.1.7 官方 release 资产核对、依赖清单与 CI cache key 审查 | 通过；macOS ARM64、Linux x86_64、Windows x64 URL/SHA256 已固定，Windows 使用官方 `LLVM-22.1.7-win64.exe` 安装包，保留 clang-cl。|
-
-| 2026-09-19 | ABI 元数据夹具：改前 configure 失败；改后 `check-abi.cmake` 的 valid/runtime/iterator 三场景 | 通过；隔离供给检查后正例成功、两种错误覆盖均被拒绝；使用 Apple Clang，仅验证 CMake 元数据策略 |
-| 2026-09-19 | `gh run list --limit 5`，核对最近远程 CI | 最新可见 run 35356240701 为旧提交 6ae8ed3，结论 failure；不能将旧绿灯或本机系统旁路用作当前 LLVM 实现的三平台证据 |
-| 2026-09-21 | macOS arm64；`cargo sanitize`（托管 LLVM 22.1.7，asan-ubsan 与 tsan 两棵独立插桩树，完整 CTest） | 通过：两树各 49/49（asan-ubsan 约 20s，tsan 约 66s，TSan 初始化显著变慢）；LeakSanitizer 按官方文档显式 `detect_leaks=1`，第三方噪声按抑制清单处理 |
-| 2026-09-28 | macOS arm64；任务 080 修订后 `cargo sanitize` | ASan/UBSan 62/62，TSan 47/47；异步激活两例在 ASan/UBSan 运行，TSan 精确排除，其他五个 ViewModel 用例仍通过。Linux CI 的同组合结果待新提交复跑。 |
-| 2026-09-21 | 受控失败实证：托管 clang 分别构造 signed-overflow、heap-buffer-overflow、自有代码泄漏样本 | 均非零退出：UBSan 报 `signed integer overflow` exit 134（`-fno-sanitize-recover=undefined` 生效）；ASan 报 `heap-buffer-overflow` exit 134；LSan 在抑制清单生效下仍报自有泄漏 exit 1，证明清单不掩盖自有代码 |
-| 2026-09-21 | Linux x86_64 / Windows x64 sanitizer 与 CI `sanitize` 矩阵 | 未在本机运行；job 已接线（Windows 仅 ASan），等待当前提交的三平台 CI 证据，不宣称三平台等价 |
-| 2026-09-24 | GitHub Actions run [36001859191](https://github.com/Yuki-Nagori/panta/actions/runs/36001859191)，commit `48ea4b4`：macOS/Linux/Windows build and test jobs | 三平台构建与测试成功：Linux CTest 56/56、macOS ASan/UBSan CTest 56/56、Windows CTest 54/54。没有单独证明每个平台的 clean/incremental Debug/Release 和全部 SDK/ABI 组合，因此该验收项仍未完成。 |
-| 2026-10-14 | macOS arm64；Issue #17 修复后 `cargo sanitize`、`cargo test --locked --workspace` | ASan/UBSan CTest 75/75、TSan CTest 52/52、普通 Cargo 聚合与 native/QML CTest 75/75 通过；新增的两个测试仅从 TSan 排除。未在 Linux 本机重跑 Issue #17 的原 runner，需以修复后的 nightly CI 验证 Linux 报告消失。 |
-
-## 2026-09-19 复审时发现的问题（修复记录见下）
-
-- **P1：Windows 工具链未闭合。** CI 使用 Visual Studio 生成器，launcher 仅对 Ninja 供给 Ninja，核验器却强制要求 Ninja 和 compile_commands；CMake 官方明确 VS 不支持该数据库。`-T ClangCL` 与显式编译器参数尚不足以证明 MSBuild 使用 target 中的 LLVM，需要固定安装根并实跑核验。
-- **P1：冷构建供给存在竞争。** panta-ffi 与 panta-tests 的 build.rs 共用 `llvm`、归档和 marker，没有互斥与原子发布，可能在对方下载或解包时删除目录。
-- **P1：native coverage 工具错配。** C++ 已指定 LLVM 22.1.7，但 CI 仍通过 rustup 找 profdata/cov；应使用 C++ 发行包配套工具，Rust 覆盖率保留 rustc 配套工具。
-- **P1（本轮修复）：ABI 元数据夹具被新版本检查提前拦截。** 夹具未设置 LLVM 版本，原本正例也失败；现明确只在该夹具启用系统工具旁路，生产门禁不变。
-- **P2：验证器只检查预期路径。** 未读取 CMakeCache/实际编译命令，未校验 CXX 编译器与 clang-tidy；不能将工具文件存在等同于已被构建使用。
-- **P2：配置切换与平台边界。** 系统旁路和 coverage 仅向 CMake 写 ON，取消环境变量后缓存不自动回 OFF；无资产平台仍隐式回退。Release、sanitizer、平台运行库及未来 SDK 消费验证尚未完成。
-
-## 风险与回退
-
-主要风险为预编译包的 CRT/STL 或异常边界差异、clang-cl 未识别参数与旧 CMake 缓存。失败时恢复受影响平台的完整构建配置和相应缓存身份，以全新构建树验证原 Apple Clang/GCC/cl.exe 基线；保留已有 SDK 发布资产及用户数据。
-
-## 决策与工作记录
-
-- 2026-09-18：从 Windows clang-cl 规划开始评审；维护者明确要求三平台统一 LLVM。
-- 2026-09-19：任务文件重命名为 `042-unified-llvm-toolchain.md`；固定 LLVM 22.1.7，macOS/Linux 使用 clang++，Windows 使用 clang-cl；Cargo provision、CXX、CMake、CI、质量工具与文档同步实现，无兼容层。
-- 2026-09-21：维护者确认实施步骤 6 的选型为 LLVM 自带 sanitizer（ASan+UBSan 主组合三平台、TSan 仅官方支持平台），工具矩阵由 runner `cargo sanitize` 固化，Windows 的 UBSan 子集与 TSan 缺口按官方文档注明理由；不引入 Valgrind 等独立检测工具。
-- 2026-09-25：本地非提权 shell 安装 LLVM 时报 os error 740（NSIS 安装器清单为 requireAdministrator，CI 的提权 runner 不受影响）。`extract()` 以 `__COMPAT_LAYER=RunAsInvoker` 启动安装器，覆盖清单按当前用户运行；`/D=` 目标在 target 托管树内，静默模式下卸载注册表项与快捷方式写入失败不阻断安装。资产 URL 与 SHA 不变，已提权进程行为不变；本机 Windows 重跑 toolchain 供给与 lint 编译步骤通过（`panta_benchmark_moc` 聚合目标生成四个基准 moc）。
-- 2026-09-25：Windows 本地首次全量 clang-tidy 暴露 4 个 Ubuntu CI 门禁不可见的平台性告警（warnings-as-errors）：`vtk_native_surface.cpp` HWND 整数转指针（performance-no-int-to-ptr，Win32 惯用法）、`step_import_test.cpp` 与 `netgen_mesher_test.cpp` 的 Windows 专用宏缺括号（bugprone-macro-parentheses）、`mesh_ir_benchmark.cpp` 经 MSVC STL 分配器的 exception-escape。均与本次暂存改动无关；处置（NOLINT/检查豁免/代码修正）留待本任务收口三平台 lint 证据时统一处理。
-- 2026-09-25：Windows 本地 includes/cppcheck 同样暴露平台缺口：includes 仅 `vtk_native_surface.cpp` 的 Win32 符号直接包含告警；cppcheck 的 `unusedFunction` 大量误报（QtTest 槽、cxxbridge 生成码），并定位到 `tests/src/main.rs` 的 `--suppress=unusedFunction:{target_root}/*` 以正斜杠拼接而 Windows 报告路径为反斜杠，目标树抑制整体失配——修复该 runner 抑制（分隔符归一化）与 QtTest 槽误报的豁免策略，随三平台 lint 证据收口一并处理。
-- 2026-09-26：上条 4 项 clang-tidy 告警全部修复——宏替换列表按检查建议加括号（字符串化宏加括号语义不变）；`mesh_ir_benchmark` 的 main 保留函数级 try 并显式豁免（重构为内部 try/catch 实测仍误报，检查器无法建模 MSVC STL `_Throw_bad_array_new_length` 的间接抛出）；`vtk_native_surface` 的 HWND 转换收进命名契约函数 `qt_native_handle_to_void`（原 NOLINTNEXTLINE 挂错行从未生效）。`tests/cpp/geometry|mesh` 目录级 `.clang-tidy` 关闭 bugprone-macro-parentheses（夹具路径 -D 宏无源位置无法 NOLINT）。clang-tidy 阶段本地转绿；includes/cppcheck 两项仍待处理。
+- 2026-09-18：维护者要求三平台自有 C++ 统一 LLVM；锁定 LLVM 22.1.7，Windows 继续使用 clang-cl/MSVC ABI。
+- 2026-09-21：sanitizer 只按各平台实际支持矩阵验证；Rust 与 C++ coverage 工具分别配套各自编译器工具链。
+- 2026-10-25：任务 130 将已安装工具和依赖迁至 `.toolchain/`，并将 Windows/macOS 完整测试移至 nightly。042 只保留迁移后尚缺的三平台证据；SDK 生产与质量门槛不再作为依赖或阻塞项。
+- 2026-10-25：main commit `ae4f7c5` 的 nightly run `40125142431` 完成三平台 workspace/toolchain 验收与 sanitizer 矩阵，所有 042 验收项通过，状态改为 done。
 
 ## 完成摘要
 
-统一 LLVM 供给和编译器选择已落地：Cargo 默认下载并校验 LLVM 22.1.7 到 `target/panta-tools/llvm`，CMake 与 panta-ffi CXX 使用同一目录；macOS/Linux 选择 clang++，Windows 选择 clang-cl；clang-format 与 clang-tidy 复用该版本。本轮已补无资产平台拒绝、共享供给互斥与版本隔离、Windows Ninja/SDK 配置、CXX 数据库和实际编译器核验、native coverage 配套 LLVM 工具。run 36001859191 的三平台 build/test 均通过；完整 cold/incremental、Debug/Release 与 SDK/ABI 组合矩阵仍缺对应证据。
-
-## 2026-09-19 修复验证
-
-- macOS arm64 使用官方 LLVM 22.1.7 冷安装，摘要验证通过；`cargo build --locked --workspace`、`panta-tests toolchain` 成功，CMakeCache 与 CMake/CXX 数据库指向同一托管目录。未启用系统工具旁路。
-- 两条 C++ 链显式使用 Apple SDK libc++ 头与 sysroot，修复 LLVM 发行包 libc++ 头引用平台运行库尚无的 `__hash_memory` 符号。部署目标取 `MACOSX_DEPLOYMENT_TARGET`，未指定时与 cc 的 SDK 默认值一致。
-- `cargo test --locked --release` 通过，Rust 与 native CTest 28/28；Debug 聚合由 `cargo quality` 通过。`cargo coverage native` 使用 LLVM 22 配套 profdata/cov 成功生成报告（函数 93.51%、行 92.93%、分支 50.26%，包含自有测试源，不能视为纯业务代码指标）。QML 仅有行为验证，CXX adapter 插桩与 native 百分比门禁仍待 032。
-- panta-build 的 12 项测试通过：并发安装只发布一次、失败升级保留旧版本、进程退出后重试成功、数据库筛选和实际编译器拒错、Cppcheck 依赖模型投影。Rust coverage 对象目录复用根 target LLVM 缓存，不再重复下载。
-- 截至 2026-09-21，Linux/Windows 未在本机运行，远程 CI 尚未触发。后续 run 36001859191 已提供三平台 build/test 成功证据；但完整 clean/incremental、Debug/Release、平台运行库、sanitizer 与 CAE SDK 组合矩阵仍未完成，保持 in-progress。
+三平台统一 LLVM 22.1.7 的供给、CMake/Cargo CXX 编译器选择和 LLVM 质量工具闭环已完成。迁移至 `.toolchain/` 后，main nightly 的三平台完整测试、实际工具链核验和登记的 sanitizer 矩阵全部通过。

@@ -1,6 +1,6 @@
 # 130 — 工具链目录与 PR CI 收敛
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[012](012-ci-reproducibility.md)、[020](020-toolchain-provisioning.md)、[041](041-build-artifact-consolidation.md)、[120](120-pr-affected-test-selection.md)
 - 优先级：P1
@@ -84,4 +84,6 @@ Cargo/native 构建树、coverage、性能报告和按需编译工具的临时�
 
 ## 完成摘要
 
-实现、独立评审与 PR CI 验证完成。macOS NativeFormat 用例未能在本机沙箱写入用户 Preferences；PR CI 的平台为 Ubuntu，macOS NativeFormat 真实系统存储仍由 nightly 三平台全测验证。
+工具链资产已迁至仓库根 `.toolchain/`，PR CI 收敛为 Ubuntu 影响范围检查，Windows/macOS 完整测试及 Objective-C++ 检查由 nightly 承接。独立评审与 PR [#88](https://github.com/Yuki-Nagori/panta/pull/88) CI 全部通过；本机 `cargo clean` 后重建及工具链核验通过。
+
+本机沙箱不能写入 `~/Library/Preferences`，因此 `QtAdapter.UserSettingsStore` 的 NativeFormat 系统存储用例未在本机验证。该平台行为由 nightly 三平台测试承接，不阻塞本任务完成；nightly 后续结果按常规 CI 维护处理。

@@ -44,7 +44,7 @@
 | 039 | [CI FFI 构建链修复](task/039-ci-ffi-build-fix.md) | 验证基础 | 006, 018, 036 | done |
 | 040 | [统一 Cargo 构建编排入口](task/040-cargo-build-orchestration.md) | 验证基础 | 004, 039 | done |
 | 041 | [构建产物归一与第三方缓存共享](task/041-build-artifact-consolidation.md) | 验证基础 | 004, 020 | done |
-| 130 | [工具链目录与 PR CI 收敛](task/130-toolchain-root-and-pr-ci.md) | 验证基础 | 012, 020, 041, 120 | in-progress |
+| 130 | [工具链目录与 PR CI 收敛](task/130-toolchain-root-and-pr-ci.md) | 验证基础 | 012, 020, 041, 120 | done |
 
 ## 应用平台扩展队列
 
@@ -123,7 +123,7 @@
 | 034 | [Rust Panta Artifact 解析与 TS/QM 编译入口](task/034-rust-panta-artifact-parser.md) | 应用平台扩展 | 001 | done |
 | 035 | [`.pa` 格式化器与格式校验器选型](task/035-pa-formatter-and-validator.md) | 应用平台扩展 | 034 | done |
 | 037 | [软件内增量更新基础](task/037-incremental-update-foundation.md) | 交付基础 | 005, 008, 013, 023 | planned |
-| 042 | [三平台自有 C++ 统一 LLVM/Clang 工具链](task/042-unified-llvm-toolchain.md) | 验证基础 | 018, 032, 038 | in-progress |
+| 042 | [三平台自有 C++ 统一 LLVM/Clang 工具链](task/042-unified-llvm-toolchain.md) | 验证基础 | 018, 020 | done |
 | 043 | [根目录质量入口与测试聚合](task/043-root-quality-runner.md) | 验证基础 | 011, 032 | done |
 | 044 | [Windows CI 停滞诊断与修复](task/044-windows-ci.md) | 验证基础 | 018, 042 | done |
 | 045 | [Windows CI 分支代码审查与收敛](task/045-branch-code-review.md) | 验证基础 | 044 | done |
