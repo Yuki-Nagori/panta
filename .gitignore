@@ -1,5 +1,6 @@
 # Cargo workspace outputs; keep Cargo.lock and .cargo/config.toml tracked.
 /target/
+/.toolchain/
 
 # Native/Python build and package outputs (out-of-source builds only).
 /build/

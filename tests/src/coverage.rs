@@ -56,7 +56,7 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
         .args(["--json", "--output-path"])
         .arg(&report_path)
         .env("CARGO_TARGET_DIR", target)
-        .env("PANTA_TOOL_CACHE_ROOT", target)
+        .env("PANTA_TOOLCHAIN_ROOT", panta_build::toolchain_root(target))
         .current_dir(root);
     run_command("cargo llvm-cov", command)?;
     let report = Report::parse(&fs::read(report_path)?, root)?;
@@ -109,7 +109,7 @@ fn write_rust_details(
 fn configure_report_command(command: &mut Command, root: &Path, target: &Path) {
     command
         .env("CARGO_TARGET_DIR", target)
-        .env("PANTA_TOOL_CACHE_ROOT", target)
+        .env("PANTA_TOOLCHAIN_ROOT", panta_build::toolchain_root(target))
         .current_dir(root);
 }
 

@@ -32,19 +32,20 @@ pub(super) fn verify_toolchain() -> Result<(), Box<dyn Error>> {
     let clang_format = &llvm.clang_format;
     let llvm_root = &llvm.root;
     let llvm_version = panta_build::LLVM_VERSION;
-    let managed_root = target_root.join("panta-tools");
+    let toolchain_root = panta_build::toolchain_root(target_root);
+    let managed_root = toolchain_root.join("tools");
     let managed_cmake = managed_root.join("cmake");
     let managed_llvm = managed_root.join("llvm");
     let ninja = panta_build::resolve_ninja(target_root, &cmake)?;
-    let qt_bin = target_root.join("panta-deps/qt/staging/bin");
+    let qt_bin = toolchain_root.join("deps/qt/staging/bin");
     let googletest_triple = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("macos", "aarch64") => "macos-arm64",
         ("linux", "x86_64") => "linux-x86_64",
         ("windows", "x86_64") => "windows-x86_64",
         (os, arch) => return Err(format!("不支持的 GoogleTest SDK 平台：{os}/{arch}").into()),
     };
-    let googletest = target_root
-        .join("panta-deps/sdk/googletest/1.18.0")
+    let googletest = toolchain_root
+        .join("deps/sdk/googletest/1.18.0")
         .join(googletest_triple)
         .join("lib/cmake/GTest/GTestConfig.cmake");
     let compile_database = native_dir.join("compile_commands.json");

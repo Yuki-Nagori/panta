@@ -1,10 +1,10 @@
 # 依赖获取与主平台环境
 
-更新日期：2026-10-20。本文维护依赖供给规则和配置入口；技术选择见[版本基线](baseline.md)，构建职责与命令见[构建说明](../architecture/build-and-development.md)，实施证据见责任任务。
+更新日期：2026-10-25。本文维护依赖供给规则和配置入口；技术选择见[版本基线](baseline.md)，构建职责与命令见[构建说明](../architecture/build-and-development.md)，实施证据见责任任务。
 
 ## 托管原则
 
-- Cargo 引导将固定预编译包安装到 `target/panta-tools/`、`target/panta-deps/`；普通构建不编译第三方源码，不写源码树，也不隐式回退到系统包、Python wheel 或源码。需要新平台制品时，由独立 SDK 管线生产。
+- Cargo 引导将固定预编译包安装到仓库根 `.toolchain/tools/`、`.toolchain/deps/`；Cargo 与 native 构建树、临时编译输出保留在 `target/`。普通构建不编译第三方源码，不写入受版本控制的源码文件，也不隐式回退到系统包、Python wheel 或源码。需要新平台制品时，由独立 SDK 管线生产。
 - 资产必须匹配平台、架构、编译器 / 运行库 ABI、Qt 兼容范围及模块；缺包、摘要或 target 不匹配立即失败并给出诊断。个人安装的同名库不构成项目基线。
 - 源码固定 tag 和 commit，归档固定 URL 与 SHA256；尽量选择相容的稳定版。升级同一提交更新实际清单、相关说明和任务，记录来源、构建选项、许可证、验证与回退；受依赖约束不能升级时记录重评条件。
 
@@ -35,7 +35,7 @@
 | Netgen | 同 OCCT 配对 manifest / 制品说明 | 必须以大写 N 调用 `find_package(Netgen CONFIG)`；targets 为 `ngcore` / `nglib`，`USE_OCC=ON`；GUI / Python / MPI / JPEG / MPEG 关闭。网格正确性见 010。 |
 | GoogleTest | [SDK manifest](../../native/cmake/sdk-provision.cmake)、[制品说明](../../tools/sdk/releases/googletest-1.18.0.md) | 仅 `BUILD_TESTING=ON` 获取静态 SDK；`find_package(GTest CONFIG)`、`GTest::gtest` / `GTest::gtest_main`。上游 CMake 安装、C++17、关闭 GMock，Windows Release `/MD`。任务 019 / 070 / 071。 |
 
-Qt 缓存为 `target/panta-deps/qt/staging`，归档指纹位于 `qt/extracted`，跨 profile 共享。官方源失败或摘要不符时可尝试 TUNA 镜像；`PANTA_QT_MIRROR` 可插入同构镜像，所有来源均强校验。SDK 使用 `panta_require_sdk`，在 `target/panta-deps/sdk/<name>/<version>/<triple>` 缓存，并用受限的 `find_package(... CONFIG ... NO_DEFAULT_PATH)` 消费。
+Qt 缓存为 `.toolchain/deps/qt/staging`，归档指纹位于 `qt/extracted`，跨 profile 共享。官方源失败或摘要不符时可尝试 TUNA 镜像；`PANTA_QT_MIRROR` 可插入同构镜像，所有来源均强校验。SDK 使用 `panta_require_sdk`，在 `.toolchain/deps/sdk/<name>/<version>/<triple>` 缓存，并用受限的 `find_package(... CONFIG ... NO_DEFAULT_PATH)` 消费。
 
 许可证随发布包保留：CMake / VTK / GoogleTest 为 BSD 系列，Ninja 为 Apache-2.0，LLVM 带 LLVM exceptions，Qt 为 LGPL-3.0，OCCT 为 LGPL-2.1 加例外，Netgen 为 LGPL-2.1，Dawn / ICU 各按上游许可证。具体模块及再分发要求以各归档的 license / provenance 和制品说明为准，不将仓库许可证套用于依赖。
 
@@ -47,14 +47,14 @@ Qt 缓存为 `target/panta-deps/qt/staging`，归档指纹位于 `qt/extracted`�
 
 ## CI 与干净重建
 
-[ci.yml](../../.github/workflows/ci.yml) 在三平台构建并按影响范围执行测试及质量检查；[nightly.yml](../../.github/workflows/nightly.yml) 承担完整测试、覆盖率和长时检查。纯文档规则与代码目录内 Markdown 夹具的例外以 workflow 为准；选择器与日常验证见 AGENTS.md。CI 的 Linux 宿主前置由独立 action 安装，不属于项目 SDK；工具、Qt 与 SDK 仍经 Cargo 入口供给。
+[ci.yml](../../.github/workflows/ci.yml) 在 Ubuntu 构建并按影响范围执行测试及质量检查；Windows/macOS 完整测试与 macOS Objective-C++ 检查由 [nightly.yml](../../.github/workflows/nightly.yml) 承担，nightly 覆盖三平台。纯文档规则与代码目录内 Markdown 夹具的例外以 workflow 为准；选择器与日常验证见 AGENTS.md。CI 的 Linux 宿主前置由独立 action 安装，不属于项目 SDK；工具、Qt 与 SDK 仍经 Cargo 入口供给。
 
 干净检出后安装上述宿主前置，在仓库内由 rustup 按工具链文件补齐组件，再执行 `cargo build --locked`、`cargo run --locked`。构建目录、无桥接诊断和安装命令统一见[构建说明](../architecture/build-and-development.md)。回退时恢复上一版配套配置并重建；删除构建树不影响源码。跨平台窗口及部署限制分别记录在 007 / 013。
 
 ## 质量工具供给与缓存
 
-`panta-build` 的 [assets.rs](../../crates/panta-build/src/assets.rs) 与 [install.rs](../../crates/panta-build/src/install.rs) 统一固定资产、校验、加锁及安装。uv / hyperfine 与 LLVM 等工具按版本和摘要隔离在 `target/panta-tools/`；`cargo hyperfine` 按需安装，命令见[性能模块](../modules/performance.md)。Python 解释器版本见 [python.rs](../../crates/panta-build/src/python.rs)，工具锁见 [pyproject.toml](../../pyproject.toml) / [uv.lock](../../uv.lock)，禁止源码安装回退。Cppcheck 是仅开发 / CI 使用的 GPL-3.0 工具，不链接进应用；工具及解释器许可证沿分发包保留。质量入口见[质量工具链](../modules/quality-tooling.md)。
+`panta-build` 的 [assets.rs](../../crates/panta-build/src/assets.rs) 与 [install.rs](../../crates/panta-build/src/install.rs) 统一固定资产、校验、加锁及安装。uv / hyperfine 与 LLVM 等工具按版本和摘要隔离在 `.toolchain/tools/`；Cargo 安装的质量工具也写入该目录，编译临时输出仍在 `target/cargo-build/`。`cargo hyperfine` 按需安装，命令见[性能模块](../modules/performance.md)。Python 解释器版本见 [python.rs](../../crates/panta-build/src/python.rs)，工具锁见 [pyproject.toml](../../pyproject.toml) / [uv.lock](../../uv.lock)，禁止源码安装回退。Cppcheck 是仅开发 / CI 使用的 GPL-3.0 工具，不链接进应用；工具及解释器许可证沿分发包保留。质量入口见[质量工具链](../modules/quality-tooling.md)。
 
-CI 仅缓存 Cargo registry/git 和可校验的工具 / SDK 资产；不缓存 `target/native` 或 Cargo 编译产物，避免旧配置、编译数据库和对象泄漏。键包含平台、架构、工具版本与供给清单；回退命中仍需目录内版本及摘要校验，Windows LLVM 安装目录同样适用。
+CI 仅缓存 Cargo registry/git 与 `.toolchain/tools`、`.toolchain/deps` 中可校验的工具 / SDK 资产；不缓存 `target/native` 或 Cargo 编译产物，避免旧配置、编译数据库和对象泄漏。键包含布局版本、平台、架构、工具版本与供给清单；回退命中仍需目录内版本及摘要校验，Windows LLVM 安装目录同样适用。
 
 工具下载由父进程限制含重试的总耗时 30 分钟，解包 / Windows 安装上限 20 分钟；超时回收直接子进程，不发布 `.complete`，临时目录留待下次持锁清理。安装各阶段有日志，长操作每 30 秒报告耗时。不能只用 curl `--max-time` 代替总预算：每次重试会重置该计时，`--retry-max-time` 也不截断在途传输。依据见 [curl 手册](https://curl.se/docs/manpage.html#--max-time)，实跑诊断见任务 [044](../task/044-windows-ci.md)。

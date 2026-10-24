@@ -1,4 +1,4 @@
-# 保存托管缓存（任务 012/046）。仅 ci.yml check job 在 main push 时调用；
+# 保存托管缓存（任务 012/046）。仅 main 上的 CI push 和 nightly 调用；
 # PR 只恢复不保存，避免条目按 PR 数量膨胀。缓存瘦身在供给层完成：
 # panta-build 安装归档发布即删并按白名单裁剪 LLVM，Qt/SDK CMake 供给发布
 # 即删归档；cargo-home 键不缓存 registry src/ 解包副本。改键时与
@@ -11,9 +11,9 @@ runs:
   steps:
     - shell: bash
       run: |
-        du -sh target/panta-tools target/panta-deps ~/.cargo/registry 2>/dev/null || true
+        du -sh .toolchain/tools .toolchain/deps ~/.cargo/registry 2>/dev/null || true
 
-    - if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    - if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
       continue-on-error: true
       uses: actions/cache/save@v4
       with:
@@ -24,12 +24,12 @@ runs:
           ~/.cargo/git/checkouts
         key: cargo-home-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
 
-    - if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    - if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
       continue-on-error: true
       uses: actions/cache/save@v4
       with:
         path: |
-          target/panta-tools
-          target/panta-deps
-          !target/panta-tools/cargo-*
-        key: panta-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}
+          .toolchain/tools
+          !.toolchain/tools/cargo-*
+          .toolchain/deps
+        key: panta-cache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/panta-build/Cargo.toml', 'crates/panta-build/src/*.rs', 'native/CMakeLists.txt', 'native/cmake/*.cmake', 'native/cmake/**/*.cmake') }}

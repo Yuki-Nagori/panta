@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::paths::toolchain_root;
+
 /// Qt 与 macOS 原生 SDK 制品共同支持的最低部署版本。
 pub const MACOS_DEPLOYMENT_TARGET: &str = "13.0";
 
@@ -62,7 +64,7 @@ pub fn native_test_env(
         return Ok(environment);
     }
 
-    let deps = target_root.join("panta-deps");
+    let deps = toolchain_root(target_root).join("deps");
     let qt_bin = deps.join("qt").join("staging").join("bin");
     if !qt_bin.is_dir() {
         return Err(format!("托管 Qt 运行库目录不存在：{}", qt_bin.display()));
@@ -171,7 +173,7 @@ mod tests {
     #[test]
     fn windows_sdk_dll_dirs_only_keeps_windows_triples_with_bin() -> Result<(), String> {
         let root = std::env::temp_dir().join(format!("panta-sdk-dll-{}", std::process::id()));
-        let sdk = root.join("panta-deps/sdk");
+        let sdk = root.join(".toolchain/deps/sdk");
         // 正常布局：sdk/<name>/<version>/<triple>/[bin|lib]。
         let vtk = sdk.join("vtk/9.7.0");
         for triple in ["windows-x86_64", "linux-x86_64", "macos-arm64"] {
@@ -184,7 +186,7 @@ mod tests {
         // 嵌套布局（OCCT 8：win64/vc14/bin）；非 bin 中间目录照常下探。
         let occt = sdk.join("occt/8.0.1/windows-x86_64");
         fs::create_dir_all(occt.join("win64/vc14/bin")).map_err(|e| e.to_string())?;
-        let dirs = windows_sdk_dll_dirs(&root.join("panta-deps"));
+        let dirs = windows_sdk_dll_dirs(&root.join(".toolchain/deps"));
         let expected = vec![
             sdk.join("dawn/1.0.0/windows-x86_64/bin"),
             occt.join("win64/vc14/bin"),

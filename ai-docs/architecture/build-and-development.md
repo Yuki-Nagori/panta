@@ -13,7 +13,7 @@
 | Rust 与 CXX | Cargo 构建 Rust；`panta-ffi` 生成桥接头和 staticlib，launcher 将路径交给 CMake。普通依赖与 build-dependency 保证库先于 launcher 构建脚本就绪。 |
 | Qt / QML / C++ | CMake 管理 native 编译、moc、rcc、qmlcachegen、静态 QML 插件和桌面可执行文件；Ninja 执行构建图。 |
 | 构建目录 | `target/native/<profile>`，Cargo 与 presets 共用有效配置，Debug / Release 分开。 |
-| 固定工具与 SDK | 工具位于 `target/panta-tools/`，Qt 与 native SDK 位于 `target/panta-deps/`；版本与摘要见[依赖规范](../standards/dependency-acquisition.md)。 |
+| 固定工具与 SDK | 工具位于 `.toolchain/tools/`，Qt 与 native SDK 位于 `.toolchain/deps/`；版本与摘要见[依赖规范](../standards/dependency-acquisition.md)。 |
 | 增量重建 | 跟踪 native 源码/配置、QML、正式资源及测试使用的原型输入；`prototypes/shell/shell.js` 是图标 symbol 来源，不能因位于原型目录而跳过。 |
 
 Qt 入口为 `native/app`；`Panta.App` 包装可复用的 `Panta.Shell`，使部署扫描能解析传递的 QML imports。应用和测试显式链接静态插件，保留类型注册。i18n 的 `.pa → TS → QM` 产物均在构建树生成，QM 随资源打包；运行期切换见任务 022。

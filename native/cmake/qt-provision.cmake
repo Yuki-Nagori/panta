@@ -9,7 +9,7 @@
 # 如 https://mirrors.tuna.tsinghua.edu.cn/qt）可把其他镜像插到最前。
 # SHA256 校验与来源无关，始终强制。
 # 供给结果缓存在 QT_PROVISION_DIR（默认构建树 qt/；任务 041 起由
-# build.rs 传入 target/panta-deps/qt，跨 profile 与 presets 共享）。
+# build.rs 传入仓库根 .toolchain/deps/qt，跨 profile 与 presets 共享）。
 # 模块构成：qtbase + qtdeclarative（005）、qttools（034，含 lrelease）、
 # qtsvg（029，图标资源经 Image 渲染依赖 qsvg 图像格式插件）与 qtscxml
 # （074，提供 Qt StateMachine）；其他附加模块按实际消费者扩展。

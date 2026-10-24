@@ -107,7 +107,7 @@ pub(super) fn ensure_cargo_tool(name: &str, version: &str) -> Result<PathBuf, Bo
             .args([name, "--locked", "--version", &format!("={version}")])
             .env(
                 "CARGO_TARGET_DIR",
-                target_root.join("panta-tools/cargo-build").join(name),
+                target_root.join("cargo-build").join(name),
             );
         run(&format!("安装 {name} {version}"), command).map_err(|e| e.to_string())?;
         if !staging

@@ -10,7 +10,7 @@ fn main() -> Result<(), io::Error> {
     println!("cargo:rerun-if-changed=src/ffi_support.cc");
     println!("cargo:rerun-if-changed=include/panta/ffi.hpp");
     println!("cargo:rerun-if-env-changed=PANTA_USE_SYSTEM_TOOLS");
-    println!("cargo:rerun-if-env-changed=PANTA_TOOL_CACHE_ROOT");
+    println!("cargo:rerun-if-env-changed=PANTA_TOOLCHAIN_ROOT");
     println!("cargo:rerun-if-env-changed=CC");
     println!("cargo:rerun-if-env-changed=CXX");
     println!("cargo:rerun-if-env-changed=CLANG_FORMAT");

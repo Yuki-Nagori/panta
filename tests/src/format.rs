@@ -309,7 +309,9 @@ fn qmlformat_path(target_root: &Path) -> PathBuf {
     } else {
         "qmlformat"
     };
-    target_root.join("panta-deps/qt/staging/bin").join(name)
+    panta_build::toolchain_root(target_root)
+        .join("deps/qt/staging/bin")
+        .join(name)
 }
 
 fn provision_qml_format(root: &Path, target_root: &Path) -> Result<(), Box<dyn Error>> {
@@ -318,7 +320,9 @@ fn provision_qml_format(root: &Path, target_root: &Path) -> Result<(), Box<dyn E
     command
         .arg(format!(
             "-DQT_PROVISION_DIR={}",
-            target_root.join("panta-deps/qt").display()
+            panta_build::toolchain_root(target_root)
+                .join("deps/qt")
+                .display()
         ))
         .arg("-P")
         .arg(root.join("native/cmake/qt-provision.cmake"));

@@ -2,7 +2,7 @@
 
 [模块导航](README.md) · [实施任务 048](../task/048-performance-testing.md) · [质量工具链](quality-tooling.md)
 
-更新日期：2026-10-20。
+更新日期：2026-10-25。
 
 ## 统一手动入口（任务 100）
 
@@ -77,7 +77,7 @@ DSL 套件测量解析 fixture、从源码解析并格式化、以及对已解�
 
 2026-10-18 本机 Criterion 基线：macOS 26.3.1 arm64、rustc/cargo 1.98.1、`bench` profile。以下为 Criterion `slope` 点估计及 95% CI：DSL fixture 解析 17.674 µs（17.351–18.172 µs）、源码 parse+format 19.513 µs（19.308–19.767 µs）、已解析文档格式化 1.894 µs（1.890–1.899 µs）；工程页签新建 57.154 ns（56.244–58.210 ns）、未加载页签激活请求 31.659 ns（29.213–33.780 ns）、单页签快照 196.732 ns（194.887–199.628 ns）。少数样本存在高位异常；本结果仅用于同机后续对比，不设性能门槛。`CRITERION_HOME` 显式固定到 workspace `target/criterion`，避免 Cargo workspace 中报告落入 crate 子目录。完整统计与图表可由上方命令重建。
 
-命令级对比使用 `cargo hyperfine`，首次调用会从固定的官方平台资产安装 hyperfine 2.0.0 并验证 SHA256，文件缓存位于 `target/panta-tools/hyperfine/`。先编译两个 profile，避免把编译耗时混入执行耗时；无预热 run 只是首次进程启动样本，不代表清空磁盘缓存。工作区不存在可切换的 dslc 编译开关，因此 Debug/Release 是本项目实际可比较的构建配置：
+命令级对比使用 `cargo hyperfine`，首次调用会从固定的官方平台资产安装 hyperfine 2.0.0 并验证 SHA256，文件缓存位于 `.toolchain/tools/hyperfine/`。先编译两个 profile，避免把编译耗时混入执行耗时；无预热 run 只是首次进程启动样本，不代表清空磁盘缓存。工作区不存在可切换的 dslc 编译开关，因此 Debug/Release 是本项目实际可比较的构建配置：
 
 ```sh
 cargo build --locked -p panta-dslc

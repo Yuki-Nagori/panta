@@ -4,6 +4,7 @@ use std::process::Command;
 
 use crate::assets::Tool;
 use crate::install::ensure_tool;
+use crate::paths::toolchain_root;
 
 pub use crate::assets::UV_VERSION;
 
@@ -12,7 +13,7 @@ pub const PYTHON_VERSION: &str = "3.14.7";
 /// uv 自身按 SHA256 安装；其固定版本携带 Python 下载清单及校验和，禁止选择系统 Python。
 pub fn command(target: &Path, project: &Path, tool: &str) -> Result<Command, String> {
     let uv = ensure_tool(Tool::Uv, target, None)?;
-    let root = target.join("panta-tools/python");
+    let root = toolchain_root(target).join("tools/python");
     let mut command = Command::new(uv);
     command
         .current_dir(project)

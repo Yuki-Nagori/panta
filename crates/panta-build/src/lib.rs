@@ -24,7 +24,7 @@ pub use environment::{
     use_system_tools, windows_sdk_env,
 };
 pub use install::{install_directory, install_lock};
-pub use paths::exe_name;
+pub use paths::{exe_name, toolchain_root};
 
 /// 解析按需安装并经 SHA256 校验的 hyperfine 命令。
 pub fn resolve_hyperfine(target_root: &Path) -> Result<PathBuf, String> {

@@ -12,8 +12,23 @@ pub fn exe_name(name: &str) -> String {
     }
 }
 
+/// 独立于 Cargo 构建树的共享安装根。`PANTA_TOOLCHAIN_ROOT` 供隔离构建
+/// （如 coverage）显式保持同一安装目录；常规构建使用 Cargo target 的兄弟目录。
+pub fn toolchain_root(target_root: &Path) -> PathBuf {
+    std::env::var_os("PANTA_TOOLCHAIN_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default_toolchain_root(target_root))
+}
+
+pub(super) fn default_toolchain_root(target_root: &Path) -> PathBuf {
+    target_root
+        .parent()
+        .map(|parent| parent.join(".toolchain"))
+        .unwrap_or_else(|| PathBuf::from(".toolchain"))
+}
+
 pub(super) fn tools_root(target_root: &Path) -> PathBuf {
-    target_root.join("panta-tools")
+    toolchain_root(target_root).join("tools")
 }
 
 /// 深度受限地查找 `bin/cmake`；返回第一个命中的路径。
@@ -100,6 +115,14 @@ pub(super) fn set_executable(path: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn toolchain_root_is_sibling_to_target_directory() {
+        assert_eq!(
+            default_toolchain_root(Path::new("/workspace/target")),
+            PathBuf::from("/workspace/.toolchain")
+        );
+    }
 
     #[test]
     fn finds_cmake_binary_in_nested_layout() {
