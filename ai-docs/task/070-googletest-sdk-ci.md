@@ -5,7 +5,9 @@
 - 依赖：[019 GTest 测试配置与规则](019-gtest-native-testing.md)、[031 预编译 native 依赖](031-prebuilt-native-dependencies.md)、[038 native SDK 制品生产](038-native-sdk-artifact-production.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-10-14
+- 创建 / 更新：2026-09-24 / 2026-10-25
+
+> 生产 workflow、自检工程和制品说明已迁移到 [sdk-packaging](https://github.com/Jack-Lab-at-EIT/sdk-packaging)；本任务保留 Panta 内历史实施与验收证据。后续生产维护只在外部仓库进行。
 
 ## 目标与背景
 
@@ -53,8 +55,8 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 
 ## 预计改动
 
-- `.github/workflows/sdk-googletest.yml`（新增）
-- `tools/sdk/selfcheck/googletest/`（新增自检 CMake 工程与 smoke test）
+- [外部 GoogleTest workflow](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/.github/workflows/sdk-googletest.yml)（原新增）
+- [外部 GoogleTest selfcheck](https://github.com/Jack-Lab-at-EIT/sdk-packaging/tree/main/tools/sdk/selfcheck/googletest)（原新增）
 - `ai-docs/standards/dependency-acquisition.md`
 - `ai-docs/task-index.md`
 - `ai-docs/task/070-googletest-sdk-ci.md`
@@ -82,7 +84,7 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
 | 2026-09-24 | macOS：`cargo format` | 仓库聚合格式入口通过 | 通过 |
-| 2026-09-24 | macOS：`actionlint .github/workflows/sdk-googletest.yml`；Ruby YAML parser | workflow 语法与 GitHub Actions 表达式通过静态检查 | 通过 |
+| 2026-09-24 | macOS：actionlint 与 Ruby YAML parser 检查 GoogleTest producer workflow | workflow 语法与 GitHub Actions 表达式通过静态检查 | 通过；当前生产 workflow 位于外部仓库，见上方链接 |
 | 2026-09-24 | Actions run [35972333653](https://github.com/Yuki-Nagori/panta/actions/runs/35972333653) `workflow_dispatch` | Linux/macOS/Windows 每个平台完成固定源码校验、SDK build/install、自检、package、artifact upload；Release 收口成功 | 全绿；Release `sdk-googletest-1.18.0` 已发布 |
 | 2026-09-24 | 下载三平台 Release 归档与 sidecar、`shasum -a 256`、`tar tzf` | 实际摘要与 GitHub Release API digest / sidecar 相同，归档内有 config、静态库、license | 通过；消费摘要记录在任务 071 与依赖固定清单 |
 | 2026-09-24 | Actions run [35992062001](https://github.com/Yuki-Nagori/panta/actions/runs/35992062001) Windows consumer link | 固定 Windows SDK 能与仓库 MSVC ABI 链接 | 失败；link log 引用了 `libgtest.a`、`__mingw_vfprintf` 和 `__cxxabiv1`，证明现有 Windows SDK 是 MinGW ABI；producer selfcheck 曾用同一默认编译器，因此未覆盖该错配。修复跟踪见任务 075 |
@@ -105,4 +107,4 @@ GoogleTest v1.18.0 目前通过 CMake FetchContent 从 Git 仓库拉取固定 co
 
 ## 完成摘要
 
-手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程已落地。run 35999015400 修复 Windows MSVC ABI；run 38509650651 按 macOS 13.0 目标重产并发布三平台资产，Release digest、sidecar 与任务 071 manifest 一致。新摘要的消费端复验由任务 071 跟进。
+手动三平台 SDK 生产 workflow、自检工程与单 job 全量覆盖发布流程已落地，并迁至 `Jack-Lab-at-EIT/sdk-packaging`。run 35999015400 修复 Windows MSVC ABI；run 38509650651 按 macOS 13.0 目标重产并发布三平台资产，Release digest、sidecar 与任务 071 manifest 一致。新摘要的消费端复验由任务 071 跟进。

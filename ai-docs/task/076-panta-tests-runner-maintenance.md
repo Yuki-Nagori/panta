@@ -5,7 +5,7 @@
 - 依赖：[011 统一测试与质量入口](011-test-quality-entrypoints.md)、[043 根目录质量入口与测试聚合](043-root-quality-runner.md)
 - 优先级：P2
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-24
+- 创建 / 更新：2026-09-24 / 2026-10-25
 
 ## 目标与背景
 
@@ -61,7 +61,7 @@
 |---|---|---|---|
 | 2026-09-24 | macOS：`cargo format --check`、`cargo build`、`cargo lint --check` | 格式、常规构建与八阶段质量聚合通过 | 全部通过；lint 包含 qmllint、clang-tidy、include-cleaner 与 cppcheck |
 | 2026-09-24 | macOS：`cargo test --locked --workspace` | Rust、native CTest 与 QML 聚合测试通过 | 通过；native CTest 56/56，workspace Rust 测试及 doc-tests 均通过 |
-| 2026-09-24 | macOS：`actionlint .github/workflows/sdk-googletest.yml` | GoogleTest SDK workflow 语法检查通过 | 通过 |
+| 2026-09-24 | macOS：actionlint 检查 GoogleTest SDK producer workflow | workflow 语法检查通过 | 通过；生产 workflow 现由 [sdk-packaging](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/.github/workflows/sdk-googletest.yml) 维护 |
 | 2026-09-24 | GitHub Actions run [35998981964](https://github.com/Yuki-Nagori/panta/actions/runs/35998981964)，standalone cppcheck | 单项 lint 为自身准备 benchmark moc，且扫描通过 | 失败；`cppcheck.json` 包含 QML benchmark 的 `mocs_compilation.cpp`，而 `run_cppcheck` 单项入口只构建 launcher；修复后本机复验 |
 | 2026-09-24 | macOS：`cargo lint cppcheck --check` 和 `cargo lint --check` | standalone cppcheck 和八阶段质量聚合生成 moc 并通过 | 全部通过；独立入口生成两个 benchmark AUTOGEN 目标后 cppcheck 通过，聚合 lint 八阶段全通过 |
 | 2026-09-24 | macOS：`cargo test --locked --workspace`，使用更新后的 SDK manifest | 新 macOS GoogleTest 归档校验与 workspace 测试通过 | 通过；staging marker 为新 SHA `654e87d9…cc2230`，native CTest 56/56，workspace Rust/doc tests 全通过 |

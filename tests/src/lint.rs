@@ -192,7 +192,7 @@ fn run_changed_cmake_lint() -> Result<(), Box<dyn Error>> {
                     || path
                         .extension()
                         .is_some_and(|extension| extension == "cmake"))
-                && ["native", "qml", "tools"]
+                && ["native", "qml"]
                     .iter()
                     .any(|directory| path.starts_with(root.join(directory)))
         })

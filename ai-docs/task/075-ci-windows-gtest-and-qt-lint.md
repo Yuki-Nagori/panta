@@ -5,7 +5,7 @@
 - 依赖：[070 GoogleTest SDK 制品 CI](070-googletest-sdk-ci.md)、[071 GoogleTest SDK 消费接入](071-googletest-sdk-consumption.md)、[046 CI 触发拆分与缓存预算](046-ci-trigger-split-cache-budget.md)
 - 优先级：P1
 - 负责人：Yuki
-- 创建 / 更新：2026-09-24 / 2026-09-24
+- 创建 / 更新：2026-09-24 / 2026-10-25
 
 ## 目标与背景
 
@@ -42,7 +42,7 @@
 
 ## 预计改动
 
-- `.github/workflows/sdk-googletest.yml`
+- [GoogleTest producer workflow（现由外部仓库维护）](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/.github/workflows/sdk-googletest.yml)
 - `tests/src/main.rs`
 - [076 Cargo 测试与质量 runner 维护](076-panta-tests-runner-maintenance.md) 中的 runner 局部收敛同文件提交，但独立记录与验收。
 - `native/cmake/sdk-provision.cmake`（仅当新 Windows 归档摘要确定后）
@@ -68,7 +68,7 @@
 |---|---|---|---|
 | 2026-09-24 | GitHub Actions run `35992062001`：查看 Windows linker 与 Ubuntu clang-tidy/includes 日志 | 确认失败符号和缺失输入 | 已确认：GTest 链接出现 `__mingw_vfprintf`、`__cxxabiv1` 与 `testing::*` 未解析符号；benchmark 报缺少源内 `.moc` include；push 包含 `da880de` 的 QML 改动，路径分类器触发代码 CI 正确 |
 | 2026-09-24 | 当前工作区：检查 GoogleTest workflow、SDK manifest、CMake compile database 与 benchmark target 属性 | 确认 Windows 目标 ABI 和 lint 生成依赖 | 已确认 workflow 设 Ninja 但未声明 MSVC 编译器；消费者调用 `lld-link`；两个 benchmark 使用 `EXCLUDE_FROM_ALL` 并仍在 clang-tidy compile database 中 |
-| 2026-09-24 | macOS：`actionlint .github/workflows/sdk-googletest.yml` | Windows producer workflow 语法通过 | 通过；明确使用 Visual Studio 2022 x64 生成器，并以 Release 配置 build/install；Windows 库名自检拒绝 MinGW `.a` |
+| 2026-09-24 | macOS：actionlint 检查 GoogleTest producer workflow | Windows producer workflow 语法通过 | 通过；明确使用 Visual Studio 2022 x64 生成器，并以 Release 配置 build/install；Windows 库名自检拒绝 MinGW `.a`。workflow 已迁至外部仓库 |
 | 2026-09-24 | macOS：`cargo format --check`、`cargo build`、`cargo lint --check`、`cargo test --locked --workspace` | 当前平台聚合验证通过，所有扫描器前两个 benchmark moc 已生成 | 全部通过；八阶段 lint 通过（含 clang-tidy、include-cleaner、cppcheck），新 manifest 对应 macOS SDK staging marker 命中，native CTest 56/56 |
 | 2026-09-24 | GitHub Actions run [35999015400](https://github.com/Yuki-Nagori/panta/actions/runs/35999015400) `workflow_dispatch`，发布输入开启 | MSVC Release SDK 通过自检并替换三平台 Release 资产 | 全绿；Windows 使用 Visual Studio 2022 x64；三平台 package 与 selfcheck 均成功 |
 | 2026-09-24 | 下载三个 `.sha256` sidecar 并与 Release API `digest` 对照 | 更新 manifest 的三平台归档摘要 | 一致；macOS `654e87d943c68ab964da77ac3e9514900049e6f1b3c044e311017a7725cc2230`，Linux `4b4b1281828c095cda29fdc4e7b150d816296da2b2c1375a2a2326ebc68de5ae`，Windows `d070f6fbe77d1060033e8eb6bac97b7efba736db7b40fc50ef2ce9ce914c03ff`；已更新固定清单 |

@@ -20,7 +20,7 @@
 
 ## 不在本任务范围
 
-- 重产或发布 VTK、OCCT、Netgen 等第三方 SDK；该工作属于 [038](038-native-sdk-artifact-production.md)，当前仍为 deferred。应用消费已发布 SDK 的构建测试仍属于本任务验证范围。
+- 重产或发布 VTK、OCCT、Netgen 等第三方 SDK；生产由 [sdk-packaging](https://github.com/Jack-Lab-at-EIT/sdk-packaging) 负责，Panta 的管线迁移和消费清单切换见 [038](038-native-sdk-artifact-production.md)。应用消费已发布 SDK 的构建测试仍属于本任务验证范围。
 - Rust 覆盖率门槛及跨语言质量门禁；由 [032](032-cross-language-quality-gates.md) 决定。本任务只保证 native coverage 使用对应 LLVM 的工具。
 - 穷举所有 Debug/Release、系统 SDK、ABI 和第三方库版本组合。验证以仓库当前支持配置的真实构建和测试为准。
 - 宣称 sanitizer 在各平台能力等价。支持组合与平台差异以 `tests/src/sanitize.rs`、`native/cmake/build-policy.cmake` 及其 CI 结果为准。

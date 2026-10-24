@@ -1,11 +1,13 @@
 # 049 — CI 修复：Netgen Linux 制品 ISA 基线与 Windows ASan 链接
 
+> SDK 生产代码与制品说明已迁至 [sdk-packaging](https://github.com/Jack-Lab-at-EIT/sdk-packaging)。下文 `tools/sdk/...` 路径记录本任务实施时的历史位置；当前配置见外部仓库。
+
 - 状态：done
 - 阶段：验证基础
 - 依赖：[038](038-native-sdk-artifact-production.md)、[042](042-unified-llvm-toolchain.md)、[010](010-netgen-adapter-smoke.md)
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-21 / 2026-09-21
+- 创建 / 更新：2026-09-21 / 2026-10-25
 
 ## 目标与背景
 
@@ -80,8 +82,8 @@ launcher 构建期测试环境补 ASan DLL 解析路径（Windows）。
 
 ## 预计改动
 
-- `tools/sdk/netgen.cmake`（现存）：构建配置 + provenance json。
-- `tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md`（现存）：补充 ISA 基线
+- [外部 Netgen 构建配置](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/netgen.cmake)：构建配置 + provenance json。
+- [外部 OCCT/Netgen 制品说明](https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md)：ISA 基线
   配置说明与覆盖重产记录。
 - `native/cmake/sdk-provision.cmake`（现存）：netgen 三平台 SHA256 与 ABI 注记。
 - `native/cmake/build-policy.cmake`（现存）：Windows ASan 链接。

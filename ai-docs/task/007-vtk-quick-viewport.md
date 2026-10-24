@@ -74,7 +74,7 @@ native/bridge/viewport、native/visualization/、QML 视口组件及 CMake；并
 | 日期 | 环境 / 命令或场景 | 结果 / 证据 |
 |---|---|---|
 | 2026-09-19 | 历史路线：Qt Quick `QQuickVTKItem` / OpenGL 方案，在 macOS 26 的 basic 与 threaded scenegraph 循环实测 | 两种窗口路径均崩溃，VTK/Qt API 契约无法满足；该路线删除，不作回退。原因与崩溃报告见本任务“前置条件已解除与历史阻塞”。 |
-| 2026-09-19–20 | 切换 VTK 9.7 WebGPU hardware-window SDK；macOS 构建与 CTest | Release [sdk-vtk-9.7.0-webgpu](https://github.com/Yuki-Nagori/panta/releases/tag/sdk-vtk-9.7.0-webgpu) 提供三平台 `RenderingWebGPU`/`RenderingUI`/Dawn targets；Cocoa bridge 编译，`CaeViewport` 创建与 SDK provision 测试通过，macOS CTest 29/29。 |
+| 2026-09-19–20 | 切换 VTK 9.7 WebGPU hardware-window SDK；macOS 构建与 CTest | 当时的 Panta Release（已于 2026-10-25 删除）提供三平台 `RenderingWebGPU`/`RenderingUI`/Dawn targets；Cocoa bridge 编译，`CaeViewport` 创建与 SDK provision 测试通过，macOS CTest 29/29。当前制品见 [sdk-packaging VTK Release](https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/tag/sdk-vtk-9.7.0-webgpu)，生产迁移记录见 [任务 038](038-native-sdk-artifact-production.md)。 |
 | 2026-09-20 | macOS surface 生命周期与覆盖层回归 | 延后到窗口可见后创建 surface，修正 AppKit flipped 坐标、Retina 逻辑尺寸和 WebGPU autoinit；用户窗口确认 VTK 可见且 QML 控件不再被遮挡。全套 resize/DPR/隐藏恢复/关闭重开验收仍未完成。 |
 | 2026-09-20 | Linux/Windows bridge 与 CI 排障 | Linux 使用 Wayland `wl_subsurface`，Windows 使用 child HWND；修复 Wayland 开发依赖/模块发现及 Windows 缺 VTK DLL（`0xC0000135`）导致的 QML 测试启动问题。Windows 修复由 run [35510679878](https://github.com/Yuki-Nagori/panta/actions/runs/35510679878) 验证，CTest 27/27。 |
 | 2026-09-20 | macOS 生命周期、更新策略与边界复审 | 尺寸未变或隐藏时跳过重复 render，显示恢复时补帧；VTK/Dawn 依赖收为 PRIVATE，surface 清理与 bridge 关闭构建均回归通过。此类自动化与离屏证据不替代实际窗口生命周期验收。 |
