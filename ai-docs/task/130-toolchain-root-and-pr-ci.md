@@ -69,6 +69,7 @@ Cargo/native 构建树、coverage、性能报告和按需编译工具的临时�
 | 2026-10-25 | `cargo verify-changed` | 变更范围格式、lint 与测试通过 | 格式、9 项 lint、Rust workspace 测试以及 90/91 native/QML 测试通过；唯一失败为 `QtAdapter.UserSettingsStore` 的 NativeFormat 用例，沙箱拒绝写入 `~/Library/Preferences` |
 | 2026-10-25 | `PANTA_TOOLCHAIN_ROOT=/tmp/panta-toolchain-override cargo test --locked -p panta-build`；`cargo fmt --all --check`；`git diff --check` | 覆盖根设置时安装测试仍隔离，相关代码格式及 diff 干净 | 通过；23 项 panta-build 测试通过；安装器运行时保留覆盖根，测试夹具固定使用独立临时目录 |
 | 2026-10-25 | 独立只读评审（`gpt-6.1-sol`, medium）与修复复核 | 检查缓存边界、平台验收承接、活动路径及覆盖根行为 | 4 项发现已修复并复核通过：VS Code Qt 路径、Cargo 质量工具缓存排除、nightly 平台工具链核验、测试夹具隔离 |
+| 2026-10-25 | PR [#88](https://github.com/Yuki-Nagori/panta/pull/88) CI（run `40123160060`） | Ubuntu 影响范围质量检查、构建与受影响测试通过 | 全部 CI jobs 通过；冷缓存下构建与测试约 12 分钟，clang-tidy 约 14 分钟；仅有 GitHub runner 的 Node.js 20 与 Ubuntu 26 迁移提示 |
 
 ## 风险与回退
 
@@ -79,7 +80,8 @@ Cargo/native 构建树、coverage、性能报告和按需编译工具的临时�
 - 2026-10-25：创建任务。保留 Ubuntu PR 快速反馈；Windows/macOS 完整平台验收由 nightly 覆盖。
 - 2026-10-25：将迁移后的缓存键升版，并让 nightly 在三平台保存对应工具链资产；PR 仍只恢复缓存，避免不同 PR 写入共享缓存。
 - 2026-10-25：独立评审发现 VS Code Qt/QML 设置仍指向旧 Qt staging 路径，且通用工具链缓存会包含质量工具的独立缓存；已修正路径并保留 `cargo-*` 排除。nightly 三平台增加工具链路径核验，承接 PR 移出的平台检查。安装测试改用独立临时根，避免 `PANTA_TOOLCHAIN_ROOT` 影响测试隔离，同时保留运行时环境覆盖行为；复核通过。
+- 2026-10-25：创建 PR 前删除旧布局 `panta-cache-*` 与 `cargo-quality-tool-v1-*` 缓存，保留 Cargo home 缓存。PR #88 首轮 CI 全绿。
 
 ## 完成摘要
 
-实现与本地适用验证完成；等待 PR CI 对 macOS NativeFormat 用例的外部验证。
+实现、独立评审与 PR CI 验证完成。macOS NativeFormat 用例未能在本机沙箱写入用户 Preferences；PR CI 的平台为 Ubuntu，macOS NativeFormat 真实系统存储仍由 nightly 三平台全测验证。
