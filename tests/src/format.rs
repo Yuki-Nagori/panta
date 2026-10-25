@@ -46,8 +46,11 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
     }
     let root = repository_root()?;
     let paths = crate::test_scope::changed_paths()?;
-    if paths.is_empty() {
-        println!("变更格式检查：没有待检查的文件");
+    if crate::test_scope::is_empty_local_change_set(
+        &paths,
+        std::env::var_os("PANTA_CHANGED_PATHS_JSON").is_some(),
+    ) {
+        println!("变更文件格式检查：没有变更文件");
         return Ok(());
     }
 
@@ -94,7 +97,9 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
         })
         .cloned()
         .collect::<Vec<_>>();
-    if !cpp_files.is_empty() {
+    if crate::test_scope::cpp_format_all()? {
+        check_cpp_format(check)?;
+    } else if !cpp_files.is_empty() {
         format_cpp_files(check, &cpp_files)?;
     }
     let cmake_files = changed_files
@@ -113,7 +118,9 @@ fn format_changed(check: bool) -> Result<(), Box<dyn Error>> {
         })
         .cloned()
         .collect::<Vec<_>>();
-    if !cmake_files.is_empty() {
+    if crate::test_scope::cmake_format_all()? {
+        run_cmake_format(check)?;
+    } else if !cmake_files.is_empty() {
         let mut command = panta_build::python::command(target_root(), root, "cmake-format")?;
         if check {
             command.args(["--check"]);
