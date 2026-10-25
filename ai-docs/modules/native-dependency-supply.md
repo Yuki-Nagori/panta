@@ -10,7 +10,7 @@ Qt、CMake 和 Ninja 使用各自的工具链供给入口；GoogleTest 虽由测
 
 ## 尚未验收
 
-任务 031 为 `deferred`，038 正在迁移到外部 SDK 生产仓库。已发布 SDK 和 fixture 供给测试不等于产品集成全部完成；剩余项包括桌面产品的依赖/许可证安装布局、Linux glibc 基线，以及制品 SBOM/provenance 的消费侧核验。具体证据和范围以对应任务为准。
+任务 031 为 `deferred`；SDK 生产已迁至外部 `sdk-packaging` 仓库，Linux SDK 固定以 Ubuntu 24.04 / glibc 2.39 为兼容基线。已发布 SDK 和 fixture 供给测试不等于产品集成全部完成；剩余项包括桌面产品的依赖/许可证安装布局与制品 SBOM/provenance 的消费侧核验。当前 Panta 消费端哈希更新后的 CI 验证见任务 031/038。具体证据和范围以对应任务为准。
 
 ## 消费边界
 

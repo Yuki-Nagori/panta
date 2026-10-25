@@ -392,19 +392,21 @@ panta_sdk_declare_version(vtk 9.7.0)
 # https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/vtk-9.7.0.md。
 # 2026-10-25 外部生产 run 40123093281 的三平台构建、自检、打包及发布通过；
 # 当前 SHA 与外部 Release sidecar / API digest 一致。
+# 2026-10-25 run 40164985126 按 Ubuntu 24.04 / GCC 13 基线重产；12 个资产的
+# Panta SHA 已按新 sidecar 与 Release API digest 更新。
 # 源码 tag
 # v9.7.0 → commit 23f0a095621e91bbdbeace8451e22b950c8e5f46（unmodified）；
 # Release/共享库/C++20/WebGPU hardware-window，不链接 Qt；Dawn 与 VTK 同包，
 # 三平台 REQUIRED_TARGETS 以真实归档内的 imported targets 为准。
-# Linux 注意：ubuntu-24.04 gcc13 生产，有效 glibc 基线高于 Qt 的 RHEL9
-# （≥2.34）；实际下限由 007 运行验证后回写。
+# Linux SDK 固定由 Ubuntu 24.04 / GCC 13 生产，glibc 兼容下限为 2.39；
+# Qt 自身要求的 RHEL9 / glibc 2.34 不能代表整个应用的实际下限。
 panta_sdk_declare_asset(
   vtk
   macos-arm64
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-macos-arm64.tar.gz
   SHA256
-  0982f3650e0cf82fc0a2ba4b5ba9b471fcda16c7a463670d4a19ce8c764cfa77
+  bb1adce48b3bef600235ecf106f098cce31efc0e89d8ba997726522d775cc0b4
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -428,7 +430,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-linux-x86_64.tar.gz
   SHA256
-  28d09a5e19dc5e62c7b4cf60a5e9d760f3169b82851f460835e984ca1427d0b4
+  785b45f8c1b445c04124f32c585572ee4c74ab7179fc93fd7faa485d62897d36
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -452,7 +454,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-vtk-9.7.0-webgpu/vtk-9.7.0-windows-x86_64.tar.gz
   SHA256
-  27cefa24dafdb8911dafef8b935a10965dbf82d8d23f2a1626dd68373aae45b4
+  86814097d9c3ab7d79af40ba2afe63c88f9b8f439d78320658822e81aae90438
   PACKAGE
   VTK
   REQUIRED_TARGETS
@@ -479,6 +481,7 @@ panta_sdk_declare_version(occt 8.0.1)
 # digest 实测回填，见外部生产记录：
 # https://github.com/Jack-Lab-at-EIT/sdk-packaging/blob/main/tools/sdk/releases/occt-netgen-8.0.1-6.2.2604.md）。
 # 外部仓库 2026-10-24 Release sidecar 与 API digest 已核对，下方摘要为外部新资产。
+# 2026-10-25 run 40164987110 按 Ubuntu 24.04 / GCC 13 基线重产并发布。
 # 维护者决策：三平台统一自托管，官方
 # Windows SDK 不再消费（仅 Windows 有归档、跨平台工具链不一致）。源码 tag
 # V8.0.1 → commit b8f597c677811d1f9f4d8a97f5ae2825c0353a42（unmodified）；
@@ -490,7 +493,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-macos-arm64.tar.gz
   SHA256
-  57927882ad4eed791e4b20643637ba0dcf1380c3f008875b6beb9d115da41d4b
+  d25cf9505824215a53c825ff510a509fd6da53517efbea0d23bde699b3e4ec16
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -510,7 +513,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-linux-x86_64.tar.gz
   SHA256
-  706ab1e5ac70629d1d01f75df057b70480277619b9cebe41e7f895d6339d2037
+  da42e7a38d1d4ee240490689c38737d5347d90a788f399c46ee6d56c545b9d5a
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -530,7 +533,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/occt-8.0.1-windows-x86_64.tar.gz
   SHA256
-  0efe2ba4735edf82ad4500b5ab83b3522d6926b0b5c573a14fe3e726633df43e
+  7dc5ccea375d8709b49e39774cbb0248e549ac59777ee408c03276f09d364f4a
   PACKAGE
   OpenCASCADE
   REQUIRED_TARGETS
@@ -562,7 +565,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-macos-arm64.tar.gz
   SHA256
-  691c830f213c4905883e000f28ce803f70eff89a55272ba55ee1bae5ab62ffdc
+  0afa15b75946bc655afb0ab9625521324abcc71e1653f69fbd79011dd7904303
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -586,7 +589,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-linux-x86_64.tar.gz
   SHA256
-  68f958630bba59793c2939cfbdb8c538d87b8e8a330fcdc3acdaa65610180c3b
+  4b08285371a36e16f023bccb30ca84af7c3e3cd88e83f1396f11222bdd83d63c
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -610,7 +613,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-occt-netgen-8.0.1-6.2.2604/netgen-6.2.2604-windows-x86_64.tar.gz
   SHA256
-  3d5a5c11fb4161e6333b2a1d4e61cd84893f160ca1ef943379816b287e713a0c
+  3a8f9bcd64412ea5a0f734c9b0ec409f9b17681a67a4e6242f2e78f9a39485d4
   PACKAGE
   Netgen
   REQUIRED_TARGETS
@@ -636,13 +639,14 @@ panta_sdk_declare_version(googletest 1.18.0)
 # 打包、发布，下方 SHA 按 sidecar 与 Release API digest 实测更新。上游 commit
 # 063de7e9578f82b369302001269680b4b1553359；C++17，Windows /MD；不含 gmock。
 # 2026-10-24 生产 Release 迁至 sdk-packaging；下方摘要与新 sidecar / API digest 一致。
+# 2026-10-25 run 40164986409 按 Ubuntu 24.04 / GCC 13 基线重产并发布。
 panta_sdk_declare_asset(
   googletest
   macos-arm64
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-macos-arm64.tar.gz
   SHA256
-  67ab330555df2de5241fc71a98c281113565f13ae638f7a83f99f5f9c44b5785
+  f027e2648225517e20524df440518f0e921f08ae53b950e3034a8602cf32bf39
   PACKAGE
   GTest
   REQUIRED_TARGETS
@@ -658,14 +662,14 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-linux-x86_64.tar.gz
   SHA256
-  715edc457e936f24e1f51146dff308f02f0c69fd7fd1333ff2bdf3961c38215b
+  c22001a1837a97aef4613e69515747859e71a52d6ac67defa03f3675cb067bbc
   PACKAGE
   GTest
   REQUIRED_TARGETS
   GTest::gtest
   GTest::gtest_main
   ABI
-  ubuntu-24.04-gcc-x86_64-Release-static-cxx17
+  ubuntu-24.04-gcc13-x86_64-Release-static-cxx17
   LICENSE
   BSD-3-Clause)
 panta_sdk_declare_asset(
@@ -674,7 +678,7 @@ panta_sdk_declare_asset(
   URL
   https://github.com/Jack-Lab-at-EIT/sdk-packaging/releases/download/sdk-googletest-1.18.0/googletest-1.18.0-windows-x86_64.tar.gz
   SHA256
-  1a3e7acfd6c227979dd5f1a97e97cb6a992fad0c268ae04f4800e83bfe79bb3a
+  6f451fbc889ddb10b4645f73ba64b0b664eeebd0a071287f967d087178a18f84
   PACKAGE
   GTest
   REQUIRED_TARGETS
