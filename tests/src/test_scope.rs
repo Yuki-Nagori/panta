@@ -5,7 +5,6 @@ use std::error::Error;
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
 
 use serde_json::Value;
 
@@ -44,13 +43,24 @@ struct Plan {
     code: bool,
     cargo_deps: bool,
     rust: bool,
+    runner_tests: bool,
+    cpp: bool,
+    cpp_lint: bool,
+    cpp_lint_all: bool,
+    cpp_format_all: bool,
+    cmake: bool,
+    cmake_lint_all: bool,
+    cmake_format_all: bool,
+    layering: bool,
     native: bool,
     qml: bool,
+    qml_lint: bool,
+    rust_lint_packages: BTreeSet<String>,
+    rust_format_packages: BTreeSet<String>,
     packages_l1: BTreeSet<String>,
     packages_l2: BTreeSet<String>,
     native_labels: BTreeSet<String>,
     full: bool,
-    full_quality: bool,
 }
 
 impl Plan {
@@ -66,14 +76,31 @@ impl Plan {
         println!("code={}", self.code);
         println!("cargo_deps={}", self.cargo_deps);
         println!("rust={}", self.rust);
+        println!(
+            "rust_lint_packages={}",
+            json_array(&self.rust_lint_packages)?
+        );
+        println!("runner_tests={}", self.runner_tests);
+        println!("cpp={}", self.cpp);
+        println!("cpp_lint={}", self.cpp_lint);
+        println!("cpp_lint_all={}", self.cpp_lint_all);
+        println!("cpp_format_all={}", self.cpp_format_all);
+        println!("cmake={}", self.cmake);
+        println!("cmake_lint_all={}", self.cmake_lint_all);
+        println!("cmake_format_all={}", self.cmake_format_all);
+        println!("layering={}", self.layering);
         println!("native={}", self.native);
         println!("qml={}", self.qml);
+        println!("qml_lint={}", self.qml_lint);
+        println!(
+            "rust_format_packages={}",
+            json_array(&self.rust_format_packages)?
+        );
         println!("test_packages={packages}");
         println!("test_packages_l1={packages_l1}");
         println!("test_packages_l2={packages_l2}");
         println!("native_labels={native_labels}");
         println!("full_tests={}", self.full);
-        println!("full_quality={}", self.full_quality);
         Ok(())
     }
 }
@@ -104,14 +131,19 @@ pub(super) fn native_lint_scope() -> Result<NativeLintScope, Box<dyn Error>> {
     if force_full_scope() {
         return Ok(NativeLintScope::All);
     }
-    Ok(native_scope_for_paths(&changed_paths()?))
+    let root = repository_root()?;
+    let paths = changed_paths()?;
+    if make_plan(&paths, &root)?.cpp_lint_all {
+        return Ok(NativeLintScope::All);
+    }
+    Ok(native_scope_for_paths(&paths))
 }
 
 fn native_scope_for_paths(paths: &[String]) -> NativeLintScope {
     let shared_input = paths.iter().any(|path| {
         let source = Path::new(path);
-        panta_build::database::is_header(source)
-            || is_cmake_path(path)
+        is_cmake_path(path)
+            || panta_build::database::is_header(source)
             || path.starts_with("crates/panta-build/")
             || path.starts_with("crates/launcher/")
             || (path.starts_with("crates/panta-ffi/")
@@ -135,6 +167,10 @@ pub(super) fn is_cmake_path(path: &str) -> bool {
         .file_name()
         .is_some_and(|name| name == "CMakeLists.txt")
         || path.ends_with(".cmake")
+}
+
+pub(super) fn is_empty_local_change_set(paths: &[String], explicit_path_source: bool) -> bool {
+    paths.is_empty() && !explicit_path_source
 }
 
 pub(super) fn print_plan(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
@@ -179,23 +215,47 @@ pub(super) fn changed_paths() -> Result<Vec<String>, Box<dyn Error>> {
     local_changed_paths(&repository_root()?, "origin/main")
 }
 
+pub(super) fn qml_lint_needed() -> Result<bool, Box<dyn Error>> {
+    if force_full_scope() {
+        return Ok(true);
+    }
+    let root = repository_root()?;
+    Ok(make_plan(&changed_paths()?, &root)?.qml_lint)
+}
+
+pub(super) fn cpp_lint_needed() -> Result<bool, Box<dyn Error>> {
+    if force_full_scope() {
+        return Ok(true);
+    }
+    let root = repository_root()?;
+    Ok(make_plan(&changed_paths()?, &root)?.cpp_lint)
+}
+
+pub(super) fn cmake_lint_all() -> Result<bool, Box<dyn Error>> {
+    let root = repository_root()?;
+    Ok(make_plan(&changed_paths()?, &root)?.cmake_lint_all)
+}
+
+pub(super) fn cpp_format_all() -> Result<bool, Box<dyn Error>> {
+    let root = repository_root()?;
+    Ok(make_plan(&changed_paths()?, &root)?.cpp_format_all)
+}
+
+pub(super) fn cmake_format_all() -> Result<bool, Box<dyn Error>> {
+    let root = repository_root()?;
+    Ok(make_plan(&changed_paths()?, &root)?.cmake_format_all)
+}
+
+pub(super) fn layering_needed() -> Result<bool, Box<dyn Error>> {
+    if force_full_scope() {
+        return Ok(true);
+    }
+    let root = repository_root()?;
+    Ok(make_plan(&changed_paths()?, &root)?.layering)
+}
+
 pub(super) fn force_full_scope() -> bool {
-    static FULL_QUALITY: OnceLock<bool> = OnceLock::new();
-    *FULL_QUALITY.get_or_init(|| {
-        if let Ok(value) = std::env::var("PANTA_FORCE_FULL") {
-            return value.eq_ignore_ascii_case("true");
-        }
-        let Ok(root) = repository_root() else {
-            return true;
-        };
-        let Ok(paths) = changed_paths() else {
-            return true;
-        };
-        if paths.is_empty() {
-            return false;
-        }
-        make_plan(&paths, &root).map_or(true, |plan| plan.full_quality)
-    })
+    std::env::var("PANTA_FORCE_FULL").is_ok_and(|value| value.eq_ignore_ascii_case("true"))
 }
 
 /// Returns the Cargo package closure affected by changed Rust code.
@@ -205,10 +265,7 @@ pub(super) fn changed_lint_packages() -> Result<BTreeSet<String>, Box<dyn Error>
     if force_full_scope() {
         return Ok(cargo_packages(&root)?.keys().cloned().collect());
     }
-    if !paths.iter().any(|path| is_rust_package_path(path)) {
-        return Ok(BTreeSet::new());
-    }
-    Ok(make_plan(&paths, &root)?.packages())
+    Ok(make_plan(&paths, &root)?.rust_lint_packages)
 }
 
 /// Returns directly changed Cargo packages for source-only formatting.
@@ -218,20 +275,10 @@ pub(super) fn changed_format_packages() -> Result<BTreeSet<String>, Box<dyn Erro
     if force_full_scope() {
         return Ok(cargo_packages(&root)?.keys().cloned().collect());
     }
-    if paths.is_empty() {
-        return Ok(BTreeSet::new());
-    }
-    if !paths.iter().any(|path| is_rust_package_path(path)) {
-        return Ok(BTreeSet::new());
-    }
-    let plan = make_plan(&paths, &root)?;
-    if plan.full {
-        Ok(plan.packages())
-    } else {
-        Ok(plan.packages_l1)
-    }
+    Ok(make_plan(&paths, &root)?.rust_format_packages)
 }
 
+#[cfg(test)]
 fn is_rust_package_path(path: &str) -> bool {
     path.starts_with("crates/")
         || path.starts_with("tests/rust/")
@@ -251,7 +298,7 @@ pub(super) fn run_scope(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
     let root = repository_root()?;
     let paths = local_changed_paths(&root, &base)?;
     if paths.is_empty() {
-        println!("本地测试范围：{scope}\n工作树相对 {base} 没有变更，无需运行受影响测试。");
+        println!("本地测试范围：{scope}\n没有变更文件");
         return Ok(());
     }
     let plan = make_plan(&paths, &root)?;
@@ -275,7 +322,7 @@ pub(super) fn run_scope(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             run_cargo(["test", "--locked", "--package", package.as_str()])?;
         }
     }
-    if !tested_runner && scope == "all" && plan.rust {
+    if !tested_runner && plan.runner_tests {
         run_cargo([
             "test",
             "--locked",
@@ -376,26 +423,57 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
     let all_packages = packages.keys().cloned().collect::<BTreeSet<_>>();
     let reverse = reverse_dependencies(&packages);
     let mut changed_packages = BTreeSet::new();
+    let mut rust_source_packages = BTreeSet::new();
+    let mut native_dependency_changed = false;
     let all_native_labels = all_native_labels();
     plan.full = paths.is_empty();
-    plan.full_quality = paths.is_empty();
     if paths.is_empty() {
         plan.cargo_deps = true;
         plan.rust = true;
+        plan.cpp = true;
+        plan.cpp_lint = true;
+        plan.cpp_lint_all = true;
+        plan.cpp_format_all = true;
+        plan.cmake = true;
+        plan.cmake_lint_all = true;
+        plan.cmake_format_all = true;
+        plan.layering = true;
         plan.native = true;
         plan.qml = true;
+        plan.qml_lint = true;
     }
 
     for path in paths {
         if is_document_path(path) {
             continue;
         }
+        match Path::new(path).file_name().and_then(|name| name.to_str()) {
+            Some(".clang-format") => {
+                plan.cpp = true;
+                plan.cpp_format_all = true;
+                continue;
+            }
+            Some(".clang-tidy") => {
+                plan.cpp = true;
+                plan.cpp_lint = true;
+                plan.cpp_lint_all = true;
+                continue;
+            }
+            Some(".cmake-format.py") => {
+                plan.cmake = true;
+                plan.cmake_lint_all = true;
+                plan.cmake_format_all = true;
+                plan.layering = true;
+                continue;
+            }
+            _ => {}
+        }
         if matches!(
-            Path::new(path).file_name().and_then(|name| name.to_str()),
-            Some(".clang-format" | ".clang-tidy" | ".cmake-format.py")
+            path.as_str(),
+            ".github/workflows/ci.yml" | ".github/actions/changed-paths/action.yml"
         ) {
-            // 工具配置变更会影响对应域中的所有文件，不能按普通单文件处理。
-            plan.full_quality = true;
+            plan.runner_tests = true;
+            continue;
         }
         if path == "Cargo.toml"
             || path == "Cargo.lock"
@@ -403,11 +481,13 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             || path.starts_with(".cargo/")
         {
             plan.full = true;
-            plan.full_quality = true;
             plan.rust = true;
-            plan.native = true;
-            plan.qml = true;
+            plan.cpp = true;
+            plan.cmake = true;
+            plan.layering = true;
             plan.cargo_deps = true;
+            changed_packages.extend(all_packages.iter().cloned());
+            rust_source_packages.extend(all_packages.iter().cloned());
             continue;
         }
         if path == "deny.toml" {
@@ -415,77 +495,137 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             continue;
         }
         if path == "tests/Cargo.toml" {
-            plan.full_quality = true;
             plan.cargo_deps = true;
             plan.rust = true;
-            plan.native = true;
+            plan.layering = true;
             if let Some(package) = package_for_path(path, &packages, root) {
+                rust_source_packages.insert(package.clone());
                 changed_packages.insert(package);
             } else {
                 plan.full = true;
-                plan.qml = true;
+                changed_packages.extend(all_packages.iter().cloned());
+                rust_source_packages.extend(all_packages.iter().cloned());
             }
-            plan.native_labels.extend(all_native_labels.iter().cloned());
             continue;
         }
         if path.ends_with("/Cargo.toml") {
             plan.cargo_deps = true;
             plan.rust = true;
+            plan.layering = true;
             if let Some(package) = package_for_path(path, &packages, root) {
+                plan.qml_lint |= package_path_affects_qml_bridge(&package, path);
+                plan.cpp |= package == "panta-ffi"
+                    || package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                plan.cpp_lint |= package == "panta-ffi"
+                    || package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                plan.cmake |= package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                native_dependency_changed |= package_requires_native_tests(&package);
+                rust_source_packages.insert(package.clone());
                 changed_packages.insert(package);
             } else {
                 plan.full = true;
-                plan.native = true;
-                plan.qml = true;
+                plan.cpp = true;
+                plan.cmake = true;
+                changed_packages.extend(all_packages.iter().cloned());
+                rust_source_packages.extend(all_packages.iter().cloned());
             }
             continue;
         }
         if path.starts_with("crates/") || path.starts_with("tests/rust/") {
             plan.rust = true;
+            plan.layering = true;
             if let Some(package) = package_for_path(path, &packages, root) {
+                plan.qml_lint |= package_path_affects_qml_bridge(&package, path);
+                plan.cpp |= package == "panta-ffi"
+                    || package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                plan.cpp_lint |= package == "panta-ffi"
+                    || package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                plan.cmake |= package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                native_dependency_changed |= package_requires_native_tests(&package);
+                rust_source_packages.insert(package.clone());
                 changed_packages.insert(package);
             } else {
                 plan.full = true;
-                plan.native = true;
-                plan.qml = true;
+                plan.cpp = true;
+                plan.cmake = true;
+                changed_packages.extend(all_packages.iter().cloned());
+                rust_source_packages.extend(all_packages.iter().cloned());
             }
             continue;
         }
         if path.starts_with("tests/performance/cpu/") && path.ends_with(".rs") {
             plan.rust = true;
+            plan.layering = true;
             if let Some(package) = package_for_path(path, &packages, root) {
+                plan.qml_lint |= package_path_affects_qml_bridge(&package, path);
+                plan.cpp |= package == "panta-ffi"
+                    || package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                plan.cpp_lint |= package == "panta-ffi"
+                    || package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                plan.cmake |= package == "panta-build"
+                    || (package == "panta-launcher" && path.ends_with("/build.rs"));
+                native_dependency_changed |= package_requires_native_tests(&package);
+                rust_source_packages.insert(package.clone());
                 changed_packages.insert(package);
             } else {
                 plan.full = true;
-                plan.native = true;
-                plan.qml = true;
+                plan.cpp = true;
+                plan.cmake = true;
+                changed_packages.extend(all_packages.iter().cloned());
+                rust_source_packages.extend(all_packages.iter().cloned());
             }
             continue;
         }
         if path.starts_with("tests/src/") {
-            plan.full = true;
-            plan.full_quality = true;
             plan.rust = true;
-            plan.native = true;
-            plan.qml = true;
-            changed_packages.extend(all_packages.iter().cloned());
-            plan.native_labels.extend(all_native_labels.iter().cloned());
+            plan.runner_tests = true;
+            changed_packages.insert("panta-tests".into());
+            rust_source_packages.insert("panta-tests".into());
+            if path == "tests/src/layering.rs" {
+                plan.layering = true;
+            }
+            if path == "tests/src/build.rs" {
+                plan.native = true;
+                plan.native_labels.extend(all_native_labels.iter().cloned());
+            }
             continue;
         }
         if path.starts_with("tests/integration/") {
             plan.rust = true;
             plan.native = true;
             if let Some(package) = package_for_path(path, &packages, root) {
+                rust_source_packages.insert(package.clone());
                 changed_packages.insert(package);
             } else {
                 plan.full = true;
                 plan.qml = true;
+                plan.qml_lint = true;
+                changed_packages.extend(all_packages.iter().cloned());
+                rust_source_packages.extend(all_packages.iter().cloned());
             }
             plan.native_labels.extend(all_native_labels.iter().cloned());
             continue;
         }
         if path.starts_with("tests/cpp/") || path.starts_with("native/") {
             plan.native = true;
+            plan.cpp = true;
+            plan.cpp_lint |= panta_build::database::is_header(Path::new(path))
+                || panta_build::database::is_source(Path::new(path));
+            let cmake_changed = is_cmake_path(path);
+            plan.cmake |= cmake_changed;
+            plan.layering |= cmake_changed;
+            if cmake_changed {
+                plan.cpp_lint = true;
+                plan.cpp_lint_all = true;
+            }
             let parts = Path::new(path)
                 .components()
                 .filter_map(|part| part.as_os_str().to_str())
@@ -499,31 +639,59 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
                 {
                     plan.native_labels
                         .extend(labels.iter().map(|label| (*label).to_owned()));
+                    plan.qml_lint |= native_header_affects_qml_typeinfo(path);
                 } else {
                     plan.full = true;
+                    plan.cpp_lint_all = true;
+                    plan.qml_lint = true;
                     plan.native_labels.extend(all_native_labels.iter().cloned());
                 }
             } else if path.starts_with("native/") {
                 plan.full = true;
+                plan.cmake = true;
                 plan.native_labels.extend(all_native_labels.iter().cloned());
             } else if path.starts_with("tests/cpp/") {
-                plan.native_labels.extend(all_native_labels.iter().cloned());
+                let module = parts.get(2).copied().unwrap_or_default();
+                if let Some((_, labels)) = NATIVE_LABELS.iter().find(|(known, _)| *known == module)
+                {
+                    plan.native_labels
+                        .extend(labels.iter().map(|label| (*label).to_owned()));
+                    plan.qml_lint |= native_header_affects_qml_typeinfo(path);
+                } else {
+                    plan.full = true;
+                    plan.cpp_lint_all = true;
+                    plan.qml_lint = true;
+                    plan.native_labels.extend(all_native_labels.iter().cloned());
+                }
             }
             continue;
         }
         if path.starts_with("tests/fixtures/") || path.starts_with("tests/support/") {
             plan.full = true;
-            plan.full_quality = true;
             plan.rust = true;
             plan.native = true;
             plan.qml = true;
+            plan.qml_lint |= path.ends_with(".qml");
+            plan.cpp |= panta_build::database::is_header(Path::new(path))
+                || panta_build::database::is_source(Path::new(path));
+            plan.cpp_lint |= panta_build::database::is_header(Path::new(path))
+                || panta_build::database::is_source(Path::new(path));
+            let cmake_changed = is_cmake_path(path);
+            plan.cmake |= cmake_changed;
+            if cmake_changed {
+                plan.cpp_lint = true;
+                plan.cpp_lint_all = true;
+                plan.layering = true;
+            }
             changed_packages.extend(all_packages.iter().cloned());
+            rust_source_packages.extend(all_packages.iter().cloned());
             plan.native_labels.extend(all_native_labels.iter().cloned());
             continue;
         }
         if path.starts_with("qml/Themes/") && path.ends_with(".pa") {
             plan.rust = true;
             changed_packages.insert("panta-core".into());
+            rust_source_packages.insert("panta-core".into());
             plan.qml = true;
             plan.native = true;
             plan.native_labels
@@ -535,6 +703,15 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             || path.starts_with("prototypes/shell/")
         {
             plan.qml = true;
+            plan.qml_lint = true;
+            let cmake_changed = is_cmake_path(path);
+            plan.cmake |= cmake_changed;
+            plan.layering |= cmake_changed;
+            plan.cpp |= cmake_changed;
+            if cmake_changed {
+                plan.cpp_lint = true;
+                plan.cpp_lint_all = true;
+            }
             plan.native = true;
             plan.native_labels
                 .extend(["qml".to_owned(), "bridge".to_owned()]);
@@ -542,26 +719,36 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         }
         if path.starts_with("resources/") {
             plan.full = true;
-            plan.full_quality = true;
             plan.rust = true;
             plan.native = true;
             plan.qml = true;
             changed_packages.extend(all_packages.iter().cloned());
+            rust_source_packages.extend(all_packages.iter().cloned());
             plan.native_labels.extend(all_native_labels.iter().cloned());
             continue;
         }
         // 新增/未登记路径保守回退，避免选择器落后时 CI 假绿。
         plan.full = true;
-        plan.full_quality = true;
+        plan.qml_lint = true;
         plan.rust = true;
+        plan.cpp = true;
+        plan.cpp_lint = true;
+        plan.cpp_lint_all = true;
+        plan.cmake = true;
+        plan.cmake_lint_all = true;
+        plan.cpp_format_all = true;
+        plan.cmake_format_all = true;
+        plan.layering = true;
         plan.native = true;
         plan.qml = true;
         plan.cargo_deps = true;
+        changed_packages.extend(all_packages.iter().cloned());
+        rust_source_packages.extend(all_packages.iter().cloned());
         plan.native_labels.extend(all_native_labels.iter().cloned());
     }
 
     if plan.full {
-        plan.packages_l2 = all_packages;
+        plan.packages_l2 = all_packages.clone();
         plan.native_labels = all_native_labels;
     } else {
         plan.packages_l1 = changed_packages.clone();
@@ -569,11 +756,14 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         if !affected.is_empty() {
             plan.rust = true;
         }
-        for (package, labels) in RUST_NATIVE_LABELS {
-            if affected.contains(*package) {
-                plan.native = true;
-                plan.native_labels
-                    .extend(labels.iter().map(|label| (*label).to_owned()));
+        if native_dependency_changed {
+            for (package, labels) in RUST_NATIVE_LABELS {
+                if affected.contains(*package) {
+                    plan.native = true;
+                    plan.qml |= labels.contains(&"qml");
+                    plan.native_labels
+                        .extend(labels.iter().map(|label| (*label).to_owned()));
+                }
             }
         }
         if changed_packages
@@ -581,11 +771,14 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
             .any(|name| matches!(name.as_str(), "panta-build" | "panta-launcher"))
         {
             plan.full = true;
-            plan.full_quality = true;
+            plan.cpp = true;
+            plan.cmake = true;
+            plan.layering = true;
             plan.native = true;
             plan.qml = true;
+            plan.qml_lint = changed_packages.contains("panta-build");
             plan.packages_l1.clear();
-            plan.packages_l2 = all_packages;
+            plan.packages_l2 = all_packages.clone();
             plan.native_labels = all_native_labels;
         } else {
             plan.packages_l2 = affected.difference(&plan.packages_l1).cloned().collect();
@@ -595,11 +788,77 @@ fn make_plan(paths: &[String], root: &Path) -> Result<Plan, Box<dyn Error>> {
         // 完整回退必须同步唤起每个域对应的 CI job，不能只扩大测试列表。
         plan.cargo_deps = true;
         plan.rust = true;
+        plan.layering = true;
         plan.native = true;
         plan.qml = true;
+        if paths.is_empty()
+            || paths.iter().any(|path| {
+                matches!(
+                    path.as_str(),
+                    "Cargo.toml" | "Cargo.lock" | "rust-toolchain.toml"
+                ) || path.starts_with(".cargo/")
+            })
+        {
+            plan.cpp = true;
+            plan.cmake = true;
+            plan.cpp_lint = true;
+            plan.cpp_lint_all = true;
+            plan.cmake_lint_all = true;
+            plan.cpp_format_all = true;
+            plan.cmake_format_all = true;
+            plan.qml_lint = true;
+            changed_packages.extend(all_packages.iter().cloned());
+            rust_source_packages.extend(all_packages.iter().cloned());
+        }
     }
-    plan.code = plan.rust || plan.native || plan.qml;
+    if paths.is_empty() {
+        rust_source_packages.extend(all_packages);
+    }
+    plan.rust_lint_packages = dependency_closure(rust_source_packages.clone(), &reverse);
+    plan.rust_format_packages = rust_source_packages;
+    plan.code = plan.rust || plan.cpp || plan.cmake || plan.native || plan.qml;
     Ok(plan)
+}
+
+fn package_path_affects_qml_bridge(package: &str, path: &str) -> bool {
+    match package {
+        "panta-ffi" | "panta-build" => true,
+        "panta-launcher" => path.ends_with("/build.rs"),
+        "panta-core" => matches!(
+            path,
+            "crates/panta-core/src/theme.rs" | "crates/panta-core/src/theme_schema.rs"
+        ),
+        _ => false,
+    }
+}
+
+fn native_header_affects_qml_typeinfo(path: &str) -> bool {
+    // Keep this list aligned with QML_ELEMENT/QML_NAMED_ELEMENT/QML_ANONYMOUS declarations.
+    matches!(
+        path,
+        "native/app/edit_command_router.hpp"
+            | "native/app/platform_fonts.hpp"
+            | "native/app/theme_view_model.hpp"
+            | "native/app/window_chrome_metrics.hpp"
+            | "native/bridge/src/project_view_model.hpp"
+            | "native/bridge/src/settings.hpp"
+            | "native/bridge/src/import_interaction_controller.hpp"
+            | "native/visualization/include/panta/visualization/cae_viewport.hpp"
+    )
+}
+
+fn package_requires_native_tests(package: &str) -> bool {
+    matches!(
+        package,
+        "panta-dsl-core"
+            | "panta-foundation"
+            | "panta-mesh"
+            | "panta-ffi"
+            | "panta-import"
+            | "panta-core"
+            | "panta-build"
+            | "panta-launcher"
+    )
 }
 
 fn cargo_packages(root: &Path) -> Result<Packages, Box<dyn Error>> {
@@ -830,6 +1089,20 @@ mod tests {
     }
 
     #[test]
+    fn clean_local_scope_is_a_noop_but_explicit_empty_ci_scope_fails_closed()
+    -> Result<(), Box<dyn Error>> {
+        assert!(is_empty_local_change_set(&[], false));
+        assert!(!is_empty_local_change_set(&[], true));
+        assert!(!is_empty_local_change_set(
+            &["crates/panta-core/src/lib.rs".into()],
+            false
+        ));
+        let root = repository_root()?;
+        assert!(make_plan(&[], &root)?.full);
+        Ok(())
+    }
+
+    #[test]
     fn local_scope_escalates_to_full_suite_when_impact_is_unknown() -> Result<(), Box<dyn Error>> {
         let plan = Plan {
             packages_l2: BTreeSet::from(["panta-core".into(), "panta-tests".into()]),
@@ -865,7 +1138,7 @@ mod tests {
         assert!(prototype.native_labels.contains("qml"));
         assert!(!prototype.full);
         let unknown = make_plan(&["ai-docs/unregistered-input.js".into()], &root)?;
-        assert!(unknown.full && unknown.full_quality);
+        assert!(unknown.full && unknown.qml_lint && unknown.cpp_lint_all);
         Ok(())
     }
 
@@ -890,10 +1163,7 @@ mod tests {
             "tests/support/qt/mesh_frame_tracker.hpp",
         ] {
             let support = make_plan(&[input.into()], &root)?;
-            assert!(
-                support.full && support.full_quality && support.qml,
-                "{input}"
-            );
+            assert!(support.full && support.qml, "{input}");
             assert!(support.native_labels.contains("bridge"), "{input}");
             assert!(support.native_labels.contains("visualization"), "{input}");
         }
@@ -911,11 +1181,15 @@ mod tests {
             "crates/launcher/build.rs",
             "crates/panta-build/src/assets.rs",
         ] {
-            assert_eq!(
-                native_scope_for_paths(&[input.into()]),
-                NativeLintScope::All,
-                "{input}"
-            );
+            let scope = native_scope_for_paths(&[input.into()]);
+            if is_cmake_path(input) {
+                assert!(
+                    scope == NativeLintScope::All,
+                    "CMake changes must lint every native translation unit: {input}"
+                );
+            } else {
+                assert_eq!(scope, NativeLintScope::All, "{input}");
+            }
         }
         let source = "native/app/window_chrome_metrics_mac.mm";
         assert_eq!(
@@ -939,6 +1213,12 @@ mod tests {
         let plan = make_plan(&["crates/panta-foundation/Cargo.toml".into()], &root)?;
         assert!(plan.packages_l1.contains("panta-foundation"));
         assert!(!plan.packages_l2.is_empty());
+        assert!(plan.rust_lint_packages.contains("panta-foundation"));
+        assert!(plan.rust_lint_packages.contains("panta-ffi"));
+        assert_eq!(
+            plan.rust_format_packages,
+            BTreeSet::from(["panta-foundation".into()])
+        );
         assert!(plan.native_labels.contains("ffi"));
         assert!(!plan.full);
         Ok(())
@@ -1077,7 +1357,7 @@ mod tests {
             "crates/panta-build/src/assets.rs",
         ] {
             let plan = make_plan(&[path.into()], &root)?;
-            assert!(plan.full && plan.full_quality, "{path}");
+            assert!(plan.full, "{path}");
         }
         Ok(())
     }
@@ -1102,24 +1382,141 @@ mod tests {
     }
 
     #[test]
-    fn unknown_paths_force_full_quality_but_known_cmake_scopes_do_not() -> Result<(), Box<dyn Error>>
-    {
+    fn tool_configs_expand_only_their_own_quality_scope() -> Result<(), Box<dyn Error>> {
         let root = repository_root()?;
-        let unknown = make_plan(&[".clang-format".into()], &root)?;
-        assert!(unknown.full_quality);
+        let clang_format = make_plan(&[".clang-format".into()], &root)?;
+        assert!(!clang_format.full);
+        assert!(clang_format.cpp_format_all);
+        assert!(!clang_format.cpp_lint && !clang_format.qml_lint);
 
         let cmake = make_plan(&["native/CMakeLists.txt".into()], &root)?;
-        assert!(!cmake.full_quality);
+        assert!(cmake.cmake && cmake.layering);
+        assert!(cmake.cpp_lint && cmake.cpp_lint_all);
+        assert!(!cmake.qml_lint);
 
-        for path in [
-            "tests/cpp/geometry/.clang-tidy",
-            "tests/cpp/mesh/.clang-tidy",
-        ] {
-            assert!(make_plan(&[path.into()], &root)?.full_quality, "{path}");
+        for path in ["qml/CMakeLists.txt", "native/cmake/sdk-provision.cmake"] {
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.cmake && plan.layering, "{path}: {plan:?}");
+            assert!(plan.cpp_lint && plan.cpp_lint_all, "{path}: {plan:?}");
         }
 
+        for path in [".clang-tidy", "tests/cpp/geometry/.clang-tidy"] {
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.cpp_lint && plan.cpp_lint_all, "{path}: {plan:?}");
+            assert!(!plan.full && !plan.qml_lint, "{path}: {plan:?}");
+        }
+
+        let cmake_format = make_plan(&[".cmake-format.py".into()], &root)?;
+        assert!(cmake_format.cmake_lint_all && cmake_format.cmake_format_all);
+        assert!(cmake_format.layering);
+        assert!(!cmake_format.cpp_lint && !cmake_format.cpp_format_all);
+        assert!(!cmake_format.full);
+
         let cargo_config = make_plan(&["Cargo.toml".into()], &root)?;
-        assert!(cargo_config.full_quality);
+        assert!(cargo_config.full && cargo_config.cpp_lint_all && cargo_config.qml_lint);
+        Ok(())
+    }
+
+    #[test]
+    fn runner_build_and_layering_inputs_select_only_their_required_checks()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+
+        let build = make_plan(&["tests/src/build.rs".into()], &root)?;
+        assert!(build.runner_tests && build.native, "{build:?}");
+        assert_eq!(build.packages_l1, BTreeSet::from(["panta-tests".into()]));
+        assert!(build.packages_l2.is_empty());
+        assert_eq!(build.native_labels, all_native_labels());
+        assert!(!build.full, "{build:?}");
+
+        let layering = make_plan(&["tests/src/layering.rs".into()], &root)?;
+        assert!(layering.runner_tests && layering.layering, "{layering:?}");
+        assert_eq!(layering.packages_l1, BTreeSet::from(["panta-tests".into()]));
+        assert!(layering.packages_l2.is_empty());
+        assert!(!layering.native && !layering.full, "{layering:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn runner_and_ci_router_changes_do_not_expand_to_application_tests()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for path in ["tests/src/test_scope.rs", "tests/src/main.rs"] {
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.rust && plan.runner_tests, "{path}: {plan:?}");
+            assert!(plan.packages_l1.contains("panta-tests"), "{path}: {plan:?}");
+            assert!(plan.packages_l2.is_empty(), "{path}: {plan:?}");
+            assert!(!plan.full && !plan.native && !plan.qml, "{path}: {plan:?}");
+            assert_eq!(
+                plan.rust_format_packages,
+                BTreeSet::from(["panta-tests".into()]),
+                "{path}: {plan:?}"
+            );
+        }
+        for path in [
+            ".github/workflows/ci.yml",
+            ".github/actions/changed-paths/action.yml",
+        ] {
+            let plan = make_plan(&[path.into()], &root)?;
+            assert!(plan.runner_tests, "{path}: {plan:?}");
+            assert!(!plan.code && !plan.rust && !plan.full, "{path}: {plan:?}");
+            assert!(plan.rust_lint_packages.is_empty(), "{path}: {plan:?}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn qml_lint_follows_qml_and_bridge_inputs_only() -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for path in [
+            "qml/App.qml",
+            "tests/qml/theme_component_test.qml",
+            "prototypes/shell/shell.js",
+            "crates/panta-ffi/src/lib.rs",
+            "crates/panta-core/src/theme_schema.rs",
+            "native/app/theme_view_model.hpp",
+            "native/app/edit_command_router.hpp",
+            "native/bridge/src/project_view_model.hpp",
+            "native/bridge/src/settings.hpp",
+            "native/bridge/src/import_interaction_controller.hpp",
+            "native/visualization/include/panta/visualization/cae_viewport.hpp",
+        ] {
+            assert!(make_plan(&[path.into()], &root)?.qml_lint, "{path}");
+        }
+        for path in [
+            "crates/panta-core/src/project/service.rs",
+            "native/i18n/qm_catalog.cpp",
+            "qml/Themes/dark.pa",
+            "native/app/document_path_adapter.hpp",
+        ] {
+            assert!(!make_plan(&[path.into()], &root)?.qml_lint, "{path}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn empty_and_unknown_inputs_request_complete_quality_and_test_ranges()
+    -> Result<(), Box<dyn Error>> {
+        let root = repository_root()?;
+        for paths in [vec![], vec!["new-area/unknown.rs".into()]] {
+            let plan = make_plan(&paths, &root)?;
+            assert!(plan.full && plan.code, "{paths:?}: {plan:?}");
+            assert!(plan.rust && plan.native && plan.qml, "{paths:?}: {plan:?}");
+            assert!(
+                plan.cpp_lint_all
+                    && plan.cpp_format_all
+                    && plan.cmake_lint_all
+                    && plan.cmake_format_all
+                    && plan.qml_lint
+                    && plan.layering,
+                "{paths:?}: {plan:?}"
+            );
+            assert_eq!(
+                plan.rust_format_packages.len(),
+                cargo_packages(&root)?.len()
+            );
+            assert_eq!(plan.rust_lint_packages.len(), cargo_packages(&root)?.len());
+        }
         Ok(())
     }
 }

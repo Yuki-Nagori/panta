@@ -54,14 +54,25 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       cargo_deps: ${{ steps.filter.outputs.cargo_deps }}
       rust: ${{ steps.filter.outputs.rust }}
+      rust_lint_packages: ${{ steps.filter.outputs.rust_lint_packages }}
+      runner_tests: ${{ steps.filter.outputs.runner_tests }}
+      cpp: ${{ steps.filter.outputs.cpp }}
+      cpp_lint: ${{ steps.filter.outputs.cpp_lint }}
+      cpp_lint_all: ${{ steps.filter.outputs.cpp_lint_all }}
+      cpp_format_all: ${{ steps.filter.outputs.cpp_format_all }}
+      cmake: ${{ steps.filter.outputs.cmake }}
+      cmake_lint_all: ${{ steps.filter.outputs.cmake_lint_all }}
+      cmake_format_all: ${{ steps.filter.outputs.cmake_format_all }}
+      layering: ${{ steps.filter.outputs.layering }}
       native: ${{ steps.filter.outputs.native }}
       qml: ${{ steps.filter.outputs.qml }}
+      qml_lint: ${{ steps.filter.outputs.qml_lint }}
+      rust_format_packages: ${{ steps.filter.outputs.rust_format_packages }}
       test_packages: ${{ steps.filter.outputs.test_packages }}
       test_packages_l1: ${{ steps.filter.outputs.test_packages_l1 }}
       test_packages_l2: ${{ steps.filter.outputs.test_packages_l2 }}
       native_labels: ${{ steps.filter.outputs.native_labels }}
       full_tests: ${{ steps.filter.outputs.full_tests }}
-      full_quality: ${{ steps.filter.outputs.full_quality }}
       changed_paths: ${{ steps.filter.outputs.changed_paths }}
     steps:
       # 本地 composite action 的解析依赖工作区已有仓库，checkout 必须在
@@ -111,7 +122,7 @@ jobs:
   lint-clippy:
     name: cargo lint (clippy, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.rust_lint_packages != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -130,17 +141,12 @@ jobs:
         shell: bash
         env:
           PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
-          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
         run: cargo lint clippy --changed --check
 
   lint-native:
-    name: cargo lint (${{ matrix.tool }}, ubuntu)
+    name: cargo lint (clang-tidy, includes, cppcheck, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.native == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        tool: [clang-tidy, includes, cppcheck]
+    if: needs.changes.outputs.cpp_lint == 'true'
     runs-on: ubuntu-24.04
     # 冷启动需供给 LLVM/Qt 并构建 native 树；上限防传输停滞拖满平台上限。
     timeout-minutes: 60
@@ -158,19 +164,21 @@ jobs:
 
       - uses: ./.github/actions/panta-cache-restore
 
-      - name: Run selected lint
+      - name: Run C++ lint tools
         shell: bash
         env:
           PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
-          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
-        run: cargo lint "${{ matrix.tool }}" --changed --check
+        run: |
+          cargo lint clang-tidy --changed --check
+          cargo lint includes --changed --check
+          cargo lint cppcheck --changed --check
 
   # machete 只读 Rust 清单与源码，不进 native 构建图：按 rust 域触发，
   # 且不需要托管工具/依赖缓存。
   lint-machete:
     name: cargo lint (machete, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.rust_lint_packages != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -200,7 +208,7 @@ jobs:
   lint-cmake:
     name: cargo lint (cmake, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.native == 'true'
+    if: needs.changes.outputs.cmake == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -214,13 +222,12 @@ jobs:
         shell: bash
         env:
           PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
-          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
         run: cargo lint cmake --changed --check
 
   lint-layering:
     name: cargo lint (layering, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.cargo_deps == 'true'
+    if: needs.changes.outputs.layering == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -236,11 +243,11 @@ jobs:
         shell: bash
         run: cargo lint layering --check
 
-  # qmllint 消费 Qt 供给与 QML/bridge 输出：按 qml 或 native 域触发。
+  # QML 静态检查按 QML 源或 bridge/type-info 依赖显式触发。
   lint-qmllint:
     name: cargo lint (qmllint, ubuntu)
     needs: [changes]
-    if: needs.changes.outputs.qml == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.native_labels != '[]' || needs.changes.outputs.full_tests == 'true'
+    if: needs.changes.outputs.qml_lint == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -276,8 +283,26 @@ jobs:
         shell: bash
         env:
           PANTA_CHANGED_PATHS_JSON: ${{ needs.changes.outputs.changed_paths }}
-          PANTA_FORCE_FULL: ${{ needs.changes.outputs.full_quality }}
         run: cargo format --changed --check
+
+  runner-tests:
+    name: panta-tests selector self-test (ubuntu)
+    needs: [changes]
+    if: needs.changes.outputs.runner_tests == 'true' && !contains(fromJSON(needs.changes.outputs.test_packages_l1), 'panta-tests')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/panta-toolchain
+
+      - uses: ./.github/actions/panta-cache-restore
+        with:
+          tools_deps: "false"
+
+      - name: Test path selector
+        shell: bash
+        run: cargo test --locked --package panta-tests --bin panta-tests
 
   check:
     name: cargo check and build (ubuntu)
@@ -300,16 +325,54 @@ jobs:
       - uses: ./.github/actions/panta-cache-restore
 
       - name: Check workspace and all aggregated targets
+        if: needs.changes.outputs.full_tests == 'true'
         run: cargo check --locked --workspace --all-targets
 
       - name: Build workspace and native targets
+        if: needs.changes.outputs.full_tests == 'true'
         run: cargo build --locked --workspace
 
+      - name: Check affected Rust packages and targets
+        if: needs.changes.outputs.rust == 'true' && needs.changes.outputs.full_tests != 'true'
+        shell: bash
+        env:
+          TEST_PACKAGES: ${{ needs.changes.outputs.test_packages }}
+        run: |
+          selected=()
+          while IFS= read -r -d '' package; do
+            [[ -n "$package" ]] || continue
+            selected+=(--package "$package")
+          done < <(jq -j '.[] | ., "\u0000"' <<< "$TEST_PACKAGES")
+          if (( ${#selected[@]} == 0 )); then
+            echo "Rust changes did not select any Cargo packages" >&2
+            exit 1
+          fi
+          cargo check --locked --all-targets "${selected[@]}"
+
+      - name: Build affected Rust packages and native dependencies
+        if: needs.changes.outputs.rust == 'true' && needs.changes.outputs.full_tests != 'true'
+        shell: bash
+        env:
+          TEST_PACKAGES: ${{ needs.changes.outputs.test_packages }}
+        run: |
+          selected=()
+          while IFS= read -r -d '' package; do
+            [[ -n "$package" ]] || continue
+            selected+=(--package "$package")
+          done < <(jq -j '.[] | ., "\u0000"' <<< "$TEST_PACKAGES")
+          if (( ${#selected[@]} == 0 )); then
+            echo "Rust changes did not select any Cargo packages" >&2
+            exit 1
+          fi
+          cargo build --locked "${selected[@]}"
+
       - name: Verify Cargo-provisioned toolchain
+        if: needs.changes.outputs.native_labels != '[]'
         shell: bash
         run: cargo run --locked --package panta-tests -- toolchain
 
       - name: Test L1 Rust packages
+        if: needs.changes.outputs.rust == 'true'
         shell: bash
         env:
           TEST_PACKAGES: ${{ needs.changes.outputs.test_packages_l1 }}
@@ -333,6 +396,7 @@ jobs:
           fi
 
       - name: Test L2 Rust consumers
+        if: needs.changes.outputs.rust == 'true'
         shell: bash
         env:
           TEST_PACKAGES: ${{ needs.changes.outputs.test_packages_l2 }}

@@ -113,6 +113,7 @@
 | 126 | [OCCT Shape 仓库与 Netgen 复用](task/126-native-shape-repository-and-netgen-reuse.md) | CAE 领域模块迁移 | 009, 010, 066, 067, 119 | done |
 | 127 | [Rust 与 Qt 职责边界收尾](task/127-rust-qt-boundary-followup.md) | Rust 架构整理 | 057, 080, 088, 092, 107, 117, 124 | done |
 | 128 | [冗余代码与状态收敛](task/128-dead-code-and-redundancy-cleanup.md) | Rust 架构整理 | 008, 029, 056, 109, 117, 127 | done |
+| 131 | [影响范围选择器的质量域路由](task/131-test-scope-domain-routing.md) | 验证基础 | 119, 120 | in-progress |
 
 ## 验证与质量扩展队列
 

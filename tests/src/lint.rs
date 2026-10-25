@@ -100,8 +100,11 @@ fn lint_changed(check: bool) -> Result<(), Box<dyn Error>> {
         return lint(None, check, false, &[]);
     }
     let paths = crate::test_scope::changed_paths()?;
-    if paths.is_empty() {
-        println!("变更 lint：没有变更路径");
+    if crate::test_scope::is_empty_local_change_set(
+        &paths,
+        std::env::var_os("PANTA_CHANGED_PATHS_JSON").is_some(),
+    ) {
+        println!("变更 lint：没有变更文件");
         return Ok(());
     }
     let rust_packages = crate::test_scope::changed_lint_packages()?;
@@ -110,21 +113,25 @@ fn lint_changed(check: bool) -> Result<(), Box<dyn Error>> {
         lint(Some("machete"), check, false, &[])?;
     }
 
-    if paths.iter().any(|path| is_layering_path(path)) {
-        run_changed_cmake_lint()?;
+    if crate::test_scope::layering_needed()? {
+        if paths.iter().any(|path| is_cmake_path(path))
+            || crate::test_scope::cmake_lint_all()?
+            || paths.is_empty()
+        {
+            run_changed_cmake_lint()?;
+        }
         crate::layering::check()?;
     }
 
     let native_scope = active_native_scope(crate::test_scope::native_lint_scope()?, false);
-    let qml_changed = paths.iter().any(|path| {
-        path.starts_with("qml/") || path.starts_with("tests/qml/") || path.starts_with("native/")
-    }) || matches!(native_scope, NativeLintScope::All);
+    let qml_changed = crate::test_scope::qml_lint_needed()?;
+    let cpp_lint = crate::test_scope::cpp_lint_needed()?;
 
-    if !native_scope.is_empty() || qml_changed {
+    if (cpp_lint && !native_scope.is_empty()) || qml_changed {
         // 当前平台共用一次构建；没有静态分析输入时不准备 LLVM/编译数据库。
         build_launcher()?;
     }
-    if !native_scope.is_empty() {
+    if cpp_lint && !native_scope.is_empty() {
         build_benchmark_moc()?;
         scan_clang_tidy(false, check, &native_scope, false)?;
         scan_clang_tidy(true, check, &native_scope, false)?;
@@ -136,13 +143,6 @@ fn lint_changed(check: bool) -> Result<(), Box<dyn Error>> {
         run_qmllint()?;
     }
     Ok(())
-}
-
-fn is_layering_path(path: &str) -> bool {
-    is_cmake_path(path)
-        || path == "Cargo.toml"
-        || path.ends_with("/Cargo.toml")
-        || path == "Cargo.lock"
 }
 
 fn run_changed_clippy(check: bool) -> Result<(), Box<dyn Error>> {
@@ -177,7 +177,7 @@ fn run_cmake_lint() -> Result<(), Box<dyn Error>> {
 }
 
 fn run_changed_cmake_lint() -> Result<(), Box<dyn Error>> {
-    if crate::test_scope::force_full_scope() {
+    if crate::test_scope::force_full_scope() || crate::test_scope::cmake_lint_all()? {
         return run_cmake_lint();
     }
     let root = repository_root()?;
