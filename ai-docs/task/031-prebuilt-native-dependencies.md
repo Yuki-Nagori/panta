@@ -85,7 +85,7 @@
 - 2026-09-24：run 360018 提供三平台 SDK 消费和 native CTest 证据。应用运行时分发、真实窗口验收及 SBOM/provenance 仍未完成；009/010 的 adapter 冒烟已通过，不列为当前待办。
 - 2026-10-14：VTK/Dawn、OCCT/Netgen 与 GoogleTest 发布资产按 macOS 13.0 最低部署目标重产并替换；三组共 12 个归档的本地 SHA256 与 sidecar、manifest 一致，归档目录表检查通过。新摘要的消费端 CI 待复验；任务维持 deferred，安装分发与真实引擎集成范围仍未完成。
 - 2026-10-25：SDK producer 唯一维护位置迁至 [sdk-packaging](https://github.com/Jack-Lab-at-EIT/sdk-packaging)。VTK run [40123093281](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40123093281) 三平台生产、自检、打包和 Release 发布成功；OCCT/Netgen、GoogleTest 资产同样发布。下载 sidecar 与 Release API digest 对照通过，Panta manifest 已切换并完成本机消费验证。
-- 2026-10-25：为扩大 Linux 兼容范围，维护者决定用 Ubuntu 24.04 / GCC 13 重产，而非要求用户使用 glibc 2.43。sdk-packaging PR #1 已合并，三个 SDK 的三平台构建、自检和 Release 发布成功；新 sidecar 与 Release API digest 核对通过，Panta manifest 改为新资产摘要，CI 待验。
+- 2026-10-25：为扩大 Linux 兼容范围，维护者决定用 Ubuntu 24.04 / GCC 13 重产，而非要求用户使用 glibc 2.43。sdk-packaging PR #1 已合并，三个 SDK 的三平台构建、自检和 Release 发布成功；新 sidecar 与 Release API digest 核对通过，Panta manifest 改为新资产摘要。为避免 `ubuntu-latest` 漂移至 Ubuntu 26.04，Panta PR、nightly 与 package 的 Linux runner 固定到 Ubuntu 24.04；cargo 工具成品缓存 key 也加入 Linux 发行版与版本，避免 ABI 不兼容的缓存复用，CI 待验。
 - 2026-09-25：Windows 本地供给两处修复：LLVM NSIS 安装器经 `__COMPAT_LAYER=RunAsInvoker` 免提权运行（登记于 042）；Qt 供给（`qt-provision.cmake`）官方源失败时自动回退清华 TUNA 镜像，`PANTA_QT_MIRROR` 可置其他同构镜像根优先，来源切换不改 SHA256 强校验。按 IP/地域自动选镜像被否决：`download.qt.io` 自身已按 IP 做 geo-CDN（本机被解析到 JAIST 仍中断），IP 猜测不可靠且掩盖实际失败信号；回退触发在真实下载失败上，行为可在 configure 输出观察。TUNA 路径同构性已 HEAD 实测（qtdeclarative 字节数与官方一致）。
 
 ## 完成摘要

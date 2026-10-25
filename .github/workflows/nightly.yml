@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-2022]
+        os: [macos-latest, ubuntu-24.04, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     env:
@@ -47,7 +47,7 @@ jobs:
 
   full-lint:
     name: full quality checks (ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
       CMAKE_GENERATOR: Ninja
@@ -116,7 +116,7 @@ jobs:
 
   rust-coverage:
     name: full Rust coverage gate (ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -152,7 +152,7 @@ jobs:
 
   native-coverage:
     name: full native coverage report (ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       CMAKE_GENERATOR: Ninja
@@ -185,7 +185,7 @@ jobs:
 
   miri:
     name: rust miri UB checks (ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -201,7 +201,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-2022]
+        os: [macos-latest, ubuntu-24.04, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -222,7 +222,7 @@ jobs:
 
   cpu-performance:
     name: CPU performance sample (ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       CMAKE_GENERATOR: Ninja
