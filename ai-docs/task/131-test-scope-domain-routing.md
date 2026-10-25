@@ -1,6 +1,6 @@
 # 131 — 影响范围选择器的质量域路由
 
-- 状态：in-progress
+- 状态：done
 - 阶段：验证基础
 - 依赖：[119 Rust 与 CMake 分层依赖 lint](119-rust-cmake-layering-lint.md)、[120 PR 按影响范围选择测试](120-pr-affected-test-selection.md)
 - 优先级：P1
@@ -56,17 +56,17 @@
 
 ## 验收标准
 
-- [ ] Rust 测试、Clippy、格式、native lint、CMake lint、QML lint、分层检查和 runner 自测分别由同一规划结果选择。
-- [ ] 各工具配置只扩大对应工具的扫描范围；未知路径、空 CI diff 和公共构建输入不会静默漏检。
-- [ ] runner、workflow 与路径分类器变更运行 selector 自身回归，不因此触发无关的全量应用测试。
-- [ ] 本地 `cargo verify-changed` 与 PR CI 对相同变更路径得出一致检查范围。
-- [ ] 选择器行为测试、适用格式/lint/测试、CI workflow 校验及独立只读评审通过。
+- [x] Rust 测试、Clippy、格式、native lint、CMake lint、QML lint、分层检查和 runner 自测分别由同一规划结果选择。
+- [x] 各工具配置只扩大对应工具的扫描范围；未知路径、空 CI diff 和公共构建输入不会静默漏检。
+- [x] runner、workflow 与路径分类器变更运行 selector 自身回归，不因此触发无关的全量应用测试。
+- [x] 本地 `cargo verify-changed` 与 PR CI 对相同变更路径得出一致检查范围。
+- [x] 选择器行为测试、适用格式/lint/测试、CI workflow 校验及独立只读评审通过。
 
 ## 验证计划与结果
 
 | 日期 | 环境 / 命令或场景 | 预期 | 实际结果 / 证据 |
 |---|---|---|---|
-| 2026-10-25 | `cargo test --locked --package panta-tests --bin panta-tests`、`cargo verify-changed`、`actionlint .github/workflows/ci.yml`、`git diff --check` | selector/runner 单测、L1/L2 受影响验证、CI workflow 语法及 diff 检查通过；改动范围不误升全套测试 | runner 42 项中 39 项通过、3 项既有性能专属入口忽略；`cargo verify-changed` 按当前 7 个变更文件选择 `panta-tests` L1、无 L2/native/full fallback，格式、Clippy 与 runner 测试通过；actionlint 与 diff 检查通过。selector 自身测试覆盖空 CI 输入全量回退、本地空改动 no-op、各工具配置域、CMake 全量 native lint、当前 8 个 QML 注册头文件映射；本地与 `test-plan --ci` 对同一变更列表输出相同范围。PR CI 尚未运行。 |
+| 2026-10-25 | `cargo test --locked --package panta-tests --bin panta-tests`、`cargo verify-changed`、`actionlint .github/workflows/ci.yml`、[PR #93 CI](https://github.com/Yuki-Nagori/panta/actions/runs/40198513307)、独立只读 review | selector/runner 单测、L1/L2 受影响验证、CI workflow 语法及 diff 检查通过；本地与 PR CI 范围一致 | runner 42 项中 39 项通过、3 项既有性能专属入口忽略；`cargo verify-changed` 按当前 7 个变更文件选择 `panta-tests` L1、无 L2/native/full fallback，格式、Clippy 与 runner 测试通过；actionlint 与 diff 检查通过。selector 自身测试覆盖空 CI 输入全量回退、本地空改动 no-op、各工具配置域、CMake 全量 native lint、当前 8 个 QML 注册头文件映射；本地与 `test-plan --ci` 对同一变更列表输出相同范围。PR CI 全部适用 job 通过（路径检测、format、check/build、Clippy、machete）；依赖审计及 native/QML/CMake/layering job 按选择器跳过，runner 测试包含在 `panta-tests` L1 中；nightly coverage 不属于本次 PR CI。`gpt-6.1-sol` medium 独立评审及修复后复核无未解决问题。 |
 
 ## 风险与回退
 
@@ -75,8 +75,8 @@
 ## 决策与工作记录
 
 - 2026-10-25：根据 caret commit `e41f400` 新增本地跟进任务；确认需要按 Panta 当前 package、CTest label 和工具入口迁移，不能直接复制整文件。
-- 2026-10-25：移植分域选择输出，接入本地 format/lint、CI action 与 job；独立评审发现 QML 注册头映射、CMake 全量 clang-tidy 与本地空变更处理的边界缺口，已修复并补回归；`gpt-6.1-sol` medium 复核更新 diff 未发现剩余问题。PR CI 尚待验证。
+- 2026-10-25：移植分域选择输出，接入本地 format/lint、CI action 与 job；独立评审发现 QML 注册头映射、CMake 全量 clang-tidy 与本地空变更处理的边界缺口，已修复并补回归；`gpt-6.1-sol` medium 复核更新 diff 未发现剩余问题。PR #93 全部适用 CI 通过。
 
 ## 完成摘要
 
-尚未完成。
+完成共享影响范围规划的质量域路由迁移。Panta 本地和 PR CI 复用同一选择器，按受影响范围运行 Rust 测试、格式与 lint、native/CMake/QML 检查及 runner 自测；未知输入和空 CI diff 保持 fail-closed。PR #93 的全部适用 CI 与独立 review 通过。
