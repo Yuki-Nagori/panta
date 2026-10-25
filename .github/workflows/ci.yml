@@ -48,7 +48,7 @@ concurrency:
 jobs:
   changes:
     name: detect changed paths (ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       code: ${{ steps.filter.outputs.code }}
@@ -83,7 +83,7 @@ jobs:
     name: cargo audit (ubuntu)
     needs: [changes]
     if: needs.changes.outputs.cargo_deps == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -112,7 +112,7 @@ jobs:
     name: cargo lint (clippy, ubuntu)
     needs: [changes]
     if: needs.changes.outputs.rust == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -141,7 +141,7 @@ jobs:
       fail-fast: false
       matrix:
         tool: [clang-tidy, includes, cppcheck]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 冷启动需供给 LLVM/Qt 并构建 native 树；上限防传输停滞拖满平台上限。
     timeout-minutes: 60
     steps:
@@ -171,7 +171,7 @@ jobs:
     name: cargo lint (machete, ubuntu)
     needs: [changes]
     if: needs.changes.outputs.rust == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -201,7 +201,7 @@ jobs:
     name: cargo lint (cmake, ubuntu)
     needs: [changes]
     if: needs.changes.outputs.native == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -221,7 +221,7 @@ jobs:
     name: cargo lint (layering, ubuntu)
     needs: [changes]
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.cargo_deps == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -241,7 +241,7 @@ jobs:
     name: cargo lint (qmllint, ubuntu)
     needs: [changes]
     if: needs.changes.outputs.qml == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.native_labels != '[]' || needs.changes.outputs.full_tests == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -261,7 +261,7 @@ jobs:
     name: cargo format (ubuntu)
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -283,7 +283,7 @@ jobs:
     name: cargo check and build (ubuntu)
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       CMAKE_GENERATOR: Ninja

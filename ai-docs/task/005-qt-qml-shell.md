@@ -5,7 +5,7 @@
 - 依赖：[004](004-cargo-native-orchestration.md)（已完成）
 - 优先级：P0
 - 负责人：Yuki
-- 创建 / 更新：2026-09-16 / 2026-09-16
+- 创建 / 更新：2026-09-16 / 2026-10-25
 
 ## 目标与背景
 
@@ -77,7 +77,7 @@ native/app 的非 Qt 骨架实现（打印版本退出）被 Qt 实现替换；`
 | 2026-09-16 | 增量重建：修改 qml/App.qml（加窗口背景色）后 `cargo build` | build.rs 重跑 → qmlcachegen 重跑 → 重链，1.6s 完成；QML/资源重建追踪实测生效 |
 | 2026-09-16 | `cargo fmt --all -- --check`、`cargo clippy --locked --all-targets` | 均通过 |
 
-未覆盖：Linux/Windows 运行时（预编译资产与供给逻辑三端就绪，运行验证待 012 runner；Linux 需 glibc ≥2.34，Windows 需 MSVC2022）；窗口 resize 拖拽未自动化实测。
+未覆盖：Linux/Windows 运行时（预编译资产与供给逻辑三端就绪，运行验证待 012 runner；Qt 需 glibc ≥2.34，当前 native SDK 以 Ubuntu 24.04 / glibc 2.39 为构建基线，Windows 需 MSVC2022）；窗口 resize 拖拽未自动化实测。
 
 ## 风险与回退
 

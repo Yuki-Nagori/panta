@@ -35,7 +35,13 @@ runs:
         directory=".toolchain/tools/$TOOL/$version"
         executable="$directory/bin/$TOOL"
         if [[ "$RUNNER_OS" == Windows ]]; then executable+=.exe; fi
-        printf 'version=%s\npath=%s\n' "$version" "$directory" >> "$GITHUB_OUTPUT"
+        cache_platform="$RUNNER_OS-$RUNNER_ARCH"
+        if [[ "$RUNNER_OS" == Linux ]]; then
+          source /etc/os-release
+          cache_platform+="-$ID-$VERSION_ID"
+        fi
+        printf 'version=%s\npath=%s\ncache_platform=%s\n' \
+          "$version" "$directory" "$cache_platform" >> "$GITHUB_OUTPUT"
         if [[ -f "$executable" && -f "$directory/.complete" && "$(cat "$directory/.complete")" == "$version" ]]; then
           printf 'complete=true\n' >> "$GITHUB_OUTPUT"
         fi
@@ -44,11 +50,11 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ steps.identity.outputs.path }}
-        key: cargo-quality-tool-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.tool }}-${{ steps.identity.outputs.version }}-${{ hashFiles('rust-toolchain.toml') }}
+        key: cargo-quality-tool-v2-${{ steps.identity.outputs.cache_platform }}-${{ inputs.tool }}-${{ steps.identity.outputs.version }}-${{ hashFiles('rust-toolchain.toml') }}
 
     - if: inputs.mode == 'save' && steps.identity.outputs.complete == 'true' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
       continue-on-error: true
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.identity.outputs.path }}
-        key: cargo-quality-tool-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.tool }}-${{ steps.identity.outputs.version }}-${{ hashFiles('rust-toolchain.toml') }}
+        key: cargo-quality-tool-v2-${{ steps.identity.outputs.cache_platform }}-${{ inputs.tool }}-${{ steps.identity.outputs.version }}-${{ hashFiles('rust-toolchain.toml') }}
