@@ -190,6 +190,29 @@ jobs:
               ;;
           esac
 
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            resource_dir="$PACKAGE_DIR/panta.app/Contents/Resources"
+          else
+            resource_dir="$PACKAGE_DIR/share/panta"
+          fi
+
+          for license in \
+            VTK/Copyright.txt \
+            Dawn/LICENSE \
+            OCCT/LICENSE_LGPL_21.txt \
+            OCCT/OCCT_LGPL_EXCEPTION.txt \
+            Netgen/LICENSE; do
+            test -s "$resource_dir/licenses/$license"
+          done
+
+          for sdk in vtk occt netgen; do
+            metadata="$resource_dir/sdk/$sdk/panta-sdk.json"
+            test -s "$metadata"
+          done
+
+          find "$resource_dir/sbom" -type f \
+            \( -name '*.spdx.json' -o -name '*.cdx.json' \) -print -quit | grep -q .
+
       - name: Prepare archive directory
         shell: bash
         run: mkdir -p "$ARCHIVE_DIR"

@@ -1,6 +1,6 @@
 # 038 — Native SDK 制品生产与发布
 
-- 状态：in-progress
+- 状态：done
 - 阶段：交付基础
 - 依赖：[031](031-prebuilt-native-dependencies.md)、[020](020-toolchain-provisioning.md)
 - 优先级：P0
@@ -25,11 +25,15 @@ SDK 的生产、打包、自检和 Release 发布由独立仓库 [sdk-packaging]
 | 日期 | 环境 / 场景 | 结果 |
 |---|---|---|
 | 2026-10-25 | `sdk-packaging` Releases | VTK run [40123093281](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40123093281) 三平台生产、自检、打包和发布成功；OCCT/Netgen 与 GoogleTest Releases 也已发布。12 个归档 SHA256 均与下载 sidecar 及 Release API digest 一致。 |
-| 2026-10-25 | Panta 分支迁移与本地验证 | 已移除三条 SDK producer workflow 与 `tools/sdk/`，并把 12 个消费资产的 URL/SHA256 切换到外部 Releases。删除空 `tools/` 后同步修复格式/lint CMake 扫描根。`cargo test-scope l1` 通过（Rust tests 与 CTest 91/91）；`cargo format --check`、`cargo lint cmake --check`、`cargo lint --changed clippy` 均通过。PR/CI 待完成。 |
+| 2026-10-25 | Panta 分支迁移与本地验证 | 已移除三条 SDK producer workflow 与 `tools/sdk/`，并把 12 个消费资产的 URL/SHA256 切换到外部 Releases。删除空 `tools/` 后同步修复格式/lint CMake 扫描根。`cargo test-scope l1` 通过（Rust tests 与 CTest 91/91）；`cargo format --check`、`cargo lint cmake --check`、`cargo lint --changed clippy` 均通过。 |
 | 2026-10-25 | Panta 旧 SDK Releases 清理 | 三个外部资产切换后的旧 Panta Releases 与同名 Git tags 已删除；远端 tag 查询确认均不存在。当前 manifest 只引用 `Jack-Lab-at-EIT/sdk-packaging`。 |
-| 2026-10-25 | Ubuntu 24.04 基线兼容性重产 | sdk-packaging PR [#1](https://github.com/Jack-Lab-at-EIT/sdk-packaging/pull/1) 合并后，VTK run [40164985126](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40164985126)、OCCT/Netgen run [40164987110](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40164987110)、GoogleTest run [40164986409](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40164986409) 全部通过三平台构建、自检与 Release 发布。新归档 `.sha256` sidecar 的内容与 Release API archive digest 一致；Panta 12 项 SHA 已同步，消费端验证待 CI。 |
-| 2026-10-25 | Panta consumer smoke | macOS arm64 `cargo verify-changed` 下载新 Release 资产并通过 SHA、Rust workspace 测试、native/QML CTest（91/91）、格式及适用 lint。Panta PR/nightly/package 的 Linux runner 已固定 Ubuntu 24.04；cargo 工具成品缓存 key 隔离 Linux 发行版版本。consumer CI 正在验证该最低基线。 |
+| 2026-10-25 | Ubuntu 24.04 基线兼容性重产 | sdk-packaging PR [#1](https://github.com/Jack-Lab-at-EIT/sdk-packaging/pull/1) 合并后，VTK run [40164985126](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40164985126)、OCCT/Netgen run [40164987110](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40164987110)、GoogleTest run [40164986409](https://github.com/Jack-Lab-at-EIT/sdk-packaging/actions/runs/40164986409) 全部通过三平台构建、自检与 Release 发布。新归档 `.sha256` sidecar 的内容与 Release API archive digest 一致；Panta 12 项 SHA 已同步。 |
+| 2026-10-25 | Panta consumer smoke 与 PR CI | macOS arm64 `cargo verify-changed` 下载新 Release 资产并通过 SHA、Rust workspace 测试、native/QML CTest（91/91）、格式及适用 lint。Panta PR/nightly/package 的 Linux runner 已固定 Ubuntu 24.04；cargo 工具成品缓存 key 隔离 Linux 发行版版本。Panta PR [#91](https://github.com/Yuki-Nagori/panta/pull/91) 的 CI run [40169893498](https://github.com/Yuki-Nagori/panta/actions/runs/40169893498) 在 Ubuntu 24.04 上全部通过，PR 已合并（合并提交 `557deec`）。 |
 
 ## 决策记录
 
-- 2026-10-25：SDK producer 的唯一维护位置改为 `Jack-Lab-at-EIT/sdk-packaging`；Panta 不再复制生产脚本或 Release 说明。VTK Windows 资产发布并核验完成后，再完成消费端切换及 PR。
+- 2026-10-25：SDK producer 的唯一维护位置改为 `Jack-Lab-at-EIT/sdk-packaging`；Panta 不再复制生产脚本或 Release 说明。三个 SDK 的 Ubuntu 24.04 重产、全部 12 个资产校验、消费 manifest 更新和 Panta PR #91 的 Ubuntu 24.04 CI 均已通过并合并。
+
+## 完成摘要
+
+三平台 SDK 生产与发布由外部 `sdk-packaging` 维护；Panta 消费 manifest 已切换到最新 Release，SHA 校验、本地消费验证和 Ubuntu 24.04 PR CI 均通过。任务验收完成。

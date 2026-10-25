@@ -5,7 +5,7 @@
 - 依赖：[011](011-test-quality-entrypoints.md)（已完成）
 - 优先级：P1
 - 负责人：待分配
-- 创建 / 更新：2026-09-16 / 2026-10-17
+- 创建 / 更新：2026-09-16 / 2026-10-25
 
 ## 目标与背景
 
@@ -55,7 +55,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - [x] macOS arm64 清理开发环境变量后仍可定位资源与依赖；记录平台和验证范围。
 - [x] 安装树含 SDK 许可、版本 provenance 与 Qt SBOM 清单；未验证的平台没有标记为支持。
 - [ ] macOS 归档中的 app 在全部资源安装完成后签名完整，`codesign --verify --deep --strict` 通过。
-- [x] 已同步 Cargo 安装命令、README、构建说明和当前架构事实，task-index 保持 in-progress。
+- [x] 已同步 Cargo 安装命令、README、构建说明和当前架构事实，task-index 与本任务状态同步。
 - [ ] Windows `cargo run` 的启动诊断在控制台正确显示中文；WebGPU adapter 预检和 VTK 实际初始化均固定使用 D3D12，不尝试加载未选用的 Vulkan backend。
 - [ ] Windows CI 通过 C++/Rust 工程服务的 Unicode 路径创建与打开回归；该测试验证程序文件操作链，不替代用户机器上的 ACL / 杀毒软件验收。
 
@@ -88,7 +88,7 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 | 2026-10-14 | Windows 11 x64（Windows 11 Pro 26300，x86_64；clang-cl/lld-link 22.1.7，Windows Kits mt.exe 10.0.26100）；本地复现 CI 归档的启动失败链 | 事件查看器 SideBySide 33：`requestedExecutionLevel` 缺 `level`（用户桌面包与本机复现一致）。逐层修复后，`panta-windows-x86_64.zip`（SHA256 `F8AF8CD0…9BD6`）解压一次后 `bin\panta.exe` 正常启动出现 "panta" 真实窗口。 |
 | 2026-10-14 | 用户实机验收 PR #31 最新 Windows package 产物 | 用户确认本次下载包可以正常使用；该结果与 run 38562885901 的三平台 package CI 通过记录相互补充。 |
 | 2026-10-14 | Windows 11 x64；`cargo test --locked --workspace` | 部分通过：71/73 CTest 与全部 Rust 测试通过；`Build.SdkProvision`（子 CMake 找不到 CXX 编译器）与 `Qml.FormatCheck`（qmlformat 格式基线）失败。stash 本轮改动后的基线运行同样失败这两项，确认与本轮 diff 无关，属本机环境限制（CI 门禁有完整工具链环境）。 |
-| 待平台验收 | Linux x86_64 | 尚未安装树与真实窗口验收，不宣称受支持。 |
+| 2026-10-25 | Linux x86_64 用户打包产物启动 | 维护者确认 Linux 打包产物已实际启动；本次对话未提供发行版、设备或启动命令细节，不据此扩展到 Wayland/DPR 等未测试场景。 |
 
 ## 风险与回退
 
@@ -125,8 +125,8 @@ native install/deploy 规则、包资源、依赖清单与部署说明。执行�
 - 2026-10-14：PR #31 package run 38564810367 验证 manifest 链路精简后的三平台构建全部成功。CMake 改用项目专用 `PANTA_WINDOWS_MANIFEST_TOOL`，不再覆盖全局 `CMAKE_MT`；workflow 从构建目录固定位置读取 Qt manifest，并复用 RC 同一 SDK 的 `mt.exe` 做 PE 提取。移除未命中的源码清单清理分支及对 build-script 日志文案的依赖。用户确认下载的 Windows package 可正常使用。
 - 2026-10-16：Windows 开发启动输出出现中文乱码与 Dawn Vulkan 动态加载警告；将 stderr 诊断改为控制台 Unicode 写入、Windows Dawn 预检与 VTK 初始化固定使用 D3D12，并补工程 Unicode 路径创建/打开的跨语言回归。PR #45 的首轮 Windows 构建成功，测试发现 Windows 路径字符串分隔符表示不同导致断言失败；现改为比较 canonical path，等待 Windows CI 重跑。本机文件夹权限差异仍需 Windows 实机证据。
 - 2026-10-16：首轮 CI 断言修正经 `gpt-6.1-sol medium` 独立只读复审通过；修正后 macOS `cargo test-scope all` 77/77，Windows CI 复验待完成。
-- 当前范围限制：桌面 app 实际链接 VTK；OCCT/Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包。Windows 11 x64 单机安装包已启动并显示真实窗口；PR #31 当前 Windows manifest 修复已通过 GitHub Actions package 验证。Linux 安装与实机验收仍待验证；桌面 app 的 OCCT/Netgen 加载验收需待对应 consumer 接入后完成。
+- 当前范围限制：桌面 app 实际链接 VTK；OCCT/Netgen 仍由独立 smoke test 消费，未进入 app 的链接闭包。Windows 11 x64 单机安装包已启动并显示真实窗口；PR #31 当前 Windows manifest 修复已通过 GitHub Actions package 验证。维护者确认 Linux 打包产物已启动，尚未记录具体发行版和命令；桌面 app 的 OCCT/Netgen 加载验收需待对应 consumer 接入后完成。
 
 ## 完成摘要
 
-部分完成并暂缓：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收；Windows 11 x64 的单机包启动和 manifest 修复后的 package 产物已通过用户验收，package CI 通过。OCCT/Netgen 尚无桌面 app consumer，Linux 尚未实机验收；维护者于 2026-10-17 决定暂不推进，恢复时从未完成的验收项继续。
+部分完成并暂缓：macOS arm64 安装布局、Qt/QML 与 app 当前链接依赖部署已实现并验收；Windows 11 x64 单机包启动和 manifest 修复后的 package 产物已通过用户验收；维护者确认 Linux 打包产物已启动。OCCT/Netgen 尚无桌面 app consumer，Windows 启动诊断和 D3D12 实机确认仍有遗留；任务于 2026-10-17 暂缓，之后的人工验收证据见验证表。
