@@ -1,6 +1,6 @@
 # Rust 编码与工具链
 
-更新日期：2026-10-20。状态：workspace Clippy 已启用 warning-as-error；FFI、native 依赖接入仍按对应 task 验证。
+更新日期：2026-10-28。状态：workspace Clippy 已启用 warning-as-error；FFI、native 依赖接入仍按对应 task 验证。
 
 适用于 `crates/`、launcher 和 Rust 构建辅助代码。stable 表示工具链渠道；可复现构建仍需固定实际版本。
 
@@ -19,7 +19,9 @@ Rust 2024 edition 随 Rust 1.85.0 发布；这只是 edition 的起点，不代�
 - `unsafe` 集中在边界模块，每处注明安全前提、所有者和线程条件。workspace 默认 `unsafe_code = "deny"`；当前登记的 allow 仅包括 CXX 桥接生成胶水和 `panta-foundation::crash` 专用模块，均不得向业务代码外扩。新增手写 unsafe 需专用模块并逐块写 `// SAFETY:`。不得为了通过类型检查无依据实现 `Send`/`Sync`。
 - 大型数据使用明确所有者和借用/共享策略；`Arc` 解决共享所有权，不自动保证内部修改安全。异步运行时是否引入由具体任务决定，不先堆叠多套 runtime。
 - panic 不作为业务错误；FFI 捕获策略依赖 panic 配置，`panic=abort` 不可由 `catch_unwind` 恢复。引擎隔离依靠外部进程，不能靠捕获 panic 承诺所有故障可恢复。
-- 单元测试留在被测 `.rs` 的 `#[cfg(test)]` 模块中以访问私有项；公共 API 的黑盒/跨模块测试放根 `tests/rust/` 并由所属 crate 的 `[[test]]` 注册。根跨语言聚合测试放 `tests/integration/`，具体见[测试规范](testing.md)。
+- 新建或重构多文件模块时，以 `module.rs` 作为模块入口，在同级 `module/` 放子模块与 `tests.rs`；不采用新的 `module/mod.rs` 布局。Rust 仍支持 `mod.rs`，但 `module.rs` 风格更一致，也避免编辑器中出现多个同名入口文件。[Rust Reference：模块源文件名](https://doc.rust-lang.org/reference/items/modules.html#module-source-filenames)；[Rust Book：拆分模块](https://doc.rust-lang.org/book/ch07-05-separating-modules-into-different-files.html)
+- 私有单元测试注册为父模块的 `#[cfg(test)] mod tests;`，实现放在同级 `module/tests.rs`，通过子模块关系保留对父模块私有项的访问。crate 根 `lib.rs` / `main.rs` 的较大测试放 `src/tests.rs`；小型且紧贴实现的测试可保留内联。不要用 `module_tests.rs` 平铺测试文件，也不按行数阈值机械拆分；先检查测试是否形成独立职责和清晰维护边界。
+- 既有 `mod.rs` 在其模块未参与职责重构时无需仅为统一风格迁移。公共 API 黑盒测试放根 `tests/rust/` 并由所属 crate 的 `[[test]]` 注册；根跨语言聚合测试放 `tests/integration/`，具体见[测试规范](testing.md)。
 
 ## 导入与领域 crate（067）
 

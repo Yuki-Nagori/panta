@@ -1,6 +1,6 @@
 # 测试目录与入口规范
 
-更新日期：2026-10-20。本文定义测试代码归属、发现方式和当前入口；具体领域断言由[验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
+更新日期：2026-10-28。本文定义测试代码归属、发现方式和当前入口；具体领域断言由[验证与评审](validation-and-review.md)、[GTest](gtest.md)、[Rust](rust.md) 和 [QML](qml.md) 约束。
 
 ## 目录职责
 
@@ -31,7 +31,7 @@ tests/
 
 ## Rust 测试边界
 
-- 单元测试使用同一 `.rs` 文件中的 `#[cfg(test)] mod tests`，因为它们需要访问模块私有项；不要为了目录整齐把私有实现测试搬到根 `tests/`。
+- Rust 私有单元测试布局遵循 [Rust 编码与工具链](rust.md)：职责明确或规模较大的测试可放到父模块注册的同级 `tests.rs`，保持对子模块私有项的访问；crate 根较大测试放 `src/tests.rs`。小型测试可内联，公共 API 黑盒测试则放根 `tests/rust/`。新建或重构模块采用 `module.rs` 入口；既有 `mod.rs` 不要求无关迁移。
 - crate 级公共行为、跨模块和黑盒测试优先放根 `tests/rust/`，按领域命名并由所属 crate 注册；只能使用公开 API。已有的 crate 内 `tests/` 可随相关任务逐步迁移，不能保留同一用例的双份实现。
 - 根 `tests/integration/native.rs` 是跨语言聚合测试，不承载 Rust 领域断言；它只验证构建树、qmllint、CTest 的退出码和失败传播。
 - 测试应断言行为、不变量和错误上下文；不要复制实现、依赖测试顺序或通过重复调用提升覆盖率。

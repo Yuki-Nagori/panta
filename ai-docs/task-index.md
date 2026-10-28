@@ -168,3 +168,4 @@
 | 111 | [构建供给与质量命令模块整理](task/111-build-and-quality-module-boundaries.md) | Rust 架构整理 | 107 | done |
 | 112 | [FFI 私有单元测试归属修正](task/112-ffi-unit-test-placement.md) | Rust 架构整理 | 107 | done |
 | 129 | [仓库文档去重与实现对齐](task/129-repository-docs-alignment.md) | 仓库与文档维护 | 128 | done |
+| 132 | [Rust 模块与私有测试文件布局](task/132-rust-module-test-layout.md) | Rust 架构整理 | 107, 112 | in-progress |
